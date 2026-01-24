@@ -1,10 +1,32 @@
+import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 export default async function PortalPage() {
-  // In production, get user from session/auth
-  // For now, this is a basic implementation
-  // TODO: Add authentication and fetch actual user data
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect('/api/auth/signin');
+  }
+
+  const user = session.user;
+  const userEmail = user.email || 'No email';
+  const userName = user.name || 'User';
+  const userImage = user.image;
+
+  // Get user from database to fetch additional info like createdAt
+  const dbUser = await prisma.user.findUnique({
+    where: { email: userEmail },
+    select: { createdAt: true },
+  });
+
+  const memberSince = dbUser?.createdAt
+    ? new Date(dbUser.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+      })
+    : 'Recently';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -42,16 +64,25 @@ export default async function PortalPage() {
 
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Account Information</h2>
-          <div className="space-y-2 text-gray-600">
-            <p>
-              <span className="font-medium">Email:</span> user@example.com
-            </p>
-            <p>
-              <span className="font-medium">GitHub Username:</span> your-username
-            </p>
-            <p>
-              <span className="font-medium">Member Since:</span> January 2025
-            </p>
+          <div className="flex items-start space-x-4 mb-4">
+            {userImage && (
+              <img
+                src={userImage}
+                alt={userName}
+                className="w-16 h-16 rounded-full"
+              />
+            )}
+            <div className="space-y-2 text-gray-600 flex-1">
+              <p>
+                <span className="font-medium">Name:</span> {userName}
+              </p>
+              <p>
+                <span className="font-medium">Email:</span> {userEmail}
+              </p>
+              <p>
+                <span className="font-medium">Member Since:</span> {memberSince}
+              </p>
+            </div>
           </div>
         </div>
 

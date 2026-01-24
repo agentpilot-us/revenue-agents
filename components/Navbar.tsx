@@ -25,8 +25,28 @@ export default function Navbar() {
               FAQ
             </Link>
             <Link
+              href="/api/auth/signin"
+              className="px-4 py-2 text-slate-700 hover:text-slate-900 transition-colors"
+            >
+              Sign In
+            </Link>
+            <Link
               href="/portal"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Portal
+            </Link>
+          </div>
+          <div className="md:hidden flex items-center space-x-4">
+            <Link
+              href="/api/auth/signin"
+              className="px-3 py-2 text-slate-700 hover:text-slate-900 text-sm"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/portal"
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
             >
               Portal
             </Link>

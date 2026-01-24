@@ -1,21 +1,91 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_PRISMA_URL")
-}
+// Prisma Schema - Models Only (Prisma 7)
+// Database configuration is in prisma.config.ts
 
 generator client {
   provider = "prisma-client-js"
 }
 
+datasource db {
+  provider = "postgresql"
+}
+
+// NextAuth.js Required Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
-  id                 String    @id @default(cuid())
-  email              String    @unique
-  name               String?
-  githubUsername     String?
-  stripeCustomerId   String?   @unique
-  subscriptionTier   String    @default("community")
-  subscriptionStatus String    @default("inactive")
-  subscriptionId     String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  emailVerified    DateTime?
+  image            String?
+  githubUsername   String?   @unique
+  stripeCustomerId String?   @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  purchases Purchase[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Revenue Agents Business Models
+model Purchase {
+  id               String   @id @default(cuid())
+  userId           String
+  stripeProductId  String
+  stripePriceId    String
+  stripePurchaseId String   @unique
+  productType      String // "library" | "suite"
+  productCategory  String // "new-logo" | "expansion" | "partner" | "sales-velocity" | "complete"
+  purchaseAmount   Decimal  @db.Decimal(10, 2)
+  purchaseDate     DateTime @default(now())
+  expirationDate   DateTime // 12 months from purchase
+  status           String   @default("active") // active | expired | refunded
+  githubTeamAdded  String? // Which GitHub team they were added to
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  downloads Download[]
+}
+
+model Download {
+  id           String   @id @default(cuid())
+  purchaseId   String
+  version      String // e.g., "v1.0.0"
+  downloadedAt DateTime @default(now())
+  ipAddress    String?
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 }
