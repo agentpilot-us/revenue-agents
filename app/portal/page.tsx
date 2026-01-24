@@ -1,13 +1,13 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 
 export default async function PortalPage() {
   const session = await auth();
 
+  // Layout handles redirect, but keeping this as a safety check
   if (!session?.user) {
-    redirect('/api/auth/signin');
+    return null;
   }
 
   const user = session.user;
