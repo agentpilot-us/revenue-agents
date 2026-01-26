@@ -14,6 +14,5 @@ export default defineConfig({
   },
   datasource: {
     url: process.env.POSTGRES_PRISMA_URL,      // Pooled connection for queries
-    directUrl: process.env.POSTGRES_URL_NON_POOLING  // Direct connection for migrations
   },
 });

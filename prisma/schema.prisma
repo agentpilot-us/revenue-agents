@@ -38,15 +38,18 @@ model Session {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  name             String?
-  email            String    @unique
-  emailVerified    DateTime?
-  image            String?
-  githubUsername   String?   @unique
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  githubUsername    String?   @unique
   stripeCustomerId String?   @unique
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  subscriptionId    String?   @unique
+  subscriptionStatus String?  // 'active' | 'cancelled' | 'past_due' | null
+  subscriptionTier  String?   // 'pro' | 'community' | null
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   accounts  Account[]
   sessions  Session[]
