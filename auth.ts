@@ -3,33 +3,33 @@ import Google from 'next-auth/providers/google';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/db';
 
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-  throw new Error('Missing Google OAuth credentials');
-}
+// Only initialize auth if credentials are available
+// This prevents the app from crashing if env vars are missing
+const hasAuthConfig = 
+  process.env.GOOGLE_CLIENT_ID && 
+  process.env.GOOGLE_CLIENT_SECRET && 
+  (process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET);
 
-if (!process.env.NEXTAUTH_SECRET && !process.env.AUTH_SECRET) {
-  throw new Error('Missing NEXTAUTH_SECRET or AUTH_SECRET');
-}
-
-// Test Prisma connection before creating adapter
 let adapter;
-try {
-  adapter = PrismaAdapter(prisma);
-} catch (error: any) {
-  console.error('Failed to create PrismaAdapter:', error);
-  throw new Error(`PrismaAdapter initialization failed: ${error.message}`);
+if (hasAuthConfig) {
+  try {
+    adapter = PrismaAdapter(prisma);
+  } catch (error: any) {
+    console.error('Failed to create PrismaAdapter:', error);
+    // Don't throw - allow app to run without auth
+  }
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter,
-  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
+  adapter: adapter || undefined,
+  secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'fallback-secret-for-dev',
   trustHost: true,
-  providers: [
+  providers: hasAuthConfig ? [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
-  ],
+  ] : [],
   callbacks: {
     async session({ session, user }) {
       if (session?.user && user) {
