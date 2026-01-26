@@ -23,10 +23,24 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Navigation />
+        <ErrorBoundary>
+          <Navigation />
+        </ErrorBoundary>
         {children}
-        <Footer />
+        <ErrorBoundary>
+          <Footer />
+        </ErrorBoundary>
       </body>
     </html>
   );
+}
+
+// Simple error boundary component
+function ErrorBoundary({ children }: { children: React.ReactNode }) {
+  try {
+    return <>{children}</>;
+  } catch (error) {
+    console.error('Layout error:', error);
+    return null; // Don't render if there's an error
+  }
 }

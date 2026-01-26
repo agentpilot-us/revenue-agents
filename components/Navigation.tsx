@@ -7,15 +7,17 @@ import { NavigationClient } from './NavigationClient';
 export const dynamic = 'force-dynamic';
 
 export default async function Navigation() {
-  let session = null;
+  // Always return navigation, even if auth fails
   let isAuthenticated = false;
   
   try {
-    session = await auth();
+    const session = await auth();
     isAuthenticated = !!session;
   } catch (error: any) {
-    console.error('Auth error in Navigation:', error);
-    // Continue without authentication - don't break the page
+    // Silently fail - don't log in production to avoid noise
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Auth error in Navigation:', error);
+    }
     isAuthenticated = false;
   }
 
