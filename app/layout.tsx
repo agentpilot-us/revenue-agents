@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 // Mark layout as dynamic since Navigation uses auth
 export const dynamic = 'force-dynamic';
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -23,24 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ErrorBoundary>
-          <Navigation />
-        </ErrorBoundary>
+        <Navigation />
         {children}
-        <ErrorBoundary>
-          <Footer />
-        </ErrorBoundary>
+        <Footer />
       </body>
     </html>
   );
-}
-
-// Simple error boundary component
-function ErrorBoundary({ children }: { children: React.ReactNode }) {
-  try {
-    return <>{children}</>;
-  } catch (error) {
-    console.error('Layout error:', error);
-    return null; // Don't render if there's an error
-  }
 }
