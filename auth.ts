@@ -23,6 +23,8 @@ if (hasAuthConfig) {
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: adapter || undefined,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'fallback-secret-for-dev',
+  // trustHost allows NextAuth to work with Vercel's preview URLs
+  // It trusts the x-forwarded-host header from Vercel
   trustHost: true,
   providers: hasAuthConfig ? [
     Google({
