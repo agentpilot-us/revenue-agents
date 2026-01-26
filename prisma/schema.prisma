@@ -1,5 +1,4 @@
-// Prisma Schema - Models Only (Prisma 7)
-// Database configuration is in prisma.config.ts
+// Prisma Schema
 
 generator client {
   provider = "prisma-client-js"
