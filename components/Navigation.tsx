@@ -4,8 +4,17 @@ import { auth } from '@/auth';
 import { NavigationClient } from './NavigationClient';
 
 export default async function Navigation() {
-  const session = await auth();
-  const isAuthenticated = !!session;
+  let session = null;
+  let isAuthenticated = false;
+  
+  try {
+    session = await auth();
+    isAuthenticated = !!session;
+  } catch (error: any) {
+    console.error('Auth error in Navigation:', error);
+    // Continue without authentication - don't break the page
+    isAuthenticated = false;
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">

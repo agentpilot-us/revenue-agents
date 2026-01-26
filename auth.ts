@@ -11,8 +11,17 @@ if (!process.env.NEXTAUTH_SECRET && !process.env.AUTH_SECRET) {
   throw new Error('Missing NEXTAUTH_SECRET or AUTH_SECRET');
 }
 
+// Test Prisma connection before creating adapter
+let adapter;
+try {
+  adapter = PrismaAdapter(prisma);
+} catch (error: any) {
+  console.error('Failed to create PrismaAdapter:', error);
+  throw new Error(`PrismaAdapter initialization failed: ${error.message}`);
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter,
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
   trustHost: true,
   providers: [
