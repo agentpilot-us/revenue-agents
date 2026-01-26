@@ -3,6 +3,9 @@ import { Zap } from 'lucide-react';
 import { auth } from '@/auth';
 import { NavigationClient } from './NavigationClient';
 
+// Mark as dynamic since we use auth() which accesses headers
+export const dynamic = 'force-dynamic';
+
 export default async function Navigation() {
   let session = null;
   let isAuthenticated = false;
