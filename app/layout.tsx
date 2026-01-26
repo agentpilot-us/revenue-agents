@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     'Pre-built Agentforce blueprints, working code, and proven playbooks. Everything you need to deploy enterprise-grade revenue agents.',
 };
 
+// Mark layout as dynamic since Navigation uses auth
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({
   children,
 }: Readonly<{

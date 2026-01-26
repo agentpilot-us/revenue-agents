@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { Check, X, Star, ArrowRight, Play } from 'lucide-react';
 
+// Mark as dynamic since layout uses auth
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
