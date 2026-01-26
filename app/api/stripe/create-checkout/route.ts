@@ -12,24 +12,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Map price IDs to product categories
+    const priceToCategory: Record<string, string> = {
+      [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY || '']: 'complete',
+      [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_ANNUAL || '']: 'complete',
+      // Add individual library prices when you create them
+    };
+
+    const productCategory = priceToCategory[priceId] || 'unknown';
+
     const session = await stripe.checkout.sessions.create({
+      mode: priceId.includes('monthly') || priceId.includes('annual') ? 'subscription' : 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
       customer_email: email,
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.NEXT_PUBLIC_URL}/portal?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL}/pricing`,
-      metadata: { 
+      metadata: {
         githubUsername: githubUsername || '',
+        productCategory,
+        stripePriceId: priceId,
       },
+      success_url: `${process.env.NEXT_PUBLIC_URL || process.env.NEXTAUTH_URL}/portal?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_URL || process.env.NEXTAUTH_URL}/pricing`,
     });
 
     return NextResponse.json({ sessionId: session.id, url: session.url });
   } catch (error: any) {
-    console.error('Stripe checkout error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create checkout session' },
-      { status: 500 }
-    );
+    console.error('Error creating checkout session:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
