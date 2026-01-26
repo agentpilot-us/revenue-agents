@@ -16,9 +16,7 @@ import {
   TrendingUp,
   Shield,
 } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+// Stripe.js v8 removed redirectToCheckout, so we use direct URL redirect instead
 
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -36,6 +34,11 @@ export default function PricingPage() {
       return;
     }
 
+    if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+      alert('Stripe is not configured. Please contact support.');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch('/api/stripe/create-checkout', {
@@ -48,16 +51,20 @@ export default function PricingPage() {
         }),
       });
 
-      const { sessionId } = await response.json();
-      const stripe = await stripePromise;
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
 
-      if (stripe) {
-        await stripe.redirectToCheckout({ sessionId });
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
       console.error('Checkout error:', error);
       alert('Failed to start checkout. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
