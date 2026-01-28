@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/db';
-import { inviteUserToTeam, getTeamSlugForProduct } from '@/lib/github';
 import Stripe from 'stripe';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -62,24 +61,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Map priceId to productCategory (fallback if Stripe product metadata not set)
-function getProductCategoryFromPriceId(priceId: string): string {
-  const priceToCategory: Record<string, string> = {
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_NEW_LOGO_ANNUAL || '']: 'new-logo',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_NEW_LOGO_MONTHLY || '']: 'new-logo',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXPANSION_ANNUAL || '']: 'expansion',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXPANSION_MONTHLY || '']: 'expansion',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PARTNER_ANNUAL || '']: 'partner',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PARTNER_MONTHLY || '']: 'partner',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_VELOCITY_ANNUAL || '']: 'sales-velocity',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_VELOCITY_MONTHLY || '']: 'sales-velocity',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_SUITE_ANNUAL || '']: 'complete',
-    [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_SUITE_MONTHLY || '']: 'complete',
-  };
-  
-  return priceToCategory[priceId] || 'unknown';
-}
-
 // Handle successful checkout
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log('Processing checkout.session.completed:', session.id);
@@ -91,29 +72,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     throw new Error('Missing required metadata');
   }
 
-  // Get price details to determine which library/suite
+  // Get price details to determine which library
   const price = await stripe.prices.retrieve(priceId!, {
     expand: ['product'],
   });
 
   const metadata = price.metadata;
-  const githubTeam = metadata.github_team || getTeamSlugForProduct(getProductCategoryFromPriceId(priceId!));
+  const productName = (price.product as Stripe.Product).name;
+  const productCategory = metadata.product_category || 'unknown';
+  const githubTeam = metadata.github_team;
 
-  // Send GitHub team invitation
-  if (githubTeam) {
-    try {
-      const inviteResult = await inviteUserToTeam(githubUsername, githubTeam);
-      if (!inviteResult.success) {
-        console.error(`Failed to invite ${githubUsername} to team ${githubTeam}:`, inviteResult.error);
-        // Don't throw - we still want to record the purchase even if GitHub invitation fails
-      }
-    } catch (err) {
-      console.error('GitHub invitation error:', err);
-      // Continue processing purchase even if GitHub invitation fails
-    }
-  }
-
-  // Get subscription details and calculate expiration
+  // Get subscription details
   let expirationDate: Date;
   let subscriptionId: string | null = null;
 
@@ -122,7 +91,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     try {
       const subscription: any = await stripe.subscriptions.retrieve(session.subscription);
       
-      // Calculate expiration from subscription period end
       if (subscription && subscription.current_period_end) {
         const timestamp = typeof subscription.current_period_end === 'number' 
           ? subscription.current_period_end 
@@ -130,13 +98,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         
         expirationDate = new Date(timestamp * 1000);
         
-        // Validate the date is actually valid
         if (isNaN(expirationDate.getTime())) {
           console.error('Invalid date from subscription, using fallback');
           expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
         }
       } else {
-        console.log('No current_period_end, using 1 year fallback');
         expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
       }
     } catch (error) {
@@ -144,12 +110,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
     }
   } else {
-    // No subscription (shouldn't happen with subscription mode)
     expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-    console.log('No subscription ID, using 1 year fallback');
   }
 
-  // Final validation before saving
+  // Final validation
   if (isNaN(expirationDate.getTime())) {
     console.error('Expiration date is still invalid, forcing 1 year fallback');
     expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
@@ -163,7 +127,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       stripePriceId: priceId!,
       stripePurchaseId: session.id,
       productType: metadata.product_type || 'library',
-      productCategory: metadata.product_category || getProductCategoryFromPriceId(priceId!),
+      productCategory,
       purchaseAmount: (session.amount_total || 0) / 100,
       purchaseDate: new Date(),
       expirationDate,
@@ -183,21 +147,30 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     },
   });
 
-  console.log(`Successfully processed purchase for user ${userId}, GitHub team: ${githubTeam || 'none'}`);
-}
+  // Log for manual processing
+  console.log('=================================');
+  console.log('🎉 NEW PURCHASE - MANUAL ACTION REQUIRED');
+  console.log('=================================');
+  console.log('Customer:', email);
+  console.log('Name:', session.metadata?.userName || 'Not provided');
+  console.log('Product:', productName);
+  console.log('Category:', productCategory);
+  console.log('Amount:', `$${(session.amount_total || 0) / 100}`);
+  console.log('GitHub Username:', githubUsername);
+  console.log('GitHub Team:', githubTeam);
+  console.log('User ID:', userId);
+  console.log('Subscription ID:', subscriptionId);
+  console.log('=================================');
+  console.log('NEXT STEPS:');
+  console.log('1. Verify GitHub username exists: https://github.com/' + githubUsername);
+  if (githubTeam) {
+    console.log('2. Invite to team: https://github.com/orgs/agentpilot-pro/teams/' + githubTeam);
+  }
+  console.log('3. Send welcome email with resources');
+  console.log('4. Send Slack workspace invite');
+  console.log('=================================');
 
-// Helper to extract product category from product name (fallback)
-function getProductCategoryFromProductName(productName: string | null | undefined): string | null {
-  if (!productName) return null;
-  
-  const name = productName.toLowerCase();
-  if (name.includes('new logo') || name.includes('acquisition')) return 'new-logo';
-  if (name.includes('expansion') || name.includes('customer expansion')) return 'expansion';
-  if (name.includes('partner') || name.includes('channel')) return 'partner';
-  if (name.includes('velocity') || name.includes('sales velocity')) return 'sales-velocity';
-  if (name.includes('suite') || name.includes('complete') || name.includes('gtm')) return 'complete';
-  
-  return null;
+  console.log(`Successfully processed purchase for user ${userId}`);
 }
 
 // Handle subscription deletion (cancellation)
@@ -207,7 +180,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.userId;
   
   if (!userId) {
-    // Try to find user by customer ID
+    // Try to find user by subscription ID
     const user = await prisma.user.findFirst({
       where: { subscriptionId: subscription.id },
     });
@@ -229,7 +202,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     await prisma.purchase.updateMany({
       where: {
         userId: user.id,
-        stripePurchaseId: subscription.id,
+        status: 'active',
       },
       data: {
         status: 'canceled',
@@ -248,9 +221,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     },
   });
 
-  // Update purchase status - find purchases for this user that are still active
-  // Note: stripePurchaseId is the checkout session ID, not subscription ID
-  // We update all active purchases for this user since they're tied to the subscription
+  // Update purchase status
   await prisma.purchase.updateMany({
     where: {
       userId,
@@ -264,14 +235,14 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Subscription canceled for user ${userId}`);
 }
 
-// Handle subscription updates (e.g., plan changes)
+// Handle subscription updates
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('Processing subscription update:', subscription.id);
 
   const userId = subscription.metadata?.userId;
   
   if (!userId) {
-    // Try to find user by customer ID
+    // Try to find user by subscription ID
     const user = await prisma.user.findFirst({
       where: { subscriptionId: subscription.id },
     });
