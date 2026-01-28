@@ -82,7 +82,7 @@ export default async function DashboardPage({
                   Customer Portal
                 </h1>
                 <p className="text-gray-600">
-                  Welcome back, {session.user.name || session.user.email}!
+                  Welcome back, {session.user?.name || session.user?.email}!
                 </p>
               </div>
               <Link
