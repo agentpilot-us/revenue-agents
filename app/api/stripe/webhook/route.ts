@@ -98,7 +98,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   const metadata = price.metadata;
   const githubTeam = metadata.github_team || getTeamSlugForProduct(getProductCategoryFromPriceId(priceId!));
-  const githubRepos = metadata.github_repos?.split(',') || [];
 
   // Send GitHub team invitation
   if (githubTeam) {
@@ -114,13 +113,23 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
   }
 
-  // Get subscription details - session.subscription is a string ID
-  let expirationDate = new Date();
-  if (session.subscription) {
-    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-    expirationDate = new Date(subscription.current_period_end * 1000);
+  // Get subscription details and calculate expiration
+  let expirationDate: Date;
+  let subscriptionId: string | null = null;
+
+  if (session.subscription && typeof session.subscription === 'string') {
+    try {
+      const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(session.subscription);
+      expirationDate = new Date((subscription.current_period_end as number) * 1000);
+      subscriptionId = subscription.id;
+    } catch (error) {
+      console.error('Failed to retrieve subscription:', error);
+      // Fallback to 1 year from now
+      expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      subscriptionId = session.subscription;
+    }
   } else {
-    // Fallback: 1 year from now for one-time payments (shouldn't happen with subscriptions)
+    // Fallback: 1 year from now
     expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
   }
 
@@ -133,7 +142,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       stripePurchaseId: session.id,
       productType: metadata.product_type || 'library',
       productCategory: metadata.product_category || getProductCategoryFromPriceId(priceId!),
-      purchaseAmount: (session.amount_total || 0) / 100, // Convert cents to dollars
+      purchaseAmount: (session.amount_total || 0) / 100,
       purchaseDate: new Date(),
       expirationDate,
       status: 'active',
@@ -145,7 +154,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   await prisma.user.update({
     where: { id: userId },
     data: {
-      subscriptionId: session.subscription as string,
+      subscriptionId: subscriptionId,
       subscriptionStatus: 'active',
       subscriptionTier: 'professional',
       githubUsername,
