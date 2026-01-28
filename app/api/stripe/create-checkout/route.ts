@@ -1,28 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { stripe } from '@/lib/stripe';
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { priceId, email, githubUsername } = await req.json();
+    const session = await auth();
 
-    if (!priceId || !email) {
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { priceId, email, githubUsername } = body;
+
+    // Validate inputs
+    if (!priceId || !email || !githubUsername) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Map price IDs to product categories
-    const priceToCategory: Record<string, string> = {
-      [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY || '']: 'complete',
-      [process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_ANNUAL || '']: 'complete',
-      // Add individual library prices when you create them
-    };
+    // Validate GitHub username format
+    const githubRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
+    if (!githubRegex.test(githubUsername)) {
+      return NextResponse.json(
+        { error: 'Invalid GitHub username format' },
+        { status: 400 }
+      );
+    }
 
-    const productCategory = priceToCategory[priceId] || 'unknown';
-
-    const session = await stripe.checkout.sessions.create({
-      mode: priceId.includes('monthly') || priceId.includes('annual') ? 'subscription' : 'payment',
+    // Create Stripe Checkout session
+    const checkoutSession = await stripe.checkout.sessions.create({
+      mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
         {
@@ -31,19 +44,33 @@ export async function POST(req: NextRequest) {
         },
       ],
       customer_email: email,
-      metadata: {
-        githubUsername: githubUsername || '',
-        productCategory,
-        stripePriceId: priceId,
+      subscription_data: {
+        metadata: {
+          userId: session.user.id,
+          githubUsername,
+          userEmail: email,
+        },
       },
-      success_url: `${process.env.NEXT_PUBLIC_URL || process.env.NEXTAUTH_URL}/portal?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL || process.env.NEXTAUTH_URL}/pricing`,
+      metadata: {
+        userId: session.user.id,
+        githubUsername,
+        priceId,
+      },
+      success_url: `${process.env.NEXTAUTH_URL}/dashboard?success=true`,
+      cancel_url: `${process.env.NEXTAUTH_URL}/pricing?canceled=true`,
+      allow_promotion_codes: true,
     });
 
-    return NextResponse.json({ sessionId: session.id, url: session.url });
-  } catch (error: any) {
-    console.error('Error creating checkout session:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      url: checkoutSession.url,
+      sessionId: checkoutSession.id,
+    });
+  } catch (error: unknown) {
+    console.error('Stripe checkout error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to create checkout session';
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    );
   }
 }
-
