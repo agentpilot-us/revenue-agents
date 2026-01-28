@@ -87,33 +87,21 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const { userId, githubUsername, priceId } = session.metadata || {};
   const email = session.customer_email || session.metadata?.userEmail;
 
-  if (!userId || !githubUsername || !email || !priceId) {
-    throw new Error('Missing required metadata: userId, githubUsername, email, or priceId');
-  }
-
-  // Get subscription to access subscription metadata
-  let subscription: Stripe.Subscription | null = null;
-  if (session.subscription) {
-    subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+  if (!userId || !githubUsername || !email) {
+    throw new Error('Missing required metadata');
   }
 
   // Get price details to determine which library/suite
-  const price = await stripe.prices.retrieve(priceId, {
+  const price = await stripe.prices.retrieve(priceId!, {
     expand: ['product'],
   });
 
-  const product = price.product as Stripe.Product;
-  
-  // Get product category from price metadata or fallback to priceId mapping
-  const productCategory = price.metadata?.product_category || getProductCategoryFromProductName(product.name) || getProductCategoryFromPriceId(priceId);
-  const productType = price.metadata?.product_type || (productCategory === 'complete' ? 'suite' : 'library');
-  
-  // Get GitHub team from product metadata or use mapping function
-  const githubTeam = price.metadata?.github_team || getTeamSlugForProduct(productCategory);
-  const githubRepos = price.metadata?.github_repos?.split(',') || [];
+  const metadata = price.metadata;
+  const githubTeam = metadata.github_team || getTeamSlugForProduct(getProductCategoryFromPriceId(priceId!));
+  const githubRepos = metadata.github_repos?.split(',') || [];
 
   // Send GitHub team invitation
-  if (githubTeam && githubUsername) {
+  if (githubTeam) {
     try {
       const inviteResult = await inviteUserToTeam(githubUsername, githubTeam);
       if (!inviteResult.success) {
@@ -126,12 +114,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
   }
 
-  // Calculate expiration date from subscription period end
+  // Get subscription details - session.subscription is a string ID
   let expirationDate = new Date();
-  if (subscription?.current_period_end) {
+  if (session.subscription) {
+    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
     expirationDate = new Date(subscription.current_period_end * 1000);
   } else {
-    // Fallback: 1 year from now for one-time payments
+    // Fallback: 1 year from now for one-time payments (shouldn't happen with subscriptions)
     expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
   }
 
@@ -139,11 +128,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   await prisma.purchase.create({
     data: {
       userId,
-      stripeProductId: product.id,
-      stripePriceId: priceId,
+      stripeProductId: (price.product as Stripe.Product).id,
+      stripePriceId: priceId!,
       stripePurchaseId: session.id,
-      productType,
-      productCategory,
+      productType: metadata.product_type || 'library',
+      productCategory: metadata.product_category || getProductCategoryFromPriceId(priceId!),
       purchaseAmount: (session.amount_total || 0) / 100, // Convert cents to dollars
       purchaseDate: new Date(),
       expirationDate,
@@ -156,9 +145,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   await prisma.user.update({
     where: { id: userId },
     data: {
-      subscriptionId: subscription?.id || null,
-      subscriptionStatus: subscription ? 'active' : null,
-      subscriptionTier: subscription ? 'professional' : null,
+      subscriptionId: session.subscription as string,
+      subscriptionStatus: 'active',
+      subscriptionTier: 'professional',
       githubUsername,
     },
   });
