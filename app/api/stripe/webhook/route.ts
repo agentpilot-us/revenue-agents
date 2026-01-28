@@ -118,21 +118,40 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   let subscriptionId: string | null = null;
 
   if (session.subscription && typeof session.subscription === 'string') {
+    subscriptionId = session.subscription;
     try {
-      // Let TypeScript infer the type - don't explicitly type it
-      const subscriptionResponse = await stripe.subscriptions.retrieve(session.subscription);
-      // @ts-ignore - Stripe SDK type definitions may not match runtime behavior
-      expirationDate = new Date(subscriptionResponse.current_period_end * 1000);
-      // @ts-ignore
-      subscriptionId = subscriptionResponse.id;
+      const subscription: any = await stripe.subscriptions.retrieve(session.subscription);
+      
+      // Calculate expiration from subscription period end
+      if (subscription && subscription.current_period_end) {
+        const timestamp = typeof subscription.current_period_end === 'number' 
+          ? subscription.current_period_end 
+          : parseInt(subscription.current_period_end);
+        
+        expirationDate = new Date(timestamp * 1000);
+        
+        // Validate the date is actually valid
+        if (isNaN(expirationDate.getTime())) {
+          console.error('Invalid date from subscription, using fallback');
+          expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        }
+      } else {
+        console.log('No current_period_end, using 1 year fallback');
+        expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      }
     } catch (error) {
       console.error('Failed to retrieve subscription:', error);
-      // Fallback to 1 year from now
       expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-      subscriptionId = session.subscription;
     }
   } else {
-    // Fallback: 1 year from now
+    // No subscription (shouldn't happen with subscription mode)
+    expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    console.log('No subscription ID, using 1 year fallback');
+  }
+
+  // Final validation before saving
+  if (isNaN(expirationDate.getTime())) {
+    console.error('Expiration date is still invalid, forcing 1 year fallback');
     expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
   }
 
