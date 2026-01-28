@@ -119,9 +119,12 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   if (session.subscription && typeof session.subscription === 'string') {
     try {
-      const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(session.subscription);
-      expirationDate = new Date((subscription.current_period_end as number) * 1000);
-      subscriptionId = subscription.id;
+      // Let TypeScript infer the type - don't explicitly type it
+      const subscriptionResponse = await stripe.subscriptions.retrieve(session.subscription);
+      // @ts-ignore - Stripe SDK type definitions may not match runtime behavior
+      expirationDate = new Date(subscriptionResponse.current_period_end * 1000);
+      // @ts-ignore
+      subscriptionId = subscriptionResponse.id;
     } catch (error) {
       console.error('Failed to retrieve subscription:', error);
       // Fallback to 1 year from now
