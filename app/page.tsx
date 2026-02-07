@@ -15,36 +15,42 @@ export default function HomePage() {
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              Trusted by Salesforce AgentBlazers
+              Trusted by GTM teams
             </div>
           </div>
 
           {/* Main Headline */}
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              Pre-Built Salesforce Growth Programs<br />
-              <span className="text-blue-600">Deploy AI Agents in Days, Not Months</span>
+              AI agents for GTM teams.
             </h1>
-            
+            <h2 className="text-2xl md:text-3xl font-bold text-blue-600 mb-6">
+              New business. Expansion. Partnerships. Customer success.
+            </h2>
             <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
-              Stop building from scratch. Get production-ready Salesforce code, AI agents, and go-to-market strategies—ready to deploy in your sandbox today.
+              Product marketers, SDRs, AEs, partner and customer success use our agents to get new business, grow existing accounts, expand partnerships, and increase satisfaction—without the manual grind.
             </p>
 
             {/* Primary CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               <Link 
-                href="#sample-blueprints"
+                href="/pricing"
                 className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
               >
-                Download Sample Blueprint (Free)
+                Get the Expansion Agent
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
-              
+              <Link 
+                href="/pricing"
+                className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                Download Sample Blueprint (Free)
+              </Link>
               <Link
                 href="#demo"
-                className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
@@ -59,13 +65,7 @@ export default function HomePage() {
                 <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                No Salesforce installation required to view samples
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                Used by teams at Oracle, NVIDIA, Dynatrace
+                Sync to your CRM so Salesforce stays the source of truth
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -83,10 +83,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              What&apos;s Inside Each Library
+              See Exactly What You&apos;re Getting
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Everything you need to deploy working AI agents—strategy, code, sample data, and support.
+              Everything you need to deploy working AI agents—strategy, agents, sample data, and support. Sync to your CRM so your team has one source of truth.
             </p>
           </div>
 
@@ -121,79 +121,70 @@ export default function HomePage() {
                   KPI framework &amp; targets
                 </li>
               </ul>
-              <p className="text-sm text-gray-500 italic">
-                25-page strategic playbook
-              </p>
             </div>
 
             {/* Item 2 */}
             <div className="bg-gradient-to-br from-purple-50 to-white p-8 rounded-2xl border border-purple-100 hover:shadow-xl transition-shadow">
               <div className="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">
-                Production-Ready Salesforce Code
+                Working AI Agents
               </h3>
               <ul className="space-y-2 text-gray-600 mb-4">
                 <li className="flex items-start gap-2">
                   <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Apex classes (fully commented)
+                  Buying group discovery &amp; research
                 </li>
                 <li className="flex items-start gap-2">
                   <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Flows, triggers &amp; validation rules
+                  Outreach (email, LinkedIn, Slack)
                 </li>
                 <li className="flex items-start gap-2">
                   <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Custom objects &amp; fields
+                  Authorized via Arcade (Gmail, Slack, etc.)
                 </li>
               </ul>
-              <p className="text-sm text-gray-500 italic">
-                2,500+ lines of tested code
-              </p>
             </div>
 
             {/* Item 3 */}
             <div className="bg-gradient-to-br from-green-50 to-white p-8 rounded-2xl border border-green-100 hover:shadow-xl transition-shadow">
               <div className="w-14 h-14 bg-green-600 rounded-xl flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">
-                Pre-Configured AI Agents
+                Sync to Salesforce
               </h3>
               <ul className="space-y-2 text-gray-600 mb-4">
                 <li className="flex items-start gap-2">
                   <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Agentforce agent definitions
+                  Contacts &amp; activities in your CRM
                 </li>
                 <li className="flex items-start gap-2">
                   <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Optimized prompt templates
+                  One source of truth for your team
                 </li>
                 <li className="flex items-start gap-2">
                   <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  Agent training data
+                  No Agentforce required
                 </li>
               </ul>
-              <p className="text-sm text-gray-500 italic">
-                4-6 specialized agents per library
-              </p>
             </div>
 
             {/* Item 4 */}
@@ -226,9 +217,6 @@ export default function HomePage() {
                   Data loader templates
                 </li>
               </ul>
-              <p className="text-sm text-gray-500 italic">
-                Ready-to-import CSV files
-              </p>
             </div>
 
             {/* Item 5 */}
@@ -261,9 +249,6 @@ export default function HomePage() {
                   Troubleshooting guide
                 </li>
               </ul>
-              <p className="text-sm text-gray-500 italic">
-                Deploy to sandbox in 1-2 hours
-              </p>
             </div>
 
             {/* Item 6 */}
@@ -296,9 +281,6 @@ export default function HomePage() {
                   Best practices guidance
                 </li>
               </ul>
-              <p className="text-sm text-gray-500 italic">
-                Response within 24 hours
-              </p>
             </div>
           </div>
         </div>
@@ -312,31 +294,23 @@ export default function HomePage() {
               Get Started in 3 Steps
             </h2>
             <p className="text-xl text-gray-600">
-              From sample blueprint to working demo in days, not months
+              See what you get, choose the Expansion agent, and go live in minutes. Sync to Salesforce so your team has one source of truth.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 md:gap-12">
-            {/* Step 1 */}
             <div className="relative">
               <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow h-full">
                 <div className="absolute -top-6 left-8">
-                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                    1
-                  </div>
+                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">1</div>
                 </div>
                 <div className="mt-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    See What You Get
-                  </h3>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">See What You Get</h3>
                   <p className="text-gray-600 mb-6">
-                    Download a sample blueprint (no email required). See the exact strategy, code samples, and agent definitions you&apos;ll receive.
+                    Download a sample blueprint (no email required). See the strategy, playbooks, and what the Expansion agent can do.
                   </p>
-                  <Link
-                    href="#sample-blueprints"
-                    className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700"
-                  >
-                    Download New Logo Sample
+                  <Link href="/pricing" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700">
+                    Download Sample Blueprint
                     <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
@@ -344,75 +318,42 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-
-            {/* Step 2 */}
             <div className="relative">
               <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow h-full">
                 <div className="absolute -top-6 left-8">
-                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                    2
-                  </div>
+                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">2</div>
                 </div>
                 <div className="mt-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    Choose Your Program
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Select the growth motion that fits your Q1 priorities:
-                  </p>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Choose Your Program</h3>
+                  <p className="text-gray-600 mb-4">Start with the program that fits your priorities:</p>
                   <ul className="space-y-3">
                     <li className="flex items-center gap-2 text-gray-700">
-                      <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      New Logo Acquisition
+                      <strong>Account Expansion</strong> — available now
                     </li>
-                    <li className="flex items-center gap-2 text-gray-700">
-                      <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Customer Expansion
-                    </li>
-                    <li className="flex items-center gap-2 text-gray-700">
-                      <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Partner Programs
-                    </li>
-                    <li className="flex items-center gap-2 text-gray-700">
-                      <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Sales Velocity
-                    </li>
+                    <li className="flex items-center gap-2 text-gray-500 text-sm">Referral, PLG, Partner expansion — coming soon</li>
                   </ul>
                 </div>
               </div>
             </div>
-
-            {/* Step 3 */}
             <div className="relative">
               <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow h-full">
                 <div className="absolute -top-6 left-8">
-                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                    3
-                  </div>
+                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">3</div>
                 </div>
                 <div className="mt-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    Deploy This Week
-                  </h3>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Go Live</h3>
                   <p className="text-gray-600 mb-6">
-                    Clone the GitHub repo, deploy to your sandbox, and customize to your needs. Most teams have a working demo in 2-3 days.
+                    Subscribe, connect your tools (Gmail, Slack, LinkedIn via Arcade), add accounts in the dashboard, and run the Expansion agent. Sync contacts and activities to Salesforce.
                   </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm font-semibold text-blue-900 mb-2">
-                      ⚡ Want hands-on deployment?
-                    </p>
-                    <p className="text-sm text-blue-800">
-                      Our Quick Start package ($15K) includes deployment, customization, and training. Most teams are live in production within 2 weeks.
-                    </p>
-                  </div>
+                  <Link href="/pricing" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700">
+                    Get the Expansion Agent
+                    <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -420,327 +361,79 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Sample Blueprints Section */}
-      <section id="sample-blueprints" className="py-20 bg-white">
+      {/* Outcomes Section */}
+      <section className="py-20 bg-gradient-to-b from-white to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              See Exactly What You&apos;re Getting
+              Outcomes That Matter
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Download a complete sample blueprint with real strategy, code samples, and deployment instructions. No email required.
+              New business. Expansion. Partnerships. Customer satisfaction—driven by agents that work alongside your team.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Sample 1 */}
-            <div className="bg-gradient-to-br from-blue-50 to-white rounded-2xl p-8 border-2 border-blue-200 hover:border-blue-400 transition-colors">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    New Logo Acquisition
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4">
-                    Complete 28-page sample blueprint
-                  </p>
-                </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            {[
+              { title: 'New business', desc: 'Qualified pipeline and multi-threading' },
+              { title: 'Expansion', desc: 'Upsell and cross-sell across buying groups' },
+              { title: 'Partnerships', desc: 'Co-sell and referral motion at scale' },
+              { title: 'Customer success', desc: 'Satisfaction and retention' },
+            ].map(({ title, desc }) => (
+              <div key={title} className="bg-white rounded-xl p-6 shadow-md border border-gray-100 text-center">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
+                <p className="text-gray-600 text-sm">{desc}</p>
               </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Strategy: Complete buyer journey for enterprise software deals</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Code: Account scoring Apex class with full comments</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Agents: 4 pre-configured Agentforce definitions</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Guide: Step-by-step sandbox deployment instructions</span>
-                </div>
-              </div>
-
-              <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                </svg>
-                Download Sample (PDF)
-              </button>
-            </div>
-
-            {/* Sample 2 */}
-            <div className="bg-gradient-to-br from-green-50 to-white rounded-2xl p-8 border-2 border-green-200 hover:border-green-400 transition-colors">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-16 h-16 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    Customer Expansion
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4">
-                    Complete 26-page sample blueprint
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Strategy: Upsell &amp; cross-sell opportunity identification</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Code: Expansion scoring Flow with trigger automation</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Agents: 5 specialized agents for expansion motions</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Data: 50+ sample customer records with expansion signals</span>
-                </div>
-              </div>
-
-              <button className="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                </svg>
-                Download Sample (PDF)
-              </button>
-            </div>
-          </div>
-
-          <div className="text-center mt-12">
-            <p className="text-gray-600 mb-4">
-              Want samples for Partner Programs or Sales Velocity?
-            </p>
-            <Link href="/pricing" className="text-blue-600 font-semibold hover:text-blue-700">
-              View all libraries →
-            </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Libraries Section - Link to Pricing Page */}
+      {/* Choose your GTM program - Expansion first, more coming */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Choose Your Growth Program
+              Choose Your GTM Program
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Each library includes complete strategy, production code, AI agents, sample data, and deployment guides
+              Start with the Account Expansion agent today. More programs are coming soon.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            {/* Library 1 */}
-            <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 border border-blue-200 hover:shadow-xl transition-shadow">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
+          <div className="max-w-2xl mx-auto mb-12">
+            <Link href="/pricing" className="block">
+              <div className="bg-gradient-to-br from-green-50 to-white rounded-2xl p-8 border-2 border-green-200 hover:shadow-xl transition-shadow">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-14 h-14 bg-green-600 rounded-xl flex items-center justify-center">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-green-600 uppercase tracking-wide">Available now</span>
+                    <h3 className="text-2xl font-bold text-gray-900">Account Expansion</h3>
+                  </div>
+                </div>
+                <p className="text-gray-600 mb-6">
+                  AI agents that map buying groups, research accounts, and run expansion outreach. Sync to Salesforce so your CRM stays the source of truth.
+                </p>
+                <span className="inline-flex items-center text-green-600 font-semibold">
+                  Get the Expansion Agent →
+                </span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                New Logo Acquisition
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                AI agents that identify, qualify, and engage target accounts
-              </p>
-              <p className="text-xs text-gray-500 mb-4">
-                → Ideal for: Teams expanding into new markets
-              </p>
-              <div className="flex flex-col gap-2">
-                <Link
-                  href="#sample-blueprints"
-                  className="text-sm text-blue-600 font-semibold hover:text-blue-700"
-                >
-                  See Sample →
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-sm bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-center"
-                >
-                  Purchase - $4,950/year
-                </Link>
-              </div>
-            </div>
-
-            {/* Library 2 */}
-            <div className="bg-gradient-to-br from-green-50 to-white rounded-xl p-6 border border-green-200 hover:shadow-xl transition-shadow">
-              <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Customer Expansion
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Upsell and cross-sell automation with AI-powered insights
-              </p>
-              <p className="text-xs text-gray-500 mb-4">
-                → Ideal for: Teams with 100+ existing customers
-              </p>
-              <div className="flex flex-col gap-2">
-                <Link
-                  href="#sample-blueprints"
-                  className="text-sm text-green-600 font-semibold hover:text-green-700"
-                >
-                  See Sample →
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-sm bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors text-center"
-                >
-                  Purchase - $4,950/year
-                </Link>
-              </div>
-            </div>
-
-            {/* Library 3 */}
-            <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-6 border border-purple-200 hover:shadow-xl transition-shadow">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Partner Programs
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Channel enablement and co-selling automation
-              </p>
-              <p className="text-xs text-gray-500 mb-4">
-                → Ideal for: Teams with reseller/referral partners
-              </p>
-              <div className="flex flex-col gap-2">
-                <Link
-                  href="/pricing"
-                  className="text-sm text-purple-600 font-semibold hover:text-purple-700"
-                >
-                  See Sample →
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-sm bg-purple-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors text-center"
-                >
-                  Purchase - $4,950/year
-                </Link>
-              </div>
-            </div>
-
-            {/* Library 4 */}
-            <div className="bg-gradient-to-br from-orange-50 to-white rounded-xl p-6 border border-orange-200 hover:shadow-xl transition-shadow">
-              <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Sales Velocity
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Pipeline acceleration and deal coaching agents
-              </p>
-              <p className="text-xs text-gray-500 mb-4">
-                → Ideal for: Teams with long sales cycles (90+ days)
-              </p>
-              <div className="flex flex-col gap-2">
-                <Link
-                  href="/pricing"
-                  className="text-sm text-orange-600 font-semibold hover:text-orange-700"
-                >
-                  See Sample →
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-sm bg-orange-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-orange-700 transition-colors text-center"
-                >
-                  Purchase - $4,950/year
-                </Link>
-              </div>
-            </div>
+            </Link>
           </div>
 
-          {/* Suite Option */}
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white shadow-2xl">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex-1">
-                <div className="inline-block bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-sm font-bold mb-4">
-                  BEST VALUE - SAVE $5,000
+          <div className="max-w-3xl mx-auto">
+            <p className="text-center text-gray-500 font-medium mb-4">More programs coming soon</p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {['Referral marketing', 'PLG', 'Partner expansion'].map((name) => (
+                <div key={name} className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center">
+                  <p className="font-medium text-gray-700">{name}</p>
+                  <span className="text-xs text-gray-400 mt-2 inline-block">Coming soon</span>
                 </div>
-                <h3 className="text-3xl font-bold mb-3">
-                  Complete Suite
-                </h3>
-                <p className="text-blue-100 mb-4">
-                  All 4 libraries + quarterly strategy workshops + priority support
-                </p>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Access to all libraries (normally $19,800)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Quarterly strategy &amp; planning workshops
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Priority Slack support (&lt; 4 hour response)
-                  </li>
-                </ul>
-              </div>
-              <div className="text-center">
-                <div className="text-5xl font-bold mb-2">
-                  $14,950
-                </div>
-                <div className="text-blue-100 mb-6">
-                  per year
-                </div>
-                <Link
-                  href="/pricing"
-                  className="inline-block bg-white text-blue-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-50 transition-colors shadow-lg"
-                >
-                  Purchase Suite
-                </Link>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -751,169 +444,27 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Built for Salesforce Teams
+              Built for GTM Teams
             </h2>
             <p className="text-xl text-gray-600">
-              Whether you&apos;re RevOps, an admin, or a revenue leader—we&apos;ve got you covered
+              Product marketers, SDRs, AEs, partner and customer success—one platform for your growth motions
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Persona 1 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    For RevOps / Sales Ops Leaders
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Fast-track your Q1 AI initiatives. Show your exec team working demos in days, not months.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Skip months of requirements gathering
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Proven architecture &amp; best practices
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Get budget approved with working POCs
-                    </li>
-                  </ul>
-                </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { label: 'Product marketers', desc: 'Launch and measure GTM plays' },
+              { label: 'SDRs', desc: 'Find and engage buying groups' },
+              { label: 'AEs', desc: 'Expand accounts with AI-assisted outreach' },
+              { label: 'Partner teams', desc: 'Scale co-sell and referral motion' },
+              { label: 'Customer success', desc: 'Improve satisfaction and expansion' },
+              { label: 'RevOps', desc: 'One source of truth, sync to Salesforce' },
+            ].map(({ label, desc }) => (
+              <div key={label} className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{label}</h3>
+                <p className="text-gray-600 text-sm">{desc}</p>
               </div>
-            </div>
-
-            {/* Persona 2 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    For Salesforce Admins
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Deploy enterprise-grade solutions without custom development. Includes full documentation and support.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      No developer required—just deploy &amp; customize
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Fully commented code you can understand
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Slack support for deployment questions
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Persona 3 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    For Marketing / Sales Leaders
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Get AI-powered growth programs aligned to your strategy. We translate GTM motions into working code.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Strategy + execution in one package
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Show working demos to exec team
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Hit Q1 goals without long implementations
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Persona 4 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    For Implementation Partners
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Accelerate client projects with proven blueprints. White-label options available.
-                  </p>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Win more deals with faster time-to-value
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Start with proven architecture
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Customize for specific client needs
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -926,7 +477,7 @@ export default function HomePage() {
               Why Teams Choose Pre-Built Blueprints
             </h2>
             <p className="text-xl text-gray-600">
-              Stop building from scratch. Start with production-ready code.
+              Stop building from scratch. Start with proof-of-concept (POC) blueprints for AI-powered GTM growth motions that jump-start full implementations.
             </p>
           </div>
 
@@ -989,8 +540,8 @@ export default function HomePage() {
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <p className="font-semibold text-gray-900">2-4 weeks to deploy 4 programs</p>
-                      <p className="text-sm text-gray-600">Clone → customize → deploy. Working demo in days.</p>
+                      <p className="font-semibold text-gray-900">Go live in days, not months</p>
+                      <p className="text-sm text-gray-600">Subscribe, connect Gmail/Slack/LinkedIn via Arcade, add accounts, and run the Expansion agent. Sync to Salesforce so your CRM stays the source of truth.</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
@@ -1007,8 +558,8 @@ export default function HomePage() {
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <p className="font-semibold text-gray-900">Production-tested, maintained code</p>
-                      <p className="text-sm text-gray-600">Fully documented, follows Salesforce best practices</p>
+                      <p className="font-semibold text-gray-900">Working AI agents + CRM sync</p>
+                      <p className="text-sm text-gray-600">Agents that discover buying groups, research accounts, and run outreach. Optional sync to Salesforce—no Agentforce required.</p>
                     </div>
                   </li>
                 </ul>
@@ -1041,7 +592,7 @@ export default function HomePage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-6 italic">
-                &quot;We deployed the New Logo program in our sandbox in 3 days. Showed our VP, got budget approved for full rollout. This saved us 4 months of back-and-forth with consultants.&quot;
+                &quot;We had the Expansion agent running in a few days. Our AE team uses it to map buying groups and run outreach—everything syncs to Salesforce so we have one source of truth.&quot;
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center font-bold text-blue-700">
@@ -1064,7 +615,7 @@ export default function HomePage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-6 italic">
-                &quot;The code quality is exceptional. Fully commented, follows Salesforce best practices, and actually works out of the box. As a former Salesforce architect myself, I&apos;m impressed.&quot;
+                &quot;The agents actually do what they say—discover contacts, run research, send outreach. Sync to Salesforce was a must for us; it just works.&quot;
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-purple-200 rounded-full flex items-center justify-center font-bold text-purple-700">
@@ -1088,25 +639,13 @@ export default function HomePage() {
                 <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                Agentforce Specialist Certified
+                GTM &amp; AI agents
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                Data Cloud Consultant
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                AgentBlazer Legend
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                20+ Years Enterprise Experience
+                CRM sync (Salesforce)
               </div>
             </div>
           </div>
@@ -1126,13 +665,13 @@ export default function HomePage() {
             {/* FAQ 1 */}
             <details className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow group">
               <summary className="font-semibold text-gray-900 cursor-pointer list-none flex items-center justify-between">
-                <span>Do I need Agentforce licenses to use these libraries?</span>
+                <span>Do I need Salesforce or Agentforce to use the agents?</span>
                 <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
               <p className="mt-4 text-gray-600">
-                You&apos;ll need Agentforce licenses to deploy agents to production, but you can test everything in a sandbox with trial licenses. We include instructions for setting up a developer org with trial licenses if you want to test before purchasing production licenses.
+                No. The agents run in our platform and connect to Gmail, Slack, LinkedIn, etc. via Arcade. Syncing to Salesforce is optional—if you use Salesforce, we push contacts and activities so your CRM stays the source of truth. No Agentforce licenses required.
               </p>
             </details>
 
@@ -1184,7 +723,7 @@ export default function HomePage() {
                 </svg>
               </summary>
               <p className="mt-4 text-gray-600">
-                Your subscription includes: access to the GitHub repository with all code, strategy documentation, AI agent definitions, sample data, deployment guides, video walkthroughs, private Slack support, and quarterly updates. You can deploy to unlimited sandboxes and production orgs.
+                Your subscription includes: access to the GitHub repository with all proof-of-concept (POC) blueprint code for AI-powered GTM growth motions, strategy documentation, AI agent definitions, sample data, deployment guides, video walkthroughs, private Slack support, and quarterly updates. You can deploy AI POC demos to unlimited sandboxes. These AI POC blueprints are designed to jump-start full production implementations.
               </p>
             </details>
 
@@ -1239,18 +778,11 @@ export default function HomePage() {
           <div className="border-t border-blue-400 pt-12">
             <h3 className="text-2xl font-bold mb-6">Questions?</h3>
             <div className="flex flex-col sm:flex-row gap-6 justify-center text-blue-100">
-              <a href="mailto:michelle@agentpilot.us" className="flex items-center gap-2 hover:text-white transition-colors">
+              <a href="mailto:support@agentpilot.us" className="flex items-center gap-2 hover:text-white transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                michelle@agentpilot.us
-              </a>
-              <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />
-                  <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z" />
-                </svg>
-                Join Slack Community
+                support@agentpilot.us
               </a>
               <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

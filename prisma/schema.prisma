@@ -46,16 +46,28 @@ model User {
   emailVerified     DateTime?
   image             String?
   githubUsername    String?   @unique
-  stripeCustomerId String?   @unique
+  stripeCustomerId  String?   @unique
   subscriptionId    String?   @unique
   subscriptionStatus String?  // 'active' | 'cancelled' | 'past_due' | null
   subscriptionTier  String?   // 'pro' | 'community' | null
+  role              String?   // "AE" | "CSM" | "SDR" | "Marketing" | "Partner"
+  teamId            String?
+  arcadeUserId      String?   @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  accounts  Account[]
-  sessions  Session[]
-  purchases Purchase[]
+  accounts               Account[]
+  sessions               Session[]
+  purchases              Purchase[]
+  team                   Team?                    @relation(fields: [teamId], references: [id])
+  ownedContacts         Contact[]                 @relation("ContactOwner")
+  plays                  Play[]
+  activities             Activity[]
+  chatMessages           ChatMessage[]
+  createdBuyingGroupTemplates BuyingGroupTemplate[]
+  createdBuyingGroups    BuyingGroup[]
+  companies            Company[]
+  messagingFrameworks   MessagingFramework[]
 }
 
 model VerificationToken {
@@ -93,4 +105,258 @@ model Download {
   ipAddress    String?
 
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+}
+
+// Agent Pilot: Team and Company (business account)
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  users     User[]
+  companies Company[]
+  buyingGroupTemplates BuyingGroupTemplate[]
+  messagingFrameworks  MessagingFramework[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Product marketing: messaging frameworks the agent uses when drafting outreach
+model MessagingFramework {
+  id          String   @id @default(cuid())
+  name        String   // e.g. "Enterprise value prop", "Expansion play"
+  description String?  // Short note for PMM
+  content     String   @db.Text // Full framework: value props, positioning, key messages, do's/don'ts
+  teamId      String?
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  isDefault   Boolean  @default(false) // One default per user/team for agent to use
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([teamId])
+  @@index([isDefault])
+}
+
+model Company {
+  id             String   @id @default(cuid())
+  name           String
+  domain         String?
+  tier           String?  // "Strategic" | "Enterprise" | "Growth"
+  stage          String   // "Prospect" | "Customer" | "Expansion" | "Renewal"
+  arr            Int?     // Annual Recurring Revenue in cents
+  industry       String?
+  sfdcAccountId  String?  @unique
+  teamId         String?
+  team           Team?    @relation(fields: [teamId], references: [id])
+  createdById    String?  // User who created (for "my companies" when no team)
+  createdBy      User?    @relation(fields: [createdById], references: [id])
+  contacts       Contact[]
+  plays          Play[]
+  researchBriefs ResearchBrief[]
+  activities     Activity[]
+  buyingGroups   BuyingGroup[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([domain])
+  @@index([sfdcAccountId])
+  @@index([teamId])
+  @@index([createdById])
+}
+
+model Contact {
+  id               String    @id @default(cuid())
+  firstName        String?
+  lastName         String?
+  email            String?
+  linkedinUrl      String?
+  linkedinProfileId String?
+  phone            String?
+  role             String?
+  department       String?
+  seniority        String?
+  yearsExperience  Int?
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerId          String?
+  owner            User?     @relation("ContactOwner", fields: [ownerId], references: [id])
+  ownerRole        String?
+  lastContactedAt  DateTime?
+  lastContactedBy  String?
+  sfdcContactId    String?   @unique
+  sfdcLeadId       String?   @unique
+  activities       Activity[]
+  buyingGroupMemberships BuyingGroupMember[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([email, companyId])
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([email])
+  @@index([linkedinProfileId])
+}
+
+model BuyingGroupTemplate {
+  id               String   @id @default(cuid())
+  createdById      String
+  createdBy        User     @relation(fields: [createdById], references: [id])
+  teamId           String?
+  team             Team?    @relation(fields: [teamId], references: [id])
+  isPublic         Boolean  @default(false)
+  name             String
+  description      String?
+  industry         String?
+  useCase          String?
+  personas         Json     // Array of PersonaDefinition
+  segmentationRules Json?
+  timesUsed        Int      @default(0)
+  buyingGroups     BuyingGroup[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([teamId])
+  @@index([isPublic])
+  @@index([industry])
+}
+
+model BuyingGroup {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  templateId      String?
+  template        BuyingGroupTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  customName      String
+  customPersonas  Json?
+  segmentApplied  String?
+  segmentRules    Json?
+  status          String   // "Discovering" | "Complete" | "Incomplete"
+  contactsFound   Int      @default(0)
+  personasSearched Int     @default(0)
+  createdById     String
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  members         BuyingGroupMember[]
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([createdById])
+  @@index([status])
+  @@index([templateId])
+}
+
+model BuyingGroupMember {
+  id             String   @id @default(cuid())
+  buyingGroupId  String
+  buyingGroup    BuyingGroup @relation(fields: [buyingGroupId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  persona        String
+  personaLabel   String
+  segment        String?
+  segmentMatches Json?
+  influence      String?
+  foundVia       String?
+  confidence     Float?
+  createdAt      DateTime @default(now())
+
+  @@unique([buyingGroupId, contactId])
+  @@index([buyingGroupId])
+  @@index([contactId])
+  @@index([segment])
+}
+
+model Play {
+  id               String   @id @default(cuid())
+  type             String   // "ABM" | "Referral" | "Expansion" | "Renewal"
+  status           String   // "Planning" | "Active" | "Paused" | "Completed"
+  goal             String
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerId          String
+  owner            User     @relation(fields: [ownerId], references: [id])
+  blockedBy        String?
+  blockedReason    String?
+  contactsFound    Int      @default(0)
+  emailsSent       Int      @default(0)
+  repliesReceived  Int      @default(0)
+  meetingsBooked   Int      @default(0)
+  activities       Activity[]
+  startedAt        DateTime @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+model Activity {
+  id           String    @id @default(cuid())
+  type         String    // "Email" | "InMail" | "EmailReply" | "BuyingGroupDiscovery"
+  summary      String
+  content      String?   @db.Text
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId    String?
+  contact      Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  playId       String?
+  play         Play?     @relation(fields: [playId], references: [id], onDelete: SetNull)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  userRole     String
+  sentVia      String?
+  externalId   String?
+  openedAt     DateTime?
+  openCount    Int       @default(0)
+  clickedAt    DateTime?
+  clickedUrl   String?
+  repliedAt    DateTime?
+  replyContent String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([playId])
+  @@index([userId])
+  @@index([type])
+  @@index([externalId])
+}
+
+model ResearchBrief {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  summary       String   @db.Text
+  fundingInfo   String?  @db.Text
+  techStack     String?  @db.Text
+  recentNews    String?  @db.Text
+  hiringSignals String?  @db.Text
+  competitorInfo String? @db.Text
+  source        String   // "Perplexity" | "Exa" | "Manual"
+  rawData       Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent      String   // "abm" | "referral" | "expansion"
+  role       String   // "user" | "assistant" | "system"
+  content    String   @db.Text
+  toolCalls  Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([agent])
 }

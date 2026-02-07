@@ -7,16 +7,15 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'annual' | 'monthly'>('annual');
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="container mx-auto px-4 py-12">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Choose Your Revenue Engine
+            Choose Your GTM Program
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Production-ready Salesforce Agentforce programs. Deploy demos in 30 minutes, 
-            production in 2-3 weeks. All plans include quarterly updates and Slack support.
+            AI agents for product marketers, SDRs, AEs, partner and customer success. Get started in minutes; sync contacts and activities to your Salesforce CRM. All plans include quarterly updates and Slack support.
           </p>
         </div>
 
@@ -58,92 +57,51 @@ export default function PricingPage() {
           </button>
         </div>
 
-        {/* Individual Libraries */}
-        <div className="mt-16">
-          <h2 className="text-3xl font-bold text-center mb-8">Individual Libraries</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-            <LibraryCard
-              name="New Logo Acquisition"
-              description="Generate qualified pipeline with ABM targeting, intent signals, and multi-threading"
-              features={[
-                "5 strategic blueprints",
-                "15 Apex classes, 8 LWCs",
-                "12 Agentforce agents",
-                "CLI-deployable demo",
-                "NVIDIA: $400K pipeline in 30 days"
-              ]}
-              annualPrice="4,950"
-              monthlyPrice="499"
-              annualPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_NEW_LOGO_ANNUAL!}
-              monthlyPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_NEW_LOGO_MONTHLY!}
-              billingCycle={billingCycle}
-            />
-            
-            <LibraryCard
-              name="Customer Expansion"
-              description="Orchestrate upsell and cross-sell across multiple buying groups"
-              features={[
-                "5 strategic blueprints",
-                "12 Apex classes, 6 LWCs",
-                "10 Agentforce agents",
-                "Whitespace analysis",
-                "Track 20+ buying groups"
-              ]}
-              annualPrice="4,950"
-              monthlyPrice="499"
-              annualPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXPANSION_ANNUAL!}
-              monthlyPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXPANSION_MONTHLY!}
-              billingCycle={billingCycle}
-            />
-            
-            <LibraryCard
-              name="Partner & Channel"
-              description="Manage partner ecosystem with co-selling workflows and performance tracking"
-              features={[
-                "5 strategic blueprints",
-                "10 Apex classes, 7 LWCs",
-                "8 Agentforce agents",
-                "Deal registration automation",
-                "Manage 100+ partners"
-              ]}
-              annualPrice="4,950"
-              monthlyPrice="499"
-              annualPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PARTNER_ANNUAL!}
-              monthlyPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PARTNER_MONTHLY!}
-              billingCycle={billingCycle}
-            />
-            
-            <LibraryCard
-              name="Sales Velocity"
-              description="Accelerate deals with risk scoring, automated nudges, and velocity tracking"
-              features={[
-                "5 strategic blueprints",
-                "14 Apex classes, 9 LWCs",
-                "11 Agentforce agents",
-                "AI-powered deal risk scoring",
-                "Reduce cycles 20-30%"
-              ]}
-              annualPrice="4,950"
-              monthlyPrice="499"
-              annualPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_VELOCITY_ANNUAL!}
-              monthlyPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_VELOCITY_MONTHLY!}
-              billingCycle={billingCycle}
-            />
-          </div>
-        </div>
-
-        {/* Complete Suite - Highlighted */}
-        <div className="mt-24">
-          <CompleteSuiteCard
-            annualPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_SUITE_ANNUAL!}
-            monthlyPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_SUITE_MONTHLY!}
+        {/* Account Expansion - only buyable product */}
+        <div className="max-w-xl mx-auto">
+          <LibraryCard
+            name="Account Expansion"
+            description="Agents that map buying groups, research accounts, and run expansion outreach. Orchestrate upsell and cross-sell across multiple buying groups."
+            features={[
+              "Agents that discover buying groups and run research",
+              "Track 20+ buying groups per account",
+              "Sync to Salesforce so your CRM stays the source of truth",
+              "Strategic playbooks and persona templates",
+              "Quarterly updates and Slack support"
+            ]}
+            annualPrice="4,950"
+            monthlyPrice="499"
+            annualPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXPANSION_ANNUAL ?? ''}
+            monthlyPriceId={process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_EXPANSION_MONTHLY ?? ''}
             billingCycle={billingCycle}
           />
         </div>
 
+        {/* Coming soon */}
+        <div className="mt-16 max-w-3xl mx-auto">
+          <h2 className="text-xl font-bold text-center mb-6 text-gray-500">More agents coming soon</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
+              <p className="font-medium text-gray-700">Referral marketing</p>
+              <p className="text-sm text-gray-500 mt-1">Agents to scale referral programs</p>
+              <span className="inline-block mt-2 text-xs font-medium text-gray-400 bg-gray-200 px-2 py-1 rounded">Coming soon</span>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
+              <p className="font-medium text-gray-700">PLG</p>
+              <p className="text-sm text-gray-500 mt-1">Product-led growth agents</p>
+              <span className="inline-block mt-2 text-xs font-medium text-gray-400 bg-gray-200 px-2 py-1 rounded">Coming soon</span>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
+              <p className="font-medium text-gray-700">Partner expansion</p>
+              <p className="text-sm text-gray-500 mt-1">Agents for partner pipeline and co-sell</p>
+              <span className="inline-block mt-2 text-xs font-medium text-gray-400 bg-gray-200 px-2 py-1 rounded">Coming soon</span>
+            </div>
+          </div>
+        </div>
+
         {/* FAQ Section */}
         <div className="mt-24 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">Frequently Asked Questions</h2>
           <FAQSection />
         </div>
       </div>
@@ -177,8 +135,49 @@ function LibraryCard({
   const displayPrice = billingCycle === 'annual' ? annualPrice : monthlyPrice;
   const displayPeriod = billingCycle === 'annual' ? '/year' : '/month';
 
+  // Determine color theme based on library name
+  const getColorTheme = () => {
+    if (name.includes('New Logo')) return {
+      gradient: 'from-blue-50 to-white',
+      border: 'border-blue-100',
+      button: 'bg-blue-600 hover:bg-blue-700',
+      iconBg: 'bg-blue-600',
+      checkColor: 'text-blue-600'
+    };
+    if (name.includes('Expansion')) return {
+      gradient: 'from-green-50 to-white',
+      border: 'border-green-100',
+      button: 'bg-green-600 hover:bg-green-700',
+      iconBg: 'bg-green-600',
+      checkColor: 'text-green-600'
+    };
+    if (name.includes('Partner')) return {
+      gradient: 'from-purple-50 to-white',
+      border: 'border-purple-100',
+      button: 'bg-purple-600 hover:bg-purple-700',
+      iconBg: 'bg-purple-600',
+      checkColor: 'text-purple-600'
+    };
+    if (name.includes('Velocity')) return {
+      gradient: 'from-orange-50 to-white',
+      border: 'border-orange-100',
+      button: 'bg-orange-600 hover:bg-orange-700',
+      iconBg: 'bg-orange-600',
+      checkColor: 'text-orange-600'
+    };
+    return {
+      gradient: 'from-blue-50 to-white',
+      border: 'border-blue-100',
+      button: 'bg-blue-600 hover:bg-blue-700',
+      iconBg: 'bg-blue-600',
+      checkColor: 'text-blue-600'
+    };
+  };
+
+  const colors = getColorTheme();
+
   return (
-    <div className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow border border-gray-200">
+    <div className={`bg-gradient-to-br ${colors.gradient} rounded-2xl p-8 hover:shadow-xl transition-shadow border ${colors.border}`}>
       <h3 className="text-2xl font-bold text-gray-900 mb-3">{name}</h3>
       <p className="text-gray-600 mb-6 min-h-[60px]">{description}</p>
       
@@ -191,17 +190,23 @@ function LibraryCard({
         )}
       </div>
 
-      <Link
-        href={`/checkout/${currentPriceId}`}
-        className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg text-center transition-colors mb-4"
-      >
-        Get Started
-      </Link>
+      {currentPriceId ? (
+        <Link
+          href={`/checkout/${currentPriceId}`}
+          className={`block w-full ${colors.button} text-white font-semibold py-3 px-6 rounded-lg text-center transition-colors mb-4`}
+        >
+          Get Started
+        </Link>
+      ) : (
+        <div className="block w-full bg-gray-300 text-gray-500 font-semibold py-3 px-6 rounded-lg text-center mb-4 cursor-not-allowed">
+          Coming soon
+        </div>
+      )}
 
       <div className="space-y-3 mb-6">
         {features.map((feature, idx) => (
           <div key={idx} className="flex items-start gap-2">
-            <svg className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <svg className={`w-5 h-5 ${colors.checkColor} mt-0.5 flex-shrink-0`} fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
             <span className="text-sm text-gray-700">{feature}</span>
@@ -220,106 +225,16 @@ function LibraryCard({
   );
 }
 
-// Complete Suite Card Component
-interface CompleteSuiteCardProps {
-  annualPriceId: string;
-  monthlyPriceId: string;
-  billingCycle: 'annual' | 'monthly';
-}
-
-function CompleteSuiteCard({ annualPriceId, monthlyPriceId, billingCycle }: CompleteSuiteCardProps) {
-  const currentPriceId = billingCycle === 'annual' ? annualPriceId : monthlyPriceId;
-  const displayPrice = billingCycle === 'annual' ? '14,950' : '1,499';
-  const displayPeriod = billingCycle === 'annual' ? '/year' : '/month';
-
-  return (
-    <div className="relative">
-      {/* "Best Value" Badge */}
-      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-        <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
-          BEST VALUE - Save $4,850
-        </span>
-      </div>
-
-      <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl shadow-2xl p-12 text-white">
-        <div className="text-center mb-8">
-          <h2 className="text-4xl font-bold mb-3">Complete GTM Suite</h2>
-          <p className="text-xl text-blue-100">All 4 Libraries Included</p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          <div>
-            <h3 className="text-xl font-bold mb-4">What's Included:</h3>
-            <ul className="space-y-2 text-blue-100">
-              <li>✓ New Logo Acquisition Library</li>
-              <li>✓ Customer Expansion Library</li>
-              <li>✓ Partner & Channel Library</li>
-              <li>✓ Sales Velocity Library</li>
-              <li className="pt-2 border-t border-blue-400">
-                <span className="text-white font-semibold">20 strategic blueprints</span>
-              </li>
-              <li><span className="text-white font-semibold">50+ Apex classes, 30+ LWCs</span></li>
-              <li><span className="text-white font-semibold">41 Agentforce agents</span></li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-xl font-bold mb-4">Perfect For:</h3>
-            <ul className="space-y-2 text-blue-100">
-              <li>✓ RevOps transforming full GTM motion</li>
-              <li>✓ Consulting firms building practice</li>
-              <li>✓ Enterprises with multiple revenue motions</li>
-              <li>✓ Organizations deploying comprehensive AI revenue engine</li>
-              <li className="pt-2 border-t border-blue-400">
-                <span className="text-white font-semibold">SI partners: 120+ agents deployed across 50+ clients</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="text-center mb-8">
-          <div className="inline-block bg-white/10 backdrop-blur rounded-lg p-6 mb-6">
-            <div className="text-5xl font-bold mb-2">
-              ${displayPrice}<span className="text-2xl text-blue-200">{displayPeriod}</span>
-            </div>
-            {billingCycle === 'annual' && (
-              <div className="text-blue-200">or $1,499/month</div>
-            )}
-            <div className="text-sm text-blue-100 mt-3">
-              <span className="line-through">$19,800/year</span> if purchased separately
-            </div>
-          </div>
-
-          <Link
-            href={`/checkout/${currentPriceId}`}
-            className="inline-block bg-white text-blue-600 hover:bg-blue-50 font-bold py-4 px-12 rounded-lg text-lg transition-colors shadow-lg"
-          >
-            Get Complete Suite
-          </Link>
-        </div>
-
-        <div className="text-center text-blue-100 text-sm">
-          {billingCycle === 'annual' && (
-            <p>✓ Fallback license after 12 months (all 4 libraries)</p>
-          )}
-          <p>✓ Quarterly updates across all programs</p>
-          <p>✓ Comprehensive Slack support</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // FAQ Section Component
 function FAQSection() {
   const faqs = [
     {
       question: "What's included with the annual subscription?",
-      answer: "Complete access to all blueprints, production-ready code, CLI-deployable demos, implementation guides, quarterly updates, and private Slack support. After 12 consecutive months, you receive a fallback license - you own that version forever even if you cancel."
+      answer: "Full access to the Account Expansion agent: discover and track buying groups, research accounts, run outreach, and sync contacts and activities to your Salesforce CRM. You get strategic playbooks, persona templates, quarterly updates, and private Slack support. After 12 consecutive months, you receive a fallback license—you own that version forever even if you cancel."
     },
     {
       question: "What does 'fallback license' mean?",
-      answer: "After paying for 12 consecutive months, you receive perpetual rights to use that version of the library forever. You can cancel and keep using it, or continue your subscription for ongoing updates and support."
+      answer: "After paying for 12 consecutive months, you receive perpetual rights to use that version of the program forever. You can cancel and keep using it, or continue your subscription for ongoing updates and support."
     },
     {
       question: "What's the difference between annual and monthly?",
@@ -327,22 +242,22 @@ function FAQSection() {
     },
     {
       question: "What support is included?",
-      answer: "Private Slack workspace access for demo setup, architecture guidance, implementation questions, and technical support. Support helps you understand and deploy the code, but does NOT include production implementation services (available separately)."
+      answer: "Private Slack workspace access for setup, architecture guidance, and technical support. Support helps you get the most out of the agents and sync to your CRM; it does not include custom implementation or integration services (available separately)."
     },
     {
-      question: "Can you deploy this to our production org?",
-      answer: "The subscription includes the blueprints and code - you deploy it yourself or work with your team/SI partner. We offer Quick Start Deployment ($15K) and Full Implementation ($35K-75K) services separately if you need hands-on deployment assistance."
+      question: "How does syncing to Salesforce work?",
+      answer: "Agent-discovered contacts, buying groups, and activities can be synced to your Salesforce org so your CRM stays the source of truth. You connect your org once; we handle the sync. Custom integration or deployment services are available separately if needed."
     },
     {
       question: "How do updates work?",
-      answer: "Quarterly updates include new features, Salesforce release compatibility (3x/year), security patches, bug fixes, and new blueprints. Updates are automatic for active subscriptions."
+      answer: "Quarterly updates include new agent capabilities, connector improvements, security patches, and bug fixes. Updates are automatic for active subscriptions."
     }
   ];
 
   return (
     <div className="space-y-6">
       {faqs.map((faq, idx) => (
-        <details key={idx} className="bg-white rounded-lg shadow-md p-6 group">
+        <details key={idx} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 group">
           <summary className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600 list-none flex items-center justify-between">
             <span>{faq.question}</span>
             <svg 

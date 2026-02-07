@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
+import Image from 'next/image';
 import { auth } from '@/auth';
 import { NavigationClient } from './NavigationClient';
 
@@ -24,9 +24,14 @@ export default async function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="AgentPilot Logo"
+              width={40}
+              height={40}
+              className="h-10 w-auto"
+              priority
+            />
             <span className="text-xl font-bold text-slate-900">Revenue Agents</span>
           </Link>
           <NavigationClient isAuthenticated={isAuthenticated} />
