@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const companies = await prisma.company.findMany({
-    where: { createdById: session.user.id },
+    where: { userId: session.user.id },
     orderBy: { updatedAt: 'desc' },
   });
   return NextResponse.json({ companies });
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    const { name, domain, stage, tier, industry } = body;
+    const { name, domain, industry } = body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json(
         { error: 'Name is required' },
@@ -32,10 +32,8 @@ export async function POST(req: NextRequest) {
       data: {
         name: name.trim(),
         domain: domain?.trim() || null,
-        stage: stage?.trim() || 'Prospect',
-        tier: tier?.trim() || null,
         industry: industry?.trim() || null,
-        createdById: session.user.id,
+        userId: session.user.id,
       },
     });
     return NextResponse.json({ company });

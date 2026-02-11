@@ -12,12 +12,9 @@ export default function Navbar() {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-slate-900">Revenue Agents</span>
+            <span className="text-xl font-bold text-slate-900">Agent Pilot</span>
           </Link>
           <div className="hidden md:flex items-center space-x-6 text-sm">
-            <Link href="/pricing" className="text-slate-600 hover:text-slate-900">
-              Pricing
-            </Link>
             <Link href="/#blueprints" className="text-slate-600 hover:text-slate-900">
               Blueprints
             </Link>
@@ -31,10 +28,10 @@ export default function Navbar() {
               Sign In
             </Link>
             <Link
-              href="/portal"
+              href="/dashboard"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Portal
+              Dashboard
             </Link>
           </div>
           <div className="md:hidden flex items-center space-x-4">
@@ -45,10 +42,10 @@ export default function Navbar() {
               Sign In
             </Link>
             <Link
-              href="/portal"
+              href="/dashboard"
               className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
             >
-              Portal
+              Dashboard
             </Link>
           </div>
         </div>

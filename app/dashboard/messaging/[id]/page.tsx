@@ -14,7 +14,7 @@ export default async function MessagingFrameworkDetailPage({
 
   const { id } = await params;
   const framework = await prisma.messagingFramework.findFirst({
-    where: { id, createdById: session.user.id },
+    where: { id, userId: session.user.id },
   });
   if (!framework) notFound();
 
@@ -23,17 +23,7 @@ export default async function MessagingFrameworkDetailPage({
       <Link href="/dashboard/messaging" className="text-sm text-blue-600 hover:text-blue-700 mb-6 inline-block">
         ← Messaging frameworks
       </Link>
-      <div className="flex items-center gap-2 mb-2">
-        <h1 className="text-2xl font-bold text-gray-900">{framework.name}</h1>
-        {framework.isDefault && (
-          <span className="inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-            Default
-          </span>
-        )}
-      </div>
-      {framework.description && (
-        <p className="text-gray-500 mb-6">{framework.description}</p>
-      )}
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{framework.name}</h1>
       <MessagingFrameworkForm framework={framework} />
     </div>
   );

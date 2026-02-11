@@ -8,8 +8,8 @@ export default async function MessagingPage() {
   if (!session?.user?.id) redirect('/api/auth/signin');
 
   const frameworks = await prisma.messagingFramework.findMany({
-    where: { createdById: session.user.id },
-    orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    where: { userId: session.user.id },
+    orderBy: { updatedAt: 'desc' },
   });
 
   return (
@@ -18,7 +18,7 @@ export default async function MessagingPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Messaging frameworks</h1>
           <p className="text-gray-500">
-            Upload positioning, value props, and key messages. The Expansion agent uses the default framework when drafting outreach.
+            Upload positioning, value props, and key messages. The Expansion agent uses your frameworks when drafting outreach.
           </p>
         </div>
         <Link
@@ -47,17 +47,7 @@ export default async function MessagingPage() {
               <Link href={`/dashboard/messaging/${f.id}`} className="block">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-gray-900">{f.name}</p>
-                      {f.isDefault && (
-                        <span className="inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                    {f.description && (
-                      <p className="text-sm text-gray-500 mt-1 line-clamp-1">{f.description}</p>
-                    )}
+                    <p className="font-medium text-gray-900">{f.name}</p>
                     <p className="text-xs text-gray-400 mt-2 line-clamp-2">{f.content}</p>
                   </div>
                   <span className="text-gray-400 shrink-0">Edit →</span>

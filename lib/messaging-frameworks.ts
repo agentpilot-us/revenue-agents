@@ -2,11 +2,26 @@ import { prisma } from '@/lib/db';
 
 /**
  * Get the default messaging framework for a user (for use by the Expansion agent when drafting outreach).
- * Returns null if none is set.
  */
 export async function getDefaultMessagingFramework(userId: string) {
-  const framework = await prisma.messagingFramework.findFirst({
-    where: { createdById: userId, isDefault: true },
+  return prisma.messagingFramework.findFirst({
+    where: { userId },
+    orderBy: { updatedAt: 'desc' },
   });
-  return framework;
+}
+
+/**
+ * Get messaging context for the expansion agent.
+ */
+export async function getMessagingContextForAgent(
+  userId: string,
+  _query?: string,
+  _companyId?: string | null
+): Promise<{ content: string; fromRag: boolean } | null> {
+  const framework = await getDefaultMessagingFramework(userId);
+  if (!framework) return null;
+  return {
+    content: framework.content,
+    fromRag: false,
+  };
 }

@@ -8,7 +8,7 @@ export default function NewCompanyPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
-  const [stage, setStage] = useState('Prospect');
+  const [industry, setIndustry] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,7 +20,11 @@ export default function NewCompanyPage() {
       const res = await fetch('/api/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), domain: domain.trim() || undefined, stage }),
+        body: JSON.stringify({
+          name: name.trim(),
+          domain: domain.trim() || undefined,
+          industry: industry.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -38,8 +42,8 @@ export default function NewCompanyPage() {
 
   return (
     <div className="max-w-lg mx-auto py-8 px-6">
-      <Link href="/dashboard" className="text-sm text-blue-600 hover:text-blue-700 mb-6 inline-block">
-        ← Back to Dashboard
+      <Link href="/dashboard/companies" className="text-sm text-blue-600 hover:text-blue-700 mb-6 inline-block">
+        ← Back to Companies
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Add company</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -74,20 +78,17 @@ export default function NewCompanyPage() {
           />
         </div>
         <div>
-          <label htmlFor="stage" className="block text-sm font-medium text-gray-700 mb-1">
-            Stage
+          <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-1">
+            Industry (optional)
           </label>
-          <select
-            id="stage"
-            value={stage}
-            onChange={(e) => setStage(e.target.value)}
+          <input
+            id="industry"
+            type="text"
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="Prospect">Prospect</option>
-            <option value="Customer">Customer</option>
-            <option value="Expansion">Expansion</option>
-            <option value="Renewal">Renewal</option>
-          </select>
+            placeholder="e.g. Healthcare, SaaS"
+          />
         </div>
         <div className="flex gap-3 pt-4">
           <button
@@ -98,7 +99,7 @@ export default function NewCompanyPage() {
             {loading ? 'Creating…' : 'Create company'}
           </button>
           <Link
-            href="/dashboard"
+            href="/dashboard/companies"
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel

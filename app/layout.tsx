@@ -4,13 +4,13 @@ import './globals.css';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import Providers from '@/components/Providers';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Revenue Agents - Launch AI-Native Revenue Programs',
-  description:
-    'Pre-built Agentforce blueprints, working code, and proven playbooks. Everything you need to deploy enterprise-grade revenue agents.',
+  title: 'Agent Pilot',
+  description: 'AI Agents That Do The Grunt Work',
 };
 
 // Mark layout as dynamic since Navigation uses auth
@@ -24,11 +24,13 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
-          <Navigation />
-          {children}
-          <Footer />
-        </Providers>
+        <TooltipProvider>
+          <Providers>
+            <Navigation />
+            {children}
+            <Footer />
+          </Providers>
+        </TooltipProvider>
       </body>
     </html>
   );

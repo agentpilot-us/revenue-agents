@@ -1,193 +1,116 @@
-import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { success?: string; canceled?: string };
-}) {
+export default async function DashboardPage() {
   const session = await auth();
 
   if (!session?.user?.id) {
     redirect('/api/auth/signin');
   }
 
-  const userId = session.user.id;
-
-  // Fetch user's companies (created by them; later can add teamId)
-  const companiesList = await prisma.company.findMany({
-    where: { createdById: userId },
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      _count: {
-        select: { contacts: true, buyingGroups: true },
-      },
-    },
+  // Get user's stats
+  const activities = await prisma.activity.findMany({
+    where: { userId: session.user.id },
+    select: { type: true },
   });
-
-  const companyIds = companiesList.map((c) => c.id);
-
-  // Agent performance: aggregate from Activity and BuyingGroup for user's companies
-  const [activityCounts, totalContacts, totalBuyingGroups] = await Promise.all([
-    prisma.activity.groupBy({
-      by: ['type'],
-      where: { companyId: { in: companyIds } },
-      _count: true,
-    }),
-    prisma.contact.count({ where: { companyId: { in: companyIds } } }),
-    prisma.buyingGroup.count({ where: { companyId: { in: companyIds } } }),
-  ]);
-
-  const emailsSent =
-    activityCounts.find((a: { type: string; _count: number }) => a.type === 'Email' || a.type === 'InMail')?._count ?? 0;
-  const repliesReceived =
-    activityCounts.find((a: { type: string; _count: number }) => a.type === 'EmailReply')?._count ?? 0;
-  const buyingGroupDiscoveries =
-    activityCounts.find((a: { type: string; _count: number }) => a.type === 'BuyingGroupDiscovery')?._count ?? 0;
-
-  const recentActivities = await prisma.activity.findMany({
-    where: { companyId: { in: companyIds } },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-    include: {
-      company: { select: { id: true, name: true } },
-      contact: { select: { firstName: true, lastName: true } },
-    },
-  });
+  const contactsDiscovered = activities.filter((a) => a.type === 'ContactDiscovered').length;
+  const emailsSent = activities.filter((a) => a.type === 'Email').length;
+  const repliesReceived = activities.filter((a) => a.type === 'EmailReply').length;
 
   return (
-    <div className="py-8 px-6">
-      <div className="max-w-5xl mx-auto">
-        {/* Success / Canceled messages (keep after checkout) */}
-        {searchParams.success === 'true' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-bold text-green-900 mb-2">Payment successful</h2>
-            <p className="text-green-800 text-sm">
-              Your subscription is active. You can use the Account Expansion agent from any company below.
-            </p>
-          </div>
-        )}
-        {searchParams.canceled === 'true' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-bold text-yellow-900 mb-2">Payment canceled</h2>
-            <p className="text-yellow-800 text-sm">No charges were made.</p>
-            <Link href="/pricing" className="text-blue-600 hover:underline text-sm font-medium mt-2 inline-block">
-              Return to Pricing
-            </Link>
-          </div>
-        )}
-
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Welcome back, {session.user?.name || session.user?.email}. Your agents and performance.
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {session.user.name?.split(' ')[0]}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Your AI agents are ready to work
           </p>
         </div>
 
-        {/* Agent performance */}
-        <section className="mb-10">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Agent performance</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-500">Contacts discovered</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{totalContacts}</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-500">Emails sent</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{emailsSent}</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-500">Replies received</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{repliesReceived}</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <p className="text-sm text-gray-500">Buying groups</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{totalBuyingGroups}</p>
-            </div>
-          </div>
-          {recentActivities.length > 0 && (
-            <div className="mt-6 bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Recent activity</h3>
-              <ul className="space-y-2">
-                {recentActivities.map((a: { id: string; type: string; summary: string; company: { name: string }; contact: { firstName: string | null; lastName: string | null } | null }) => (
-                  <li key={a.id} className="text-sm text-gray-600 flex gap-2">
-                    <span className="font-medium text-gray-500">{a.type}</span>
-                    <span>{a.summary}</span>
-                    <span className="text-gray-400">· {a.company.name}</span>
-                    {a.contact && (
-                      <span className="text-gray-400">
-                        {a.contact.firstName} {a.contact.lastName}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
+        {/* Play Selector */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Choose Your Play</h2>
 
-        {/* Companies */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Companies</h2>
-            <Link
-              href="/dashboard/companies/new"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Add company
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Expansion Play */}
+            <Link href="/chat?play=expansion">
+              <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl border-2 border-blue-200 hover:shadow-xl transition-shadow cursor-pointer">
+                <div className="text-4xl mb-4">📈</div>
+                <h3 className="text-2xl font-bold mb-2">Account Expansion</h3>
+                <p className="text-gray-600 mb-4">
+                  Discover buying groups, run multi-threaded outreach
+                </p>
+                <span className="text-sm text-gray-600">For Strategic AEs</span>
+              </div>
+            </Link>
+
+            {/* Partner Play */}
+            <Link href="/chat?play=partner">
+              <div className="bg-gradient-to-br from-purple-50 to-white p-6 rounded-2xl border-2 border-purple-200 hover:shadow-xl transition-shadow cursor-pointer">
+                <div className="text-4xl mb-4">🤝</div>
+                <h3 className="text-2xl font-bold mb-2">Partner Enablement</h3>
+                <p className="text-gray-600 mb-4">
+                  Onboard and activate co-sell with partners
+                </p>
+                <span className="text-sm text-gray-600">For Partner Managers</span>
+              </div>
+            </Link>
+
+            {/* Referral Play */}
+            <Link href="/chat?play=referral">
+              <div className="bg-gradient-to-br from-green-50 to-white p-6 rounded-2xl border-2 border-green-200 hover:shadow-xl transition-shadow cursor-pointer">
+                <div className="text-4xl mb-4">⭐</div>
+                <h3 className="text-2xl font-bold mb-2">Referral Program</h3>
+                <p className="text-gray-600 mb-4">
+                  Generate referrals from happy customers
+                </p>
+                <span className="text-sm text-gray-600">For Customer Success</span>
+              </div>
             </Link>
           </div>
-          {companiesList.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <p className="text-gray-600 mb-4">No companies yet.</p>
-              <p className="text-sm text-gray-500 mb-4">
-                Add a company to run the Account Expansion agent and discover buying groups.
-              </p>
-              <Link
-                href="/dashboard/companies/new"
-                className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Add company
-              </Link>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {companiesList.map((company: { id: string; name: string; domain: string | null; stage: string; tier: string | null; _count: { contacts: number; buyingGroups: number } }) => (
-                <li key={company.id}>
-                  <Link
-                    href={`/dashboard/companies/${company.id}`}
-                    className="block bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-gray-900">{company.name}</p>
-                        {company.domain && (
-                          <p className="text-sm text-gray-500">{company.domain}</p>
-                        )}
-                        <p className="text-xs text-gray-400 mt-1">
-                          {company.stage}
-                          {company.tier && ` · ${company.tier}`}
-                        </p>
-                      </div>
-                      <div className="text-right text-sm text-gray-500">
-                        <p>{company._count.contacts} contacts</p>
-                        <p>{company._count.buyingGroups} buying groups</p>
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        </div>
 
-        {/* Compact subscription / Billing link */}
-        <div className="mt-10 pt-6 border-t border-gray-200">
-          <Link href="/portal" className="text-sm text-blue-600 hover:text-blue-700">
-            Manage subscription & Billing →
-          </Link>
+        {/* Performance Metrics */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6">This Week</h2>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <p className="text-gray-700 mb-2">Contacts Discovered</p>
+              <p className="text-4xl font-bold text-gray-900">{contactsDiscovered}</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <p className="text-gray-700 mb-2">Emails Sent</p>
+              <p className="text-4xl font-bold text-gray-900">{emailsSent}</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+              <p className="text-gray-700 mb-2">Replies Received</p>
+              <p className="text-4xl font-bold text-gray-900">{repliesReceived}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-semibold text-gray-900">Recent Activity</h2>
+            <Link href="/activities" className="text-blue-600 hover:text-blue-700">
+              View All →
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-lg shadow divide-y">
+            <div className="p-4 text-gray-600 text-center">
+              No recent activity
+            </div>
+          </div>
         </div>
       </div>
     </div>

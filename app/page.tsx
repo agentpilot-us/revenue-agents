@@ -34,7 +34,7 @@ export default function HomePage() {
             {/* Primary CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-10">
               <Link 
-                href="/pricing"
+                href="/dashboard"
                 className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 Get Account Expansion Agent
@@ -388,7 +388,7 @@ export default function HomePage() {
           </div>
 
           <div className="max-w-3xl mx-auto mb-12">
-            <Link href="/pricing" className="block group">
+            <Link href="/dashboard" className="block group">
               <div className="bg-gradient-to-br from-green-50 to-white rounded-2xl p-8 border-2 border-green-200 hover:shadow-2xl hover:border-green-300 transition-all">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -591,7 +591,7 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Link
-              href="/pricing"
+              href="/dashboard"
               className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5"
             >
               Get Started Now

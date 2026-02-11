@@ -17,8 +17,8 @@ export default function Footer() {
             <div className="font-semibold mb-2">Product</div>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
-                <Link href="/pricing" className="hover:text-white">
-                  Pricing
+                <Link href="/dashboard" className="hover:text-white">
+                  Dashboard
                 </Link>
               </li>
               <li>
@@ -76,7 +76,7 @@ export default function Footer() {
         </div>
         <div className="border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
           <p>
-            © 2025 Revenue Agents Platform. Built by{' '}
+            © 2025 Agent Pilot. Built by{' '}
             <span className="text-blue-400">Agent Pilot</span>.
           </p>
           <p className="mt-2">

@@ -40,3 +40,7 @@ next-env.d.ts
 # prisma
 prisma/migrations/
 .env.local.backup
+
+# Environment variables
+.env.local
+.env.*.local

@@ -49,15 +49,9 @@ npx prisma generate
 npx prisma migrate dev --name init
 ```
 
-### 4. Set Up Stripe
+### 4. Stripe (optional for MVP)
 
-1. Create products in Stripe dashboard:
-   - "Revenue Agents Pro - Monthly" ($499/month)
-   - "Revenue Agents Pro - Annual" ($4,990/year)
-2. Copy Price IDs to `.env.local`
-3. Set up webhook endpoint in Stripe:
-   - URL: `https://your-app.vercel.app/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.deleted`, `customer.subscription.updated`
+Payment (Stripe Checkout/webhook) is not wired for MVP. See [`docs/STRIPE_PRICE_ID_GUIDE.md`](docs/STRIPE_PRICE_ID_GUIDE.md) when re-enabling.
 
 ### 5. Set Up GitHub
 
@@ -81,29 +75,29 @@ Visit `http://localhost:3000`
 ```
 /
 ├── app/
-│   ├── layout.tsx          # Root layout with Navbar/Footer
+│   ├── layout.tsx
 │   ├── page.tsx            # Landing page
-│   ├── pricing/
-│   │   └── page.tsx        # Pricing page
-│   ├── portal/
-│   │   └── page.tsx        # Customer dashboard
+│   ├── plays/page.tsx     # Play selection (Expansion, Partner, Referral)
+│   ├── chat/page.tsx       # Chat UI (?play=expansion&accountId=…)
+│   ├── dashboard/          # Companies, messaging, settings
+│   ├── pricing/            # Pricing page
+│   ├── portal/             # Customer dashboard
 │   └── api/
-│       ├── stripe/
-│       │   ├── create-checkout/route.ts
-│       │   └── webhook/route.ts
-│       └── github/
-│           └── invite/route.ts
-├── components/
-│   ├── Navbar.tsx
-│   ├── Footer.tsx
-│   └── PricingPage.tsx    # Full pricing UI with checkout
+│       ├── auth/           # NextAuth
+│       ├── chat/route.ts   # Single chat route (playId, accountId)
+│       ├── webhooks/resend/, webhooks/cal/
+│       ├── cron/calculate-engagement/
+│       └── messaging-frameworks/
 ├── lib/
 │   ├── db.ts               # Prisma client
-│   ├── stripe.ts           # Stripe client
-│   └── github.ts           # GitHub Octokit client
-└── prisma/
-    └── schema.prisma       # Database schema
+│   ├── tools/              # Resend, Clay, PhantomBuster, Cal, Perplexity, Firecrawl
+│   ├── plays/              # Expansion, Partner, Referral configs
+│   └── engagement/         # Engagement scoring
+├── docs/                   # All setup and reference docs (see below)
+└── prisma/schema.prisma
 ```
+
+**Documentation** is in the [`docs/`](docs/) folder: setup, database, env vars, Vercel, testing, troubleshooting, etc.
 
 ## Features
 
@@ -134,4 +128,4 @@ Visit `http://localhost:3000`
 
 ## Environment Variables Reference
 
-See `.env.local.example` for all required variables.
+See `.env.local.example` for required variables. Detailed guides: [`docs/ENV_SETUP_GUIDE.md`](docs/ENV_SETUP_GUIDE.md), [`docs/CHECK_ENV_VARS.md`](docs/CHECK_ENV_VARS.md).

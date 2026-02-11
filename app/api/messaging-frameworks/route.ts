@@ -8,8 +8,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const frameworks = await prisma.messagingFramework.findMany({
-    where: { createdById: session.user.id },
-    orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    where: { userId: session.user.id },
+    orderBy: { updatedAt: 'desc' },
   });
   return NextResponse.json({ frameworks });
 }
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    const { name, description, content, isDefault } = body;
+    const { name, content } = body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return NextResponse.json(
         { error: 'Name is required' },
@@ -34,20 +34,11 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const setAsDefault = Boolean(isDefault);
-    if (setAsDefault) {
-      await prisma.messagingFramework.updateMany({
-        where: { createdById: session.user.id },
-        data: { isDefault: false },
-      });
-    }
     const framework = await prisma.messagingFramework.create({
       data: {
         name: name.trim(),
-        description: description?.trim() || null,
         content: content.trim(),
-        createdById: session.user.id,
-        isDefault: setAsDefault,
+        userId: session.user.id,
       },
     });
     return NextResponse.json({ framework });

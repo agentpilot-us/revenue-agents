@@ -1,17 +1,15 @@
-// Prisma Schema
+// Prisma Schema – simplified per cleanup plan
 
 generator client {
   provider = "prisma-client-js"
 }
 
+// In Prisma 7+, connection URL is set in prisma.config.ts
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // directUrl is optional - only needed for migrations with connection pooling
-  // directUrl = env("DATABASE_URL_UNPOOLED")
+  provider = "postgresql"
 }
 
-// NextAuth.js Required Models
+// ----- NextAuth (do not change) -----
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -25,9 +23,7 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
 }
 
@@ -40,323 +36,492 @@ model Session {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  name              String?
-  email             String    @unique
-  emailVerified     DateTime?
-  image             String?
-  githubUsername    String?   @unique
-  stripeCustomerId  String?   @unique
-  subscriptionId    String?   @unique
-  subscriptionStatus String?  // 'active' | 'cancelled' | 'past_due' | null
-  subscriptionTier  String?   // 'pro' | 'community' | null
-  role              String?   // "AE" | "CSM" | "SDR" | "Marketing" | "Partner"
-  teamId            String?
-  arcadeUserId      String?   @unique
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  accounts               Account[]
-  sessions               Session[]
-  purchases              Purchase[]
-  team                   Team?                    @relation(fields: [teamId], references: [id])
-  ownedContacts         Contact[]                 @relation("ContactOwner")
-  plays                  Play[]
-  activities             Activity[]
-  chatMessages           ChatMessage[]
-  createdBuyingGroupTemplates BuyingGroupTemplate[]
-  createdBuyingGroups    BuyingGroup[]
-  companies            Company[]
-  messagingFrameworks   MessagingFramework[]
+  accounts   Account[]
+  sessions   Session[]
+  companies  Company[]
+  activities Activity[]
+  messagingFrameworks MessagingFramework[]
+  orgs             Org[]
+  products         Product[]
+  contentLibraries ContentLibrary[]
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
-  expires    DateTime
-
+  expires   DateTime
   @@unique([identifier, token])
 }
 
-// Revenue Agents Business Models
-model Purchase {
-  id               String   @id @default(cuid())
-  userId           String
-  stripeProductId  String
-  stripePriceId    String
-  stripePurchaseId String   @unique
-  productType      String // "library" | "suite"
-  productCategory  String // "new-logo" | "expansion" | "partner" | "sales-velocity" | "complete"
-  purchaseAmount   Decimal  @db.Decimal(10, 2)
-  purchaseDate     DateTime @default(now())
-  expirationDate   DateTime // 12 months from purchase
-  status           String   @default("active") // active | expired | refunded
-  githubTeamAdded  String? // Which GitHub team they were added to
-
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  downloads Download[]
-}
-
-model Download {
-  id           String   @id @default(cuid())
-  purchaseId   String
-  version      String // e.g., "v1.0.0"
-  downloadedAt DateTime @default(now())
-  ipAddress    String?
-
-  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-}
-
-// Agent Pilot: Team and Company (business account)
-model Team {
-  id        String   @id @default(cuid())
-  name      String
-  users     User[]
-  companies Company[]
-  buyingGroupTemplates BuyingGroupTemplate[]
-  messagingFrameworks  MessagingFramework[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Product marketing: messaging frameworks the agent uses when drafting outreach
-model MessagingFramework {
+// ----- Business: Company (Account in spec; name kept to avoid NextAuth Account clash) -----
+model Company {
   id          String   @id @default(cuid())
-  name        String   // e.g. "Enterprise value prop", "Expansion play"
-  description String?  // Short note for PMM
-  content     String   @db.Text // Full framework: value props, positioning, key messages, do's/don'ts
-  teamId      String?
-  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  isDefault   Boolean  @default(false) // One default per user/team for agent to use
+  name        String
+  domain      String?
+  industry    String?
+  website     String?
+  size        String?  // "1-50", "51-200", etc.
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  contacts        Contact[]
+  activities      Activity[]
+  departments     CompanyDepartment[]
+  companyProducts CompanyProduct[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([createdById])
-  @@index([teamId])
-  @@index([isDefault])
-}
-
-model Company {
-  id             String   @id @default(cuid())
-  name           String
-  domain         String?
-  tier           String?  // "Strategic" | "Enterprise" | "Growth"
-  stage          String   // "Prospect" | "Customer" | "Expansion" | "Renewal"
-  arr            Int?     // Annual Recurring Revenue in cents
-  industry       String?
-  sfdcAccountId  String?  @unique
-  teamId         String?
-  team           Team?    @relation(fields: [teamId], references: [id])
-  createdById    String?  // User who created (for "my companies" when no team)
-  createdBy      User?    @relation(fields: [createdById], references: [id])
-  contacts       Contact[]
-  plays          Play[]
-  researchBriefs ResearchBrief[]
-  activities     Activity[]
-  buyingGroups   BuyingGroup[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([domain])
-  @@index([sfdcAccountId])
-  @@index([teamId])
-  @@index([createdById])
-}
-
-model Contact {
-  id               String    @id @default(cuid())
-  firstName        String?
-  lastName         String?
-  email            String?
-  linkedinUrl      String?
-  linkedinProfileId String?
-  phone            String?
-  role             String?
-  department       String?
-  seniority        String?
-  yearsExperience  Int?
-  companyId        String
-  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ownerId          String?
-  owner            User?     @relation("ContactOwner", fields: [ownerId], references: [id])
-  ownerRole        String?
-  lastContactedAt  DateTime?
-  lastContactedBy  String?
-  sfdcContactId    String?   @unique
-  sfdcLeadId       String?   @unique
-  activities       Activity[]
-  buyingGroupMemberships BuyingGroupMember[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  @@unique([email, companyId])
-  @@index([companyId])
-  @@index([ownerId])
-  @@index([email])
-  @@index([linkedinProfileId])
-}
-
-model BuyingGroupTemplate {
-  id               String   @id @default(cuid())
-  createdById      String
-  createdBy        User     @relation(fields: [createdById], references: [id])
-  teamId           String?
-  team             Team?    @relation(fields: [teamId], references: [id])
-  isPublic         Boolean  @default(false)
-  name             String
-  description      String?
-  industry         String?
-  useCase          String?
-  personas         Json     // Array of PersonaDefinition
-  segmentationRules Json?
-  timesUsed        Int      @default(0)
-  buyingGroups     BuyingGroup[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([createdById])
-  @@index([teamId])
-  @@index([isPublic])
+  @@index([userId])
   @@index([industry])
 }
 
-model BuyingGroup {
-  id              String   @id @default(cuid())
-  companyId       String
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  templateId      String?
-  template        BuyingGroupTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  customName      String
-  customPersonas  Json?
-  segmentApplied  String?
-  segmentRules    Json?
-  status          String   // "Discovering" | "Complete" | "Incomplete"
-  contactsFound   Int      @default(0)
-  personasSearched Int     @default(0)
-  createdById     String
-  createdBy       User     @relation(fields: [createdById], references: [id])
-  members         BuyingGroupMember[]
-  startedAt       DateTime @default(now())
-  completedAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// ----- Contact with engagement -----
+model Contact {
+  id String @id @default(cuid())
 
-  @@index([companyId])
-  @@index([createdById])
-  @@index([status])
-  @@index([templateId])
-}
+  firstName   String?
+  lastName    String?
+  email       String?
+  phone       String?
+  title       String?
+  department  String?   // Legacy free-text; use companyDepartmentId for structured department
+  companyDepartmentId String?
+  companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
+  personaId   String?
+  persona     Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  linkedinUrl String?
+  photoUrl    String?
+  bio         String?  @db.Text
+  enrichedData Json?
 
-model BuyingGroupMember {
-  id             String   @id @default(cuid())
-  buyingGroupId  String
-  buyingGroup    BuyingGroup @relation(fields: [buyingGroupId], references: [id], onDelete: Cascade)
-  contactId      String
-  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  persona        String
-  personaLabel   String
-  segment        String?
-  segmentMatches Json?
-  influence      String?
-  foundVia       String?
-  confidence     Float?
-  createdAt      DateTime @default(now())
+  city    String?
+  state   String?
+  country String?
 
-  @@unique([buyingGroupId, contactId])
-  @@index([buyingGroupId])
-  @@index([contactId])
-  @@index([segment])
-}
+  seniority      String?
+  seniorityLevel Int?
 
-model Play {
-  id               String   @id @default(cuid())
-  type             String   // "ABM" | "Referral" | "Expansion" | "Renewal"
-  status           String   // "Planning" | "Active" | "Paused" | "Completed"
-  goal             String
-  companyId        String
-  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ownerId          String
-  owner            User     @relation(fields: [ownerId], references: [id])
-  blockedBy        String?
-  blockedReason    String?
-  contactsFound    Int      @default(0)
-  emailsSent       Int      @default(0)
-  repliesReceived  Int      @default(0)
-  meetingsBooked   Int      @default(0)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  lastContactedAt    DateTime?
+  lastContactMethod  String?
+  lastEmailSentAt    DateTime?
+  lastEmailOpenedAt  DateTime?
+  lastEmailClickedAt DateTime?
+  lastEmailRepliedAt DateTime?
+
+  totalEmailsSent    Int @default(0)
+  totalEmailsOpened  Int @default(0)
+  totalEmailsClicked Int @default(0)
+  totalEmailsReplied Int @default(0)
+
+  engagementScore Float?
+  isResponsive    Boolean @default(false)
+  isDormant       Boolean @default(false)
+
   activities       Activity[]
-  startedAt        DateTime @default(now())
-  completedAt      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  eventAttendances EventAttendance[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([email, companyId])
   @@index([companyId])
-  @@index([ownerId])
-  @@index([status])
+  @@index([department])
+  @@index([companyDepartmentId])
+  @@index([personaId])
+  @@index([lastContactedAt])
+  @@index([lastEmailRepliedAt])
+  @@index([engagementScore])
+  @@index([seniorityLevel])
+  @@index([city, state])
 }
 
 model Activity {
-  id           String    @id @default(cuid())
-  type         String    // "Email" | "InMail" | "EmailReply" | "BuyingGroupDiscovery"
-  summary      String
-  content      String?   @db.Text
-  companyId    String
-  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contactId    String?
-  contact      Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  playId       String?
-  play         Play?     @relation(fields: [playId], references: [id], onDelete: SetNull)
-  userId       String
-  user         User      @relation(fields: [userId], references: [id])
-  userRole     String
-  sentVia      String?
-  externalId   String?
-  openedAt     DateTime?
-  openCount    Int       @default(0)
-  clickedAt    DateTime?
-  clickedUrl   String?
-  repliedAt    DateTime?
-  replyContent String?   @db.Text
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  type      String   // EMAIL_SENT, MEETING_SCHEDULED, etc. (see ActivityType enum for canonical values)
+  summary   String
+  content   String?  @db.Text
+  subject   String?
+  body      String?  @db.Text
+  metadata  Json?
+
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyDepartmentId String?
+  companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  resendEmailId String?
+  calEventId    String?
+  agentUsed     String?
+
+  createdAt DateTime @default(now())
 
   @@index([companyId])
+  @@index([companyDepartmentId])
   @@index([contactId])
-  @@index([playId])
-  @@index([userId])
   @@index([type])
-  @@index([externalId])
+  @@index([resendEmailId])
+  @@index([createdAt])
 }
 
-model ResearchBrief {
-  id            String   @id @default(cuid())
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  summary       String   @db.Text
-  fundingInfo   String?  @db.Text
-  techStack     String?  @db.Text
-  recentNews    String?  @db.Text
-  hiringSignals String?  @db.Text
-  competitorInfo String? @db.Text
-  source        String   // "Perplexity" | "Exa" | "Manual"
-  rawData       Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([companyId])
-}
-
-model ChatMessage {
+model EventAttendance {
   id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agent      String   // "abm" | "referral" | "expansion"
-  role       String   // "user" | "assistant" | "system"
-  content    String   @db.Text
-  toolCalls  Json?
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  eventName  String
+  eventDate  DateTime
+  source     String
+  rsvpStatus String?
   createdAt  DateTime @default(now())
+  @@unique([contactId, eventName])
+  @@index([eventName])
+  @@index([eventDate])
+}
+
+model MessagingFramework {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+}
+
+// ============================================
+// ACCOUNT & DEPARTMENT HIERARCHY (Org = account level)
+// Org = business account (spec "Account"; name avoids NextAuth Account clash)
+// ============================================
+
+model Org {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  industry    String
+  website     String?
+  description String?  @db.Text
+
+  orgDepartments OrgDepartment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([agent])
+  @@index([industry])
+}
+
+model OrgDepartment {
+  id          String   @id @default(cuid())
+  accountId   String
+  account     Org      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+
+  relevantProducts DepartmentProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+}
+
+// ============================================
+// DEPARTMENT LAYER (Company-scoped)
+// ============================================
+
+enum DepartmentType {
+  SALES
+  MARKETING
+  CUSTOMER_SUCCESS
+  REVENUE_OPERATIONS
+  PRODUCT
+  ENGINEERING
+  AUTONOMOUS_VEHICLES
+  MANUFACTURING_OPERATIONS
+  INDUSTRIAL_DESIGN
+  IT_DATA_CENTER
+  SUPPLY_CHAIN
+  CONNECTED_SERVICES
+  EXECUTIVE_LEADERSHIP
+  FINANCE
+  LEGAL
+  HR
+  OTHER
+}
+
+enum DepartmentStatus {
+  ACTIVE_CUSTOMER
+  EXPANSION_TARGET
+  RESEARCH_PHASE
+  NOT_ENGAGED
+  NOT_APPLICABLE
+}
+
+model CompanyDepartment {
+  id                String            @id @default(cuid())
+
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type              DepartmentType
+  customName        String?
+  status            DepartmentStatus  @default(NOT_ENGAGED)
+
+  estimatedSize     Int?
+  budget            Decimal?          @db.Decimal(18, 2)
+  notes             String?           @db.Text
+
+  contacts          Contact[]
+  companyProducts   CompanyProduct[]
+  activities        Activity[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([companyId, type])
+  @@index([companyId])
+  @@index([status])
+}
+
+// ============================================
+// PRODUCT CATALOG (Company × Product × Department matrix)
+// ============================================
+
+enum ProductOwnershipStatus {
+  ACTIVE
+  TRIAL
+  CHURNED
+  OPPORTUNITY
+  NOT_APPLICABLE
+}
+
+model CatalogProduct {
+  id                String            @id @default(cuid())
+
+  name              String            @unique
+  slug              String            @unique
+  description       String?           @db.Text
+
+  priceMin          Decimal?          @db.Decimal(18, 2)
+  priceMax          Decimal?          @db.Decimal(18, 2)
+  pricingModel      String?
+
+  targetDepartments DepartmentType[]
+  targetPersonas    String[]
+
+  useCases          String[]
+  contentTags       String[]
+
+  companyProducts   CompanyProduct[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([slug])
+}
+
+model CompanyProduct {
+  id                String                  @id @default(cuid())
+
+  companyId         String
+  company           Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  companyDepartmentId String?
+  companyDepartment   CompanyDepartment?    @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
+
+  productId         String
+  product           CatalogProduct          @relation(fields: [productId], references: [id])
+
+  status            ProductOwnershipStatus  @default(OPPORTUNITY)
+  arr               Decimal?                @db.Decimal(18, 2)
+  contractStart     DateTime?
+  contractEnd       DateTime?
+
+  fitScore          Decimal?                @db.Decimal(5, 2)
+  fitReasoning      String?                 @db.Text
+  opportunitySize   Decimal?                @db.Decimal(18, 2)
+
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@unique([companyId, companyDepartmentId, productId])
+  @@index([companyId])
+  @@index([companyDepartmentId])
+  @@index([productId])
+  @@index([status])
+}
+
+// ============================================
+// USER PRODUCTS & CONTENT (existing)
+// ============================================
+
+model Product {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?  @db.Text
+  category    String?
+
+  contentLibrary     ContentLibrary[]
+  departmentProducts DepartmentProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DepartmentProduct {
+  id           String  @id @default(cuid())
+  departmentId String
+  productId    String
+  relevance    String? @db.Text
+  priority     Int     @default(5)
+
+  department OrgDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, productId])
+  @@index([departmentId])
+  @@index([productId])
+}
+
+enum ContentType {
+  Framework
+  UseCase
+  SuccessStory
+  Persona
+  Battlecard
+}
+
+model ContentLibrary {
+  id        String      @id @default(cuid())
+  userId    String
+  productId String
+
+  title   String
+  type    ContentType
+  content Json
+
+  persona    String?
+  department String?
+  industry   String?
+  company    String?
+  competitor String?
+
+  inferredTags    Json?
+  userConfirmed   Boolean @default(false)
+  confidenceScore String?
+
+  sourceUrl String?
+  scrapedAt DateTime?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([productId, persona])
+  @@index([productId, department])
+  @@index([productId, industry])
+  @@index([company])
+  @@index([confidenceScore])
+}
+
+// ============================================
+// PERSONAS (department + role matrix)
+// ============================================
+
+model Persona {
+  id                    String            @id @default(cuid())
+
+  name                  String            @unique
+  description           String?           @db.Text
+
+  includeTitles         String[]
+  excludeTitles         String[]
+
+  primaryDepartment    DepartmentType?
+  secondaryDepartments  DepartmentType[]
+
+  painPoints            String[]
+  successMetrics        String[]
+
+  contentTypes          String[]
+  messagingTone         String            @default("business")
+
+  preferredChannels     String[]
+
+  contacts              Contact[]
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([primaryDepartment])
+}
+
+// ============================================
+// CONTENT ITEMS (AI-tagged content library)
+// ============================================
+
+enum ContentItemType {
+  CASE_STUDY
+  WHITEPAPER
+  ROI_CALCULATOR
+  DEMO_VIDEO
+  PRODUCT_BRIEF
+  BATTLECARD
+  EMAIL_TEMPLATE
+  PRESENTATION
+  RESEARCH_REPORT
+  USE_CASE_GUIDE
+}
+
+model ContentItem {
+  id          String          @id @default(cuid())
+
+  title       String
+  description String?         @db.Text
+  type        ContentItemType
+  url         String?
+  fileUrl     String?
+
+  industries  Json?
+  departments Json?
+  personas    Json?
+  useCases    Json?
+  stage       String?
+
+  fullText    String?         @db.Text
+
+  tags        String[]
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([type])
 }
