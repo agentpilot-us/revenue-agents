@@ -9,8 +9,7 @@
     "lint": "eslint",
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
-    "db:studio": "dotenv -e .env.local -- prisma studio",
-    "db:seed-products": "dotenv -e .env.local -- npx tsx prisma/seed-products.ts"
+    "db:studio": "dotenv -e .env.local -- prisma studio"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.59",

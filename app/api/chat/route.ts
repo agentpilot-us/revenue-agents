@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { getPlay } from '@/lib/plays';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
+import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import {
   searchLinkedInContacts,
   enrichContact,
@@ -79,7 +80,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Content library: fetch content matching account industry and/or target contact's department for department-specific messaging
+    // Content library: fetch content matching account industry and/or target contact's department for department-specific messaging.
+    // When account (company) is set, include and prefer entries where company matches so account-specific guides (e.g. GM) are used.
     type ContentShape = {
       valueProp?: string;
       benefits?: string[];
@@ -93,14 +95,33 @@ export async function POST(req: Request) {
     if (targetContactDepartment) {
       orConditions.push({ department: targetContactDepartment });
     }
+    const whereClause: {
+      userId: string;
+      userConfirmed: boolean;
+      isActive: boolean;
+      OR?: Array<{ industry?: string | null; department?: string }>;
+      AND?: Array<Record<string, unknown>>;
+    } = {
+      userId: session.user.id,
+      userConfirmed: true,
+      isActive: true,
+    };
+    if (company?.name) {
+      whereClause.AND = [
+        ...(orConditions.length > 0 ? [{ OR: orConditions }] : []),
+        { OR: [{ company: company.name }, { company: null }, { company: '' }] },
+      ];
+    } else if (orConditions.length > 0) {
+      whereClause.OR = orConditions;
+    }
     const relevantContent = await prisma.contentLibrary.findMany({
-      where: {
-        userId: session.user.id,
-        userConfirmed: true,
-        isActive: true,
-        ...(orConditions.length > 0 ? { OR: orConditions } : {}),
-      },
-      orderBy: [{ department: 'desc' }, { persona: 'desc' }, { industry: 'desc' }],
+      where: whereClause,
+      orderBy: [
+        { company: 'desc' }, // company-matched (non-null) first when account is set
+        { department: 'desc' },
+        { persona: 'desc' },
+        { industry: 'desc' },
+      ],
       take: 8,
     });
 
@@ -135,6 +156,13 @@ When drafting emails or messages:
 3. Personalize by contact: department drives which messaging applies; use their title and department together.`
         : '';
 
+    // Account-level messaging (additive to content library and department logic)
+    let accountContextBlock = '';
+    if (accountId && session.user.id) {
+      const block = await getAccountMessagingPromptBlock(accountId, session.user.id);
+      if (block) accountContextBlock = `\n\n${block}`;
+    }
+
     // Messaging framework
     const lastUserContent = messages
       .filter((m: unknown) => (m as { role?: string }).role === 'user')
@@ -165,19 +193,63 @@ When drafting emails or messages:
       calendarBookingUrl: process.env.CAL_PUBLIC_BOOKING_URL || process.env.NEXT_PUBLIC_CAL_BOOKING_URL || undefined,
     })}
 
-You are an AI assistant for account expansion. You help account managers:
-- Discover departments at their accounts (use discover_departments and list_departments)
-- Find contacts by department and role (use find_contacts_in_department)
-- Identify expansion opportunities
-- Draft personalized outreach
+You are an AI assistant for account expansion.
 
-When asked about a company:
-1. First check which departments exist (list_departments or discover_departments)
-2. Identify which departments are customers vs. expansion targets
-3. Find relevant contacts in target departments
-4. Suggest expansion strategies
+You help account managers:
+- Discover departments at their accounts
+- Find contacts by department and role
+- Match contacts to personas (ENHANCED)
+- Identify product expansion opportunities
+- Calculate product fit using AI
+- Draft personalized outreach based on persona (NEW)
 
-Always be proactive—suggest next steps based on context.
+PERSONA-AWARE WORKFLOW:
+When drafting emails or outreach:
+1. Identify the contact's persona (Economic Buyer, Technical Buyer, Program Manager, etc.)
+2. Understand what that persona cares about (pain points, success metrics)
+3. Match messaging tone to persona (executive = strategic, technical = detailed, business = practical)
+4. Reference relevant content that matches persona preferences
+5. Use appropriate channel (Economic Buyer = exec dinner, Technical Buyer = sandbox trial)
+
+EXAMPLE CONVERSATION:
+User: "Draft an email to Michael Torres at GM about Jetson"
+
+You:
+1. Look up Michael Torres (VP Manufacturing at GM)
+2. Match persona → "Economic Buyer - Manufacturing"
+3. Get persona details → Cares about: quality defects, cost reduction, ROI
+4. Draft email with persona-aware messaging:
+   - Tone: Business (not too technical, focus on outcomes)
+   - Pain point: Reference quality control / defect reduction
+   - Proof: BMW case study ($40M savings, 60% defect reduction)
+   - CTA: Soft ask (plant tour, ROI calculator)
+   - Length: 100-150 words (exec is busy)
+
+Always explain WHY you chose a certain messaging approach based on persona.
+
+PERSONA TYPES:
+- Economic Buyer: Budget owner, C-suite/VP, cares about ROI and business outcomes
+- Technical Buyer: Evaluates tech fit, Director/Manager, cares about architecture and integration
+- Program Manager: Implements solutions, Manager/Director, cares about deployment and change mgmt
+- Champion: Your internal advocate, any level, cares about their personal success
+- End User: Daily user, IC level, cares about ease of use and productivity
+
+Be proactive—suggest persona-specific next steps based on context.
+
+When presenting product penetration, format the full department-by-product matrix as a markdown table: rows = productList (product names), columns = departmentList (department type or customName), cells = status + amount (e.g. ACTIVE + arr as "$500K", OPPORTUNITY + opportunitySize as "$300K", TRIAL + amount, or "—" when matrix[departmentId][productId] is null). Use the departmentList, productList, and matrix returned by get_product_penetration to build this table.
+
+CROSS-DEPARTMENT EXPANSION STRATEGY:
+When the user asks "What's my best approach to expand at [company] across all departments?" or "strategy across departments" or "expand at [company]":
+1. Call get_expansion_strategy(companyId) to get phase1, phase2, phase3 with department names, top product, opportunity size, and fit score per department.
+2. Optionally call list_departments and get_product_penetration for more detail (contacts, last activity).
+3. Respond with this EXACT structure (use the section headers and formatting below):
+   - PHASE 1 (NOW - Q1): List each department from phase1 with product, $, fit %, status, action plan (bullet points: THIS WEEK, WEEK 2-3), timeline, success probability. Add a short "KEY INSIGHT" if relevant (e.g. "Run Manufacturing + Design plays SIMULTANEOUSLY").
+   - PHASE 2 (Q2): List phase2 departments (upsell / existing customer expansion) with action plan and timeline.
+   - PHASE 3 (Q3-Q4): List phase3 departments (longer cycle or lower priority) with action plan and timeline.
+   - SUMMARY: Total expansion target ($), Phase 1/2/3 breakdown, expected close rate, timeline (e.g. "9-12 months for full account expansion").
+   - FOCUS THIS WEEK: Numbered list of 1-3 concrete actions (e.g. "Follow up with Michael Torres (Manufacturing)", "Email David for Jennifer intro (Design)").
+   - End with: "Want me to draft those emails?" or "Want me to draft the follow-up for [contact]?" so the user has a clear CTA.
+Use clear section dividers (e.g. ━━━) and keep action plans specific (names, products, next step).
 
 ACCOUNT CONTEXT:
 - Current company ID (use this as companyId in list_departments, find_contacts_in_department, discover_departments): ${accountId || 'none'}
@@ -188,10 +260,15 @@ ACCOUNT CONTEXT:
 ${contactsList}
 ${!accountId ? '\nNo account is selected. If the user asks about departments or contacts, ask them to open a company (e.g. from the dashboard) and start the chat from that company\'s page.' : ''}
 
+When the user asks "what departments does [company] have?" or similar: first call list_departments with the Current company ID above. That returns the departments already mapped for this account. Only use discover_departments if it is available and the user wants to find additional departments via AI research.
+
+Parse research and save to database: When the user asks "what departments are interested in [product] and why?" (e.g. NVIDIA chips, Jetson): (1) call research_company with a query about that company and product interest, (2) call apply_department_product_research with the Current company ID and the research summary (and optional productFocus). That extracts departments and product interests with value prop and writes them to the account. Then summarize what was added. When the user pastes a block of research text (earnings notes, LinkedIn research, etc.) and wants it ingested: call apply_department_product_research with the Current company ID and the pasted text; then confirm what was created or updated.
+
 DEPARTMENT-BASED MESSAGING: Each contact may have a department (e.g. Autonomous Vehicles, IT Infrastructure). Use the content library entries that match that department to determine value propositions and use cases when drafting to that contact. If department is "Not set", use industry and persona from the content library.
 
 ${messagingSection}
 ${contentLibrarySection}
+${accountContextBlock}
 
 Work step-by-step and explain what you're doing.`;
 

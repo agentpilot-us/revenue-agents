@@ -28,6 +28,7 @@ export const TOOL_TO_SERVICE: Record<string, ServiceId> = {
   search_linkedin_contacts: 'phantombuster',
   enrich_contact: 'clay',
   research_company: 'perplexity',
+  discover_departments: 'perplexity',
   send_email: 'resend',
   create_calendar_event: 'cal',
   get_calendar_rsvps: 'cal',

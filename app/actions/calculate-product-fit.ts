@@ -30,11 +30,36 @@ const fitScoringSchema = z.object({
 
 export type FitOpportunity = z.infer<typeof fitScoringSchema>['opportunities'][number];
 
-export async function calculateProductFit(companyId: string): Promise<FitOpportunity[]> {
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export async function calculateProductFit(
+  companyId: string,
+  forceRecalculate: boolean = false
+): Promise<FitOpportunity[]> {
   const session = await auth();
   if (!session?.user?.id) {
     throw new Error('Unauthorized');
   }
+
+  const companyCache = await prisma.company.findFirst({
+    where: { id: companyId, userId: session.user.id },
+    select: { lastFitCalculation: true, fitCalculationData: true },
+  });
+
+  if (!companyCache) {
+    throw new Error('Company not found');
+  }
+
+  const cacheValid =
+    companyCache.lastFitCalculation &&
+    Date.now() - new Date(companyCache.lastFitCalculation).getTime() < CACHE_TTL_MS;
+
+  if (!forceRecalculate && cacheValid && companyCache.fitCalculationData != null) {
+    console.log('[calculateProductFit] Using cached fit calculation');
+    return companyCache.fitCalculationData as FitOpportunity[];
+  }
+
+  console.log('[calculateProductFit] Calculating fresh product fit scores...');
 
   const company = await prisma.company.findFirst({
     where: { id: companyId, userId: session.user.id },
@@ -175,6 +200,14 @@ IMPORTANT:
       },
     });
   }
+
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      lastFitCalculation: new Date(),
+      fitCalculationData: object.opportunities,
+    },
+  });
 
   return object.opportunities;
 }

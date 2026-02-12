@@ -2,18 +2,24 @@ import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
-import { ProductPenetrationMatrix } from '@/app/components/company/ProductPenetrationMatrix';
+import { CompanyTabs } from '@/app/components/company/CompanyTabs';
+import { CompanyGetStarted } from '@/app/components/company/CompanyGetStarted';
+import { CompanyARRActions } from '@/app/components/company/CompanyARRActions';
+import { DepartmentStatus, ContentType } from '@prisma/client';
 
 export default async function CompanyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/api/auth/signin');
 
   const { id } = await params;
+  const { tab: tabParam } = await searchParams;
+  const initialTab = tabParam === 'messaging' ? 'messaging' : undefined;
   type CompanyWithRelations = {
     id: string;
     name: string;
@@ -21,29 +27,111 @@ export default async function CompanyDetailPage({
     industry: string | null;
     contacts: Array<{ id: string }>;
     activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
+    accountMessaging: {
+      id: string;
+      whyThisCompany: unknown;
+      useCases: unknown;
+      successStories: unknown;
+      objectionHandlers: unknown;
+      doNotMention: unknown;
+      aiGenerated: boolean;
+      updatedAt: Date;
+    } | null;
   };
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     include: {
       contacts: { select: { id: true } },
       activities: { orderBy: { createdAt: 'desc' } },
+      accountMessaging: true,
     },
   }) as CompanyWithRelations | null;
 
   if (!company) notFound();
 
-  const departments = await prisma.companyDepartment.findMany({
+  const companyProductsForTotals = await prisma.companyProduct.findMany({
+    where: { companyId: id },
+    select: { status: true, arr: true, opportunitySize: true },
+  });
+  const currentARR = companyProductsForTotals
+    .filter((cp) => cp.status === 'ACTIVE')
+    .reduce((sum, cp) => sum + Number(cp.arr ?? 0), 0);
+  const expansionOpportunity = companyProductsForTotals
+    .filter((cp) => cp.status === 'OPPORTUNITY')
+    .reduce((sum, cp) => sum + Number(cp.opportunitySize ?? 0), 0);
+  const targetARR = currentARR + expansionOpportunity;
+
+  const departmentsRaw = await prisma.companyDepartment.findMany({
     where: { companyId: id },
     include: {
       _count: { select: { contacts: true, activities: true } },
+      contacts: {
+        take: 2,
+        orderBy: { lastContactedAt: 'desc' },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          title: true,
+          engagementScore: true,
+          persona: { select: { name: true } },
+        },
+      },
       companyProducts: {
-        select: { id: true, status: true, opportunitySize: true },
+        include: {
+          product: { select: { id: true, name: true, slug: true } },
+        },
       },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  const matrixDepartments = await prisma.companyDepartment.findMany({
+  const activitiesByDept = await prisma.activity.findMany({
+    where: { companyId: id, companyDepartmentId: { not: null } },
+    select: { companyDepartmentId: true, summary: true, type: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const lastActivityByDeptId: Record<string, { summary: string; type: string; createdAt: Date }> = {};
+  for (const a of activitiesByDept) {
+    const deptId = a.companyDepartmentId as string;
+    if (deptId && !lastActivityByDeptId[deptId]) {
+      lastActivityByDeptId[deptId] = {
+        summary: a.summary,
+        type: a.type,
+        createdAt: a.createdAt,
+      };
+    }
+  }
+
+  const departments = departmentsRaw.map(
+    (d: (typeof departmentsRaw)[number]) => ({
+      ...d,
+      contacts: d.contacts.map((c) => ({
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        title: c.title,
+        engagementScore: c.engagementScore,
+        personaName: c.persona?.name ?? null,
+      })),
+      companyProducts: d.companyProducts.map(
+        (cp: (typeof d.companyProducts)[number]) => ({
+          id: cp.id,
+          status: cp.status,
+          productId: cp.productId,
+          product: cp.product,
+          arr: cp.arr != null ? Number(cp.arr) : null,
+          contractEnd: cp.contractEnd,
+          fitScore: cp.fitScore != null ? Number(cp.fitScore) : null,
+          fitReasoning: cp.fitReasoning,
+          opportunitySize: cp.opportunitySize != null ? Number(cp.opportunitySize) : null,
+        })
+      ),
+      lastActivity: d.id ? lastActivityByDeptId[d.id] ?? null : null,
+    })
+  );
+
+  const matrixDepartmentsRaw = await prisma.companyDepartment.findMany({
     where: { companyId: id },
     include: {
       companyProducts: {
@@ -57,13 +145,82 @@ export default async function CompanyDetailPage({
     orderBy: { createdAt: 'desc' },
   });
 
-  const catalogProducts = await prisma.catalogProduct.findMany({
+  const catalogProductsRaw = await prisma.catalogProduct.findMany({
     orderBy: { name: 'asc' },
     select: { id: true, name: true, slug: true, priceMin: true, priceMax: true },
   });
 
+  // Serialize for Client Component: Prisma Decimal -> number
+  const matrixDepartments = matrixDepartmentsRaw.map(
+    (d: (typeof matrixDepartmentsRaw)[number]) => ({
+      ...d,
+      companyProducts: d.companyProducts.map(
+        (cp: (typeof d.companyProducts)[number]) => ({
+          ...cp,
+          arr: cp.arr != null ? Number(cp.arr) : null,
+          opportunitySize: cp.opportunitySize != null ? Number(cp.opportunitySize) : null,
+          fitScore: cp.fitScore != null ? Number(cp.fitScore) : null,
+          product: {
+            ...cp.product,
+            priceMin: cp.product.priceMin != null ? Number(cp.product.priceMin) : null,
+            priceMax: cp.product.priceMax != null ? Number(cp.product.priceMax) : null,
+          },
+        })
+      ),
+    })
+  );
+
+  const catalogProducts = catalogProductsRaw.map(
+    (p: (typeof catalogProductsRaw)[number]) => ({
+      ...p,
+      priceMin: p.priceMin != null ? Number(p.priceMin) : null,
+      priceMax: p.priceMax != null ? Number(p.priceMax) : null,
+    })
+  );
+
+  const accountMessaging = company.accountMessaging
+    ? {
+        id: company.accountMessaging.id,
+        whyThisCompany: company.accountMessaging.whyThisCompany as string[] | null,
+        useCases: company.accountMessaging.useCases as unknown[] | null,
+        successStories: company.accountMessaging.successStories as unknown[] | null,
+        objectionHandlers: company.accountMessaging.objectionHandlers as unknown[] | null,
+        doNotMention: company.accountMessaging.doNotMention as unknown[] | null,
+        aiGenerated: company.accountMessaging.aiGenerated,
+        updatedAt: company.accountMessaging.updatedAt.toISOString(),
+      }
+    : null;
+
+  const hasMessaging = !!accountMessaging;
+
+  const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
+    where: {
+      userId: session.user.id,
+      type: { in: [ContentType.UseCase, ContentType.SuccessStory] },
+      isActive: true,
+    },
+    select: { id: true, title: true, type: true },
+    orderBy: { title: 'asc' },
+    take: 100,
+  });
+
+  type DeptItem = (typeof departments)[number];
+  const deptLabel = (d: { type: string; customName: string | null }) =>
+    d.customName || d.type.replace(/_/g, ' ');
+  const expansionStrategy = {
+    phase1: departments
+      .filter((d: DeptItem) => d.status === DepartmentStatus.EXPANSION_TARGET || d.status === DepartmentStatus.RESEARCH_PHASE)
+      .map(deptLabel),
+    phase2: departments
+      .filter((d: DeptItem) => d.status === DepartmentStatus.ACTIVE_CUSTOMER)
+      .map(deptLabel),
+    phase3: departments
+      .filter((d: DeptItem) => d.status === DepartmentStatus.NOT_ENGAGED || d.status === DepartmentStatus.NOT_APPLICABLE)
+      .map(deptLabel),
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <Link
@@ -74,112 +231,66 @@ export default async function CompanyDetailPage({
         </Link>
 
         {/* Company Header */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h1 className="text-3xl font-bold mb-2">{company.name}</h1>
-          <p className="text-gray-600">{company.domain ?? '—'}</p>
-          <div className="mt-4 flex gap-4 text-sm text-gray-600">
+        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 mb-6 border border-gray-200 dark:border-zinc-700">
+          <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">{company.name}</h1>
+          <p className="text-gray-600 dark:text-gray-300">{company.domain ?? '—'}</p>
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
             <span>Industry: {company.industry || 'Not specified'}</span>
             <span>•</span>
             <span>{company.contacts.length} contacts</span>
           </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-
-          <div className="bg-white rounded-lg shadow p-6 mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              🚀 Launch Account Expansion Play
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Chat with AI agent to:
-            </p>
-            <ul className="text-sm text-gray-700 space-y-2 mb-4">
-              <li>• Find contacts by role or department</li>
-              <li>• Enrich contacts with business emails</li>
-              <li>• Research company news and priorities</li>
-              <li>• Draft personalized outreach emails</li>
-              <li>• Track engagement (opens, clicks, replies)</li>
-            </ul>
-            <Link
-              href={`/chat?play=expansion&accountId=${company.id}`}
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Launch Chat →
-            </Link>
-          </div>
-
-          <Link
-            href={`/dashboard/companies/${company.id}/contacts`}
-            className="block bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
-          >
-            <h3 className="text-lg font-semibold mb-2">
-              📊 View Contact Engagement
-            </h3>
-            <p className="text-gray-600">
-              See opens, clicks, replies by contact
-            </p>
-          </Link>
-        </div>
-
-        {/* Departments */}
-        <div className="mb-6">
-          <DepartmentsTab companyId={company.id} departments={departments} />
-        </div>
-
-        {/* Product Penetration Matrix */}
-        <div className="mb-6">
-          <ProductPenetrationMatrix
-            data={{
-              companyId: company.id,
-              departments: matrixDepartments,
-              products: catalogProducts,
-            }}
-          />
-        </div>
-
-        {/* Recent Activity */}
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Agent Activity</h2>
-          <div className="bg-white rounded-lg shadow divide-y">
-            {company.activities.length === 0 ? (
-              <div className="p-6 text-center text-gray-600">
-                No activity yet. Launch a play to get started.
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-600 flex flex-wrap gap-6">
+            <div>
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Current ARR</div>
+              <div className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                ${currentARR.toLocaleString()}
               </div>
-            ) : (
-              company.activities.slice(0, 5).map((activity) => (
-                <div key={activity.id} className="p-4">
-                  <div className="flex items-start">
-                    <span className="text-2xl mr-3">
-                      {activity.type === 'Email' ? '📧' :
-                        activity.type === 'Research' ? '🔍' :
-                          activity.type === 'ContactDiscovered' ? '👥' : '📝'}
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-medium">{activity.summary}</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {new Date(activity.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+              <Link href={`/dashboard/companies/${id}#products`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block">+ Add Current</Link>
+            </div>
+            <div>
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Expansion Opportunity</div>
+              <div className="text-xl font-semibold text-green-600 dark:text-green-400">
+                ${expansionOpportunity.toLocaleString()}
+              </div>
+              <CompanyARRActions companyId={id} />
+            </div>
+            <div>
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Target ARR</div>
+              <div className="text-xl font-semibold text-gray-700 dark:text-gray-200">
+                ${targetARR.toLocaleString()}
+                {expansionOpportunity > 0 && (
+                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1">
+                    ({((expansionOpportunity / (currentARR || 1)) * 100).toFixed(0)}% growth potential)
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Engagement Summary */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Engagement Summary</h2>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600 mb-4">This Month:</p>
-            <ul className="space-y-2 text-gray-700">
-              <li>• {company.contacts.length} total contacts</li>
-              <li>• {company.activities.filter((a) => a.type === 'Email').length} emails sent</li>
-              <li>• {company.activities.filter((a) => a.type === 'EmailReply').length} replies received</li>
-            </ul>
-          </div>
+        <CompanyGetStarted
+          companyId={id}
+          companyName={company.name}
+          hasDepartments={departments.length > 0}
+          hasContacts={company.contacts.length > 0}
+          hasMessaging={hasMessaging}
+        />
+
+        {/* Tabs: Departments (default), Overview, Contacts, Products, Activity */}
+        <div className="mb-6">
+          <CompanyTabs
+            companyId={company.id}
+            companyName={company.name}
+            departments={departments}
+            matrixDepartments={matrixDepartments}
+            catalogProducts={catalogProducts}
+            activities={company.activities}
+            contactCount={company.contacts.length}
+            expansionStrategy={expansionStrategy}
+            accountMessaging={accountMessaging}
+            contentLibraryUseCasesAndStories={contentLibraryForMessaging}
+            initialTab={initialTab}
+          />
         </div>
       </div>
     </div>

@@ -4,24 +4,32 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+type ImportMode = 'url' | 'text';
+
 export default function ImportContentPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<ImportMode>('url');
   const [url, setUrl] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [company, setCompany] = useState('General Motors');
   const [products, setProducts] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
+  const [textPreviewItems, setTextPreviewItems] = useState<any[]>([]);
+  const [editedTagsByIndex, setEditedTagsByIndex] = useState<Record<number, any>>({});
   const [error, setError] = useState('');
-
   const [editedTags, setEditedTags] = useState<any>(null);
+  const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
     async function fetchProducts() {
       const response = await fetch('/api/products');
       const data = await response.json();
-      setProducts(data.products ?? []);
-      if (data.products?.length > 0) {
-        setSelectedProduct(data.products[0].id);
+      const list = Array.isArray(data.products) ? data.products : (Array.isArray(data) ? data : []);
+      setProducts(list);
+      if (list.length > 0) {
+        setSelectedProduct(list[0].id);
       }
     }
     fetchProducts();
@@ -61,6 +69,54 @@ export default function ImportContentPage() {
     }
   };
 
+  const handleExtractFromText = async () => {
+    if (!pastedText.trim() || !selectedProduct) {
+      setError('Please paste content and select product');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setTextPreviewItems([]);
+    setEditedTagsByIndex({});
+
+    try {
+      const response = await fetch('/api/content-library/import-from-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: pastedText,
+          productId: selectedProduct,
+          company: company || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Import from text failed');
+      }
+
+      const items = data.items ?? [];
+      setTextPreviewItems(items);
+      const initial: Record<number, any> = {};
+      items.forEach((item: any, i: number) => {
+        initial[i] = {
+          industry: item.inference?.industry ?? null,
+          department: item.inference?.department ?? null,
+          persona: item.inference?.persona ?? null,
+          confidence: item.inference?.confidence ?? 'medium',
+        };
+      });
+      setEditedTagsByIndex(initial);
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Import from text error:', err);
+      setError(err.message ?? 'Import from text failed');
+      setLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!preview || !editedTags) return;
     try {
@@ -75,6 +131,7 @@ export default function ImportContentPage() {
           persona: editedTags.persona,
           department: editedTags.department,
           industry: editedTags.industry,
+          company: null,
           sourceUrl: url,
           inferredTags: preview.inference,
           confidenceScore: editedTags.confidence,
@@ -93,6 +150,50 @@ export default function ImportContentPage() {
     }
   };
 
+  const handleSaveAllFromText = async () => {
+    if (!textPreviewItems.length) return;
+    setSavingAll(true);
+    setError('');
+    let saved = 0;
+    for (let i = 0; i < textPreviewItems.length; i++) {
+      const item = textPreviewItems[i];
+      const tags = editedTagsByIndex[i] ?? item.inference;
+      try {
+        const response = await fetch('/api/content-library', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: selectedProduct,
+            type: item.type,
+            title: item.title,
+            content: item.content,
+            persona: tags.persona,
+            department: tags.department,
+            industry: tags.industry,
+            company: item.company ?? company,
+            sourceUrl: null,
+            inferredTags: item.inference,
+            confidenceScore: tags.confidence,
+            userConfirmed: true,
+          }),
+        });
+        if (response.ok) saved++;
+        else {
+          const data = await response.json();
+          setError(data.error || `Failed to save item ${i + 1}`);
+          break;
+        }
+      } catch (err: any) {
+        setError(err instanceof Error ? err.message : 'Failed to save');
+        break;
+      }
+    }
+    setSavingAll(false);
+    if (saved === textPreviewItems.length) {
+      router.push('/dashboard/content-library');
+    }
+  };
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-6">
@@ -102,9 +203,9 @@ export default function ImportContentPage() {
         >
           ← Back to Content Library
         </Link>
-        <h1 className="text-2xl font-bold">Import Content from URL</h1>
+        <h1 className="text-2xl font-bold">Import Content</h1>
         <p className="text-gray-600">
-          AI will scrape the page and infer organizational tags from context
+          Import from a URL (scrape + extract) or paste text (e.g. from a PDF messaging guide)
         </p>
       </div>
 
@@ -114,6 +215,24 @@ export default function ImportContentPage() {
         </div>
       )}
 
+      <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => { setMode('url'); setPreview(null); setTextPreviewItems([]); setError(''); }}
+          className={`px-4 py-2 font-medium rounded-t ${mode === 'url' ? 'bg-blue-100 text-blue-800 border border-b-0 border-gray-200 -mb-px' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          From URL
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode('text'); setPreview(null); setTextPreviewItems([]); setError(''); }}
+          className={`px-4 py-2 font-medium rounded-t ${mode === 'text' ? 'bg-blue-100 text-blue-800 border border-b-0 border-gray-200 -mb-px' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          From text (paste)
+        </button>
+      </div>
+
+      {mode === 'url' && (
       <div className="bg-white border rounded-lg p-6 mb-6">
         <div className="space-y-4">
           <div>
@@ -156,6 +275,61 @@ export default function ImportContentPage() {
           </button>
         </div>
       </div>
+      )}
+
+      {mode === 'text' && (
+      <div className="bg-white border rounded-lg p-6 mb-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Paste content (e.g. from a PDF sales messaging guide)
+            </label>
+            <textarea
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder="Paste or type the guide text here. AI will split by buying group/department if sections are present."
+              rows={10}
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Company (for tagging)</label>
+            <input
+              type="text"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="e.g. General Motors"
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Product</label>
+            <select
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
+            >
+              <option value="">Select product</option>
+              {products.map((product: any) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleExtractFromText}
+            disabled={!pastedText.trim() || !selectedProduct || loading}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
+          >
+            {loading ? '🔄 Extracting...' : '📋 Extract & split by department'}
+          </button>
+        </div>
+      </div>
+      )}
 
       {preview && editedTags && (
         <div className="bg-white border rounded-lg p-6">
@@ -358,6 +532,88 @@ export default function ImportContentPage() {
             </button>
             <button
               onClick={() => setPreview(null)}
+              className="px-6 py-3 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              ✗ Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'text' && textPreviewItems.length > 0 && (
+        <div className="bg-white border rounded-lg p-6">
+          <h2 className="text-xl font-bold mb-4">Review extracted content ({textPreviewItems.length} section{textPreviewItems.length !== 1 ? 's' : ''})</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Edit tags if needed, then save all to Content Library. Each section will be stored with company &quot;{company || 'General Motors'}&quot; and the department below.
+          </p>
+          <div className="space-y-6">
+            {textPreviewItems.map((item: any, i: number) => {
+              const tags = editedTagsByIndex[i] ?? item.inference;
+              return (
+                <div key={i} className="border rounded-lg p-4 bg-gray-50">
+                  <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Industry</label>
+                      <input
+                        type="text"
+                        value={tags.industry ?? ''}
+                        onChange={(e) =>
+                          setEditedTagsByIndex((prev) => ({
+                            ...prev,
+                            [i]: { ...prev[i], industry: e.target.value },
+                          }))
+                        }
+                        className="w-full px-3 py-2 border rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Department</label>
+                      <input
+                        type="text"
+                        value={tags.department ?? ''}
+                        onChange={(e) =>
+                          setEditedTagsByIndex((prev) => ({
+                            ...prev,
+                            [i]: { ...prev[i], department: e.target.value },
+                          }))
+                        }
+                        placeholder="e.g. Manufacturing"
+                        className="w-full px-3 py-2 border rounded bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Persona</label>
+                      <input
+                        type="text"
+                        value={tags.persona ?? ''}
+                        onChange={(e) =>
+                          setEditedTagsByIndex((prev) => ({
+                            ...prev,
+                            [i]: { ...prev[i], persona: e.target.value },
+                          }))
+                        }
+                        className="w-full px-3 py-2 border rounded bg-white"
+                      />
+                    </div>
+                  </div>
+                  {item.content?.valueProp && (
+                    <p className="text-sm text-gray-700 mt-2 line-clamp-2">{item.content.valueProp}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-4 mt-8 pt-6 border-t">
+            <button
+              onClick={handleSaveAllFromText}
+              disabled={savingAll}
+              className="flex-1 px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700 font-medium disabled:opacity-50"
+            >
+              {savingAll ? 'Saving...' : `✓ Save all ${textPreviewItems.length} to Content Library`}
+            </button>
+            <button
+              onClick={() => setTextPreviewItems([])}
               className="px-6 py-3 border border-gray-300 rounded hover:bg-gray-50"
             >
               ✗ Discard

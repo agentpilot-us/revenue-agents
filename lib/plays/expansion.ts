@@ -22,7 +22,9 @@ export const expansion: PlayConfig = {
     'list_products',
     'calculate_product_fit',
     'get_product_penetration',
+    'get_expansion_strategy',
     'get_product_details',
+    'apply_department_product_research',
   ],
   buildSystemPrompt: (ctx: PlayContext) => {
     const { companyName, companyDomain, stage, tier, messagingSection } = ctx;

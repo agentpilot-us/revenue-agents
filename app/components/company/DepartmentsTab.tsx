@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { DepartmentStatus } from '@prisma/client';
 import { discoverDepartments, type DiscoveredDepartment } from '@/app/actions/discover-departments';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,26 @@ type CompanyDepartmentWithRelations = {
   notes: string | null;
   estimatedSize: number | null;
   _count: { contacts: number; activities: number };
+  contacts: Array<{
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    title: string | null;
+    engagementScore: number | null;
+    personaName: string | null;
+  }>;
   companyProducts: Array<{
     id: string;
     status: string;
-    opportunitySize: unknown;
+    productId: string;
+    product: { id: string; name: string; slug: string };
+    arr: number | null;
+    contractEnd: Date | null;
+    fitScore: number | null;
+    fitReasoning: string | null;
+    opportunitySize: number | null;
   }>;
+  lastActivity: { summary: string; type: string; createdAt: Date } | null;
 };
 
 export function DepartmentsTab({
@@ -110,7 +126,7 @@ export function DepartmentsTab({
           disabled={discovering}
           variant="outline"
         >
-          {discovering ? 'Discovering…' : 'Auto-Discover Departments'}
+          {discovering ? 'Discovering…' : 'Discover More'}
         </Button>
       </div>
 
@@ -153,14 +169,25 @@ export function DepartmentsTab({
             </Button>
           </div>
         ) : (
-          departments.map((dept) => (
-            <div
-              key={dept.id}
-              className="border rounded-lg p-6 hover:shadow-md transition-shadow bg-white"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
+          departments.map((dept) => {
+            const deptARR = dept.companyProducts
+              .filter((cp) => cp.status === 'ACTIVE')
+              .reduce((sum, cp) => sum + (cp.arr ?? 0), 0);
+            const oppSum = dept.companyProducts
+              .filter((cp) => cp.status === 'OPPORTUNITY')
+              .reduce((sum, cp) => sum + (cp.opportunitySize ?? 0), 0);
+            const topFit = dept.companyProducts
+              .filter((cp) => cp.fitScore != null)
+              .sort((a, b) => (b.fitScore ?? 0) - (a.fitScore ?? 0))[0];
+            const whyNow = dept.notes || topFit?.fitReasoning || null;
+
+            return (
+              <div
+                key={dept.id}
+                className="border rounded-lg p-6 hover:shadow-md transition-shadow bg-white"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-xl font-semibold">
                       {dept.customName || dept.type.replace(/_/g, ' ')}
                     </h3>
@@ -168,62 +195,119 @@ export function DepartmentsTab({
                       {statusIcons[dept.status]} {dept.status.replace(/_/g, ' ')}
                     </Badge>
                   </div>
-                  {dept.notes && (
-                    <p className="text-gray-600 text-sm">{dept.notes}</p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
+                  {deptARR > 0 && (
+                    <div>
+                      <span className="text-gray-500">ARR</span>
+                      <div className="font-semibold">${deptARR.toLocaleString()}</div>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-gray-500">Opportunity</span>
+                    <div className="font-semibold text-green-600">
+                      ${oppSum.toLocaleString()}
+                      {topFit?.fitScore != null && (
+                        <span className="text-gray-500 font-normal ml-1">({Math.round(topFit.fitScore)}% fit)</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Contacts</span>
+                    <div className="font-semibold">{dept._count.contacts}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Activities</span>
+                    <div className="font-semibold">{dept._count.activities}</div>
+                  </div>
+                </div>
+
+                {dept.contacts.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-medium text-gray-500 uppercase mb-1">Contacts</div>
+                    <ul className="text-sm space-y-0.5">
+                      {dept.contacts.map((c) => (
+                        <li key={c.id}>
+                          {[c.firstName, c.lastName].filter(Boolean).join(' ').trim() || 'Unknown'}
+                          {c.title && ` (${c.title})`}
+                          {c.personaName && (
+                            <span className="text-gray-500"> — {c.personaName}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {dept.companyProducts.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-medium text-gray-500 uppercase mb-1">Products</div>
+                    <div className="text-sm text-gray-700 space-y-0.5">
+                      {dept.companyProducts
+                        .filter((cp) => cp.status === 'ACTIVE')
+                        .map((cp) => (
+                          <div key={cp.id}>
+                            {cp.product.name}
+                            {cp.arr != null && ` ($${cp.arr.toLocaleString()})`}
+                            {cp.contractEnd && ` · renews ${new Date(cp.contractEnd).toLocaleDateString()}`}
+                          </div>
+                        ))}
+                      {dept.companyProducts
+                        .filter((cp) => cp.status === 'OPPORTUNITY')
+                        .map((cp) => (
+                          <div key={cp.id} className="text-green-700">
+                            {cp.product.name} — ${(cp.opportunitySize ?? 0).toLocaleString()} opportunity
+                            {cp.fitScore != null && ` (${Math.round(cp.fitScore)}% fit)`}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {whyNow && (
+                  <div className="mb-3">
+                    <div className="text-xs font-medium text-gray-500 uppercase mb-1">Why now</div>
+                    <p className="text-sm text-gray-700 line-clamp-2">{whyNow}</p>
+                  </div>
+                )}
+
+                {dept.lastActivity && (
+                  <div className="mb-4 text-xs text-gray-500">
+                    Last activity: {dept.lastActivity.summary} —{' '}
+                    {new Date(dept.lastActivity.createdAt).toLocaleDateString()}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-3 border-t">
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`/dashboard/companies/${companyId}/departments/${dept.id}`}>
+                      View Details
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={`/dashboard/companies/${companyId}/contacts?department=${dept.id}`}>
+                      View Contacts
+                    </a>
+                  </Button>
+                  <Button size="sm" asChild>
+                    <Link href={`/chat?play=expansion&accountId=${companyId}&departmentId=${dept.id}`}>
+                      Start Expansion Play
+                    </Link>
+                  </Button>
+                  {dept.contacts.length > 0 && (
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link
+                        href={`/chat?play=expansion&accountId=${companyId}&contactId=${dept.contacts[0].id}`}
+                      >
+                        Draft follow-up
+                      </Link>
+                    </Button>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" aria-label="More options">
-                  ⋮
-                </Button>
               </div>
-
-              <div className="grid grid-cols-4 gap-4 mb-4">
-                <div>
-                  <div className="text-sm text-gray-500">Contacts</div>
-                  <div className="text-2xl font-bold">{dept._count.contacts}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Activities</div>
-                  <div className="text-2xl font-bold">{dept._count.activities}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Products</div>
-                  <div className="text-2xl font-bold">
-                    {dept.companyProducts.filter((cp) => cp.status === 'ACTIVE').length}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Expansion Opp</div>
-                  <div className="text-2xl font-bold text-green-600">
-                    $
-                    {dept.companyProducts
-                      .filter((cp) => cp.status === 'OPPORTUNITY')
-                      .reduce(
-                        (sum, cp) => sum + Number(cp.opportunitySize ?? 0),
-                        0
-                      )
-                      .toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" asChild>
-                  <a href={`/dashboard/companies/${companyId}/contacts?department=${dept.id}`}>
-                    View Contacts
-                  </a>
-                </Button>
-                <Button size="sm" variant="outline">
-                  Add Product
-                </Button>
-                <Button size="sm" asChild>
-                  <a href={`/chat?play=expansion&accountId=${companyId}`}>
-                    Start Expansion Play
-                  </a>
-                </Button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
