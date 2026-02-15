@@ -40,7 +40,7 @@ export default async function EditIndustryPlaybookPage({
           name: playbook.name,
           slug: playbook.slug,
           overview: playbook.overview ?? '',
-          departmentProductMapping: (playbook.departmentProductMapping as unknown[]) ?? [],
+          departmentProductMapping: (playbook.departmentProductMapping as Array<{ department: string; productIds: string[]; typicalDealSize: string }>) ?? [],
           valuePropsByDepartment: (playbook.valuePropsByDepartment as Record<string, unknown>) ?? {},
           buyingCommittee: playbook.buyingCommittee ?? '',
           landmines: (playbook.landmines as string[]) ?? [],

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 const patchDraftSchema = z.object({
@@ -38,9 +39,9 @@ export async function PATCH(
     }
 
     const { step, data } = parsed.data;
-    const update: { workflowStep?: number; draftData?: unknown } = {};
+    const update: { workflowStep?: number; draftData?: Prisma.InputJsonValue } = {};
     if (step != null) update.workflowStep = step;
-    if (data != null) update.draftData = data;
+    if (data != null) update.draftData = data as Prisma.InputJsonValue;
 
     await prisma.company.update({
       where: { id: companyId },

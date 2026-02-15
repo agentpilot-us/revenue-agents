@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
@@ -16,12 +17,17 @@ export async function GET(
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId: session.user.id },
-      include: {
+      select: {
+        employees: true,
+        headquarters: true,
+        revenue: true,
+        businessOverview: true,
+        keyInitiatives: true,
         departments: {
           where: {
             OR: [
               { useCase: { not: null } },
-              { targetRoles: { not: null } },
+              { targetRoles: { not: Prisma.JsonNull } },
               { estimatedOpportunity: { not: null } },
             ],
           },
@@ -42,13 +48,6 @@ export async function GET(
             },
           },
         },
-      },
-      select: {
-        employees: true,
-        headquarters: true,
-        revenue: true,
-        businessOverview: true,
-        keyInitiatives: true,
       },
     });
 

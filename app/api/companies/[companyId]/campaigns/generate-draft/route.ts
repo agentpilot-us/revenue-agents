@@ -205,7 +205,7 @@ Output exactly one draft per target (${targets.length} total). Return valid JSON
 
     const { output } = await generateText({
       model: anthropic('claude-sonnet-4-20250514'),
-      maxTokens: 8000,
+      maxOutputTokens: 8000,
       system: systemPrompt,
       prompt: userPrompt,
       output: Output.object({

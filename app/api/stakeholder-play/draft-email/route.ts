@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     const { text } = await generateText({
       model: anthropic('claude-sonnet-4-20250514'),
-      maxTokens: 1000,
+      maxOutputTokens: 1000,
       system: `You draft a short, warm intro email for a new executive/stakeholder at an existing account. Tone: professional, congratulatory, one clear value hook. Reference the research brief and any existing relationship. Do not use placeholders like [Company] - use the actual company and contact names.
 ${messagingSection}`,
       prompt: `Draft an intro email for this new stakeholder engagement.

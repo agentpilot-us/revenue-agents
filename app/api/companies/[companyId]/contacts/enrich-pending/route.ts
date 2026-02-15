@@ -52,9 +52,9 @@ export async function POST(
             enrichmentStatus: 'complete',
             enrichedAt: new Date(),
             enrichedData: result.data as object,
-            ...(result.data.email && { email: String(result.data.email) }),
-            ...(result.data.phone && { phone: String(result.data.phone) }),
-            ...(result.data.title && { title: String(result.data.title) }),
+            ...(result.data.email ? { email: String(result.data.email) } : {}),
+            ...(result.data.phone ? { phone: String(result.data.phone) } : {}),
+            ...(result.data.title ? { title: String(result.data.title) } : {}),
           },
         });
         enriched++;

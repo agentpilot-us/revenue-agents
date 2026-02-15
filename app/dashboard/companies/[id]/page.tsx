@@ -290,11 +290,11 @@ export default async function CompanyDetailPage({
               <p className="text-gray-600 dark:text-gray-300">{company.domain ?? '—'}</p>
             </div>
             <div className="flex items-center gap-2">
-              {company.researchData && (
+              {company.researchData ? (
                 <span className="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
                   ✅ AI Researched
                 </span>
-              )}
+              ) : null}
               <DeleteCompanyButton companyId={company.id} companyName={company.name} />
             </div>
           </div>

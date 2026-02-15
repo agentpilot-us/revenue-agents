@@ -113,7 +113,7 @@ export async function syncGTCSessions(sessionCatalogUrl?: string): Promise<{
 
     const scrapeResult = await scrapeUrl({ url: gtcUrl, formats: ['markdown'] });
     if (!scrapeResult.ok || !scrapeResult.markdown) {
-      return { ok: false, error: scrapeResult.error || 'Failed to scrape session catalog' };
+      return { ok: false, error: (scrapeResult as { error?: string }).error || 'Failed to scrape session catalog' };
     }
 
     const markdown = scrapeResult.markdown.slice(0, 80000); // Increased limit for session catalog
@@ -174,7 +174,7 @@ export async function syncIndustryContent(
 
     const scrapeResult = await scrapeUrl({ url: industryUrl, formats: ['markdown'] });
     if (!scrapeResult.ok || !scrapeResult.markdown) {
-      return { ok: false, error: scrapeResult.error || 'Failed to scrape industry page' };
+      return { ok: false, error: (scrapeResult as { error?: string }).error || 'Failed to scrape industry page' };
     }
 
     const markdown = scrapeResult.markdown.slice(0, 50000);
@@ -232,7 +232,7 @@ export async function syncEventsFromUrl(
 
     const scrapeResult = await scrapeUrl({ url: eventsUrl, formats: ['markdown'] });
     if (!scrapeResult.ok || !scrapeResult.markdown) {
-      return { ok: false, error: scrapeResult.error || 'Failed to scrape events page' };
+      return { ok: false, error: (scrapeResult as { error?: string }).error || 'Failed to scrape events page' };
     }
 
     const markdown = scrapeResult.markdown.slice(0, 60000);

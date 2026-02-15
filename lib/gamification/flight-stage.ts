@@ -85,7 +85,7 @@ export function getCompanyFlightStage(
  * Call with prisma and list of company ids; returns a map companyId -> params to pass to getCompanyFlightStage.
  */
 export async function getFlightStageParamsForCompanies(
-  prisma: { activity: { groupBy: (args: unknown) => Promise<{ companyId: string; _count: { id: number } }[]> }; expansionPlay: { findMany: (args: unknown) => Promise<{ companyId: string; status: string }[]> }; companyProduct: { findMany: (args: unknown) => Promise<{ companyId: string }[]> } },
+  prisma: import('@prisma/client').PrismaClient,
   companyIds: string[],
   companyData: Map<
     string,

@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
 
     const { text } = await generateText({
       model: anthropic('claude-sonnet-4-20250514'),
-      maxTokens: 800,
+      maxOutputTokens: 800,
       system: `You draft a single follow-up or intro email for a B2B sales context. Be concise (2-4 short paragraphs). Use the messaging framework and reference value props/case studies where relevant. Return ONLY a JSON object with "subject" (string) and "body" (string, plain text). No HTML.
 ${productKnowledgeSection}
 ${industryPlaybookSection}

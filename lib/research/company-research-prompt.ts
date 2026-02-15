@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { DepartmentType } from '@prisma/client';
+import { DepartmentType, Prisma } from '@prisma/client';
 
 type CatalogProduct = {
   name: string;
@@ -75,9 +75,9 @@ export async function getCompanyResearchPromptBlock(
     include: {
       departments: {
         where: {
-          OR: [
+            OR: [
             { useCase: { not: null } },
-            { targetRoles: { not: null } },
+            { targetRoles: { not: Prisma.JsonNull } },
             { estimatedOpportunity: { not: null } },
           ],
         },

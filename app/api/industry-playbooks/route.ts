@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
@@ -116,11 +117,17 @@ export async function POST(req: NextRequest) {
         name: parsed.data.name,
         slug: parsed.data.slug,
         overview: parsed.data.overview ?? undefined,
-        departmentProductMapping: parsed.data.departmentProductMapping ?? undefined,
-        valuePropsByDepartment: parsed.data.valuePropsByDepartment ?? undefined,
+        departmentProductMapping: (parsed.data.departmentProductMapping ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
+        valuePropsByDepartment: (parsed.data.valuePropsByDepartment ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         buyingCommittee: parsed.data.buyingCommittee ?? undefined,
-        landmines: parsed.data.landmines ?? undefined,
-        relevantCaseStudyIds: parsed.data.relevantCaseStudyIds ?? undefined,
+        landmines: (parsed.data.landmines ?? undefined) as Prisma.InputJsonValue | undefined,
+        relevantCaseStudyIds: (parsed.data.relevantCaseStudyIds ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
       },
     });
 

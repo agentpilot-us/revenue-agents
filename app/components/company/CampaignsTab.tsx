@@ -601,8 +601,10 @@ function CreateLandingPageFlow({
   };
 
   const toggleDraftSelection = (index: number) => {
-    setSelectedDraftIndexes((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    setSelectedDraftIndexes(
+      selectedDraftIndexes.includes(index)
+        ? selectedDraftIndexes.filter((i) => i !== index)
+        : [...selectedDraftIndexes, index]
     );
   };
 

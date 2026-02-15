@@ -84,7 +84,7 @@ export async function POST(
           ? 'Generate a LinkedIn post or message: professional tone, concise. Use the context below for the target account and your company\'s messaging. Output plain text only.'
           : 'Generate copy for a custom URL or landing page: include a short headline, a body paragraph or two, and a CTA button label. Use the context below. Output plain text with clear line breaks (e.g. "Headline: ...", "Body: ...", "CTA: ...").';
 
-    const systemPrompt = `You are a B2B content writer. The user is creating ${contentType.replace(/_/g, ' ')} content for the target account "${company.name}".
+    const systemPrompt = `You are a B2B content writer. The user is creating ${(contentType ?? 'email').replace(/_/g, ' ')} content for the target account "${company.name}".
 
 ${contentTypeInstruction}
 
@@ -98,7 +98,7 @@ ${messagingSection}${accountSection}${researchSection}`;
 
     const { text } = await generateText({
       model: anthropic('claude-sonnet-4-20250514'),
-      maxTokens: 1500,
+      maxOutputTokens: 1500,
       system: systemPrompt,
       prompt: `User prompt: ${prompt}\n\nGenerate the content. Output only the requested content, no preamble.`,
     });

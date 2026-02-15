@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     const { object } = await generateObject({
       model: anthropic('claude-sonnet-4-20250514'),
-      maxTokens: 2000,
+      maxOutputTokens: 2000,
       schema: researchOutputSchema,
       system: `You are a sales research assistant. Extract structured research for a new-stakeholder intro.
 Return:

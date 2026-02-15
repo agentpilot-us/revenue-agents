@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { ContentType } from '@prisma/client';
+import { ContentType, Prisma } from '@prisma/client';
 
 type UseCaseEntry = {
   contentLibraryId: string;
@@ -33,12 +33,17 @@ export async function autoGenerateAccountMessaging(
     // Fetch company with research data
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        industry: true,
+        businessOverview: true,
+        keyInitiatives: true,
         departments: {
           where: {
             OR: [
               { useCase: { not: null } },
-              { targetRoles: { not: null } },
+              { targetRoles: { not: Prisma.JsonNull } },
             ],
           },
           select: {
@@ -47,13 +52,6 @@ export async function autoGenerateAccountMessaging(
             useCase: true,
           },
         },
-      },
-      select: {
-        id: true,
-        name: true,
-        industry: true,
-        businessOverview: true,
-        keyInitiatives: true,
       },
     });
 

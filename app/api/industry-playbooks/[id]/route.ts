@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
@@ -105,6 +106,7 @@ export async function PUT(
       }
     }
 
+    const toJson = (v: unknown) => (v === null ? Prisma.JsonNull : (v as Prisma.InputJsonValue));
     const updated = await prisma.industryPlaybook.update({
       where: { id },
       data: {
@@ -112,17 +114,19 @@ export async function PUT(
         ...(parsed.data.slug !== undefined && { slug: parsed.data.slug }),
         ...(parsed.data.overview !== undefined && { overview: parsed.data.overview }),
         ...(parsed.data.departmentProductMapping !== undefined && {
-          departmentProductMapping: parsed.data.departmentProductMapping,
+          departmentProductMapping: toJson(parsed.data.departmentProductMapping),
         }),
         ...(parsed.data.valuePropsByDepartment !== undefined && {
-          valuePropsByDepartment: parsed.data.valuePropsByDepartment,
+          valuePropsByDepartment: toJson(parsed.data.valuePropsByDepartment),
         }),
         ...(parsed.data.buyingCommittee !== undefined && {
           buyingCommittee: parsed.data.buyingCommittee,
         }),
-        ...(parsed.data.landmines !== undefined && { landmines: parsed.data.landmines }),
+        ...(parsed.data.landmines !== undefined && {
+          landmines: toJson(parsed.data.landmines),
+        }),
         ...(parsed.data.relevantCaseStudyIds !== undefined && {
-          relevantCaseStudyIds: parsed.data.relevantCaseStudyIds,
+          relevantCaseStudyIds: toJson(parsed.data.relevantCaseStudyIds),
         }),
       },
     });

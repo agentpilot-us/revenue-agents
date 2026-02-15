@@ -53,7 +53,7 @@ export async function importUseCasesFromUrl(
     onlyMainContent: true,
   });
   if (!scrapeResult.ok || !scrapeResult.markdown) {
-    return { ok: false, error: scrapeResult.error ?? 'Scrape failed' };
+    return { ok: false, error: (scrapeResult as { error?: string }).error ?? 'Scrape failed' };
   }
 
   const markdown = scrapeResult.markdown.slice(0, 30000);
@@ -183,7 +183,7 @@ If the page contains multiple stories, return all. If it's a single story, retur
           },
           industry: cs.industry,
           company: cs.company,
-          sourceUrl: sourceUrl || undefined,
+          sourceUrl: sourceUrl ?? '',
         });
       }
     } catch {

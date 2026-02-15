@@ -142,14 +142,14 @@ export default async function AnalyticsPage() {
               const avgCycleMonths =
                 avgCycleDays > 0 ? (avgCycleDays / 30).toFixed(1) : '—';
               const topProduct =
-                r.productWonCounts.size > 0
-                  ? Array.from(r.productWonCounts.entries()).sort(
+                r.productWonTotal.size > 0
+                  ? Array.from(r.productWonTotal.entries()).sort(
                       (a, b) => b[1] - a[1]
                     )[0][0]
                   : '—';
               const topProductWon =
-                r.productWonCounts.size > 0
-                  ? Array.from(r.productWonCounts.entries()).sort(
+                r.productWonTotal.size > 0
+                  ? Array.from(r.productWonTotal.entries()).sort(
                       (a, b) => b[1] - a[1]
                     )[0][1]
                   : 0;

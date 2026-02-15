@@ -210,7 +210,7 @@ export function CompanyTabs({
         <AccountMessagingTab
           companyId={companyId}
           companyName={companyName}
-          initialData={accountMessaging}
+          initialData={accountMessaging as React.ComponentProps<typeof AccountMessagingTab>['initialData']}
           contentLibrary={contentLibraryUseCasesAndStories}
         />
       )}

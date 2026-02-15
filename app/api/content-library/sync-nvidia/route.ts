@@ -156,11 +156,17 @@ export async function POST(req: NextRequest) {
               },
             });
           } else {
-            // Create new
+            // Create new (product is always set in gtc branch)
+            const createProductId = eventData.productId ?? product?.id;
+            if (!createProductId) {
+              errors.push(`Skipped "${gtcSession.title}": no product`);
+              continue;
+            }
             await prisma.contentLibrary.create({
               data: {
                 userId: session.user.id,
                 ...eventData,
+                productId: createProductId,
                 userConfirmed: true,
                 scrapedAt: new Date(),
               },
@@ -188,16 +194,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Save success stories
-      if (result.content.successStories) {
+      // Save success stories (product is set in industry branch)
+      const industryProductId = productId ?? product?.id;
+      if (result.content.successStories && industryProductId) {
         for (const story of result.content.successStories) {
           try {
-            const storyData = successStoryToContentLibrary(story, productId);
+            const storyData = successStoryToContentLibrary(story, industryProductId);
             
             const existing = await prisma.contentLibrary.findFirst({
               where: {
                 userId: session.user.id,
-                productId,
+                productId: industryProductId,
                 type: 'SuccessStory',
                 title: storyData.title,
                 company: storyData.company,
@@ -234,15 +241,15 @@ export async function POST(req: NextRequest) {
       }
 
       // Save product announcements (tag with user's industry name)
-      if (result.content.productAnnouncements) {
+      if (result.content.productAnnouncements && industryProductId) {
         for (const announcement of result.content.productAnnouncements) {
           try {
-            const releaseData = productAnnouncementToFeatureRelease(announcement, productId);
+            const releaseData = productAnnouncementToFeatureRelease(announcement, industryProductId);
 
             const existing = await prisma.contentLibrary.findFirst({
               where: {
                 userId: session.user.id,
-                productId,
+                productId: industryProductId,
                 type: 'FeatureRelease',
                 title: releaseData.title,
                 sourceUrl: releaseData.sourceUrl || undefined,

@@ -61,8 +61,16 @@ Focus on information relevant to B2B enterprise software sales, particularly AI 
       return { ok: false, error: perplexityResult.error };
     }
 
-    // Step 3: Structure the research using Anthropic
-    const systemPrompt = buildCompanyResearchPrompt(catalogProducts);
+    // Step 3: Structure the research using Anthropic (map Decimal to number for prompt)
+    const catalogForPrompt = catalogProducts.map((p) => ({
+      name: p.name,
+      slug: p.slug,
+      description: p.description,
+      priceMin: p.priceMin != null ? Number(p.priceMin) : null,
+      priceMax: p.priceMax != null ? Number(p.priceMax) : null,
+      targetDepartments: p.targetDepartments as string[] | null,
+    }));
+    const systemPrompt = buildCompanyResearchPrompt(catalogForPrompt);
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return { ok: false, error: 'ANTHROPIC_API_KEY not configured' };
@@ -74,7 +82,7 @@ Focus on information relevant to B2B enterprise software sales, particularly AI 
         model: anthropic('claude-sonnet-4-20250514'),
         schema: companyResearchSchema,
         system: systemPrompt,
-        maxTokens: 4000,
+        maxOutputTokens: 4000,
         prompt: `Company Name: ${companyName}
 ${companyDomain ? `Domain: ${companyDomain}` : ''}
 

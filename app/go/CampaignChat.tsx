@@ -93,7 +93,7 @@ export function CampaignChat({ campaignId }: CampaignChatProps) {
                 {m.role === 'user' ? (
                   <MessageResponse>
                     {typeof (m as { content?: string }).content === 'string'
-                      ? (m as { content: string }).content
+                      ? (m as unknown as { content: string }).content
                       : (m as { parts?: Array<{ type: string; text?: string }> }).parts
                           ?.filter((p): p is { type: string; text: string } => p.type === 'text')
                           .map((p) => p.text)
@@ -101,7 +101,7 @@ export function CampaignChat({ campaignId }: CampaignChatProps) {
                   </MessageResponse>
                 ) : (
                   <ChatMessageParts
-                    parts={(m as { parts?: unknown[] }).parts}
+                    parts={(m as { parts?: unknown[] }).parts as undefined | Array<{ type: string; text?: string } & Record<string, unknown>>}
                   />
                 )}
               </MessageContent>

@@ -60,7 +60,7 @@ export async function categorizePage(
   const excerpt = markdown.slice(0, 8000);
   const { text } = await generateText({
     model: anthropic('claude-sonnet-4-20250514'),
-    maxTokens: 500,
+    maxOutputTokens: 500,
     system: `You are a content classifier. Given a web page URL and excerpt, output exactly:
 - title: short page title (from content or URL)
 - description: one-line description (max 200 chars)

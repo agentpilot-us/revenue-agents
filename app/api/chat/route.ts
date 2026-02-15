@@ -439,9 +439,12 @@ Work step-by-step and explain what you're doing.`;
       activeEnrollment,
     };
 
-    const allTools = {
+    // Wrapper so tool() accepts our schemas when combined with chatTools (avoids FlexibleSchema<never> inference)
+    const toolWithSchema = (config: any) => tool(config);
+
+    const allTools: Record<string, Tool> = {
       ...chatTools,
-      search_linkedin_contacts: tool({
+      search_linkedin_contacts: toolWithSchema({
         description: 'Search for contacts on LinkedIn by company, job title, and keywords',
         inputSchema: z.object({
           companyName: z.string().optional().describe('Company name to search'),
@@ -463,8 +466,7 @@ Work step-by-step and explain what you're doing.`;
           return { found: res.contacts.length, profiles: res.contacts };
         },
       }),
-
-      enrich_contact: tool({
+      enrich_contact: toolWithSchema({
         description: 'Enrich contact with email, phone, and other data (e.g. from Clay)',
         inputSchema: z.object({
           firstName: z.string().optional(),
@@ -526,7 +528,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      research_company: tool({
+      research_company: toolWithSchema({
         description: 'Research company using Perplexity AI',
         inputSchema: z.object({
           companyName: z.string().optional().describe('Company name'),
@@ -561,7 +563,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      draft_next_sequence_touch: tool({
+      draft_next_sequence_touch: toolWithSchema({
         description:
           'Get the next sequence step context for a contact so you can draft the next touch (e.g. next email in their sequence). Use when the user asks to "draft the next sequence email" or "what\'s the next touch" for a contact. Returns step role, CTA type, and prompt context. Then use send_email (or create_calendar_event) with that context.',
         inputSchema: z.object({
@@ -595,7 +597,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      send_email_to_segment: tool({
+      send_email_to_segment: toolWithSchema({
         description:
           'Send the same email (e.g. an event invite) to every contact in a segment (buying group). Use when the user says to send an invite or email to "all [segment name] segment" or "everyone in [department]". Creates one draft; user approves in the Approval queue, then the same subject and body are sent to each contact in that segment. Call list_departments first if you need to resolve segment name to a department.',
         inputSchema: z.object({
@@ -709,7 +711,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      send_email: tool({
+      send_email: toolWithSchema({
         description:
           'Send an email to a contact. The user must approve the draft in the chat before the email is sent. Use when the user or you want to send an email; a draft will be shown for approval, then sent via Resend.',
         inputSchema: z.object({
@@ -802,7 +804,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      create_calendar_event: tool({
+      create_calendar_event: toolWithSchema({
         description:
           'Schedule a calendar invite (meeting) via Cal.com. The user must approve in the chat before the invite is created. Provide title, start and end in UTC (ISO 8601), and attendeeEmail. After approval, a Cal.com booking link is created.',
         inputSchema: z.object({
@@ -885,7 +887,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      get_calendar_rsvps: tool({
+      get_calendar_rsvps: toolWithSchema({
         description: 'Get calendar event RSVPs (attendee accept/decline status)',
         inputSchema: z.object({
           eventSlug: z.string().optional().describe('Event type slug'),
@@ -898,7 +900,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      record_decision: tool({
+      record_decision: toolWithSchema({
         description:
           'Record a decision or preference for this account so future conversations remember it. Use when the user states a preference (e.g. "focus on Engineering only", "don\'t target Finance", "we\'re prioritizing AV department").',
         inputSchema: z.object({
@@ -925,7 +927,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      get_contacts_by_engagement: tool({
+      get_contacts_by_engagement: toolWithSchema({
         description: 'Query contacts by engagement criteria, location, seniority, or event attendance',
         inputSchema: z.object({
           criteria: z
@@ -1090,7 +1092,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      import_event_attendees: tool({
+      import_event_attendees: toolWithSchema({
         description: 'Import event attendees (e.g., from conference, webinar) as contacts with event attendance',
         inputSchema: z.object({
           eventName: z.string().describe('Name of the event'),
@@ -1235,19 +1237,21 @@ Work step-by-step and explain what you're doing.`;
           : undefined;
         const usagePayload =
           stepResult.usage &&
-          (stepResult.usage.promptTokens != null ||
-            stepResult.usage.completionTokens != null ||
+          (stepResult.usage.inputTokens != null ||
+            stepResult.usage.outputTokens != null ||
             stepResult.usage.totalTokens != null)
             ? {
-                promptTokens: stepResult.usage.promptTokens,
-                completionTokens: stepResult.usage.completionTokens,
+                promptTokens: stepResult.usage.inputTokens,
+                completionTokens: stepResult.usage.outputTokens,
                 totalTokens: stepResult.usage.totalTokens,
               }
             : undefined;
+        const userId = session?.user?.id;
+        if (!userId) return;
         void prisma.agentStepLog
           .create({
             data: {
-              userId: session.user.id,
+              userId,
               accountId: accountId || null,
               stepIndex: idx,
               toolCalls: toolCallsPayload ?? undefined,
