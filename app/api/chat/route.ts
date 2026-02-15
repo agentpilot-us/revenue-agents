@@ -122,7 +122,7 @@ export async function POST(req: Request) {
       proofPoints?: string[];
       successStories?: Array<{ company?: string; results?: string[] }>;
     };
-    const orConditions: Array<{ industry?: string | null; department?: string }> = [];
+    const orConditions: Array<{ industry?: string | null; department?: string; company?: string | null }> = [];
     if (company?.industry) {
       orConditions.push({ industry: company.industry }, { industry: null }, { industry: '' });
     }
@@ -133,7 +133,7 @@ export async function POST(req: Request) {
       userId: string;
       userConfirmed: boolean;
       isActive: boolean;
-      OR?: Array<{ industry?: string | null; department?: string }>;
+      OR?: Array<{ industry?: string | null; department?: string; company?: string | null }>;
       AND?: Array<Record<string, unknown>>;
     } = {
       userId: session.user.id,
