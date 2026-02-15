@@ -48,7 +48,7 @@ export default function NewProductPage() {
             onChange={(e) =>
               setFormData({ ...formData, name: e.target.value })
             }
-            placeholder="NVIDIA DRIVE Platform"
+            placeholder="e.g. Your Product Platform"
             required
             className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

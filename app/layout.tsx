@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { Toaster } from 'sonner';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import Providers from '@/components/Providers';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import LayoutShell from './components/LayoutShell';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,11 +28,12 @@ export default async function RootLayout({
       <body className={inter.className}>
         <TooltipProvider>
           <Providers>
-            <Navigation />
-            {children}
-            <Footer />
+            <LayoutShell nav={<Navigation />} footer={<Footer />}>
+              {children}
+            </LayoutShell>
           </Providers>
         </TooltipProvider>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

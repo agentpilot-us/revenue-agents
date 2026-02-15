@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 
 type ImportMode = 'url' | 'text';
 
@@ -21,6 +22,25 @@ export default function ImportContentPage() {
   const [error, setError] = useState('');
   const [editedTags, setEditedTags] = useState<any>(null);
   const [savingAll, setSavingAll] = useState(false);
+  const [firecrawlConfigured, setFirecrawlConfigured] = useState<boolean | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [scheduleAdded, setScheduleAdded] = useState(false);
+  const [scheduleDismissed, setScheduleDismissed] = useState(false);
+  const [scheduleAdding, setScheduleAdding] = useState(false);
+  const searchParams = useSearchParams();
+  const contentType = useMemo(() => searchParams.get('type') || null, [searchParams]);
+  const isAddManyType = contentType === 'UseCase' || contentType === 'SuccessStory';
+
+  useEffect(() => {
+    const urlParam = searchParams.get('url');
+    if (urlParam && typeof urlParam === 'string') {
+      try {
+        setUrl(decodeURIComponent(urlParam));
+      } catch {
+        setUrl(urlParam);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -33,6 +53,13 @@ export default function ImportContentPage() {
       }
     }
     fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/services/status')
+      .then((res) => res.json())
+      .then((data) => setFirecrawlConfigured(data.firecrawl === true))
+      .catch(() => setFirecrawlConfigured(false));
   }, []);
 
   const handleScrape = async () => {
@@ -190,7 +217,50 @@ export default function ImportContentPage() {
     }
     setSavingAll(false);
     if (saved === textPreviewItems.length) {
-      router.push('/dashboard/content-library');
+      if (isAddManyType) {
+        setSaveSuccess(true);
+        setTextPreviewItems([]);
+        setEditedTagsByIndex({});
+        setPastedText('');
+        setError('');
+      } else {
+        router.push('/dashboard/content-library');
+      }
+    }
+  };
+
+  const canScheduleRefresh =
+    (contentType === 'UseCase' || contentType === 'SuccessStory') &&
+    url &&
+    selectedProduct;
+  const scheduleContentType =
+    contentType === 'UseCase' ? 'use-cases' : contentType === 'SuccessStory' ? 'case-studies' : null;
+
+  const addScheduleRefresh = async (frequency: 'daily' | 'weekly') => {
+    if (!scheduleContentType || !url || !selectedProduct) return;
+    setScheduleAdding(true);
+    setError('');
+    try {
+      const res = await fetch('/api/content-library/firecrawl/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          productId: selectedProduct,
+          contentType: scheduleContentType,
+          frequency,
+        }),
+      });
+      if (res.ok) {
+        setScheduleAdded(true);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Could not add schedule');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add schedule');
+    } finally {
+      setScheduleAdding(false);
     }
   };
 
@@ -206,8 +276,31 @@ export default function ImportContentPage() {
         <h1 className="text-2xl font-bold">Import Content</h1>
         <p className="text-gray-600">
           Import from a URL (scrape + extract) or paste text (e.g. from a PDF messaging guide)
+          {isAddManyType && ' — You can add many: after saving, use “Add another” to import more.'}
         </p>
       </div>
+
+      {mode === 'url' && firecrawlConfigured === false && <FirecrawlSetupCard />}
+
+      {saveSuccess && (
+        <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex flex-wrap items-center gap-4">
+          <p className="text-green-800 dark:text-green-200 font-medium">Saved. Add another?</p>
+          <button
+            type="button"
+            onClick={() => setSaveSuccess(false)}
+            className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded hover:bg-green-700"
+          >
+            Add another
+          </button>
+          <Link
+            href={contentType ? `/dashboard/content-library?tab=${contentType}` : '/dashboard/content-library'}
+          >
+            <button type="button" className="px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded hover:bg-gray-50 dark:hover:bg-zinc-800">
+              Done, go to Content Library
+            </button>
+          </Link>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -243,7 +336,7 @@ export default function ImportContentPage() {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://www.nvidia.com/en-us/industries/automotive/"
+              placeholder="https://example.com/your-page"
               className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             />
@@ -522,6 +615,44 @@ export default function ImportContentPage() {
                 </div>
               )}
           </div>
+
+          {canScheduleRefresh && !scheduleAdded && !scheduleDismissed && (
+            <div className="mt-6 p-4 bg-slate-50 dark:bg-zinc-800 rounded-lg border border-slate-200 dark:border-zinc-700">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                Update content from this URL automatically?
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => addScheduleRefresh('daily')}
+                  disabled={scheduleAdding}
+                  className="px-3 py-1.5 text-sm rounded border border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
+                >
+                  {scheduleAdding ? 'Adding...' : 'Daily'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addScheduleRefresh('weekly')}
+                  disabled={scheduleAdding}
+                  className="px-3 py-1.5 text-sm rounded border border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
+                >
+                  Weekly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleDismissed(true)}
+                  className="px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-700"
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          )}
+          {scheduleAdded && (
+            <p className="mt-4 text-sm text-green-600 dark:text-green-400">
+              Automatic refresh from this URL has been added.
+            </p>
+          )}
 
           <div className="flex gap-4 mt-8 pt-6 border-t">
             <button

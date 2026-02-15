@@ -165,7 +165,12 @@ export function AccountMessagingTab({
     if (exists) {
       setSuccessStoriesSelected((prev) => prev.filter((s) => s.contentLibraryId !== contentLibraryId));
     } else {
-      setSuccessStoriesSelected((prev) => [...prev, { contentLibraryId, whyRelevant: '', bestForDepartments: [] }));
+      const newEntry: SuccessStoryEntry = {
+        contentLibraryId,
+        whyRelevant: '',
+        bestForDepartments: [],
+      };
+      setSuccessStoriesSelected((prev) => [...prev, newEntry]);
     }
   };
   const setStoryWhyRelevant = (contentLibraryId: string, whyRelevant: string) => {

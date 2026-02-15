@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '@/auth';
+import { prisma } from '@/lib/db';
 import { isServiceConfigured, type ServiceId } from '@/lib/service-config';
+import { UserProfileSettings } from '@/app/components/settings/UserProfileSettings';
 
 function serviceStatus(id: ServiceId, optional = false) {
   const connected = isServiceConfigured(id);
@@ -21,6 +23,11 @@ export default async function SettingsPage() {
   if (!session?.user?.id) {
     redirect('/api/auth/signin');
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, name: true, email: true, companyName: true },
+  });
 
   const services = [
     {
@@ -81,7 +88,7 @@ export default async function SettingsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold mb-2 text-gray-900">Settings</h1>
         <p className="text-gray-600 mb-8">
-          Manage your connected services and preferences
+          Manage your connected services and preferences. Agent Configuration applies to all accounts.
         </p>
 
         {/* Tabs */}
@@ -94,6 +101,12 @@ export default async function SettingsPage() {
               Services
             </Link>
             <Link
+              href="/dashboard/messaging"
+              className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
+            >
+              Messaging frameworks
+            </Link>
+            <Link
               href="/dashboard/settings#profile"
               className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
             >
@@ -102,12 +115,15 @@ export default async function SettingsPage() {
           </nav>
         </div>
 
-        {/* Services */}
+        {/* Agent Configuration / Connected tools */}
         <div id="services" className="space-y-8">
+          <h2 className="text-xl font-semibold text-gray-900">Agent Configuration</h2>
+          <p className="text-gray-600 text-sm max-w-2xl">
+            These connected tools are used by the expansion agent across all your accounts. They are configured once per workspace via environment variables (by your administrator). There is no per-account tool configuration.
+          </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> All services are configured via environment variables
-              by your administrator. No setup required on your part.
+              <strong>Connected tools:</strong> Resend (email), Cal.com (meetings), Clay (enrichment), PhantomBuster (LinkedIn), Perplexity (research), Firecrawl (scraping). Configure via environment variables — no setup required on your part if already set.
             </p>
           </div>
 
@@ -142,11 +158,38 @@ export default async function SettingsPage() {
                         )}
                       </div>
                     </div>
+                    {service.name === 'Firecrawl' && service.status === 'not_configured' && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <p className="text-sm text-gray-600 mb-2">
+                          Get an API key at firecrawl.dev, add <code className="text-xs bg-gray-100 px-1 rounded">FIRECRAWL_API_KEY</code> to <code className="text-xs bg-gray-100 px-1 rounded">.env.local</code>, then restart the dev server.
+                        </p>
+                        <Link
+                          href="/dashboard/content-library"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                        >
+                          See step-by-step setup on Content Library →
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           ))}
+
+          {/* Onboarding checklist */}
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
+            <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">Onboarding checklist</h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+              Complete these once to get the most from the agent:
+            </p>
+            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <li>• Set your company name (Profile below) for Content Library matching</li>
+              <li>• Upload content: products, industry playbooks, case studies (Content Library)</li>
+              <li>• Connect tools above (Resend, Cal.com, etc.) — via env vars</li>
+              <li>• Add your first account (Companies → Add company), then run Account Intelligence</li>
+            </ul>
+          </div>
 
           {/* Enterprise Add-ons */}
           <div className="bg-gray-100 border border-gray-300 rounded-lg p-6">
@@ -166,18 +209,12 @@ export default async function SettingsPage() {
         {/* Profile section */}
         <div id="profile" className="mt-12 pt-8 border-t border-gray-200">
           <h2 className="text-xl font-semibold mb-4 text-gray-900">Profile</h2>
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="text-gray-500">Name</dt>
-                <dd className="text-gray-900">{session.user?.name ?? '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">Email</dt>
-                <dd className="text-gray-900">{session.user?.email ?? '—'}</dd>
-              </div>
-            </dl>
-          </div>
+          <UserProfileSettings 
+            userId={user?.id ?? session.user.id}
+            initialName={user?.name ?? session.user?.name ?? ''}
+            initialEmail={user?.email ?? session.user?.email ?? ''}
+            initialCompanyName={user?.companyName ?? ''}
+          />
         </div>
       </div>
     </div>

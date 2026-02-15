@@ -238,7 +238,7 @@ export function AddContactsClient({ companyId, companyName, departments }: Props
       </section>
 
       {/* Paste from LinkedIn */}
-      <section className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50">
+      <section id="paste" className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50 scroll-mt-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Paste from LinkedIn</h2>
         <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           Paste a list of names and titles (one per line: &quot;First Last - Title&quot; or &quot;First Last, Title&quot;).
@@ -264,7 +264,7 @@ export function AddContactsClient({ companyId, companyName, departments }: Props
       </section>
 
       {/* Import CSV */}
-      <section className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50">
+      <section id="csv" className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50 scroll-mt-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Import CSV</h2>
         <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           Paste or upload CSV with columns: First Name, Last Name, Title, Email.
@@ -290,7 +290,7 @@ export function AddContactsClient({ companyId, companyName, departments }: Props
       </section>
 
       {/* Add manually */}
-      <section className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50">
+      <section id="manual" className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50 scroll-mt-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Add manually</h2>
         <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
           Add one contact at a time.

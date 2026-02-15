@@ -5,20 +5,23 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Building2,
-  Library,
+  BookOpen,
   Settings,
   CreditCard,
   Bolt,
-  Target,
-  BarChart3,
+  FileText,
 } from 'lucide-react';
 
-const navigation = [
+const navigation: Array<{
+  name: string;
+  href: string;
+  icon: typeof Home;
+  badgeCount?: number;
+}> = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Companies', href: '/dashboard/companies', icon: Building2 },
-  { name: 'Plays', href: '/dashboard/plays', icon: Target },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { name: 'Content Library', href: '/dashboard/content-library', icon: Library },
+  { name: 'Create content', href: '/dashboard/create-content', icon: FileText },
+  { name: 'Content Library', href: '/dashboard/content-library', icon: BookOpen },
   { name: 'Webhooks', href: '/dashboard/webhooks', icon: Bolt },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   { name: 'Billing', href: '/billing', icon: CreditCard },
@@ -35,6 +38,7 @@ export function DashboardNav() {
           item.href === '/dashboard'
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href);
+        const count = 0;
         return (
           <Link
             key={item.href}
@@ -46,7 +50,12 @@ export function DashboardNav() {
             }`}
           >
             <Icon className="h-5 w-5 shrink-0" />
-            {item.name}
+            <span className="flex-1">{item.name}</span>
+            {count > 0 && (
+              <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-zinc-900">
+                {count > 99 ? '99+' : count}
+              </span>
+            )}
           </Link>
         );
       })}

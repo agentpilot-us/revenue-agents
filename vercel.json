@@ -5,9 +5,7 @@
   "installCommand": "npm install",
   "outputDirectory": ".next",
   "crons": [
-    {
-      "path": "/api/cron/calculate-engagement",
-      "schedule": "0 2 * * *"
-    }
+    { "path": "/api/cron/calculate-engagement", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/content-library/run-schedules", "schedule": "0 3 * * *" }
   ]
 }

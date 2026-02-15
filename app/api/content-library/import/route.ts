@@ -84,19 +84,26 @@ export async function POST(req: NextRequest) {
 
     const { url, productId } = await req.json();
 
+    if (!process.env.FIRECRAWL_API_KEY?.trim()) {
+      return NextResponse.json(
+        {
+          error: 'Firecrawl is not configured',
+          details: 'Add FIRECRAWL_API_KEY to .env.local (get an API key at firecrawl.dev), then restart the dev server. See Content Library for setup steps.',
+        },
+        { status: 503 }
+      );
+    }
+
     console.log('🌐 Scraping URL:', url);
 
-    // STEP 1: Scrape with Firecrawl
-    const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    // STEP 1: Scrape with Firecrawl v2
+    const scrapeResponse = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        url,
-        formats: ['markdown'],
-      }),
+      body: JSON.stringify({ url, formats: ['markdown'] }),
     });
 
     if (!scrapeResponse.ok) {
@@ -105,7 +112,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`Firecrawl failed: ${scrapeResponse.status}`);
     }
 
-    const scrapeData = await scrapeResponse.json();
+    const scrapeData = (await scrapeResponse.json()) as { success?: boolean; data?: { markdown?: string } };
     const markdown = scrapeData.data?.markdown;
 
     if (!markdown) {

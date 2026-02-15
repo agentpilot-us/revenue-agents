@@ -2,12 +2,13 @@
 
 import { useMemo } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
 } from '@/components/ai-elements/conversation';
+import { ChatMessageParts } from '@/components/ai-elements/chat-message-parts';
 import {
   Message,
   MessageContent,
@@ -26,19 +27,6 @@ type ExpansionChatProps = {
   companyName: string;
   contactId?: string;
 };
-
-function getMessageText(m: {
-  parts?: Array<{ type: string; text?: string }>;
-  content?: string;
-}): string {
-  if (Array.isArray(m.parts)) {
-    return m.parts
-      .filter((p): p is { type: string; text: string } => p.type === 'text')
-      .map((p) => p.text)
-      .join('');
-  }
-  return typeof m.content === 'string' ? m.content : '';
-}
 
 const EXAMPLE_PROMPTS = [
   'Find contacts at this company',
@@ -63,10 +51,11 @@ export function ExpansionChat({
     () => new DefaultChatTransport({ api: '/api/chat', body }),
     [body]
   );
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, status, stop, addToolApprovalResponse } = useChat({
     id: `expansion-${companyId}-${contactId ?? 'none'}`,
     transport,
     experimental_throttle: 80,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
 
   const displayMessages = useMemo(
@@ -110,7 +99,21 @@ export function ExpansionChat({
           {displayMessages.map((m) => (
             <Message key={m.id} from={m.role as 'user' | 'assistant'}>
               <MessageContent>
-                <MessageResponse>{getMessageText(m)}</MessageResponse>
+                {m.role === 'user' ? (
+                  <MessageResponse>
+                    {typeof (m as { content?: string }).content === 'string'
+                      ? (m as { content: string }).content
+                      : (m as { parts?: Array<{ type: string; text?: string }> }).parts
+                          ?.filter((p): p is { type: string; text: string } => p.type === 'text')
+                          .map((p) => p.text)
+                          .join('') ?? ''}
+                  </MessageResponse>
+                ) : (
+                  <ChatMessageParts
+                    parts={(m as { parts?: unknown[] }).parts}
+                    addToolApprovalResponse={addToolApprovalResponse}
+                  />
+                )}
               </MessageContent>
             </Message>
           ))}

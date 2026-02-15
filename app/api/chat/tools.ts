@@ -463,7 +463,7 @@ export const chatTools = {
       productFocus: z
         .string()
         .optional()
-        .describe('Optional product focus, e.g. "NVIDIA chips", "Jetson", to guide extraction'),
+        .describe('Optional product focus, e.g. product name or category, to guide extraction'),
     }),
     execute: async ({ companyId, researchText, productFocus }) => {
       const session = await auth();

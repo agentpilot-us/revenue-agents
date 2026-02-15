@@ -7,6 +7,13 @@ import { discoverDepartments, type DiscoveredDepartment } from '@/app/actions/di
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+type TargetRoles = {
+  economicBuyer?: string[];
+  technicalEvaluator?: string[];
+  champion?: string[];
+  influencer?: string[];
+} | null;
+
 type CompanyDepartmentWithRelations = {
   id: string;
   companyId: string;
@@ -15,6 +22,7 @@ type CompanyDepartmentWithRelations = {
   status: DepartmentStatus;
   notes: string | null;
   estimatedSize: number | null;
+  targetRoles: TargetRoles;
   _count: { contacts: number; activities: number };
   contacts: Array<{
     id: string;
@@ -240,6 +248,47 @@ export function DepartmentsTab({
                   </div>
                 )}
 
+                {dept.targetRoles && (() => {
+                  const r = dept.targetRoles;
+                  const hasRoles =
+                    (r?.economicBuyer?.length ?? 0) > 0 ||
+                    (r?.technicalEvaluator?.length ?? 0) > 0 ||
+                    (r?.champion?.length ?? 0) > 0 ||
+                    (r?.influencer?.length ?? 0) > 0;
+                  if (!hasRoles) return null;
+                  return (
+                    <div className="mb-3">
+                      <div className="text-xs font-medium text-gray-500 uppercase mb-1">Target roles (job titles)</div>
+                      <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {r?.economicBuyer && r.economicBuyer.length > 0 && (
+                          <div>
+                            <span className="text-gray-500">Economic buyer: </span>
+                            <span>{r.economicBuyer.join(', ')}</span>
+                          </div>
+                        )}
+                        {r?.technicalEvaluator && r.technicalEvaluator.length > 0 && (
+                          <div>
+                            <span className="text-gray-500">Technical evaluator: </span>
+                            <span>{r.technicalEvaluator.join(', ')}</span>
+                          </div>
+                        )}
+                        {r?.champion && r.champion.length > 0 && (
+                          <div>
+                            <span className="text-gray-500">Champion: </span>
+                            <span>{r.champion.join(', ')}</span>
+                          </div>
+                        )}
+                        {r?.influencer && r.influencer.length > 0 && (
+                          <div>
+                            <span className="text-gray-500">Influencer: </span>
+                            <span>{r.influencer.join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {dept.companyProducts.length > 0 && (
                   <div className="mb-3">
                     <div className="text-xs font-medium text-gray-500 uppercase mb-1">Products</div>
@@ -280,15 +329,20 @@ export function DepartmentsTab({
                 )}
 
                 <div className="flex flex-wrap gap-2 pt-3 border-t">
+                  <Button size="sm" asChild>
+                    <Link href={`/dashboard/companies/${companyId}/discover-contacts?department=${dept.id}`}>
+                      Find contacts for this department
+                    </Link>
+                  </Button>
                   <Button size="sm" variant="outline" asChild>
                     <Link href={`/dashboard/companies/${companyId}/departments/${dept.id}`}>
                       View Details
                     </Link>
                   </Button>
                   <Button size="sm" variant="outline" asChild>
-                    <a href={`/dashboard/companies/${companyId}/contacts?department=${dept.id}`}>
+                    <Link href={`/dashboard/companies/${companyId}/contacts?department=${dept.id}`}>
                       View Contacts
-                    </a>
+                    </Link>
                   </Button>
                   <Button size="sm" asChild>
                     <Link href={`/chat?play=expansion&accountId=${companyId}&departmentId=${dept.id}`}>

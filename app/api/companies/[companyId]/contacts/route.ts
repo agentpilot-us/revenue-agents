@@ -90,6 +90,7 @@ export async function POST(
           phone,
           title,
           linkedinUrl,
+          enrichmentStatus: 'pending',
         },
       });
       contactIds.push(created.id);

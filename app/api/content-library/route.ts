@@ -23,6 +23,11 @@ export async function GET(req: NextRequest) {
       'SuccessStory',
       'Persona',
       'Battlecard',
+      'FeatureRelease',
+      'CompanyEvent',
+      'EmailContent',
+      'VideoLink',
+      'ResourceLink',
     ];
     const typeFilter =
       type && validTypes.includes(type as ContentType) ? (type as ContentType) : undefined;

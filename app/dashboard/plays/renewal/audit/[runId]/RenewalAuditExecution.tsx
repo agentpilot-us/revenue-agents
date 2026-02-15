@@ -91,7 +91,7 @@ export function RenewalAuditExecution({
       {/* Step 4: Address Competitor Signal */}
       <section className="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
         <h3 className="font-semibold text-gray-900 mb-2">Step 4: Address Competitor Signal</h3>
-        <p className="text-sm text-gray-600">If competitor mention detected: send battlecard (e.g. &quot;NVIDIA vs Mobileye&quot;). Talking points from Content Library.</p>
+        <p className="text-sm text-gray-600">If competitor mention detected: send battlecard (e.g. your company vs competitor). Talking points from Content Library.</p>
         <div className="flex gap-2 mt-2">
           <Link href="/dashboard/content-library" className="text-sm text-blue-600 hover:underline">View battlecard</Link>
           <Link href={`/chat?play=expansion&accountId=${companyId}`} className="text-sm text-blue-600 hover:underline">Draft competitive response</Link>

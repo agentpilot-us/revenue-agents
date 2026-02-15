@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { CompanyTabs } from '@/app/components/company/CompanyTabs';
 import { CompanyGetStarted } from '@/app/components/company/CompanyGetStarted';
+import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { CompanyARRActions } from '@/app/components/company/CompanyARRActions';
+import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { DepartmentStatus, ContentType } from '@prisma/client';
 
 export default async function CompanyDetailPage({
@@ -19,12 +21,13 @@ export default async function CompanyDetailPage({
 
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
-  const initialTab = tabParam === 'messaging' ? 'messaging' : undefined;
+  const initialTab = tabParam === 'messaging' ? 'messaging' : tabParam === 'campaigns' ? 'campaigns' : undefined;
   type CompanyWithRelations = {
     id: string;
     name: string;
     domain: string | null;
     industry: string | null;
+    researchData: unknown;
     contacts: Array<{ id: string }>;
     activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
     accountMessaging: {
@@ -204,6 +207,30 @@ export default async function CompanyDetailPage({
     take: 100,
   });
 
+  const segmentCampaigns = await prisma.segmentCampaign.findMany({
+    where: { companyId: id, userId: session.user.id },
+    include: { department: { select: { id: true, customName: true, type: true } } },
+    orderBy: [{ departmentId: 'asc' }, { createdAt: 'desc' }],
+  });
+  const campaigns = segmentCampaigns.map((c) => ({
+    id: c.id,
+    slug: c.slug,
+    title: c.title,
+    description: c.description,
+    url: c.url,
+    type: c.type,
+    departmentId: c.departmentId,
+    department: c.department
+      ? { id: c.department.id, customName: c.department.customName, type: c.department.type }
+      : null,
+    headline: c.headline,
+    body: c.body,
+    ctaLabel: c.ctaLabel,
+    ctaUrl: c.ctaUrl,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+  }));
+
   type DeptItem = (typeof departments)[number];
   const deptLabel = (d: { type: string; customName: string | null }) =>
     d.customName || d.type.replace(/_/g, ' ');
@@ -219,6 +246,31 @@ export default async function CompanyDetailPage({
       .map(deptLabel),
   };
 
+  // Pipeline by microsegment (department)
+  const pipelineByMicrosegment = departments.map((d: DeptItem) => {
+    const value = (d.companyProducts as Array<{ status: string; opportunitySize: number | null }>)
+      .filter((cp) => cp.status === 'OPPORTUNITY')
+      .reduce((sum, cp) => sum + Number(cp.opportunitySize ?? 0), 0);
+    return {
+      departmentId: d.id,
+      departmentName: deptLabel(d),
+      pipelineValue: value,
+    };
+  }).filter((p) => p.pipelineValue > 0);
+
+  // Funnel counts: contacted, engaged, meetings, opportunity
+  const [contactedCount, engagedCount, meetingsCount] = await Promise.all([
+    prisma.contact.count({ where: { companyId: id, lastContactedAt: { not: null } } }),
+    prisma.contact.count({ where: { companyId: id, isResponsive: true } }),
+    prisma.activity.count({ where: { companyId: id, type: 'Meeting' } }),
+  ]);
+  const funnel = {
+    contacted: contactedCount,
+    engaged: engagedCount,
+    meetings: meetingsCount,
+    opportunity: Math.round(expansionOpportunity),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -232,8 +284,20 @@ export default async function CompanyDetailPage({
 
         {/* Company Header */}
         <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 mb-6 border border-gray-200 dark:border-zinc-700">
-          <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">{company.name}</h1>
-          <p className="text-gray-600 dark:text-gray-300">{company.domain ?? '—'}</p>
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">{company.name}</h1>
+              <p className="text-gray-600 dark:text-gray-300">{company.domain ?? '—'}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {company.researchData && (
+                <span className="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                  ✅ AI Researched
+                </span>
+              )}
+              <DeleteCompanyButton companyId={company.id} companyName={company.name} />
+            </div>
+          </div>
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
             <span>Industry: {company.industry || 'Not specified'}</span>
             <span>•</span>
@@ -268,13 +332,27 @@ export default async function CompanyDetailPage({
           </div>
         </div>
 
+      
+
         <CompanyGetStarted
           companyId={id}
           companyName={company.name}
           hasDepartments={departments.length > 0}
           hasContacts={company.contacts.length > 0}
           hasMessaging={hasMessaging}
+          hasResearch={!!company.researchData}
+          hasLaunchedCampaign={campaigns.length > 0}
         />
+
+        {initialTab === 'campaigns' && (
+          <div className="mb-6">
+            <ProgressSteps
+              companyId={id}
+              companyName={company.name}
+              currentStep={!hasMessaging || !company.researchData || departments.length === 0 ? 1 : 2}
+            />
+          </div>
+        )}
 
         {/* Tabs: Departments (default), Overview, Contacts, Products, Activity */}
         <div className="mb-6">
@@ -290,6 +368,9 @@ export default async function CompanyDetailPage({
             accountMessaging={accountMessaging}
             contentLibraryUseCasesAndStories={contentLibraryForMessaging}
             initialTab={initialTab}
+            pipelineByMicrosegment={pipelineByMicrosegment}
+            funnel={funnel}
+            campaigns={campaigns}
           />
         </div>
       </div>

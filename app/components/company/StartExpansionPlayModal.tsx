@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createExpansionPlay } from '@/app/actions/expansion-play';
-import { createUseCaseExplorationPlay } from '@/app/actions/use-case-exploration-play';
 
 type PlayType = 'cross-sell' | 'new-stakeholder' | 'use-case-exploration';
 
 type Props = {
   companyId: string;
-  companyName: string;
+  companyName?: string;
   departmentId: string;
   departmentName: string;
   productId: string;
@@ -23,7 +21,6 @@ type Props = {
 
 export function StartExpansionPlayModal({
   companyId,
-  companyName,
   departmentId,
   departmentName,
   productId,
@@ -38,32 +35,12 @@ export function StartExpansionPlayModal({
   const [selected, setSelected] = useState<PlayType>('cross-sell');
   const [loading, setLoading] = useState(false);
 
-  const handleStart = async () => {
+  const handleStart = () => {
     setLoading(true);
-    try {
-      if (selected === 'cross-sell') {
-        const res = await createExpansionPlay(companyId, departmentId, productId, opportunitySize);
-        onClose();
-        if (res.ok) {
-          router.push(`/dashboard/plays/cross-sell/${res.playId}`);
-        } else {
-          router.push(`/dashboard/companies/${companyId}/departments/${departmentId}`);
-        }
-      } else if (selected === 'use-case-exploration') {
-        const res = await createUseCaseExplorationPlay(companyId, departmentId, productId);
-        onClose();
-        if (res.ok) {
-          router.push(`/dashboard/plays/use-case-exploration/${res.playId}`);
-        } else {
-          router.push(`/dashboard/companies/${companyId}/departments/${departmentId}`);
-        }
-      } else {
-        onClose();
-        router.push(`/dashboard/plays/new-stakeholder-engagement?companyId=${companyId}&departmentId=${departmentId}`);
-      }
-    } finally {
-      setLoading(false);
-    }
+    onClose();
+    // Single expansion flow: open company Messaging tab to work with the agent
+    router.push(`/dashboard/companies/${companyId}?tab=messaging`);
+    setLoading(false);
   };
 
   if (!open) return <>{triggerButton}</>;

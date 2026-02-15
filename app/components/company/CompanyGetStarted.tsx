@@ -9,6 +9,8 @@ type Props = {
   hasDepartments: boolean;
   hasContacts: boolean;
   hasMessaging?: boolean;
+  hasResearch?: boolean;
+  hasLaunchedCampaign?: boolean;
 };
 
 export function CompanyGetStarted({
@@ -17,8 +19,11 @@ export function CompanyGetStarted({
   hasDepartments,
   hasContacts,
   hasMessaging = false,
+  hasResearch = false,
+  hasLaunchedCampaign = false,
 }: Props) {
-  const showGetStarted = !hasDepartments || !hasMessaging || !hasContacts;
+  const hasIntelligence = hasResearch && hasDepartments && hasMessaging;
+  const showGetStarted = !hasIntelligence || !hasLaunchedCampaign;
 
   if (!showGetStarted) return null;
 
@@ -28,43 +33,27 @@ export function CompanyGetStarted({
         Get started with {companyName}
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-        You haven&apos;t set up this account yet. Let&apos;s build your expansion plan.
+        Set up account intelligence, then create your AI-powered sales page and chat. New contacts from the landing page are pushed to your CRM nightly.
       </p>
 
       <div className="space-y-4">
         <div className="rounded-lg border border-gray-200 dark:border-zinc-600 p-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h3 className="font-medium text-gray-900 dark:text-gray-100">Step 1: Discover Departments</h3>
+              <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                Step 1: Account Intelligence {(hasResearch && hasDepartments && hasMessaging) && <span className="text-green-600 dark:text-green-400">✓</span>}
+              </h3>
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
-                AI will research {companyName}&apos;s org structure and identify departments that could use your products.
-              </p>
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">~10 min</span>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href={`/dashboard/companies/${companyId}/discover-departments`}>
-              <Button>Discover Departments with AI</Button>
-            </Link>
-            <Link href={`/dashboard/companies/${companyId}/add-departments`}>
-              <Button variant="outline">Add departments manually</Button>
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 dark:border-zinc-600 p-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <h3 className="font-medium text-gray-900 dark:text-gray-100">Step 2: Set Up Account Messaging</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
-                Define why {companyName} should care, relevant use cases, and case studies. AI will use this when drafting personalized outreach.
+                Research the account with AI, review microsegments (departments), and generate account messaging in one flow. Review and edit before moving on.
               </p>
             </div>
             <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">~5 min</span>
           </div>
           <div className="mt-3">
-            <Link href={`/dashboard/companies/${companyId}?tab=messaging`}>
-              <Button variant="outline">Set Up Account Messaging</Button>
+            <Link href={`/dashboard/companies/${companyId}/intelligence`}>
+              <Button variant="outline">
+                {(hasResearch && hasDepartments && hasMessaging) ? 'Review Account Intelligence' : 'Set up Account Intelligence'}
+              </Button>
             </Link>
           </div>
         </div>
@@ -72,45 +61,21 @@ export function CompanyGetStarted({
         <div className="rounded-lg border border-gray-200 dark:border-zinc-600 p-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h3 className="font-medium text-gray-900 dark:text-gray-100">Step 3: Find Contacts</h3>
+              <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                Step 2: AI Powered Custom Sales Pages + Chat {(hasLaunchedCampaign) && <span className="text-green-600 dark:text-green-400">✓</span>}
+              </h3>
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
-                Find stakeholders in each department. Import from LinkedIn, paste from a list, or let AI discover them.
+                Create a custom sales page with chat. Configure headline, body, and CTA, then launch to get a shareable URL. Visits, chats, and new leads are tracked and pushed to your CRM nightly.
               </p>
             </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">~15 min</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">~5 min</span>
           </div>
           <div className="mt-3">
-            {!hasDepartments ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">Waiting for departments</p>
+            {!hasIntelligence ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Complete Account Intelligence first</p>
             ) : (
-              <>
-                {!hasMessaging && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Waiting for messaging (recommended first)</p>
-                )}
-                <Link href={`/dashboard/companies/${companyId}/add-contacts`}>
-                  <Button variant="outline">Find Contacts</Button>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 dark:border-zinc-600 p-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <h3 className="font-medium text-gray-900 dark:text-gray-100">Step 4: Launch Outreach</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
-                AI drafts personalized emails, LinkedIn messages, and event invitations for each contact.
-              </p>
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">~20 min</span>
-          </div>
-          <div className="mt-3">
-            {!hasContacts ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">Waiting for contacts</p>
-            ) : (
-              <Link href={`/dashboard/companies/${companyId}/launch-outreach`}>
-                <Button variant="outline">Launch Outreach</Button>
+              <Link href={`/dashboard/companies/${companyId}?tab=campaigns`}>
+                <Button variant="outline">{hasLaunchedCampaign ? 'View Sales Pages' : 'Create Sales Page + Chat'}</Button>
               </Link>
             )}
           </div>
@@ -118,16 +83,10 @@ export function CompanyGetStarted({
       </div>
 
       <div className="mt-6 pt-4 border-t border-gray-200 dark:border-zinc-600">
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Already have contacts?</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Import contacts from CRM</p>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/dashboard/companies/${companyId}/add-contacts`}>
-            <Button variant="outline" size="sm">Import Contacts</Button>
-          </Link>
-          <Link href={`/dashboard/companies/${companyId}/add-contacts?paste=linkedin`}>
-            <Button variant="outline" size="sm">Paste from LinkedIn</Button>
-          </Link>
-          <Link href={`/dashboard/companies/${companyId}/add-contacts?manual=1`}>
-            <Button variant="outline" size="sm">Add Manually</Button>
+          <Link href={`/dashboard/companies/${companyId}/contacts`}>
+            <Button variant="outline" size="sm">Contacts (from CRM)</Button>
           </Link>
         </div>
       </div>

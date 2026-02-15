@@ -2,12 +2,13 @@
 
 import { useMemo } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
 } from '@/components/ai-elements/conversation';
+import { ChatMessageParts } from '@/components/ai-elements/chat-message-parts';
 import {
   Message,
   MessageContent,
@@ -20,25 +21,13 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from '@/components/ai-elements/prompt-input';
+import { CompanyResearchDisplay } from '@/app/components/company/CompanyResearchDisplay';
 
 type ChatUIProps = {
   playId: string;
   accountId?: string;
   contactId?: string;
 };
-
-function getMessageText(m: {
-  parts?: Array<{ type: string; text?: string }>;
-  content?: string;
-}): string {
-  if (Array.isArray(m.parts)) {
-    return m.parts
-      .filter((p): p is { type: string; text: string } => p.type === 'text')
-      .map((p) => p.text)
-      .join('');
-  }
-  return typeof m.content === 'string' ? m.content : '';
-}
 
 export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
   const body = useMemo(
@@ -53,10 +42,11 @@ export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
     () => new DefaultChatTransport({ api: '/api/chat', body }),
     [body]
   );
-  const { messages, sendMessage, status, stop } = useChat({
+  const { messages, sendMessage, status, stop, addToolApprovalResponse } = useChat({
     id: `chat-${playId}-${accountId ?? 'none'}-${contactId ?? 'none'}`,
     transport,
     experimental_throttle: 80,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
 
   const displayMessages = useMemo(
@@ -75,7 +65,18 @@ export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
   }
 
   return (
-    <div className="flex flex-col min-h-[400px] rounded-xl border border-gray-200 bg-gray-50/50">
+    <div className="flex flex-col min-h-[400px] rounded-xl border border-gray-200 bg-gray-50/50 dark:bg-zinc-900">
+      {accountId ? (
+        <div className="p-3 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-t-xl max-h-[300px] overflow-y-auto">
+          <CompanyResearchDisplay companyId={accountId} />
+        </div>
+      ) : (
+        <div className="p-3 border-b border-gray-200 dark:border-zinc-700 bg-yellow-50 dark:bg-yellow-900/20 rounded-t-xl">
+          <p className="text-xs text-yellow-800 dark:text-yellow-200">
+            💡 <strong>Tip:</strong> Access chat from a company page to see account research data. Go to a company and click &quot;Launch Chat&quot;.
+          </p>
+        </div>
+      )}
       <Conversation className="min-h-0 flex-1">
         <ConversationContent>
           {displayMessages.length === 0 && !isLoading && (
@@ -98,7 +99,21 @@ export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
           {displayMessages.map((m) => (
             <Message key={m.id} from={m.role as 'user' | 'assistant'}>
               <MessageContent>
-                <MessageResponse>{getMessageText(m)}</MessageResponse>
+                {m.role === 'user' ? (
+                  <MessageResponse>
+                    {typeof (m as { content?: string }).content === 'string'
+                      ? (m as { content: string }).content
+                      : (m as { parts?: Array<{ type: string; text?: string }> }).parts
+                          ?.filter((p): p is { type: string; text: string } => p.type === 'text')
+                          .map((p) => p.text)
+                          .join('') ?? ''}
+                  </MessageResponse>
+                ) : (
+                  <ChatMessageParts
+                    parts={(m as { parts?: unknown[] }).parts}
+                    addToolApprovalResponse={addToolApprovalResponse}
+                  />
+                )}
               </MessageContent>
             </Message>
           ))}

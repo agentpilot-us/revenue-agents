@@ -3,23 +3,56 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { getPlay } from '@/lib/plays';
+import { expansion } from '@/lib/plays/expansion';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
+import {
+  getProductKnowledgeBlock,
+  getIndustryPlaybookBlock,
+  getCaseStudiesBlock,
+  getRelevantProductIdsForIndustry,
+  getCompanyEventsBlock,
+  getFeatureReleasesBlock,
+} from '@/lib/prompt-context';
 import {
   searchLinkedInContacts,
   enrichContact,
   researchCompany,
-  sendEmail as resendSendEmail,
-  createCalendarEvent,
   getCalendarRsvps,
 } from '@/lib/tools';
+import { sendEmail as resendSendEmail } from '@/lib/tools/resend';
+import { createCalendarEvent } from '@/lib/tools/cal';
+import { addExpansionScore } from '@/lib/gamification/expansion-score';
+import { updateUserStreak } from '@/lib/gamification/streaks';
 import { isToolConfigured } from '@/lib/service-config';
 import { chatTools } from '@/app/api/chat/tools';
+import {
+  getNextTouchContext,
+  getActiveEnrollmentContext,
+  advanceEnrollment,
+} from '@/lib/sequences/get-next-touch-context';
 
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+/** Passed to tools via experimental_context so execute can read account without closure */
+type ChatContext = {
+  accountId: string;
+  companyName: string | null;
+  companyDomain: string | null;
+  industry: string | null;
+  userId: string;
+  contactId?: string | null;
+  activeEnrollment?: {
+    enrollmentId: string;
+    sequenceName: string;
+    currentStepIndex: number;
+    stepRole: string;
+    ctaType: string | null;
+  } | null;
+};
 
 export const maxDuration = 60;
 
@@ -39,14 +72,15 @@ export async function POST(req: Request) {
     }
 
     const messages = Array.isArray(body.messages) ? body.messages : [];
-    const playId = (typeof body.playId === 'string' ? body.playId : 'expansion');
     const accountId = typeof body.accountId === 'string' ? body.accountId : (body.companyId as string | undefined);
     const contactId = typeof body.contactId === 'string' ? body.contactId : undefined;
 
-    const play = getPlay(playId);
-    if (!play) {
-      return new Response('Invalid play', { status: 400 });
-    }
+    // Get user's company name for Content Library matching
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { companyName: true },
+    });
+    const userCompanyName = user?.companyName || 'Your company';
 
     // Resolve company (account) context and contacts with department
     type ContactRow = { id: string; firstName: string | null; lastName: string | null; title: string | null; department: string | null };
@@ -106,18 +140,25 @@ export async function POST(req: Request) {
       userConfirmed: true,
       isActive: true,
     };
+    // Prioritize: 1) User's company-branded, 2) Account-specific, 3) Industry/department matched
     if (company?.name) {
       whereClause.AND = [
         ...(orConditions.length > 0 ? [{ OR: orConditions }] : []),
-        { OR: [{ company: company.name }, { company: null }, { company: '' }] },
+        { OR: [{ company: userCompanyName }, { company: company.name }, { company: null }, { company: '' }] },
       ];
     } else if (orConditions.length > 0) {
-      whereClause.OR = orConditions;
+      whereClause.OR = [
+        { company: userCompanyName }, // User's company-branded first
+        ...orConditions,
+      ];
+    } else {
+      whereClause.OR = [{ company: userCompanyName }, { company: null }, { company: '' }];
     }
     const relevantContent = await prisma.contentLibrary.findMany({
       where: whereClause,
       orderBy: [
-        { company: 'desc' }, // company-matched (non-null) first when account is set
+        // Prioritize: userCompanyName > account company name > null/empty
+        { company: 'desc' },
         { department: 'desc' },
         { persona: 'desc' },
         { industry: 'desc' },
@@ -163,6 +204,94 @@ When drafting emails or messages:
       if (block) accountContextBlock = `\n\n${block}`;
     }
 
+    // Account research data (AI-generated company intelligence)
+    let researchDataBlock = '';
+    if (accountId && session.user.id) {
+      const block = await getCompanyResearchPromptBlock(accountId, session.user.id);
+      if (block) researchDataBlock = `\n\n${block}`;
+    }
+
+    // Agent memory: previous conversation summary and decisions for this account
+    let accountMemoryBlock = '';
+    if (accountId) {
+      const companyWithMemory = await prisma.company.findFirst({
+        where: { id: accountId, userId: session.user.id },
+        select: { agentContext: true },
+      });
+      const ctx = companyWithMemory?.agentContext as { lastConversationSummary?: string; decisions?: string[]; contactInteractionSummary?: string } | null;
+      if (ctx && (ctx.lastConversationSummary || (ctx.decisions?.length) || ctx.contactInteractionSummary)) {
+        const parts: string[] = [];
+        if (ctx.lastConversationSummary) parts.push(`Last conversation summary: ${ctx.lastConversationSummary}`);
+        if (ctx.decisions?.length) parts.push(`Decisions: ${ctx.decisions.join('; ')}`);
+        if (ctx.contactInteractionSummary) parts.push(`Contact interaction summary: ${ctx.contactInteractionSummary}`);
+        accountMemoryBlock = `\n\nPREVIOUS CONTEXT FOR THIS ACCOUNT:\n${parts.join('\n')}`;
+      }
+    }
+
+    // Product Knowledge Layer: industry playbook -> relevant product IDs -> product knowledge + case studies
+    const industryPlaybookBlock = await getIndustryPlaybookBlock(
+      session.user.id,
+      company?.industry ?? null
+    );
+    const relevantProductIds = await getRelevantProductIdsForIndustry(
+      session.user.id,
+      company?.industry ?? null,
+      targetContactDepartment
+    );
+    const productKnowledgeBlock = await getProductKnowledgeBlock(
+      session.user.id,
+      relevantProductIds.length > 0 ? relevantProductIds : undefined
+    );
+    const caseStudiesBlock = await getCaseStudiesBlock(
+      session.user.id,
+      company?.industry ?? null,
+      targetContactDepartment,
+      relevantProductIds
+    );
+    
+    // Company events (GTC sessions, webinars, etc.) - filter by contact role if available
+    const contactRole = contactId
+      ? company?.contacts.find((c) => c.id === contactId)?.title || null
+      : null;
+    const companyEventsBlock = await getCompanyEventsBlock(
+      session.user.id,
+      company?.industry ?? null,
+      targetContactDepartment,
+      contactRole
+    );
+    
+    // Feature releases and product announcements
+    const featureReleasesBlock = await getFeatureReleasesBlock(
+      session.user.id,
+      company?.industry ?? null,
+      10
+    );
+    
+    const productKnowledgeSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
+    const industryPlaybookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
+    const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
+    const companyEventsSection = companyEventsBlock ? `\n\n${companyEventsBlock}` : '';
+    const featureReleasesSection = featureReleasesBlock ? `\n\n${featureReleasesBlock}` : '';
+
+    // Hyper-personalized campaign links for this company/segment (use in segment emails and drafts)
+    let campaignBlock = '';
+    if (accountId && session.user.id) {
+      const campaigns = await prisma.segmentCampaign.findMany({
+        where: { companyId: accountId, userId: session.user.id },
+        include: { department: { select: { customName: true, type: true } } },
+        orderBy: [{ departmentId: 'asc' }, { createdAt: 'desc' }],
+      });
+      if (campaigns.length > 0) {
+        const lines = campaigns.map((c) => {
+          const segment = c.department
+            ? (c.department.customName ?? c.department.type.replace(/_/g, ' '))
+            : 'Account';
+          return `- [${c.title}] (${segment}): ${c.url}`;
+        });
+        campaignBlock = `\n\nHYPER-PERSONALIZED CONTENT (use in segment emails and when drafting for this account/segment):\n${lines.join('\n')}\nWhen sending to a segment or drafting for contacts in this account, include the relevant campaign URL in the email body when appropriate.`;
+      }
+    }
+
     // Messaging framework
     const lastUserContent = messages
       .filter((m: unknown) => (m as { role?: string }).role === 'user')
@@ -184,7 +313,7 @@ When drafting emails or messages:
         )
         .join('\n') ?? '  None';
 
-    const systemPrompt = `${play.buildSystemPrompt({
+    const systemPrompt = `${expansion.buildSystemPrompt({
       companyName: company?.name,
       companyDomain: company?.domain ?? undefined,
       stage: 'Unknown',
@@ -262,17 +391,53 @@ ${!accountId ? '\nNo account is selected. If the user asks about departments or 
 
 When the user asks "what departments does [company] have?" or similar: first call list_departments with the Current company ID above. That returns the departments already mapped for this account. Only use discover_departments if it is available and the user wants to find additional departments via AI research.
 
-Parse research and save to database: When the user asks "what departments are interested in [product] and why?" (e.g. NVIDIA chips, Jetson): (1) call research_company with a query about that company and product interest, (2) call apply_department_product_research with the Current company ID and the research summary (and optional productFocus). That extracts departments and product interests with value prop and writes them to the account. Then summarize what was added. When the user pastes a block of research text (earnings notes, LinkedIn research, etc.) and wants it ingested: call apply_department_product_research with the Current company ID and the pasted text; then confirm what was created or updated.
+You do not send email or create calendar events from this chat; the user runs outbound sequences in their CRM (Salesforce, HubSpot). You can draft copy or suggest next steps for them to use there.
+
+Parse research and save to database: When the user asks "what departments are interested in [product] and why?" (e.g. a product from your catalog): (1) call research_company with a query about that company and product interest, (2) call apply_department_product_research with the Current company ID and the research summary (and optional productFocus). That extracts departments and product interests with value prop and writes them to the account. Then summarize what was added. When the user pastes a block of research text (earnings notes, LinkedIn research, etc.) and wants it ingested: call apply_department_product_research with the Current company ID and the pasted text; then confirm what was created or updated.
+${productKnowledgeSection}
+${industryPlaybookSection}
+${caseStudiesSection}
+${companyEventsSection}
+${featureReleasesSection}
 
 DEPARTMENT-BASED MESSAGING: Each contact may have a department (e.g. Autonomous Vehicles, IT Infrastructure). Use the content library entries that match that department to determine value propositions and use cases when drafting to that contact. If department is "Not set", use industry and persona from the content library.
 
+EVENT RECOMMENDATIONS: When users ask about which sessions/events to invite contacts to (e.g. "which sessions should I invite the VP of Autonomous Vehicles to?"), use the COMPANY EVENTS & SESSIONS section above. Sessions are organized by TOPIC/INTEREST (e.g., "Autonomous Vehicles", "AI Factories", "CUDA", "Robotics"), not by product. Match events by:
+- Primary Topic/Interest (most important - e.g. "Autonomous Vehicles" sessions for AV contacts)
+- Industry (e.g. Automotive events for automotive companies)
+- Department (e.g. Autonomous Vehicles sessions for AV department contacts)
+- Role/title (e.g. VP-level sessions for VP contacts)
+- Additional topics (secondary topics covered in the session)
+
+FEATURE RELEASES: When sharing product updates or announcements, reference the FEATURE RELEASES & PRODUCT ANNOUNCEMENTS section. Use these to:
+- Share latest product features with prospects
+- Reference recent announcements in outreach
+- Highlight new capabilities relevant to the contact's use case
+
 ${messagingSection}
 ${contentLibrarySection}
+${campaignBlock}
 ${accountContextBlock}
+${researchDataBlock}
+${accountMemoryBlock}
 
 Work step-by-step and explain what you're doing.`;
 
-    const accountIdForTools = accountId ?? '';
+    let activeEnrollment: ChatContext['activeEnrollment'] = null;
+    if (contactId && session.user.id) {
+      const enrollment = await getActiveEnrollmentContext(contactId, session.user.id);
+      activeEnrollment = enrollment ?? null;
+    }
+
+    const experimental_context: ChatContext = {
+      accountId: accountId ?? '',
+      companyName: company?.name ?? null,
+      companyDomain: company?.domain ?? null,
+      industry: company?.industry ?? null,
+      userId: session.user.id,
+      contactId: contactId ?? null,
+      activeEnrollment,
+    };
 
     const allTools = {
       ...chatTools,
@@ -285,13 +450,16 @@ Work step-by-step and explain what you're doing.`;
           jobTitles: z.array(z.string()).optional().describe('Job titles to filter'),
           maxResults: z.number().default(50).optional().describe('Max number of results'),
         }),
-        execute: async (params: { companyName?: string; companyDomain?: string; maxResults?: number }) => {
+        execute: async (
+          params: { companyName?: string; companyDomain?: string; maxResults?: number },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
           const res = await searchLinkedInContacts({
             companyName: params.companyName,
             companyDomain: params.companyDomain,
             limit: params.maxResults,
           });
-          if (!res.ok) return { error: res.error };
+          if (!res.ok) throw new Error(res.error);
           return { found: res.contacts.length, profiles: res.contacts };
         },
       }),
@@ -306,13 +474,14 @@ Work step-by-step and explain what you're doing.`;
           email: z.string().optional().describe('Known email to enrich'),
           domain: z.string().optional().describe('Company domain for lookup'),
         }),
-        execute: async (params: Record<string, unknown>) => {
+        execute: async (params: Record<string, unknown>, opts?: { experimental_context?: ChatContext }) => {
+          const accountIdForTools = opts?.experimental_context?.accountId ?? '';
           const res = await enrichContact({
             email: params.email as string | undefined,
             linkedinUrl: params.linkedinUrl as string | undefined,
             domain: params.domain as string | undefined,
           });
-          if (!res.ok) return { error: res.error };
+          if (!res.ok) throw new Error(res.error);
           const data = res.data as Record<string, unknown> & { email?: string };
           if (accountIdForTools && data.email) {
             try {
@@ -343,9 +512,14 @@ Work step-by-step and explain what you're doing.`;
                   seniority: (data.seniority as string) ?? undefined,
                 },
               });
+              const uid = opts?.experimental_context?.userId;
+              if (uid) {
+                void addExpansionScore(prisma, uid, 'contacts_discovered').catch(() => {});
+                void updateUserStreak(prisma, uid).catch(() => {});
+              }
               return { contactId: contact.id, ...data };
             } catch (e) {
-              return { error: e instanceof Error ? e.message : 'Failed to save contact', ...data };
+              throw new Error(e instanceof Error ? e.message : 'Failed to save contact');
             }
           }
           return data;
@@ -360,124 +534,354 @@ Work step-by-step and explain what you're doing.`;
           query: z.string().describe('Research question or topic'),
           focusAreas: z.array(z.string()).optional().describe('Areas to focus on'),
         }),
-        execute: async (params: { companyName?: string; companyDomain?: string; query: string }) => {
+        execute: async (params: { companyName?: string; companyDomain?: string; query: string }, opts?: { experimental_context?: ChatContext }) => {
+          const ctx = opts?.experimental_context;
+          const accountIdForTools = ctx?.accountId ?? '';
           const res = await researchCompany({
             query: params.query,
             companyName: params.companyName,
             companyDomain: params.companyDomain,
           });
-          if (!res.ok) return { error: res.error };
-          if (accountIdForTools) {
+          if (!res.ok) throw new Error(res.error);
+          if (accountIdForTools && ctx?.userId) {
             await (prisma as unknown as { activity: { create: (args: unknown) => Promise<unknown> } }).activity.create({
               data: {
                 type: 'Research',
                 summary: `Research completed for ${params.companyName ?? params.query}`,
                 content: res.summary,
                 companyId: accountIdForTools,
-                userId: session!.user!.id,
-                agentUsed: playId,
+                userId: ctx.userId,
+                agentUsed: 'expansion',
               },
             });
+            void addExpansionScore(prisma, ctx.userId, 'research_completed').catch(() => {});
+            void updateUserStreak(prisma, ctx.userId).catch(() => {});
           }
           return { summary: res.summary };
         },
       }),
 
+      draft_next_sequence_touch: tool({
+        description:
+          'Get the next sequence step context for a contact so you can draft the next touch (e.g. next email in their sequence). Use when the user asks to "draft the next sequence email" or "what\'s the next touch" for a contact. Returns step role, CTA type, and prompt context. Then use send_email (or create_calendar_event) with that context.',
+        inputSchema: z.object({
+          contactId: z.string().optional().describe('Contact id; uses current chat contact if not provided'),
+        }),
+        execute: async (params: { contactId?: string }, opts?: { experimental_context?: ChatContext }) => {
+          const ctx = opts?.experimental_context;
+          const userId = ctx?.userId;
+          const contactId = params.contactId ?? ctx?.contactId ?? undefined;
+          if (!userId || !contactId) {
+            return { ok: false, message: 'Contact context required. Open a company and select a contact, or pass contactId.' };
+          }
+          const next = await getNextTouchContext(contactId, userId);
+          if (!next) {
+            return {
+              ok: false,
+              message: 'No active sequence enrollment or next touch not due for this contact.',
+            };
+          }
+          return {
+            ok: true,
+            enrollmentId: next.enrollmentId,
+            sequenceName: next.sequenceName,
+            currentStepIndex: next.currentStepIndex,
+            stepRole: next.step.role,
+            ctaType: next.step.ctaType,
+            suggestedChannel: next.suggestedChannel,
+            promptContext: next.promptContext,
+            message: `Next touch: ${next.sequenceName}, step ${next.currentStepIndex + 1}, role "${next.step.role}". Use this context to draft the email, then call send_email.`,
+          };
+        },
+      }),
+
+      send_email_to_segment: tool({
+        description:
+          'Send the same email (e.g. an event invite) to every contact in a segment (buying group). Use when the user says to send an invite or email to "all [segment name] segment" or "everyone in [department]". Creates one draft; user approves in the Approval queue, then the same subject and body are sent to each contact in that segment. Call list_departments first if you need to resolve segment name to a department.',
+        inputSchema: z.object({
+          companyId: z.string().optional().describe('Company ID; use current account from context if omitted'),
+          companyName: z.string().optional().describe('Company name to resolve (e.g. General Motors)'),
+          departmentId: z.string().optional().describe('Department/segment ID from list_departments'),
+          segmentName: z.string().optional().describe('Segment name to resolve (e.g. autonomous vehicle, SALES)'),
+          subject: z.string(),
+          body: z.string(),
+        }),
+        execute: async (
+          params: {
+            companyId?: string;
+            companyName?: string;
+            departmentId?: string;
+            segmentName?: string;
+            subject: string;
+            body: string;
+          },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
+          const ctx = opts?.experimental_context;
+          const userId = ctx?.userId;
+          if (!userId) {
+            throw new Error('User context required.');
+          }
+          let companyId = params.companyId ?? ctx?.accountId ?? '';
+          if (!companyId && params.companyName) {
+            const company = await prisma.company.findFirst({
+              where: {
+                userId,
+                name: { equals: params.companyName, mode: 'insensitive' },
+              },
+              select: { id: true },
+            });
+            if (!company) {
+              throw new Error(`Company not found: ${params.companyName}. Use the current company or provide a valid company name.`);
+            }
+            companyId = company.id;
+          }
+          if (!companyId) {
+            throw new Error('Account context required. Open a company first or provide companyId/companyName.');
+          }
+          const company = await prisma.company.findFirst({
+            where: { id: companyId, userId },
+            select: { id: true, name: true },
+          });
+          if (!company) {
+            throw new Error('Company not found or access denied.');
+          }
+          let departmentId: string | null = null;
+          let segmentName = params.segmentName ?? '';
+          if (params.departmentId) {
+            const dept = await prisma.companyDepartment.findFirst({
+              where: { id: params.departmentId, companyId },
+              select: { id: true, type: true, customName: true },
+            });
+            if (!dept) throw new Error('Department not found for this company.');
+            departmentId = dept.id;
+            segmentName = dept.customName ?? dept.type.replace(/_/g, ' ');
+          } else if (params.segmentName?.trim()) {
+            const departments = await prisma.companyDepartment.findMany({
+              where: { companyId },
+              select: { id: true, type: true, customName: true },
+            });
+            const q = params.segmentName.trim().toLowerCase();
+            const found = departments.find((d) => {
+              const name = (d.customName ?? d.type.replace(/_/g, ' ')).toLowerCase();
+              return name.includes(q) || q.includes(name) || d.type.toLowerCase() === q.replace(/\s+/g, '_');
+            });
+            if (!found) {
+              throw new Error(
+                `No segment found matching "${params.segmentName}". Call list_departments with companyId to see segment names.`
+              );
+            }
+            departmentId = found.id;
+            segmentName = found.customName ?? found.type.replace(/_/g, ' ');
+          } else {
+            throw new Error('Provide departmentId or segmentName (e.g. autonomous vehicle, SALES).');
+          }
+          const contacts = await prisma.contact.findMany({
+            where: { companyDepartmentId: departmentId, companyId, email: { not: null } },
+            select: { id: true, email: true },
+          });
+          if (contacts.length === 0) {
+            throw new Error(`No contacts with email in segment "${segmentName}". Add contacts to this department first.`);
+          }
+          const contactIds = contacts.map((c) => c.id);
+          await prisma.pendingAction.create({
+            data: {
+              type: 'email_to_segment',
+              status: 'pending',
+              payload: {
+                companyId,
+                departmentId,
+                segmentName,
+                subject: params.subject,
+                body: params.body,
+                contactIds,
+              },
+              companyId,
+              userId,
+            },
+          });
+          return {
+            ok: true,
+            message: `Draft ready. This invite will be sent to ${contactIds.length} contact${contactIds.length !== 1 ? 's' : ''} in segment "${segmentName}". Approve in the Approval queue to send.`,
+            segmentName,
+            contactCount: contactIds.length,
+          };
+        },
+      }),
+
       send_email: tool({
-        description: 'Send an email to a contact',
+        description:
+          'Send an email to a contact. The user must approve the draft in the chat before the email is sent. Use when the user or you want to send an email; a draft will be shown for approval, then sent via Resend.',
         inputSchema: z.object({
           contactId: z.string().optional(),
           to: z.string().optional(),
           subject: z.string(),
           body: z.string(),
         }),
-        execute: async (params: { contactId?: string; to?: string; subject: string; body: string }) => {
+        needsApproval: true,
+        execute: async (params: { contactId?: string; to?: string; subject: string; body: string }, opts?: { experimental_context?: ChatContext }) => {
+          const ctx = opts?.experimental_context;
+          const accountIdForTools = ctx?.accountId ?? '';
           let toEmail = params.to;
           let contactId = params.contactId;
           let companyId = accountIdForTools;
-          
+
           if (!toEmail && contactId) {
-            const contact = await (prisma as unknown as { contact: { findUnique: (args: unknown) => Promise<{ email: string | null; companyId: string } | null> } }).contact.findUnique({
+            const contact = await prisma.contact.findUnique({
               where: { id: contactId },
+              select: { email: true, companyId: true },
             });
             toEmail = contact?.email ?? undefined;
             if (contact?.companyId) companyId = contact.companyId;
           }
           if (!toEmail) {
-            return { error: 'Contact has no email or to address not provided' };
+            throw new Error('Contact has no email or to address not provided');
           }
-          if (!companyId) {
-            return { error: 'Account context required. Open a company first.' };
+          if (!companyId || !ctx?.userId) {
+            throw new Error('Account context required. Open a company first.');
           }
-          
+
           const result = await resendSendEmail({
             to: toEmail,
             subject: params.subject,
-            html: params.body,
-            text: params.body,
+            html: params.body ?? '',
+            text: params.body ?? '',
           });
-          if (!result.ok) return { error: result.error };
-          
-          // Create Activity record with resendEmailId so webhooks can link back
-          if (result.id && (contactId || toEmail)) {
-            try {
-              if (!contactId && toEmail && companyId) {
-                // Try to find contact by email
-                const existingContact = await (prisma as unknown as { contact: { findFirst: (args: unknown) => Promise<{ id: string } | null> } }).contact.findFirst({
-                  where: { email: toEmail, companyId },
-                });
-                if (existingContact) contactId = existingContact.id;
-              }
-              
-              if (contactId) {
-                await (prisma as unknown as { activity: { create: (args: unknown) => Promise<unknown> } }).activity.create({
-                  data: {
-                    type: 'Email',
-                    summary: `Sent email: ${params.subject}`,
-                    content: params.body,
-                    companyId,
-                    contactId,
-                    userId: session!.user!.id,
-                    resendEmailId: result.id,
-                    agentUsed: playId,
-                  },
-                });
-                
-                // Update contact's lastEmailSentAt and totalEmailsSent
-                await (prisma as unknown as { contact: { update: (args: unknown) => Promise<unknown> } }).contact.update({
-                  where: { id: contactId },
-                  data: {
-                    lastEmailSentAt: new Date(),
-                    totalEmailsSent: { increment: 1 },
-                  },
-                });
-              }
-            } catch (e) {
-              console.error('Failed to create activity for email:', e);
-              // Don't fail the email send if activity creation fails
-            }
+          if (!result.ok) {
+            throw new Error(result.error);
           }
-          
-          return { id: result.id, sent: true };
+          let resolvedContactId = contactId ?? null;
+          if (!resolvedContactId && toEmail && companyId) {
+            const existing = await prisma.contact.findFirst({
+              where: { email: toEmail, companyId },
+            });
+            if (existing) resolvedContactId = existing.id;
+          }
+          let activityId: string | null = null;
+          if (resolvedContactId) {
+            const activity = await prisma.activity.create({
+              data: {
+                type: 'Email',
+                summary: `Sent email: ${params.subject}`,
+                content: params.body,
+                companyId,
+                contactId: resolvedContactId,
+                userId: ctx.userId,
+                resendEmailId: result.id,
+                agentUsed: 'expansion',
+              },
+            });
+            activityId = activity.id;
+            await prisma.contact.update({
+              where: { id: resolvedContactId },
+              data: {
+                lastEmailSentAt: new Date(),
+                totalEmailsSent: { increment: 1 },
+              },
+            });
+            if (ctx.activeEnrollment?.enrollmentId && activityId) {
+              try {
+                await prisma.sequenceTouch.create({
+                  data: {
+                    enrollmentId: ctx.activeEnrollment.enrollmentId,
+                    stepIndex: ctx.activeEnrollment.currentStepIndex,
+                    channel: 'email',
+                    sentAt: new Date(),
+                    activityId,
+                  },
+                });
+                await advanceEnrollment(ctx.activeEnrollment.enrollmentId);
+              } catch (e) {
+                console.error('SequenceTouch/advance after send_email:', e);
+              }
+            }
+            void addExpansionScore(prisma, ctx.userId, 'email_sent').catch(() => {});
+            void updateUserStreak(prisma, ctx.userId).catch(() => {});
+          }
+          return { sent: true, messageId: result.id, message: 'Email sent.' };
         },
       }),
 
       create_calendar_event: tool({
         description:
-          'Create a calendar event (meeting) via Cal.com. Returns a shareable booking link (link field) and booking id. When you send an email about this meeting, you MUST include the link in the email body so the recipient can confirm. IMPORTANT: start and end must be in UTC timezone (ISO 8601 format ending in Z, e.g. 2024-01-15T17:00:00.000Z). Convert PST to UTC by adding 8 hours (PST is UTC-8). The event duration must match the event type configuration exactly (check event type settings - typically 15, 30, 45, or 60 minutes). attendeeEmail is required - always provide it.',
+          'Schedule a calendar invite (meeting) via Cal.com. The user must approve in the chat before the invite is created. Provide title, start and end in UTC (ISO 8601), and attendeeEmail. After approval, a Cal.com booking link is created.',
         inputSchema: z.object({
           title: z.string().describe('Meeting title'),
-          start: z.string().describe('Start time in UTC ISO 8601 format (e.g. 2024-01-15T17:00:00.000Z). Convert PST to UTC by adding 8 hours.'),
-          end: z.string().describe('End time in UTC ISO 8601 format. Must match event type duration EXACTLY (check event type settings - common: 15, 30, 45, or 60 minutes). If you get "Invalid event length", try 30 minutes first.'),
-          attendeeEmail: z.string().describe('Attendee email for the calendar invite (REQUIRED - always provide this)'),
+          start: z.string().describe('Start time in UTC ISO 8601 format (e.g. 2024-01-15T17:00:00.000Z).'),
+          end: z.string().describe('End time in UTC ISO 8601 format. Must match event type duration (e.g. 30 min).'),
+          attendeeEmail: z.string().describe('Attendee email for the calendar invite (REQUIRED)'),
+          contactId: z.string().optional().describe('Contact id if linking to a contact'),
         }),
-        execute: async (args: { title: string; start: string; end: string; attendeeEmail?: string }) => {
-          const res = await createCalendarEvent(args);
-          if (!res.ok) {
-            console.error('[create_calendar_event]', res.error);
-            return { error: res.error };
+        needsApproval: true,
+        execute: async (
+          args: {
+            title: string;
+            start: string;
+            end: string;
+            attendeeEmail?: string;
+            contactId?: string;
+          },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
+          const accountIdForTools = opts?.experimental_context?.accountId ?? '';
+          const userId = opts?.experimental_context?.userId;
+          if (!accountIdForTools || !userId) {
+            throw new Error('Account context required. Open a company first.');
           }
-          return res.data;
+          if (!args.attendeeEmail) {
+            throw new Error('attendeeEmail is required');
+          }
+          const res = await createCalendarEvent({
+            title: args.title,
+            start: args.start,
+            end: args.end,
+            attendeeEmail: args.attendeeEmail,
+          });
+          if (!res.ok) {
+            throw new Error(res.error);
+          }
+          if (args.contactId) {
+            try {
+              const activity = await prisma.activity.create({
+                data: {
+                  type: 'Meeting',
+                  summary: `Meeting scheduled: ${args.title}`,
+                  content: (res.data as { link?: string })?.link ?? '',
+                  companyId: accountIdForTools,
+                  contactId: args.contactId,
+                  userId,
+                  calEventId: (res.data as { id?: string })?.id,
+                  agentUsed: 'expansion',
+                },
+              });
+              const ctx = opts?.experimental_context;
+              if (ctx?.activeEnrollment?.enrollmentId && activity.id) {
+                try {
+                  await prisma.sequenceTouch.create({
+                    data: {
+                      enrollmentId: ctx.activeEnrollment.enrollmentId,
+                      stepIndex: ctx.activeEnrollment.currentStepIndex,
+                      channel: 'call_task',
+                      sentAt: new Date(),
+                      activityId: activity.id,
+                    },
+                  });
+                  await advanceEnrollment(ctx.activeEnrollment.enrollmentId);
+                } catch (e) {
+                  console.error('SequenceTouch/advance after create_calendar_event:', e);
+                }
+              }
+              void addExpansionScore(prisma, userId, 'meeting_booked').catch(() => {});
+              void updateUserStreak(prisma, userId).catch(() => {});
+            } catch (e) {
+              console.error('Failed to create activity for calendar event:', e);
+            }
+          }
+          return {
+            created: true,
+            link: (res.data as { link?: string })?.link,
+            message: 'Calendar invite created.',
+          };
         },
       }),
 
@@ -487,9 +891,37 @@ Work step-by-step and explain what you're doing.`;
           eventSlug: z.string().optional().describe('Event type slug'),
           after: z.string().optional().describe('ISO date to filter events after'),
         }),
-        execute: async (args: { eventSlug?: string; after?: string }) => {
+        execute: async (args: { eventSlug?: string; after?: string }, _opts?: { experimental_context?: ChatContext }) => {
           const res = await getCalendarRsvps(args);
-          return res.ok ? res.data : { error: res.error };
+          if (!res.ok) throw new Error(res.error);
+          return res.data;
+        },
+      }),
+
+      record_decision: tool({
+        description:
+          'Record a decision or preference for this account so future conversations remember it. Use when the user states a preference (e.g. "focus on Engineering only", "don\'t target Finance", "we\'re prioritizing AV department").',
+        inputSchema: z.object({
+          decision: z.string().describe('Short description of the decision or preference to remember'),
+        }),
+        execute: async (params: { decision: string }, opts?: { experimental_context?: ChatContext }) => {
+          const accountIdForTools = opts?.experimental_context?.accountId ?? '';
+          const userId = opts?.experimental_context?.userId;
+          if (!accountIdForTools || !userId) {
+            throw new Error('Account context required. Open a company first.');
+          }
+          const companyRow = await prisma.company.findFirst({
+            where: { id: accountIdForTools, userId },
+            select: { agentContext: true },
+          });
+          if (!companyRow) throw new Error('Company not found');
+          const ctx = (companyRow.agentContext as { decisions?: string[] } | null) ?? {};
+          const decisions = [...(ctx.decisions ?? []), params.decision];
+          await prisma.company.update({
+            where: { id: accountIdForTools },
+            data: { agentContext: { ...ctx, decisions }, updatedAt: new Date() },
+          });
+          return { recorded: true, message: 'Decision recorded for this account.' };
         },
       }),
 
@@ -514,17 +946,21 @@ Work step-by-step and explain what you're doing.`;
           attendedEvent: z.string().optional().describe('Event name to filter attendees'),
           attendedEventYear: z.number().optional().describe('Year of event for attendedEvent'),
         }),
-        execute: async (params: {
-          criteria?: string;
-          minEngagementScore?: number;
-          maxEngagementScore?: number;
-          location?: string;
-          seniority?: string;
-          attendedEvent?: string;
-          attendedEventYear?: number;
-        }) => {
+        execute: async (
+          params: {
+            criteria?: string;
+            minEngagementScore?: number;
+            maxEngagementScore?: number;
+            location?: string;
+            seniority?: string;
+            attendedEvent?: string;
+            attendedEventYear?: number;
+          },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
+          const accountIdForTools = opts?.experimental_context?.accountId ?? '';
           if (!accountIdForTools) {
-            return { error: 'Account context required. Open a company first.' };
+            throw new Error('Account context required. Open a company first.');
           }
           const where: Record<string, unknown> = {
             companyId: accountIdForTools,
@@ -668,17 +1104,21 @@ Work step-by-step and explain what you're doing.`;
             })
           ).describe('List of attendees'),
         }),
-        execute: async ({
-          eventName,
-          eventDate,
-          attendees,
-        }: {
-          eventName: string;
-          eventDate: string;
-          attendees: Array<{ email: string; firstName?: string; lastName?: string; company?: string }>;
-        }) => {
+        execute: async (
+          {
+            eventName,
+            eventDate,
+            attendees,
+          }: {
+            eventName: string;
+            eventDate: string;
+            attendees: Array<{ email: string; firstName?: string; lastName?: string; company?: string }>;
+          },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
+          const accountIdForTools = opts?.experimental_context?.accountId ?? '';
           if (!accountIdForTools) {
-            return { error: 'Account context required. Open a company first.' };
+            throw new Error('Account context required. Open a company first.');
           }
           let imported = 0;
           const errors: string[] = [];
@@ -763,21 +1203,59 @@ Work step-by-step and explain what you're doing.`;
       }),
     };
 
+    const expansionToolIds = expansion.toolIds;
     const playTools: Record<string, (typeof allTools)[keyof typeof allTools]> = {};
-    for (const toolName of play.toolIds) {
+    for (const toolName of expansionToolIds) {
       if (toolName in allTools && isToolConfigured(toolName)) {
         playTools[toolName] = allTools[toolName as keyof typeof allTools];
       }
     }
 
     const modelMessages = await convertToModelMessages(messages as Parameters<typeof convertToModelMessages>[0]);
+    let stepIndex = 0;
     const result = streamText({
       model: anthropic('claude-sonnet-4-20250514'),
       messages: modelMessages,
       system: systemPrompt,
       tools: Object.keys(playTools).length > 0 ? playTools : undefined,
+      experimental_context,
       abortSignal: req.signal,
       stopWhen: stepCountIs(20),
+      onStepFinish: async (stepResult) => {
+        stepIndex++;
+        const idx = stepIndex;
+        const toolCallsPayload = stepResult.toolCalls?.length
+          ? stepResult.toolCalls.map((tc: { toolName: string; input?: unknown }) => ({
+              toolName: tc.toolName,
+              inputSummary:
+                typeof tc.input === 'object' && tc.input !== null
+                  ? JSON.stringify(tc.input).slice(0, 500)
+                  : undefined,
+            }))
+          : undefined;
+        const usagePayload =
+          stepResult.usage &&
+          (stepResult.usage.promptTokens != null ||
+            stepResult.usage.completionTokens != null ||
+            stepResult.usage.totalTokens != null)
+            ? {
+                promptTokens: stepResult.usage.promptTokens,
+                completionTokens: stepResult.usage.completionTokens,
+                totalTokens: stepResult.usage.totalTokens,
+              }
+            : undefined;
+        void prisma.agentStepLog
+          .create({
+            data: {
+              userId: session.user.id,
+              accountId: accountId || null,
+              stepIndex: idx,
+              toolCalls: toolCallsPayload ?? undefined,
+              usage: usagePayload ?? undefined,
+            },
+          })
+          .catch(() => {});
+      },
     });
 
     return result.toUIMessageStreamResponse();

@@ -24,6 +24,9 @@ export default async function CompaniesListPage() {
             <p className="text-gray-600 mt-1">
               Manage accounts and run expansion, partner, or referral plays from a company.
             </p>
+            <p className="text-sm text-gray-500 mt-1">
+              Open a company to build your contact list, import from CRM (HubSpot/Salesforce), and enrich contacts. Run outbound sequences in your CRM.
+            </p>
           </div>
           <Link
             href="/dashboard/companies/new"
@@ -47,11 +50,8 @@ export default async function CompaniesListPage() {
           <ul className="space-y-3">
             {companies.map((company) => (
               <li key={company.id}>
-                <Link
-                  href={`/dashboard/companies/${company.id}`}
-                  className="block rounded-lg border border-gray-200 bg-white p-4 hover:border-gray-300 hover:shadow-sm transition-colors"
-                >
-                  <div className="flex items-center justify-between">
+                <div className="rounded-lg border border-gray-200 bg-white p-4 hover:border-gray-300 hover:shadow-sm transition-colors">
+                  <Link href={`/dashboard/companies/${company.id}`} className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-gray-900">{company.name}</p>
                       <p className="text-sm text-gray-500 mt-0.5">
@@ -62,8 +62,23 @@ export default async function CompaniesListPage() {
                       </p>
                     </div>
                     <span className="text-gray-400">→</span>
+                  </Link>
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                    <Link
+                      href={`/dashboard/companies/${company.id}/contacts`}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Contact list · Import from CRM
+                    </Link>
+                    <span className="text-gray-300">·</span>
+                    <Link
+                      href={`/dashboard/companies/${company.id}`}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Overview
+                    </Link>
                   </div>
-                </Link>
+                </div>
               </li>
             ))}
           </ul>

@@ -66,7 +66,7 @@ export default async function LaunchOutreachPage({
   }));
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4">
+    <div className="max-w-3xl mx-auto py-8 px-4 min-h-screen bg-zinc-900">
       <LaunchOutreachClient
         companyId={company.id}
         companyName={company.name}

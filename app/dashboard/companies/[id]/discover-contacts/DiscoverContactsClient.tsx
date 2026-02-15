@@ -17,14 +17,16 @@ type Props = {
   companyId: string;
   companyName: string;
   departments: Department[];
+  initialDepartmentId?: string;
 };
 
 export function DiscoverContactsClient({
   companyId,
   companyName,
   departments,
+  initialDepartmentId,
 }: Props) {
-  const [departmentId, setDepartmentId] = useState('');
+  const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? '');
   const [scope, setScope] = useState<SearchScopeOption[]>(['linkedin', 'clay']);
   const [step, setStep] = useState<'config' | 'running' | 'results' | 'error'>('config');
   const [steps, setSteps] = useState<Array<{ step: string; detail: string }>>([]);
@@ -123,8 +125,8 @@ export function DiscoverContactsClient({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/companies/${companyId}/add-contacts`} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
-          ← Back to add contacts
+        <Link href={`/dashboard/companies/${companyId}/contacts`} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+          ← Back to contact list
         </Link>
       </div>
 

@@ -41,17 +41,42 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  companyName   String?   // User's company name for Content Library labels
+  companyWebsite     String?   // Company website for smart import
+  companyIndustry    String?   // User's industry (e.g. Technology, Software)
+  primaryIndustrySellTo String?   // Primary target industry (e.g. Automotive, Healthcare)
+  contentRefreshFrequency String?   // daily | weekly | monthly | manual
+  contentRefreshNextAt    DateTime? // Next scheduled refresh
+  notifyOnNewContent      Boolean? @default(true)
+  notifyOnUpdatedContent  Boolean? @default(true)
+  notifyOnRemovedContent  Boolean? @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Gamification (Flight Deck)
+  expansionScore   Int       @default(0)
+  level            Int       @default(1)   // 1=Cadet, 3=Captain, 5=Ace
+  badges           Json?     // [{ id: string, earnedAt: string }]
+  lastActiveAt     DateTime?
+  currentStreakDays Int      @default(0)
 
   accounts   Account[]
   sessions   Session[]
   companies  Company[]
   activities Activity[]
+  pendingActionsRequested PendingAction[]
+  pendingActionsResolved  PendingAction[] @relation("ResolvedBy")
   messagingFrameworks MessagingFramework[]
   orgs             Org[]
   products         Product[]
   contentLibraries ContentLibrary[]
+  productProfiles  ProductProfile[]
+  industryPlaybooks IndustryPlaybook[]
+  contentCrawlSchedules ContentCrawlSchedule[]
+  contentImports        ContentImport[]
+  contentImportLastId   String?
+  outreachSequences OutreachSequence[]
+  segmentCampaigns  SegmentCampaign[]
 }
 
 model VerificationToken {
@@ -63,18 +88,30 @@ model VerificationToken {
 
 // ----- Business: Company (Account in spec; name kept to avoid NextAuth Account clash) -----
 model Company {
-  id          String   @id @default(cuid())
-  name        String
-  domain      String?
-  industry    String?
-  website     String?
-  size        String?  // "1-50", "51-200", etc.
+  id            String   @id @default(cuid())
+  name          String
+  domain        String?
+  industry      String?
+  website       String?
+  size          String?  // "1-50", "51-200", etc.
+  salesforceId  String?  // Salesforce Account Id for sync; match on pull by this or by domain/name
+  crmSource     String?  // salesforce | hubspot | other (for multi-CRM)
+  hubspotId     String?  // HubSpot company Id when crmSource = hubspot
+
+  // AI Research fields
+  employees        String?  // e.g., "~167,000"
+  headquarters     String?  // e.g., "Detroit, Michigan"
+  revenue          String?  // e.g., "$171.8B (2024)"
+  businessOverview String?  @db.Text // "What they do" summary
+  keyInitiatives   Json?    // Array of initiative strings
+  researchData     Json?    // Store raw AI research response for reference
 
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 
   contacts        Contact[]
   activities      Activity[]
+  pendingActions  PendingAction[]
   departments     CompanyDepartment[]
   companyProducts CompanyProduct[]
   expansionPlays  ExpansionPlay[]
@@ -86,12 +123,21 @@ model Company {
   fitCalculationData Json?     // Cached product fit results (opportunities array) for quick retrieval
 
   accountMessaging AccountMessaging?
+  agentContext     Json?    // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
+  segmentCampaigns SegmentCampaign[]
+
+  // Workflow: Account Intelligence → Contact List → Launch Outreach
+  workflowStep                  Int?      // 1, 2, or 3
+  accountIntelligenceCompletedAt DateTime?
+  draftData                     Json?     // Auto-save / wizard draft payload
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([industry])
+  @@index([salesforceId])
+  @@index([userId, workflowStep])
 }
 
 // Account-level messaging: why this company, use cases, success stories, objection handlers, do-not-mention
@@ -126,6 +172,9 @@ model Contact {
   title       String?
   department  String?   // Legacy free-text; use companyDepartmentId for structured department
   companyDepartmentId String?
+  salesforceId String?  // Salesforce Contact/Lead Id for sync; match on pull by this or by email
+  crmSource    String?  // salesforce | hubspot | other
+  hubspotId    String?  // HubSpot contact Id when crmSource = hubspot
   companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
   personaId   String?
   persona     Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
@@ -133,6 +182,8 @@ model Contact {
   photoUrl    String?
   bio         String?  @db.Text
   enrichedData Json?
+  enrichmentStatus String?  // pending | enriching | complete | failed
+  enrichedAt   DateTime?
 
   city    String?
   state   String?
@@ -161,8 +212,10 @@ model Contact {
   isDormant       Boolean @default(false)
 
   activities       Activity[]
+  pendingActions   PendingAction[]
   eventAttendances EventAttendance[]
   stakeholderEngagementPlays StakeholderEngagementPlay[]
+  contactSequenceEnrollments ContactSequenceEnrollment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,6 +230,8 @@ model Contact {
   @@index([engagementScore])
   @@index([seniorityLevel])
   @@index([city, state])
+  @@index([salesforceId])
+  @@index([hubspotId])
 }
 
 model Activity {
@@ -208,6 +263,126 @@ model Activity {
   @@index([contactId])
   @@index([type])
   @@index([resendEmailId])
+  @@index([createdAt])
+
+  sequenceTouches SequenceTouch[]
+}
+
+// Approval queue: agent creates pending actions; user approves/rejects
+model PendingAction {
+  id        String   @id @default(cuid())
+  type      String   // email, calendar_invite, salesforce_update
+  status    String   // pending, approved, rejected
+  payload   Json     // type-specific: to, subject, body, contactId (email); title, start, end, attendeeEmail (calendar); etc.
+  comment   String?  @db.Text
+
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userId    String   // user who owns the company (requested in their context)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resolvedAt      DateTime?
+  resolvedByUserId String?
+  resolvedBy      User?     @relation("ResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ----- Outreach sequences and enrollment -----
+model OutreachSequence {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps      OutreachSequenceStep[]
+  enrollments ContactSequenceEnrollment[]
+
+  @@index([userId])
+}
+
+model OutreachSequenceStep {
+  id             String   @id @default(cuid())
+  sequenceId     String
+  sequence       OutreachSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  order          Int      // display order
+  dayOffset      Int      // e.g. 0, 3, 6, 8, 10
+  channel        SequenceChannel
+  role           String   // e.g. opener, value_add, social_proof, breakup
+  promptTemplate String?  @db.Text
+  ctaType        String?  // e.g. single_question, conversation, resource
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([sequenceId])
+}
+
+model ContactSequenceEnrollment {
+  id               String   @id @default(cuid())
+  contactId        String
+  contact          Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sequenceId       String
+  sequence         OutreachSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  userId           String
+  status           EnrollmentStatus @default(active)
+  currentStepIndex Int      @default(0) // 0-based
+  enrolledAt       DateTime @default(now())
+  nextTouchDueAt   DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  touches SequenceTouch[]
+
+  @@unique([contactId, sequenceId])
+  @@index([contactId])
+  @@index([sequenceId])
+  @@index([userId])
+  @@index([nextTouchDueAt])
+  @@index([status])
+}
+
+model SequenceTouch {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  enrollment   ContactSequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  stepIndex    Int
+  channel      String    // email | linkedin | call_task
+  scheduledAt  DateTime  @default(now())
+  sentAt       DateTime?
+  activityId   String?
+  activity     Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([enrollmentId])
+  @@index([activityId])
+}
+
+// Analytics: chat step and tool usage (from onStepFinish)
+model AgentStepLog {
+  id        String   @id @default(cuid())
+  userId    String
+  accountId String?
+  stepIndex Int
+  toolCalls Json?   // [{ toolName, inputSummary? }]
+  usage     Json?    // { promptTokens?, completionTokens?, totalTokens? }
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([accountId])
   @@index([createdAt])
 }
 
@@ -307,6 +482,20 @@ enum DepartmentStatus {
   NOT_APPLICABLE
 }
 
+// Sequence step channel and enrollment status
+enum SequenceChannel {
+  email
+  linkedin
+  call_task
+}
+
+enum EnrollmentStatus {
+  active
+  paused
+  completed
+  exited
+}
+
 model CompanyDepartment {
   id                String            @id @default(cuid())
 
@@ -321,11 +510,17 @@ model CompanyDepartment {
   budget            Decimal?          @db.Decimal(18, 2)
   notes             String?           @db.Text
 
+  // AI Research fields for micro-segments
+  useCase              String?  @db.Text // What this department/division would use NVIDIA products for
+  targetRoles          Json?    // Store roles/titles structure: { economicBuyer: string[], technicalEvaluator: string[], champion: string[], influencer: string[] }
+  estimatedOpportunity String?  // e.g., "$500K - $2M" (store as text since it's a range)
+
   contacts          Contact[]
   companyProducts   CompanyProduct[]
   activities        Activity[]
   expansionPlays    ExpansionPlay[]
   useCaseExplorationPlays UseCaseExplorationPlay[]
+  segmentCampaigns        SegmentCampaign[]
 
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -333,6 +528,79 @@ model CompanyDepartment {
   @@unique([companyId, type])
   @@index([companyId])
   @@index([status])
+}
+
+// Hyper-personalized content: one URL (and optional page) per company + optional segment
+model SegmentCampaign {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   CompanyDepartment? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  slug        String   // URL slug for /go/[slug] (unique per user)
+  title       String
+  description String?  @db.Text
+  url         String   // full URL (e.g. https://app.example.com/go/{slug} or external)
+  type        String   // landing_page | event_invite | demo | webinar | other
+
+  headline     String?  @db.Text
+  body         String?  @db.Text
+  ctaLabel     String?
+  ctaUrl       String?
+  pageSections Json?    // { events?: [], caseStudy?: {}, successStory?: {} } for structured blocks
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leads         CampaignLead[]
+  visits       CampaignVisit[]
+  shares       CampaignShare[]
+
+  @@unique([userId, slug])
+  @@index([companyId])
+  @@index([departmentId])
+  @@index([userId])
+}
+
+model CampaignLead {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email         String
+  name          String?
+  message       String?   @db.Text
+  createdAt     DateTime  @default(now())
+  pushedToCrmAt DateTime?
+
+  @@index([campaignId])
+  @@index([pushedToCrmAt])
+}
+
+model CampaignVisit {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  visitedAt  DateTime @default(now())
+  sessionId  String?
+  leadId     String?
+
+  @@index([campaignId])
+  @@index([visitedAt])
+}
+
+model CampaignShare {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sharedAt     DateTime @default(now())
+  sharedByEmail String?
+  channel      String?  // email | copy_link
+
+  @@index([campaignId])
+  @@index([sharedAt])
 }
 
 // ============================================
@@ -366,11 +634,66 @@ model CatalogProduct {
 
   companyProducts   CompanyProduct[]
   expansionPlays    ExpansionPlay[]
+  productProfiles   ProductProfile[]
 
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
   @@index([slug])
+}
+
+// Product expert content: one-liner, elevator pitch, value props, objection handlers, etc. (one per catalog product per user)
+model ProductProfile {
+  id                String         @id @default(cuid())
+  catalogProductId  String
+  catalogProduct    CatalogProduct @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  oneLiner              String?   @db.Text
+  elevatorPitch         String?   @db.Text
+  valueProps            Json?     // array of strings
+  painPoints            Json?     // array of strings
+  bestForDepartments    Json?     // array of strings
+  bestForIndustries     Json?     // array of strings
+  technicalRequirements Json?     // array of strings
+  objectionHandlers     Json?     // array of { objection: string, response: string }
+  competitivePositioning Json?    // array of strings or text
+  linkedCaseStudyIds    Json?     // array of ContentLibrary ids (strings)
+  priceRangeText        String?
+  dealSizeSweetSpot    String?
+  salesCycle           String?
+  deployment           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([catalogProductId, userId])
+  @@index([userId])
+  @@index([catalogProductId])
+}
+
+// Industry playbook: department–product mapping, value props by department, landmines (one per industry per user)
+model IndustryPlaybook {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                  String   // e.g. "Automotive OEM"
+  slug                  String   // unique per user, e.g. "automotive-oem"
+
+  overview                  String?  @db.Text
+  departmentProductMapping  Json?    // array of { department: string, productIds: string[], typicalDealSize: string }
+  valuePropsByDepartment    Json?    // department -> value props / pain points
+  buyingCommittee           String?  @db.Text
+  landmines                 Json?    // array of strings
+  relevantCaseStudyIds      Json?    // array of ContentLibrary ids (optional)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@index([userId, slug])
 }
 
 model CompanyProduct {
@@ -530,8 +853,9 @@ model Product {
   description String?  @db.Text
   category    String?
 
-  contentLibrary     ContentLibrary[]
-  departmentProducts DepartmentProduct[]
+  contentLibrary       ContentLibrary[]
+  departmentProducts   DepartmentProduct[]
+  contentCrawlSchedules ContentCrawlSchedule[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -562,6 +886,11 @@ enum ContentType {
   SuccessStory
   Persona
   Battlecard
+  FeatureRelease
+  CompanyEvent
+  EmailContent
+  VideoLink
+  ResourceLink
 }
 
 model ContentLibrary {
@@ -586,6 +915,9 @@ model ContentLibrary {
   sourceUrl String?
   scrapedAt DateTime?
 
+  version   String?   // e.g. "1.2", "2.0" for versioning
+  archivedAt DateTime? // when set, excluded from "current" content; show as Archived in UI
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -599,6 +931,66 @@ model ContentLibrary {
   @@index([productId, industry])
   @@index([company])
   @@index([confidenceScore])
+}
+
+// Scheduled Firecrawl crawls for Content Library (daily/weekly)
+model ContentCrawlSchedule {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+
+  contentType String   // 'case-studies' | 'use-cases'
+  url         String   @db.Text
+  includePaths String? @db.Text // JSON array of path patterns, for case-studies
+  limit       Int      @default(50)
+
+  frequency  String   // 'daily' | 'weekly'
+  lastRunAt  DateTime?
+  nextRunAt  DateTime
+
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([nextRunAt])
+}
+
+// Content import job for smart website import (state: importing, review, approved)
+enum ContentImportStatus {
+  PENDING
+  DISCOVERING
+  SCRAPING
+  CATEGORIZING
+  REVIEW_PENDING
+  APPROVED
+  FAILED
+}
+
+model ContentImport {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceUrl         String              @db.Text
+  industry          String?
+  status            ContentImportStatus @default(PENDING)
+  totalPages        Int                 @default(0)
+  scrapedPages      Int                 @default(0)
+  categorizedPages  Int                 @default(0)
+  discoveredUrls    Json?
+  scrapedContent    Json?
+  categorizedContent Json?   // { products: [], caseStudies: [], events: [], ... }
+  reviewedAt        DateTime?
+  approvedCount     Int                 @default(0)
+  rejectedCount     Int                 @default(0)
+  errors            Json?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId, status])
 }
 
 // ============================================

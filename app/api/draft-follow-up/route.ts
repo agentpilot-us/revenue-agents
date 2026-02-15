@@ -5,6 +5,13 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
+import {
+  getProductKnowledgeBlock,
+  getIndustryPlaybookBlock,
+  getCaseStudiesBlock,
+  getRelevantProductIdsForIndustry,
+} from '@/lib/prompt-context';
 
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -79,6 +86,27 @@ export async function POST(req: NextRequest) {
 
     const accountContextBlock = await getAccountMessagingPromptBlock(accountId, session.user.id);
 
+    const contactDepartment = contact?.department ?? departmentName ?? null;
+    const relevantProductIds = await getRelevantProductIdsForIndustry(
+      session.user.id,
+      company.industry ?? null,
+      contactDepartment
+    );
+    const productKnowledgeBlock = await getProductKnowledgeBlock(
+      session.user.id,
+      relevantProductIds.length > 0 ? relevantProductIds : undefined
+    );
+    const industryPlaybookBlock = await getIndustryPlaybookBlock(
+      session.user.id,
+      company.industry ?? null
+    );
+    const caseStudiesBlock = await getCaseStudiesBlock(
+      session.user.id,
+      company.industry ?? null,
+      contactDepartment,
+      relevantProductIds
+    );
+
     const contactName = contact
       ? [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'there'
       : 'there';
@@ -97,12 +125,20 @@ export async function POST(req: NextRequest) {
     const accountBlockSection = accountContextBlock
       ? `\n\n${accountContextBlock}\n`
       : '';
+    const researchDataBlock = await getCompanyResearchPromptBlock(accountId, session.user.id);
+    const researchSection = researchDataBlock ? `\n\n${researchDataBlock}` : '';
+    const productKnowledgeSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
+    const industryPlaybookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
+    const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
 
     const { text } = await generateText({
       model: anthropic('claude-sonnet-4-20250514'),
       maxTokens: 800,
       system: `You draft a single follow-up or intro email for a B2B sales context. Be concise (2-4 short paragraphs). Use the messaging framework and reference value props/case studies where relevant. Return ONLY a JSON object with "subject" (string) and "body" (string, plain text). No HTML.
-${messagingSection}${accountBlockSection}`,
+${productKnowledgeSection}
+${industryPlaybookSection}
+${caseStudiesSection}
+${messagingSection}${accountBlockSection}${researchSection}`,
       prompt: `Context:
 ${contextParts.join('\n')}
 

@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createUseCaseExplorationPlayForOutreach } from '@/app/actions/use-case-exploration-play';
 import { Button } from '@/components/ui/button';
 
 type ContactRow = {
@@ -40,7 +39,6 @@ export function LaunchOutreachClient({
       ? new Set(preselectedContactIds)
       : new Set(contacts.map((c) => c.id))
   );
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const contactsInDepartment = useMemo(() => {
@@ -70,42 +68,9 @@ export function LaunchOutreachClient({
     }
   };
 
-  const handleGenerate = async () => {
-    let deptId = departmentId;
-    if (!deptId) {
-      const first = contacts.find((c) => c.id === Array.from(selectedIds)[0]);
-      deptId = first?.departmentId ?? departments[0]?.id ?? '';
-    }
-    if (!deptId) {
-      setError('Select a department or ensure contacts have a department.');
-      return;
-    }
-    const ids = Array.from(selectedIds).filter((id) => {
-      const c = contacts.find((x) => x.id === id);
-      return c?.departmentId === deptId;
-    });
-    if (ids.length === 0) {
-      setError('No selected contacts in this department. Select a department or add contacts to it.');
-      return;
-    }
-    setGenerating(true);
-    setError(null);
-    try {
-      const res = await createUseCaseExplorationPlayForOutreach(
-        companyId,
-        deptId,
-        ids
-      );
-      if (res.ok) {
-        router.push(`/dashboard/plays/use-case-exploration/${res.playId}`);
-      } else {
-        setError(res.error);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create play');
-    } finally {
-      setGenerating(false);
-    }
+  const handleLaunchAgent = () => {
+    // Single expansion flow: open company Messaging tab to work with the agent
+    router.push(`/dashboard/companies/${companyId}?tab=messaging`);
   };
 
   return (
@@ -237,14 +202,11 @@ export function LaunchOutreachClient({
       )}
 
       <div className="flex items-center gap-4">
-        <Button
-          onClick={handleGenerate}
-          disabled={generating || selectedIds.size === 0}
-        >
-          {generating ? 'Generating…' : 'Generate outreach'}
+        <Button onClick={handleLaunchAgent}>
+          Work with agent
         </Button>
         <span className="text-sm text-gray-500 dark:text-gray-400">
-          {selectedIds.size} contact(s) selected → review & launch
+          Opens the expansion agent on the Messaging tab to draft emails, calendar invites, and outreach.
         </span>
       </div>
     </div>

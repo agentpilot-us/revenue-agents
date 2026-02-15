@@ -100,7 +100,7 @@ export const programs: Program[] = [
       '15 Apex classes, 8 LWCs',
       '12 Agentforce agents',
       'CLI-deployable demo',
-      'NVIDIA: $400K pipeline in 30 days'
+      'Sample: $400K pipeline in 30 days'
     ],
     annualPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_NEW_LOGO_ANNUAL!,
     monthlyPriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_NEW_LOGO_MONTHLY!
