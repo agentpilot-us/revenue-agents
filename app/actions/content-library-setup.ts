@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import type { ContentType } from '@prisma/client';
@@ -267,7 +268,12 @@ export async function startSmartImport(): Promise<StartSmartImportResult> {
   const executeUrl = `${baseUrl.replace(/\/$/, '')}/api/content-library/imports/${contentImport.id}/execute`;
 
   try {
-    const response = await fetch(executeUrl, { method: 'POST' });
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore.toString();
+    const response = await fetch(executeUrl, {
+      method: 'POST',
+      headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
+    });
     if (!response.ok) {
       await prisma.contentImport.update({
         where: { id: contentImport.id },
