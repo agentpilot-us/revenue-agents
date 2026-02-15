@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { ContentItemType } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -52,7 +53,7 @@ export async function draftEmail(params: {
     : null;
 
   // 4. Fetch relevant content from library
-  const contentWhere: Parameters<typeof prisma.contentItem.findMany>[0]['where'] = {};
+  const contentWhere: Prisma.ContentItemWhereInput = {};
   if (persona?.contentTypes?.length) {
     const mappedTypes = persona.contentTypes
       .map((t) => t.toUpperCase().replace(/-/g, '_'))
@@ -66,7 +67,7 @@ export async function draftEmail(params: {
   }
 
   const relevantContent = await prisma.contentItem.findMany({
-    where: Object.keys(contentWhere).length ? contentWhere : undefined,
+    where: Object.keys(contentWhere).length > 0 ? contentWhere : undefined,
     take: 3,
     orderBy: { createdAt: 'desc' },
   });
