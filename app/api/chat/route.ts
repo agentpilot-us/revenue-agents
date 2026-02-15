@@ -1,4 +1,4 @@
-import { streamText, tool, convertToModelMessages, stepCountIs } from 'ai';
+import { streamText, tool, convertToModelMessages, stepCountIs, type Tool } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import { auth } from '@/auth';
@@ -1201,10 +1201,10 @@ Work step-by-step and explain what you're doing.`;
           };
         },
       }),
-    };
+    } as Record<string, Tool>;
 
     const expansionToolIds = expansion.toolIds;
-    const playTools: Record<string, (typeof allTools)[keyof typeof allTools]> = {};
+    const playTools: Record<string, Tool> = {};
     for (const toolName of expansionToolIds) {
       if (toolName in allTools && isToolConfigured(toolName)) {
         playTools[toolName] = allTools[toolName as keyof typeof allTools];
