@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 const patchSchema = z.object({
@@ -35,8 +36,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const update: { payload?: unknown; comment?: string; updatedAt: Date } = { updatedAt: new Date() };
-    if (parsed.data.payload !== undefined) update.payload = parsed.data.payload;
+    const update: Prisma.PendingActionUpdateInput = { updatedAt: new Date() };
+    if (parsed.data.payload !== undefined) update.payload = parsed.data.payload as Prisma.InputJsonValue;
     if (parsed.data.comment !== undefined) update.comment = parsed.data.comment;
 
     const updated = await prisma.pendingAction.update({
