@@ -10,7 +10,6 @@ import { ReviewImportedContent } from '@/app/components/content-library/ReviewIm
 import { ContentLibraryView } from '@/app/components/content-library/ContentLibraryView';
 import { ContentLibraryProductsTab } from '@/app/dashboard/content-library/ContentLibraryProductsTab';
 import { ContentLibraryIndustriesTab } from '@/app/dashboard/content-library/ContentLibraryIndustriesTab';
-import { ContentLibraryGettingStarted } from '@/app/dashboard/content-library/ContentLibraryGettingStarted';
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
 
@@ -85,7 +84,11 @@ export default async function ContentLibraryPage({
   const tabParam = params.tab;
   const hasTab = Boolean(tabParam && (SPECIAL_TABS.includes(tabParam as SpecialTab) || CONTENT_TABS.includes(tabParam as ContentType)));
 
-  // State-based routing: show form, import progress, review, or library
+  // ========================================
+  // STATE-BASED ROUTING (early return each branch)
+  // ========================================
+
+  // State 1: Needs company info or no content yet
   if (state === 'needs_company_info' || state === 'needs_content') {
     const failedError =
       state === 'needs_content' &&
@@ -109,20 +112,26 @@ export default async function ContentLibraryPage({
     );
   }
 
+  // State 2: Import in progress
   if (state === 'importing' && latestImport) {
     return <ImportProgress importJob={latestImport} />;
   }
 
+  // State 3: Needs review after import
   if (state === 'needs_review' && latestImport) {
     return <ReviewImportedContent importJob={latestImport} />;
   }
 
-  // state === 'ready': show overview when no tab, or tabbed list when tab is set
+  // State 4: Ready, no tab — show overview (category cards that link to tabs)
   if (state === 'ready' && !hasTab) {
     return <ContentLibraryView company={user} />;
   }
 
-  // state === 'ready' and tab is set: show existing tabbed content list
+  // State 5: Ready with tab — show tabbed content list (only reachable when state === 'ready' && hasTab)
+  if (state !== 'ready') {
+    return <ContentLibraryView company={user} />;
+  }
+
   const selectedTab = hasTab
     ? tabParam!
     : 'Framework';
@@ -201,27 +210,6 @@ export default async function ContentLibraryPage({
         })
       : [];
 
-  const [contentCounts, catalogProductCount, industryPlaybookCount] = await Promise.all([
-    prisma.contentLibrary.groupBy({
-      by: ['type'],
-      where: { userId: session.user.id, isActive: true },
-      _count: { id: true },
-    }),
-    prisma.catalogProduct.count(),
-    prisma.industryPlaybook.count({ where: { userId: session.user.id } }),
-  ]);
-  const countByType = Object.fromEntries(
-    contentCounts.map((c) => [c.type, c._count.id])
-  ) as Partial<Record<ContentType, number>>;
-  const gettingStartedCounts = {
-    products: catalogProductCount,
-    industries: industryPlaybookCount,
-    useCases: countByType.UseCase ?? 0,
-    caseStudies: countByType.SuccessStory ?? 0,
-    events: countByType.CompanyEvent ?? 0,
-    frameworks: countByType.Framework ?? 0,
-  };
-
   const needsReview = Array.isArray(content)
     ? content.filter((c) => !c.userConfirmed && c.confidenceScore === 'low').length
     : 0;
@@ -267,8 +255,6 @@ export default async function ContentLibraryPage({
           </Link>
         </div>
       </div>
-
-      <ContentLibraryGettingStarted counts={gettingStartedCounts} />
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-zinc-800/50 overflow-hidden mb-6 px-5 py-4">
         <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Keep content current</h2>
