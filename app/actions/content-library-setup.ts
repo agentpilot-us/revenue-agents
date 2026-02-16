@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import type { ContentType } from '@prisma/client';
@@ -215,11 +214,18 @@ export async function saveCompanyBasicInfo(
 export type StartSmartImportResult = { ok: true; importId: string } | { ok: false; error: string };
 
 /**
- * Create a ContentImport and trigger the execute API (fire-and-forget). Returns importId.
+ * Create a ContentImport and run the import directly in the background (no API route). Returns importId.
  */
 export async function startSmartImport(): Promise<StartSmartImportResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: 'Unauthorized' };
+
+  if (!process.env.FIRECRAWL_API_KEY?.trim()) {
+    return {
+      ok: false,
+      error: 'Firecrawl is not configured. Add FIRECRAWL_API_KEY to your environment variables.',
+    };
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -248,61 +254,18 @@ export async function startSmartImport(): Promise<StartSmartImportResult> {
     data: { contentImportLastId: contentImport.id },
   });
 
-  const port = process.env.PORT ?? '3000';
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-    (process.env.NODE_ENV === 'development' ? `http://localhost:${port}` : null) ||
-    null;
-  if (!baseUrl) {
-    await prisma.contentImport.update({
-      where: { id: contentImport.id },
-      data: {
-        status: 'FAILED',
-        errors: { step: 'trigger', error: 'Missing NEXT_PUBLIC_APP_URL or VERCEL_URL for import trigger' },
-      },
-    });
-    revalidatePath('/dashboard/content-library');
-    return { ok: false, error: 'Server configuration error. Set NEXT_PUBLIC_APP_URL or VERCEL_URL.' };
-  }
-  const executeUrl = `${baseUrl.replace(/\/$/, '')}/api/content-library/imports/${contentImport.id}/execute`;
-
-  try {
-    const cookieStore = await cookies();
-    const cookieHeader = cookieStore.toString();
-    const response = await fetch(executeUrl, {
-      method: 'POST',
-      headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
-    });
-    if (!response.ok) {
-      await prisma.contentImport.update({
-        where: { id: contentImport.id },
-        data: {
-          status: 'FAILED',
-          errors: { step: 'trigger', error: `Failed to trigger import: ${response.statusText}` },
-        },
-      });
-      revalidatePath('/dashboard/content-library');
-      return { ok: false, error: 'Failed to start import process' };
-    }
-  } catch (err) {
-    console.error('Content import execute trigger failed:', err);
-    await prisma.contentImport.update({
-      where: { id: contentImport.id },
-      data: {
-        status: 'FAILED',
-        errors: {
-          step: 'trigger',
-          error: err instanceof Error ? err.message : 'Unknown error',
-        },
-      },
-    });
-    revalidatePath('/dashboard/content-library');
-    return { ok: false, error: 'Failed to start import process' };
-  }
+  executeImportInBackground(contentImport.id, session.user.id);
 
   revalidatePath('/dashboard/content-library');
   return { ok: true, importId: contentImport.id };
+}
+
+function executeImportInBackground(importId: string, userId: string) {
+  import('@/lib/content-library/execute-import')
+    .then(({ executeContentImport }) => executeContentImport(importId, userId))
+    .catch((err) => {
+      console.error(`Background import ${importId} failed:`, err);
+    });
 }
 
 export type GetImportProgressResult =
