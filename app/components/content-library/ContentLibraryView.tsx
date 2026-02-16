@@ -6,13 +6,6 @@ import type { GetCompanySetupStateUser } from '@/app/actions/content-library-set
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
 
-const CONTENT_TYPES: { type: ContentType; label: string }[] = [
-  { type: 'Framework', label: 'Frameworks' },
-  { type: 'UseCase', label: 'Use Cases' },
-  { type: 'SuccessStory', label: 'Case Studies' },
-  { type: 'CompanyEvent', label: 'Events' },
-];
-
 type Props = {
   company: GetCompanySetupStateUser | null;
 };
@@ -143,21 +136,38 @@ export async function ContentLibraryView({ company }: Props) {
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{industryPlaybookCount}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
         </Link>
-        {CONTENT_TYPES.map(({ type, label }) => {
-          const count = countByType[type] ?? 0;
-          const tab = type === 'SuccessStory' ? 'SuccessStory' : type === 'CompanyEvent' ? 'CompanyEvent' : type;
-          return (
-            <Link
-              key={type}
-              href={`/dashboard/content-library?tab=${tab}`}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
-            >
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{label}</h3>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{count}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
-            </Link>
-          );
-        })}
+        <Link
+          href="/dashboard/content-library/frameworks"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
+        >
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Frameworks</h3>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.Framework ?? 0}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
+        </Link>
+        <Link
+          href="/dashboard/content-library/use-cases"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
+        >
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Use Cases</h3>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.UseCase ?? 0}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
+        </Link>
+        <Link
+          href="/dashboard/content-library/case-studies"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
+        >
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Case Studies</h3>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.SuccessStory ?? 0}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
+        </Link>
+        <Link
+          href="/dashboard/content-library/events"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
+        >
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Events</h3>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.CompanyEvent ?? 0}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
+        </Link>
       </div>
 
       {/* Auto-Refresh card */}

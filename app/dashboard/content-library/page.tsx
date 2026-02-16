@@ -23,47 +23,6 @@ const CONTENT_TABS: ContentType[] = [
 const SPECIAL_TABS = ['products', 'industries'] as const;
 type SpecialTab = (typeof SPECIAL_TABS)[number];
 
-/** Tab-specific empty state copy and primary CTA */
-const EMPTY_STATE_BY_TAB: Partial<
-  Record<
-    string,
-    { title: string; description: string; primaryHref: string; primaryLabel: string; secondaryHref: string; secondaryLabel: string }
-  >
-> = {
-  Framework: {
-    title: 'No frameworks yet',
-    description: 'Add sales frameworks and messaging guides. Import from a URL or paste content to extract structure.',
-    primaryHref: '/dashboard/content-library/import',
-    primaryLabel: 'Import from URL',
-    secondaryHref: '/dashboard/content-library/import',
-    secondaryLabel: 'Paste text to extract',
-  },
-  UseCase: {
-    title: 'No use cases yet',
-    description: 'Add use cases that match the industries you sell to. Import from URL or add manually—you can add many.',
-    primaryHref: '/dashboard/content-library/import?type=UseCase',
-    primaryLabel: 'Import from URL',
-    secondaryHref: '/dashboard/content-library/import?type=UseCase',
-    secondaryLabel: 'Add manually',
-  },
-  SuccessStory: {
-    title: 'No case studies yet',
-    description: 'Add customer success stories the AI can reference in outreach. Import from URL or add manually—add many.',
-    primaryHref: '/dashboard/content-library/import?type=SuccessStory',
-    primaryLabel: 'Import from URL',
-    secondaryHref: '/dashboard/content-library/import?type=SuccessStory',
-    secondaryLabel: 'Add manually',
-  },
-  CompanyEvent: {
-    title: 'No events yet',
-    description: 'Add events with a name and URL for details/sessions, or scrape GTC/other event sites.',
-    primaryHref: '/dashboard/content-library/events/add',
-    primaryLabel: 'Add event (name + URL)',
-    secondaryHref: '/dashboard/content-library/sync-nvidia',
-    secondaryLabel: 'Scrape site (GTC or events)',
-  },
-};
-
 export default async function ContentLibraryPage({
   searchParams,
 }: {
@@ -82,7 +41,24 @@ export default async function ContentLibraryPage({
   const { state, user, latestImport } = setup;
   const params = await searchParams;
   const tabParam = params.tab;
-  const hasTab = Boolean(tabParam && (SPECIAL_TABS.includes(tabParam as SpecialTab) || CONTENT_TABS.includes(tabParam as ContentType)));
+
+  // Redirect content type tabs to dedicated pages
+  if (tabParam && CONTENT_TABS.includes(tabParam as ContentType)) {
+    const routeMap: Record<ContentType, string> = {
+      Framework: '/dashboard/content-library/frameworks',
+      UseCase: '/dashboard/content-library/use-cases',
+      SuccessStory: '/dashboard/content-library/case-studies',
+      CompanyEvent: '/dashboard/content-library/events',
+    };
+    const redirectUrl =
+      params.product
+        ? `${routeMap[tabParam as ContentType]}?product=${params.product}`
+        : routeMap[tabParam as ContentType];
+    redirect(redirectUrl);
+  }
+
+  // Only handle products/industries tabs here
+  const hasTab = Boolean(tabParam && SPECIAL_TABS.includes(tabParam as SpecialTab));
 
   // ========================================
   // STATE-BASED ROUTING (early return each branch)
@@ -122,20 +98,17 @@ export default async function ContentLibraryPage({
     return <ReviewImportedContent importJob={latestImport} />;
   }
 
-  // State 4: Ready, no tab — show overview (category cards that link to tabs)
+  // State 4: Ready, no tab — show overview (category cards that link to dedicated pages)
   if (state === 'ready' && !hasTab) {
     return <ContentLibraryView company={user} />;
   }
 
-  // State 5: Ready with tab — show tabbed content list (only reachable when state === 'ready' && hasTab)
+  // State 5: Ready with products/industries tab — show tabbed content list
   if (state !== 'ready') {
     return <ContentLibraryView company={user} />;
   }
 
-  const selectedTab = hasTab
-    ? tabParam!
-    : 'Framework';
-  const isSpecialTab = SPECIAL_TABS.includes(selectedTab as SpecialTab);
+  const selectedTab = tabParam!;
   const selectedProduct = params.product;
 
   const products = await prisma.product.findMany({
@@ -147,25 +120,6 @@ export default async function ContentLibraryPage({
     },
     orderBy: { createdAt: 'desc' },
   });
-
-  const content =
-    !isSpecialTab && CONTENT_TABS.includes(selectedTab as ContentType)
-      ? await prisma.contentLibrary.findMany({
-          where: {
-            userId: session.user.id,
-            ...(selectedProduct && { productId: selectedProduct }),
-            type: selectedTab as ContentType,
-            isActive: true,
-            archivedAt: null,
-          },
-          include: {
-            product: {
-              select: { name: true, category: true },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-      : [];
 
   const catalogProducts =
     selectedTab === 'products'
@@ -210,10 +164,6 @@ export default async function ContentLibraryPage({
         })
       : [];
 
-  const needsReview = Array.isArray(content)
-    ? content.filter((c) => !c.userConfirmed && c.confidenceScore === 'low').length
-    : 0;
-
   const firecrawlConfigured = isServiceConfigured('firecrawl');
 
   return (
@@ -231,11 +181,6 @@ export default async function ContentLibraryPage({
           >
             Overview
           </Link>
-          {needsReview > 0 && (
-            <p className="text-amber-600 dark:text-amber-400 text-sm mt-2">
-              ⚠️ {needsReview} items need tag confirmation
-            </p>
-          )}
         </div>
         <div className="flex gap-3 flex-shrink-0">
           <Link href="/dashboard/content-library/import">
@@ -345,25 +290,6 @@ export default async function ContentLibraryPage({
               Industries
             </button>
           </Link>
-          {CONTENT_TABS.map((tab) => (
-            <Link
-              key={tab}
-              href={`/dashboard/content-library?${selectedProduct ? `product=${selectedProduct}&` : ''}tab=${tab}`}
-            >
-              <button
-                className={`px-4 py-3 border-b-2 font-medium ${
-                  selectedTab === tab
-                    ? 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                }`}
-              >
-                {tab === 'Framework' && 'Frameworks'}
-                {tab === 'UseCase' && 'Use Cases'}
-                {tab === 'SuccessStory' && 'Case Studies'}
-                {tab === 'CompanyEvent' && 'Events'}
-              </button>
-            </Link>
-          ))}
         </nav>
       </div>
 
@@ -397,126 +323,6 @@ export default async function ContentLibraryPage({
           catalogProducts={catalogProductsForIndustries}
         />
       )}
-
-      {!isSpecialTab && content.length === 0 ? (
-        <div className="border-2 border-dashed border-gray-300 dark:border-zinc-700 rounded-xl p-10 bg-white dark:bg-zinc-800">
-          {(() => {
-            const empty = EMPTY_STATE_BY_TAB[selectedTab as string] ?? {
-              title: `No ${(selectedTab as string).replace(/([A-Z])/g, ' $1').toLowerCase().trim()}s yet`,
-              description: 'Import from a URL or add content manually to get started.',
-              primaryHref: '/dashboard/content-library/import',
-              primaryLabel: 'Import from URL',
-              secondaryHref: '/dashboard/content-library/import',
-              secondaryLabel: 'Add manually',
-            };
-            return (
-              <>
-                <p className="text-xl font-medium text-gray-700 dark:text-gray-200 mb-2">
-                  {empty.title}
-                </p>
-                <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-lg">
-                  {empty.description}
-                </p>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  <Link href={empty.primaryHref}>
-                    <button className="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 font-medium">
-                      {empty.primaryLabel}
-                    </button>
-                  </Link>
-                  <Link href={empty.secondaryHref}>
-                    <button className="px-6 py-3 border border-gray-300 dark:border-zinc-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700">
-                      {empty.secondaryLabel}
-                    </button>
-                  </Link>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      ) : !isSpecialTab ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {content.map((item) => {
-            const contentJson = item.content as { valueProp?: string } | null;
-            const valueProp = contentJson?.valueProp ?? 'No description';
-            const versionLabel = item.version ? ` v${item.version}` : '';
-            return (
-              <div
-                key={item.id}
-                className={`border rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-zinc-800 ${
-                  !item.userConfirmed && item.confidenceScore === 'low'
-                    ? 'border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20'
-                    : 'border-gray-200 dark:border-zinc-700'
-                }`}
-              >
-                {!item.userConfirmed && (
-                  <div className="mb-3">
-                    <span
-                      className={`inline-block px-2 py-1 text-xs rounded ${
-                        item.confidenceScore === 'high'
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                          : item.confidenceScore === 'medium'
-                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                      }`}
-                    >
-                      {item.confidenceScore === 'high' && '✓ High Confidence'}
-                      {item.confidenceScore === 'medium' && '~ Medium Confidence'}
-                      {item.confidenceScore === 'low' && '⚠️ Needs Review'}
-                    </span>
-                  </div>
-                )}
-
-                <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">
-                  {item.title}{versionLabel}
-                </h3>
-
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {item.industry && (
-                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded">
-                      🏢 {item.industry}
-                    </span>
-                  )}
-                  {item.department && (
-                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">
-                      🏛️ {item.department}
-                    </span>
-                  )}
-                  {item.persona && (
-                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded">
-                      👤 {item.persona}
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
-                  {valueProp}
-                </p>
-
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  <span>📦 {item.product.name}</span>
-                  {item.sourceUrl && <span>• 🌐 Imported</span>}
-                </div>
-
-                <div className="flex gap-2">
-                  <Link
-                    href={`/dashboard/content-library/${item.id}`}
-                    className="flex-1"
-                  >
-                    <button className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-zinc-600 rounded hover:bg-gray-50 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-200">
-                      {!item.userConfirmed ? 'Review' : 'View'}
-                    </button>
-                  </Link>
-                  <Link href={`/dashboard/content-library/${item.id}/edit`}>
-                    <button className="px-3 py-2 text-sm border border-gray-300 dark:border-zinc-600 rounded hover:bg-gray-50 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-200">
-                      ✏️
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
     </div>
   );
 }
