@@ -42,18 +42,16 @@ export default async function ContentLibraryPage({
   const params = await searchParams;
   const tabParam = params.tab;
 
-  // Redirect content type tabs to dedicated pages
-  if (tabParam && CONTENT_TABS.includes(tabParam as ContentType)) {
-    const routeMap: Record<ContentType, string> = {
-      Framework: '/dashboard/content-library/frameworks',
-      UseCase: '/dashboard/content-library/use-cases',
-      SuccessStory: '/dashboard/content-library/case-studies',
-      CompanyEvent: '/dashboard/content-library/events',
-    };
-    const redirectUrl =
-      params.product
-        ? `${routeMap[tabParam as ContentType]}?product=${params.product}`
-        : routeMap[tabParam as ContentType];
+  // Redirect content type tabs to dedicated pages (only these four have dedicated pages)
+  const CONTENT_TAB_ROUTES: Record<string, string> = {
+    Framework: '/dashboard/content-library/frameworks',
+    UseCase: '/dashboard/content-library/use-cases',
+    SuccessStory: '/dashboard/content-library/case-studies',
+    CompanyEvent: '/dashboard/content-library/events',
+  };
+  if (tabParam && tabParam in CONTENT_TAB_ROUTES) {
+    const path = CONTENT_TAB_ROUTES[tabParam];
+    const redirectUrl = params.product ? `${path}?product=${params.product}` : path;
     redirect(redirectUrl);
   }
 
