@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import type { AlertType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { sendEmailAlert } from './channels/email';
 import { sendSlackAlert } from './channels/slack';
 import { sendWebhookAlert } from './channels/webhook';
@@ -183,7 +184,7 @@ async function createAndSendAlert({
   }
 
   const alert = await prisma.alert.create({
-    data: { userId, campaignId, visitId, type, title, message, data },
+    data: { userId, campaignId, visitId, type, title, message, data: data as Prisma.InputJsonValue },
   });
 
   const promises: Promise<boolean>[] = [];
