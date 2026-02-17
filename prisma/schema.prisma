@@ -623,6 +623,9 @@ model CampaignVisit {
   timeOnPage      Int      @default(0)
   scrollDepth     Int      @default(0)
   chatMessages    Int      @default(0)
+  eventsViewed    String[]
+  eventsClicked   String[]
+  caseStudiesViewed String[]
   ctaClicked      Boolean  @default(false)
   ctaClickedAt     DateTime?
   formSubmitted   Boolean  @default(false)
