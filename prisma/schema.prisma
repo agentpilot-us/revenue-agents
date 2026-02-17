@@ -600,18 +600,47 @@ model CampaignVisit {
   department   CompanyDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   visitedAt  DateTime @default(now())
   sessionId  String?
+  fingerprint String?
   leadId     String?
   qrCodeId   String?
   qrCode     QRCode?  @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
 
+  // Visitor identification
   visitorEmail    String?
   visitorName     String?
   visitorCompany  String?
   visitorJobTitle String?
+
+  // UTM & Referral tracking
+  referrer        String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmTerm         String?
+  utmContent      String?
+
+  // Engagement metrics
+  timeOnPage      Int      @default(0)
+  scrollDepth     Int      @default(0)
   chatMessages    Int      @default(0)
   ctaClicked      Boolean  @default(false)
+  ctaClickedAt     DateTime?
   formSubmitted   Boolean  @default(false)
-  timeOnPage      Int      @default(0)
+
+  // Device & Location info
+  userAgent       String?   @db.Text
+  deviceType      String?
+  browser         String?
+  os              String?
+  ipAddress       String?
+  city            String?
+  region          String?
+  country         String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastActivityAt  DateTime @default(now())
 
   alerts        Alert[]
   chatAnalytics ChatAnalytics[]
@@ -620,6 +649,10 @@ model CampaignVisit {
   @@index([visitedAt])
   @@index([qrCodeId])
   @@index([sessionId])
+  @@index([visitorEmail])
+  @@index([createdAt])
+  @@index([utmSource, utmMedium, utmCampaign])
+  @@map("campaign_visits")
 }
 
 model CampaignDailyStats {
