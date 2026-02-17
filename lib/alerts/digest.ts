@@ -9,7 +9,6 @@ export async function sendDailyDigests(): Promise<{ usersProcessed: number; emai
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const users = await prisma.user.findMany({
-    where: { email: { not: null } },
     select: {
       id: true,
       email: true,
