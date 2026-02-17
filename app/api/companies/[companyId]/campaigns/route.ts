@@ -272,7 +272,6 @@ export async function POST(
         ctaLabel: parsed.data.ctaLabel ?? null,
         ctaUrl: parsed.data.ctaUrl ?? null,
         isMultiDepartment: false,
-        departmentConfig: null,
       },
       include: {
         department: { select: { id: true, customName: true, type: true } },
