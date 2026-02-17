@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { getValuePropsForDepartment } from '@/lib/prompt-context';
 
@@ -181,7 +182,7 @@ export async function POST(
           ctaLabel: parsed.data.ctaLabel ?? null,
           ctaUrl: parsed.data.ctaUrl ?? null,
           isMultiDepartment: true,
-          departmentConfig: { departments },
+          departmentConfig: { departments } as Prisma.InputJsonValue,
         },
         include: {
           department: { select: { id: true, customName: true, type: true } },
