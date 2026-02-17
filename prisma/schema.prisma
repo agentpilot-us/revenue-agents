@@ -24,6 +24,7 @@ model Account {
   id_token          String? @db.Text
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
 }
 
@@ -36,107 +37,108 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  companyName   String?   // User's company name for Content Library labels
-  companyWebsite     String?   // Company website for smart import
-  companyIndustry    String?   // User's industry (e.g. Technology, Software)
-  primaryIndustrySellTo String?   // Primary target industry (e.g. Automotive, Healthcare)
-  contentRefreshFrequency String?   // daily | weekly | monthly | manual
+  id                      String    @id @default(cuid())
+  name                    String?
+  email                   String    @unique
+  emailVerified           DateTime?
+  image                   String?
+  companyName             String? // User's company name for Content Library labels
+  companyWebsite          String? // Company website for smart import
+  companyIndustry         String? // User's industry (e.g. Technology, Software)
+  primaryIndustrySellTo   String? // Primary target industry (e.g. Automotive, Healthcare)
+  contentRefreshFrequency String? // daily | weekly | monthly | manual
   contentRefreshNextAt    DateTime? // Next scheduled refresh
-  notifyOnNewContent      Boolean? @default(true)
-  notifyOnUpdatedContent  Boolean? @default(true)
-  notifyOnRemovedContent  Boolean? @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  notifyOnNewContent      Boolean?  @default(true)
+  notifyOnUpdatedContent  Boolean?  @default(true)
+  notifyOnRemovedContent  Boolean?  @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   // Gamification (Flight Deck)
-  expansionScore   Int       @default(0)
-  level            Int       @default(1)   // 1=Cadet, 3=Captain, 5=Ace
-  badges           Json?     // [{ id: string, earnedAt: string }]
-  lastActiveAt     DateTime?
-  currentStreakDays Int      @default(0)
+  expansionScore    Int       @default(0)
+  level             Int       @default(1) // 1=Cadet, 3=Captain, 5=Ace
+  badges            Json? // [{ id: string, earnedAt: string }]
+  lastActiveAt      DateTime?
+  currentStreakDays Int       @default(0)
 
-  alertSettings    Json?     // { enabled, email, slack, inApp, webhookUrl, highValueVisitor, ... }
-  slackWebhookUrl  String?
+  alertSettings   Json? // { enabled, email, slack, inApp, webhookUrl, highValueVisitor, ... }
+  slackWebhookUrl String?
 
-  accounts   Account[]
-  sessions   Session[]
-  companies  Company[]
-  activities Activity[]
+  accounts                Account[]
+  sessions                Session[]
+  companies               Company[]
+  activities              Activity[]
   pendingActionsRequested PendingAction[]
-  pendingActionsResolved  PendingAction[] @relation("ResolvedBy")
-  messagingFrameworks MessagingFramework[]
-  orgs             Org[]
-  products         Product[]
-  contentLibraries ContentLibrary[]
-  productProfiles  ProductProfile[]
-  industryPlaybooks IndustryPlaybook[]
-  contentCrawlSchedules ContentCrawlSchedule[]
-  contentImports        ContentImport[]
-  contentImportLastId   String?
-  outreachSequences OutreachSequence[]
-  segmentCampaigns  SegmentCampaign[]
-  alerts            Alert[]
+  pendingActionsResolved  PendingAction[]        @relation("ResolvedBy")
+  messagingFrameworks     MessagingFramework[]
+  orgs                    Org[]
+  products                Product[]
+  contentLibraries        ContentLibrary[]
+  productProfiles         ProductProfile[]
+  industryPlaybooks       IndustryPlaybook[]
+  contentCrawlSchedules   ContentCrawlSchedule[]
+  contentImports          ContentImport[]
+  contentImportLastId     String?
+  outreachSequences       OutreachSequence[]
+  segmentCampaigns        SegmentCampaign[]
+  alerts                  Alert[]
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
-  expires   DateTime
+  expires    DateTime
+
   @@unique([identifier, token])
 }
 
 // ----- Business: Company (Account in spec; name kept to avoid NextAuth Account clash) -----
 model Company {
-  id            String   @id @default(cuid())
-  name          String
-  domain        String?
-  industry      String?
-  website       String?
-  size          String?  // "1-50", "51-200", etc.
-  salesforceId  String?  // Salesforce Account Id for sync; match on pull by this or by domain/name
-  crmSource     String?  // salesforce | hubspot | other (for multi-CRM)
-  hubspotId     String?  // HubSpot company Id when crmSource = hubspot
+  id           String  @id @default(cuid())
+  name         String
+  domain       String?
+  industry     String?
+  website      String?
+  size         String? // "1-50", "51-200", etc.
+  salesforceId String? // Salesforce Account Id for sync; match on pull by this or by domain/name
+  crmSource    String? // salesforce | hubspot | other (for multi-CRM)
+  hubspotId    String? // HubSpot company Id when crmSource = hubspot
 
   // AI Research fields
-  employees        String?  // e.g., "~167,000"
-  headquarters     String?  // e.g., "Detroit, Michigan"
-  revenue          String?  // e.g., "$171.8B (2024)"
-  businessOverview String?  @db.Text // "What they do" summary
-  keyInitiatives   Json?    // Array of initiative strings
-  researchData     Json?    // Store raw AI research response for reference
+  employees        String? // e.g., "~167,000"
+  headquarters     String? // e.g., "Detroit, Michigan"
+  revenue          String? // e.g., "$171.8B (2024)"
+  businessOverview String? @db.Text // "What they do" summary
+  keyInitiatives   Json? // Array of initiative strings
+  researchData     Json? // Store raw AI research response for reference
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  contacts        Contact[]
-  activities      Activity[]
-  pendingActions  PendingAction[]
-  departments     CompanyDepartment[]
-  companyProducts CompanyProduct[]
-  expansionPlays  ExpansionPlay[]
+  contacts                   Contact[]
+  activities                 Activity[]
+  pendingActions             PendingAction[]
+  departments                CompanyDepartment[]
+  companyProducts            CompanyProduct[]
+  expansionPlays             ExpansionPlay[]
   stakeholderEngagementPlays StakeholderEngagementPlay[]
-  useCaseExplorationPlays UseCaseExplorationPlay[]
-  renewalPlays    RenewalPlay[]
+  useCaseExplorationPlays    UseCaseExplorationPlay[]
+  renewalPlays               RenewalPlay[]
 
   lastFitCalculation DateTime? // When product fit was last calculated
-  fitCalculationData Json?     // Cached product fit results (opportunities array) for quick retrieval
+  fitCalculationData Json? // Cached product fit results (opportunities array) for quick retrieval
 
   accountMessaging AccountMessaging?
-  agentContext     Json?    // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
+  agentContext     Json? // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
   segmentCampaigns SegmentCampaign[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
-  workflowStep                  Int?      // 1, 2, or 3
+  workflowStep                   Int? // 1, 2, or 3
   accountIntelligenceCompletedAt DateTime?
-  draftData                     Json?     // Auto-save / wizard draft payload
+  draftData                      Json? // Auto-save / wizard draft payload
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([industry])
@@ -146,17 +148,17 @@ model Company {
 
 // Account-level messaging: why this company, use cases, success stories, objection handlers, do-not-mention
 model AccountMessaging {
-  id        String   @id @default(cuid())
-  companyId String   @unique
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userId    String
 
-  whyThisCompany   Json?   // array of strings (bullet points)
-  useCases         Json?   // array of { contentLibraryId: string, customNote?: string, departmentFit: string[] }
-  successStories   Json?   // array of { contentLibraryId: string, whyRelevant: string, bestForDepartments: string[] }
+  whyThisCompany    Json? // array of strings (bullet points)
+  useCases          Json? // array of { contentLibraryId: string, customNote?: string, departmentFit: string[] }
+  successStories    Json? // array of { contentLibraryId: string, whyRelevant: string, bestForDepartments: string[] }
   objectionHandlers Json? // array of { objection: string, response: string }
-  doNotMention     Json?   // array of { topic: string, reason: string }
-  aiGenerated      Boolean @default(false)
+  doNotMention      Json? // array of { topic: string, reason: string }
+  aiGenerated       Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -169,25 +171,25 @@ model AccountMessaging {
 model Contact {
   id String @id @default(cuid())
 
-  firstName   String?
-  lastName    String?
-  email       String?
-  phone       String?
-  title       String?
-  department  String?   // Legacy free-text; use companyDepartmentId for structured department
+  firstName           String?
+  lastName            String?
+  email               String?
+  phone               String?
+  title               String?
+  department          String? // Legacy free-text; use companyDepartmentId for structured department
   companyDepartmentId String?
-  salesforceId String?  // Salesforce Contact/Lead Id for sync; match on pull by this or by email
-  crmSource    String?  // salesforce | hubspot | other
-  hubspotId    String?  // HubSpot contact Id when crmSource = hubspot
+  salesforceId        String? // Salesforce Contact/Lead Id for sync; match on pull by this or by email
+  crmSource           String? // salesforce | hubspot | other
+  hubspotId           String? // HubSpot contact Id when crmSource = hubspot
   companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
-  personaId   String?
-  persona     Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
-  linkedinUrl String?
-  photoUrl    String?
-  bio         String?  @db.Text
-  enrichedData Json?
-  enrichmentStatus String?  // pending | enriching | complete | failed
-  enrichedAt   DateTime?
+  personaId           String?
+  persona             Persona?           @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  linkedinUrl         String?
+  photoUrl            String?
+  bio                 String?            @db.Text
+  enrichedData        Json?
+  enrichmentStatus    String? // pending | enriching | complete | failed
+  enrichedAt          DateTime?
 
   city    String?
   state   String?
@@ -215,9 +217,9 @@ model Contact {
   isResponsive    Boolean @default(false)
   isDormant       Boolean @default(false)
 
-  activities       Activity[]
-  pendingActions   PendingAction[]
-  eventAttendances EventAttendance[]
+  activities                 Activity[]
+  pendingActions             PendingAction[]
+  eventAttendances           EventAttendance[]
   stakeholderEngagementPlays StakeholderEngagementPlay[]
   contactSequenceEnrollments ContactSequenceEnrollment[]
 
@@ -239,22 +241,22 @@ model Contact {
 }
 
 model Activity {
-  id        String   @id @default(cuid())
-  type      String   // EMAIL_SENT, MEETING_SCHEDULED, etc. (see ActivityType enum for canonical values)
-  summary   String
-  content   String?  @db.Text
-  subject   String?
-  body      String?  @db.Text
-  metadata  Json?
+  id       String  @id @default(cuid())
+  type     String // EMAIL_SENT, MEETING_SCHEDULED, etc. (see ActivityType enum for canonical values)
+  summary  String
+  content  String? @db.Text
+  subject  String?
+  body     String? @db.Text
+  metadata Json?
 
-  companyId      String
-  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId           String
+  company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   companyDepartmentId String?
   companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
-  contactId String?
-  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  contactId           String?
+  contact             Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userId              String
+  user                User               @relation(fields: [userId], references: [id])
 
   resendEmailId String?
   calEventId    String?
@@ -262,33 +264,33 @@ model Activity {
 
   createdAt DateTime @default(now())
 
+  sequenceTouches SequenceTouch[]
+
   @@index([companyId])
   @@index([companyDepartmentId])
   @@index([contactId])
   @@index([type])
   @@index([resendEmailId])
   @@index([createdAt])
-
-  sequenceTouches SequenceTouch[]
 }
 
 // Approval queue: agent creates pending actions; user approves/rejects
 model PendingAction {
-  id        String   @id @default(cuid())
-  type      String   // email, calendar_invite, salesforce_update
-  status    String   // pending, approved, rejected
-  payload   Json     // type-specific: to, subject, body, contactId (email); title, start, end, attendeeEmail (calendar); etc.
-  comment   String?  @db.Text
+  id      String  @id @default(cuid())
+  type    String // email, calendar_invite, salesforce_update
+  status  String // pending, approved, rejected
+  payload Json // type-specific: to, subject, body, contactId (email); title, start, end, attendeeEmail (calendar); etc.
+  comment String? @db.Text
 
-  companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contactId String?
-  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  userId    String   // user who owns the company (requested in their context)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resolvedAt      DateTime?
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId        String?
+  contact          Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userId           String // user who owns the company (requested in their context)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resolvedAt       DateTime?
   resolvedByUserId String?
-  resolvedBy      User?     @relation("ResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  resolvedBy       User?     @relation("ResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -311,42 +313,42 @@ model OutreachSequence {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  steps      OutreachSequenceStep[]
+  steps       OutreachSequenceStep[]
   enrollments ContactSequenceEnrollment[]
 
   @@index([userId])
 }
 
 model OutreachSequenceStep {
-  id             String   @id @default(cuid())
+  id             String           @id @default(cuid())
   sequenceId     String
   sequence       OutreachSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  order          Int      // display order
-  dayOffset      Int      // e.g. 0, 3, 6, 8, 10
+  order          Int // display order
+  dayOffset      Int // e.g. 0, 3, 6, 8, 10
   channel        SequenceChannel
-  role           String   // e.g. opener, value_add, social_proof, breakup
-  promptTemplate String?  @db.Text
-  ctaType        String?  // e.g. single_question, conversation, resource
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  role           String // e.g. opener, value_add, social_proof, breakup
+  promptTemplate String?          @db.Text
+  ctaType        String? // e.g. single_question, conversation, resource
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([sequenceId])
 }
 
 model ContactSequenceEnrollment {
-  id               String   @id @default(cuid())
+  id               String           @id @default(cuid())
   contactId        String
-  contact          Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact          Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
   sequenceId       String
   sequence         OutreachSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
   userId           String
   status           EnrollmentStatus @default(active)
-  currentStepIndex Int      @default(0) // 0-based
-  enrolledAt       DateTime @default(now())
+  currentStepIndex Int              @default(0) // 0-based
+  enrolledAt       DateTime         @default(now())
   nextTouchDueAt   DateTime?
   completedAt      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   touches SequenceTouch[]
 
@@ -359,17 +361,17 @@ model ContactSequenceEnrollment {
 }
 
 model SequenceTouch {
-  id           String    @id @default(cuid())
+  id           String                    @id @default(cuid())
   enrollmentId String
   enrollment   ContactSequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   stepIndex    Int
-  channel      String    // email | linkedin | call_task
-  scheduledAt  DateTime  @default(now())
+  channel      String // email | linkedin | call_task
+  scheduledAt  DateTime                  @default(now())
   sentAt       DateTime?
   activityId   String?
-  activity     Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  activity     Activity?                 @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
 
   @@index([enrollmentId])
   @@index([activityId])
@@ -381,8 +383,8 @@ model AgentStepLog {
   userId    String
   accountId String?
   stepIndex Int
-  toolCalls Json?   // [{ toolName, inputSummary? }]
-  usage     Json?    // { promptTokens?, completionTokens?, totalTokens? }
+  toolCalls Json? // [{ toolName, inputSummary? }]
+  usage     Json? // { promptTokens?, completionTokens?, totalTokens? }
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -399,6 +401,7 @@ model EventAttendance {
   source     String
   rsvpStatus String?
   createdAt  DateTime @default(now())
+
   @@unique([contactId, eventName])
   @@index([eventName])
   @@index([eventDate])
@@ -412,6 +415,7 @@ model MessagingFramework {
   content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@index([userId])
 }
 
@@ -421,12 +425,12 @@ model MessagingFramework {
 // ============================================
 
 model Org {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   userId      String
   name        String
   industry    String
   website     String?
-  description String?  @db.Text
+  description String? @db.Text
 
   orgDepartments OrgDepartment[]
 
@@ -440,11 +444,11 @@ model Org {
 }
 
 model OrgDepartment {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   accountId   String
-  account     Org      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account     Org     @relation(fields: [accountId], references: [id], onDelete: Cascade)
   name        String
-  description String?  @db.Text
+  description String? @db.Text
 
   relevantProducts DepartmentProduct[]
 
@@ -501,34 +505,34 @@ enum EnrollmentStatus {
 }
 
 model CompanyDepartment {
-  id                String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  companyId         String
-  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  type              DepartmentType
-  customName        String?
-  status            DepartmentStatus  @default(NOT_ENGAGED)
+  type       DepartmentType
+  customName String?
+  status     DepartmentStatus @default(NOT_ENGAGED)
 
-  estimatedSize     Int?
-  budget            Decimal?          @db.Decimal(18, 2)
-  notes             String?           @db.Text
+  estimatedSize Int?
+  budget        Decimal? @db.Decimal(18, 2)
+  notes         String?  @db.Text
 
   // AI Research fields for micro-segments
-  useCase              String?  @db.Text // What this department/division would use NVIDIA products for
-  targetRoles          Json?    // Store roles/titles structure: { economicBuyer: string[], technicalEvaluator: string[], champion: string[], influencer: string[] }
-  estimatedOpportunity String?  // e.g., "$500K - $2M" (store as text since it's a range)
+  useCase              String? @db.Text // What this department/division would use NVIDIA products for
+  targetRoles          Json? // Store roles/titles structure: { economicBuyer: string[], technicalEvaluator: string[], champion: string[], influencer: string[] }
+  estimatedOpportunity String? // e.g., "$500K - $2M" (store as text since it's a range)
 
-  contacts          Contact[]
-  companyProducts   CompanyProduct[]
-  activities        Activity[]
-  expansionPlays    ExpansionPlay[]
+  contacts                Contact[]
+  companyProducts         CompanyProduct[]
+  activities              Activity[]
+  expansionPlays          ExpansionPlay[]
   useCaseExplorationPlays UseCaseExplorationPlay[]
   segmentCampaigns        SegmentCampaign[]
-  campaignVisits    CampaignVisit[]
+  campaignVisits          CampaignVisit[]
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, type])
   @@index([companyId])
@@ -537,39 +541,40 @@ model CompanyDepartment {
 
 // Hyper-personalized content: one URL (and optional page) per company + optional segment
 model SegmentCampaign {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   companyId    String
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   departmentId String?
   department   CompanyDepartment? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
-  slug        String   // URL slug for /go/[slug] (unique per user)
+  slug        String // URL slug for /go/[slug] (unique per user)
   title       String
-  description String?  @db.Text
-  url         String   // full URL (e.g. https://app.example.com/go/{slug} or external)
-  type        String   // landing_page | event_invite | demo | webinar | other
+  description String? @db.Text
+  url         String // full URL (e.g. https://app.example.com/go/{slug} or external)
+  type        String // landing_page | event_invite | demo | webinar | other
 
-  headline     String?  @db.Text
-  body         String?  @db.Text
+  headline     String? @db.Text
+  body         String? @db.Text
   ctaLabel     String?
   ctaUrl       String?
-  pageSections Json?    // { events?: [], caseStudy?: {}, successStory?: {} } for structured blocks
+  pageSections Json? // { events?: [], caseStudy?: {}, successStory?: {} } for structured blocks
 
   isMultiDepartment Boolean @default(false)
-  departmentConfig  Json?   // { departments: [{ id, name, slug, headline?, body?, pageSections? }] } when isMultiDepartment
+  departmentConfig  Json? // { departments: [{ id, name, slug, headline?, body?, pageSections? }] } when isMultiDepartment
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  leads         CampaignLead[]
-  visits       CampaignVisit[]
-  shares       CampaignShare[]
-  qrCodes      QRCode[]
-  alerts       Alert[]
-  dailyStats   CampaignDailyStats[]
-  chatAnalytics ChatAnalytics[]
+  leads               CampaignLead[]
+  visits              CampaignVisit[]
+  shares              CampaignShare[]
+  qrCodes             QRCode[]
+  alerts              Alert[]
+  dailyStats          CampaignDailyStats[]
+  chatAnalytics       ChatAnalytics[]
+  landingPageVisitors LandingPageVisitor[]
 
   @@unique([userId, slug])
   @@index([companyId])
@@ -579,13 +584,13 @@ model SegmentCampaign {
 }
 
 model CampaignLead {
-  id            String    @id @default(cuid())
+  id            String          @id @default(cuid())
   campaignId    String
   campaign      SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   email         String
   name          String?
-  message       String?   @db.Text
-  createdAt     DateTime  @default(now())
+  message       String?         @db.Text
+  createdAt     DateTime        @default(now())
   pushedToCrmAt DateTime?
 
   @@index([campaignId])
@@ -593,17 +598,17 @@ model CampaignLead {
 }
 
 model CampaignVisit {
-  id         String   @id @default(cuid())
-  campaignId String
-  campaign   SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id           String             @id @default(cuid())
+  campaignId   String
+  campaign     SegmentCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   departmentId String?
   department   CompanyDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  visitedAt  DateTime @default(now())
-  sessionId  String?
-  fingerprint String?
-  leadId     String?
-  qrCodeId   String?
-  qrCode     QRCode?  @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  visitedAt    DateTime           @default(now())
+  sessionId    String?
+  fingerprint  String?
+  leadId       String?
+  qrCodeId     String?
+  qrCode       QRCode?            @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
 
   // Visitor identification
   visitorEmail    String?
@@ -612,38 +617,38 @@ model CampaignVisit {
   visitorJobTitle String?
 
   // UTM & Referral tracking
-  referrer        String?
-  utmSource       String?
-  utmMedium       String?
-  utmCampaign     String?
-  utmTerm         String?
-  utmContent      String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
 
   // Engagement metrics
-  timeOnPage      Int      @default(0)
-  scrollDepth     Int      @default(0)
-  chatMessages    Int      @default(0)
-  eventsViewed    String[]
-  eventsClicked   String[]
+  timeOnPage        Int       @default(0)
+  scrollDepth       Int       @default(0)
+  chatMessages      Int       @default(0)
+  eventsViewed      String[]
+  eventsClicked     String[]
   caseStudiesViewed String[]
-  ctaClicked      Boolean  @default(false)
-  ctaClickedAt     DateTime?
-  formSubmitted   Boolean  @default(false)
+  ctaClicked        Boolean   @default(false)
+  ctaClickedAt      DateTime?
+  formSubmitted     Boolean   @default(false)
 
   // Device & Location info
-  userAgent       String?   @db.Text
-  deviceType      String?
-  browser         String?
-  os              String?
-  ipAddress       String?
-  city            String?
-  region          String?
-  country         String?
+  userAgent  String? @db.Text
+  deviceType String?
+  browser    String?
+  os         String?
+  ipAddress  String?
+  city       String?
+  region     String?
+  country    String?
 
   // Timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  lastActivityAt  DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastActivityAt DateTime @default(now())
 
   alerts        Alert[]
   chatAnalytics ChatAnalytics[]
@@ -659,28 +664,28 @@ model CampaignVisit {
 }
 
 model CampaignDailyStats {
-  id              String   @id @default(cuid())
-  campaignId      String
-  campaign        SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  date            DateTime @db.Date
-  departmentId    String?  // Empty string "" for overall campaign stats
-  totalVisits     Int      @default(0)
-  uniqueVisitors  Int      @default(0)
-  returningVisitors Int    @default(0)
-  avgTimeOnPage   Int      @default(0)
-  avgScrollDepth   Int      @default(0)
-  bounceRate      Int      @default(0)
-  chatSessions    Int      @default(0)
-  chatMessages    Int      @default(0)
-  ctaClicks       Int      @default(0)
-  formSubmissions Int      @default(0)
-  directTraffic   Int      @default(0)
-  emailTraffic    Int      @default(0)
-  linkedinTraffic Int      @default(0)
-  organicTraffic  Int      @default(0)
-  paidTraffic     Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String          @id @default(cuid())
+  campaignId        String
+  campaign          SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  date              DateTime        @db.Date
+  departmentId      String? // Empty string "" for overall campaign stats
+  totalVisits       Int             @default(0)
+  uniqueVisitors    Int             @default(0)
+  returningVisitors Int             @default(0)
+  avgTimeOnPage     Int             @default(0)
+  avgScrollDepth    Int             @default(0)
+  bounceRate        Int             @default(0)
+  chatSessions      Int             @default(0)
+  chatMessages      Int             @default(0)
+  ctaClicks         Int             @default(0)
+  formSubmissions   Int             @default(0)
+  directTraffic     Int             @default(0)
+  emailTraffic      Int             @default(0)
+  linkedinTraffic   Int             @default(0)
+  organicTraffic    Int             @default(0)
+  paidTraffic       Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   @@unique([campaignId, date, departmentId])
   @@index([campaignId, date])
@@ -689,20 +694,20 @@ model CampaignDailyStats {
 }
 
 model ChatAnalytics {
-  id              String   @id @default(cuid())
-  campaignId      String
-  campaign        SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  visitId         String?
-  visit           CampaignVisit? @relation(fields: [visitId], references: [id], onDelete: SetNull)
-  sessionId       String?
-  departmentId    String?
-  question        String   @db.Text
-  answer          String   @db.Text
-  topic            String?
-  intent           String?
-  messageIndex     Int      @default(0)
-  responseTime     Int?     // milliseconds
-  createdAt        DateTime @default(now())
+  id           String          @id @default(cuid())
+  campaignId   String
+  campaign     SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  visitId      String?
+  visit        CampaignVisit?  @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  sessionId    String?
+  departmentId String?
+  question     String          @db.Text
+  answer       String          @db.Text
+  topic        String?
+  intent       String?
+  messageIndex Int             @default(0)
+  responseTime Int? // milliseconds
+  createdAt    DateTime        @default(now())
 
   @@index([campaignId])
   @@index([sessionId])
@@ -723,23 +728,23 @@ enum AlertType {
 }
 
 model Alert {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type         AlertType
-  title        String
-  message      String    @db.Text
-  data         Json?
-  campaignId   String?
-  campaign     SegmentCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  visitId      String?
-  visit        CampaignVisit? @relation(fields: [visitId], references: [id], onDelete: SetNull)
-  isRead       Boolean   @default(false)
-  readAt       DateTime?
-  sentViaEmail Boolean  @default(false)
-  sentViaSlack Boolean  @default(false)
-  sentViaWebhook Boolean @default(false)
-  createdAt    DateTime @default(now())
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           AlertType
+  title          String
+  message        String           @db.Text
+  data           Json?
+  campaignId     String?
+  campaign       SegmentCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  visitId        String?
+  visit          CampaignVisit?   @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  isRead         Boolean          @default(false)
+  readAt         DateTime?
+  sentViaEmail   Boolean          @default(false)
+  sentViaSlack   Boolean          @default(false)
+  sentViaWebhook Boolean          @default(false)
+  createdAt      DateTime         @default(now())
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
@@ -748,21 +753,21 @@ model Alert {
 }
 
 model QRCode {
-  id              String   @id @default(cuid())
+  id              String          @id @default(cuid())
   campaignId      String
   campaign        SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   name            String
-  shortCode       String   @unique
-  foregroundColor String   @default("#000000")
-  backgroundColor String   @default("#FFFFFF")
+  shortCode       String          @unique
+  foregroundColor String          @default("#000000")
+  backgroundColor String          @default("#FFFFFF")
   logoUrl         String?
-  size            Int      @default(512)
-  errorCorrection String   @default("M")
+  size            Int             @default(512)
+  errorCorrection String          @default("M")
   departmentId    String?
-  scanCount       Int      @default(0)
+  scanCount       Int             @default(0)
   lastScannedAt   DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   visits          CampaignVisit[]
 
   @@index([campaignId])
@@ -771,12 +776,12 @@ model QRCode {
 }
 
 model CampaignShare {
-  id           String   @id @default(cuid())
-  campaignId   String
-  campaign     SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  sharedAt     DateTime @default(now())
+  id            String          @id @default(cuid())
+  campaignId    String
+  campaign      SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sharedAt      DateTime        @default(now())
   sharedByEmail String?
-  channel      String?  // email | copy_link
+  channel       String? // email | copy_link
 
   @@index([campaignId])
   @@index([sharedAt])
@@ -795,54 +800,54 @@ enum ProductOwnershipStatus {
 }
 
 model CatalogProduct {
-  id                String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  name              String            @unique
-  slug              String            @unique
-  description       String?           @db.Text
+  name        String  @unique
+  slug        String  @unique
+  description String? @db.Text
 
-  priceMin          Decimal?          @db.Decimal(18, 2)
-  priceMax          Decimal?          @db.Decimal(18, 2)
-  pricingModel      String?
+  priceMin     Decimal? @db.Decimal(18, 2)
+  priceMax     Decimal? @db.Decimal(18, 2)
+  pricingModel String?
 
   targetDepartments DepartmentType[]
   targetPersonas    String[]
 
-  useCases          String[]
-  contentTags       String[]
+  useCases    String[]
+  contentTags String[]
 
-  companyProducts   CompanyProduct[]
-  expansionPlays    ExpansionPlay[]
-  productProfiles   ProductProfile[]
+  companyProducts CompanyProduct[]
+  expansionPlays  ExpansionPlay[]
+  productProfiles ProductProfile[]
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([slug])
 }
 
 // Product expert content: one-liner, elevator pitch, value props, objection handlers, etc. (one per catalog product per user)
 model ProductProfile {
-  id                String         @id @default(cuid())
-  catalogProductId  String
-  catalogProduct    CatalogProduct @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
-  userId            String
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String         @id @default(cuid())
+  catalogProductId String
+  catalogProduct   CatalogProduct @relation(fields: [catalogProductId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  oneLiner              String?   @db.Text
-  elevatorPitch         String?   @db.Text
-  valueProps            Json?     // array of strings
-  painPoints            Json?     // array of strings
-  bestForDepartments    Json?     // array of strings
-  bestForIndustries     Json?     // array of strings
-  technicalRequirements Json?     // array of strings
-  objectionHandlers     Json?     // array of { objection: string, response: string }
-  competitivePositioning Json?    // array of strings or text
-  linkedCaseStudyIds    Json?     // array of ContentLibrary ids (strings)
-  priceRangeText        String?
-  dealSizeSweetSpot    String?
-  salesCycle           String?
-  deployment           String?
+  oneLiner               String? @db.Text
+  elevatorPitch          String? @db.Text
+  valueProps             Json? // array of strings
+  painPoints             Json? // array of strings
+  bestForDepartments     Json? // array of strings
+  bestForIndustries      Json? // array of strings
+  technicalRequirements  Json? // array of strings
+  objectionHandlers      Json? // array of { objection: string, response: string }
+  competitivePositioning Json? // array of strings or text
+  linkedCaseStudyIds     Json? // array of ContentLibrary ids (strings)
+  priceRangeText         String?
+  dealSizeSweetSpot      String?
+  salesCycle             String?
+  deployment             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -854,18 +859,18 @@ model ProductProfile {
 
 // Industry playbook: department–product mapping, value props by department, landmines (one per industry per user)
 model IndustryPlaybook {
-  id                    String   @id @default(cuid())
-  userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name                  String   // e.g. "Automotive OEM"
-  slug                  String   // unique per user, e.g. "automotive-oem"
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String // e.g. "Automotive OEM"
+  slug   String // unique per user, e.g. "automotive-oem"
 
-  overview                  String?  @db.Text
-  departmentProductMapping  Json?    // array of { department: string, productIds: string[], typicalDealSize: string }
-  valuePropsByDepartment    Json?    // { [departmentKey: string]: { headline, pitch, bullets?: string[], cta?: string } }
-  buyingCommittee           String?  @db.Text
-  landmines                 Json?    // array of strings
-  relevantCaseStudyIds      Json?    // array of ContentLibrary ids (optional)
+  overview                 String? @db.Text
+  departmentProductMapping Json? // array of { department: string, productIds: string[], typicalDealSize: string }
+  valuePropsByDepartment   Json? // { [departmentKey: string]: { headline, pitch, bullets?: string[], cta?: string } }
+  buyingCommittee          String? @db.Text
+  landmines                Json? // array of strings
+  relevantCaseStudyIds     Json? // array of ContentLibrary ids (optional)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -876,28 +881,28 @@ model IndustryPlaybook {
 }
 
 model CompanyProduct {
-  id                String                  @id @default(cuid())
+  id String @id @default(cuid())
 
-  companyId         String
-  company           Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   companyDepartmentId String?
-  companyDepartment   CompanyDepartment?    @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
+  companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
 
-  productId         String
-  product           CatalogProduct          @relation(fields: [productId], references: [id])
+  productId String
+  product   CatalogProduct @relation(fields: [productId], references: [id])
 
-  status            ProductOwnershipStatus  @default(OPPORTUNITY)
-  arr               Decimal?                @db.Decimal(18, 2)
-  contractStart     DateTime?
-  contractEnd       DateTime?
+  status        ProductOwnershipStatus @default(OPPORTUNITY)
+  arr           Decimal?               @db.Decimal(18, 2)
+  contractStart DateTime?
+  contractEnd   DateTime?
 
-  fitScore          Decimal?                @db.Decimal(5, 2)
-  fitReasoning      String?                 @db.Text
-  opportunitySize   Decimal?                @db.Decimal(18, 2)
+  fitScore        Decimal? @db.Decimal(5, 2)
+  fitReasoning    String?  @db.Text
+  opportunitySize Decimal? @db.Decimal(18, 2)
 
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, companyDepartmentId, productId])
   @@index([companyId])
@@ -922,26 +927,26 @@ enum PlayStatus {
 }
 
 model ExpansionPlay {
-  id                    String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  companyId             String
-  company               Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyDepartmentId   String
-  companyDepartment     CompanyDepartment  @relation(fields: [companyDepartmentId], references: [id], onDelete: Cascade)
-  productId             String
-  product               CatalogProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  companyId           String
+  company             Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyDepartmentId String
+  companyDepartment   CompanyDepartment @relation(fields: [companyDepartmentId], references: [id], onDelete: Cascade)
+  productId           String
+  product             CatalogProduct    @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  status                PlayStatus        @default(RESEARCH_PHASE)
-  weekNumber            Int               @default(1)
-  totalWeeks            Int                @default(12)
-  lastActionSummary     String?           @db.Text
-  lastActionAt          DateTime?
-  nextActionSummary     String?           @db.Text
-  nextActionDue         DateTime?
-  opportunitySize       Decimal?          @db.Decimal(18, 2)
+  status            PlayStatus @default(RESEARCH_PHASE)
+  weekNumber        Int        @default(1)
+  totalWeeks        Int        @default(12)
+  lastActionSummary String?    @db.Text
+  lastActionAt      DateTime?
+  nextActionSummary String?    @db.Text
+  nextActionDue     DateTime?
+  opportunitySize   Decimal?   @db.Decimal(18, 2)
 
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, companyDepartmentId, productId])
   @@index([companyId])
@@ -951,27 +956,27 @@ model ExpansionPlay {
 
 // New Stakeholder Engagement play run (trigger: new VP/Director/C-level at tracked account)
 model StakeholderEngagementPlay {
-  id                   String    @id @default(cuid())
-  companyId            String
-  company              Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contactId            String
-  contact              Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  currentStep          Int       @default(1)  // 1-5
-  status               String    @default("active")  // active | paused | completed
-  playState            String    @default("waiting_for_user")  // running | waiting_for_user | waiting_for_time | paused | completed | cancelled
-  stepState            Json?     // { "1": "completed", "2": "needs_review" | "user_task" | "completed", ... }
-  researchProgress     Json?     // optional: { phase, steps, percent } for research-running UX
-  messages             Json?     // play-scoped chat: [{ role, content, createdAt }]
-  draftAttachment      String?   // e.g. content library label for display
+  currentStep      Int     @default(1) // 1-5
+  status           String  @default("active") // active | paused | completed
+  playState        String  @default("waiting_for_user") // running | waiting_for_user | waiting_for_time | paused | completed | cancelled
+  stepState        Json? // { "1": "completed", "2": "needs_review" | "user_task" | "completed", ... }
+  researchProgress Json? // optional: { phase, steps, percent } for research-running UX
+  messages         Json? // play-scoped chat: [{ role, content, createdAt }]
+  draftAttachment  String? // e.g. content library label for display
 
-  researchData         Json?     // Step 1: structured { summary, background, recentActivity, warmIntroPaths, talkingPoints, ... }
-  draftEmail           Json?     // Step 2: { subject, body }
-  draftEmailApproved   Boolean?  // Step 2: null = pending, true = approved, false = rejected
-  stepCompletedAt      Json?     // { "1": "ISO date", "2": "ISO date", ... }
+  researchData       Json? // Step 1: structured { summary, background, recentActivity, warmIntroPaths, talkingPoints, ... }
+  draftEmail         Json? // Step 2: { subject, body }
+  draftEmailApproved Boolean? // Step 2: null = pending, true = approved, false = rejected
+  stepCompletedAt    Json? // { "1": "ISO date", "2": "ISO date", ... }
 
-  createdAt            DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([contactId])
@@ -980,23 +985,23 @@ model StakeholderEngagementPlay {
 
 // Use Case Exploration: per-department find contacts, send emails, invite to events
 model UseCaseExplorationPlay {
-  id                   String    @id @default(cuid())
-  companyId            String
-  company              Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyDepartmentId  String
-  companyDepartment    CompanyDepartment @relation(fields: [companyDepartmentId], references: [id], onDelete: Cascade)
+  id                  String            @id @default(cuid())
+  companyId           String
+  company             Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyDepartmentId String
+  companyDepartment   CompanyDepartment @relation(fields: [companyDepartmentId], references: [id], onDelete: Cascade)
 
-  currentStep          Int       @default(1)   // 1-4
-  playState            String    @default("waiting_for_user")  // running | waiting_for_user | paused | completed | cancelled
-  stepState            Json?     // { "1": "completed", "2": "user_task", ... }
-  stepCompletedAt      Json?     // { "1": "ISO date", ... }
+  currentStep     Int    @default(1) // 1-4
+  playState       String @default("waiting_for_user") // running | waiting_for_user | paused | completed | cancelled
+  stepState       Json? // { "1": "completed", "2": "user_task", ... }
+  stepCompletedAt Json? // { "1": "ISO date", ... }
 
-  targetContactIds     Json?     // [{ contactId, addedAt }]
-  drafts               Json?     // [{ contactId, subject, body, sentAt? }]
-  eventIntent          Json?     // { eventType?, eventId?, contactIds? }
+  targetContactIds Json? // [{ contactId, addedAt }]
+  drafts           Json? // [{ contactId, subject, body, sentAt? }]
+  eventIntent      Json? // { eventType?, eventId?, contactIds? }
 
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([companyDepartmentId])
@@ -1005,20 +1010,20 @@ model UseCaseExplorationPlay {
 
 // Proactive Renewal Audit (90-day trigger)
 model RenewalPlay {
-  id                String   @id @default(cuid())
-  companyId         String
-  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  renewalDate       DateTime
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  renewalDate DateTime
 
-  currentStep       Int      @default(1)  // 1-5
-  status            String   @default("active")  // active | paused | completed
+  currentStep Int    @default(1) // 1-5
+  status      String @default("active") // active | paused | completed
 
-  healthCheckData   Json?    // Step 1: health score, signals
-  roiReport         Json?    // Step 2: ROI report content
-  stepCompletedAt   Json?    // { "1": "ISO date", ... }
+  healthCheckData Json? // Step 1: health score, signals
+  roiReport       Json? // Step 2: ROI report content
+  stepCompletedAt Json? // { "1": "ISO date", ... }
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([renewalDate])
@@ -1026,14 +1031,14 @@ model RenewalPlay {
 }
 
 model Product {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   userId      String
   name        String
-  description String?  @db.Text
+  description String? @db.Text
   category    String?
 
-  contentLibrary       ContentLibrary[]
-  departmentProducts   DepartmentProduct[]
+  contentLibrary        ContentLibrary[]
+  departmentProducts    DepartmentProduct[]
   contentCrawlSchedules ContentCrawlSchedule[]
 
   createdAt DateTime @default(now())
@@ -1073,7 +1078,7 @@ enum ContentType {
 }
 
 model ContentLibrary {
-  id        String      @id @default(cuid())
+  id        String @id @default(cuid())
   userId    String
   productId String
 
@@ -1094,7 +1099,7 @@ model ContentLibrary {
   sourceUrl String?
   scrapedAt DateTime?
 
-  version   String?   // e.g. "1.2", "2.0" for versioning
+  version    String? // e.g. "1.2", "2.0" for versioning
   archivedAt DateTime? // when set, excluded from "current" content; show as Archived in UI
 
   isActive  Boolean  @default(true)
@@ -1114,22 +1119,22 @@ model ContentLibrary {
 
 // Scheduled Firecrawl crawls for Content Library (daily/weekly)
 model ContentCrawlSchedule {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   userId    String
   productId String
 
-  contentType String   // 'case-studies' | 'use-cases'
-  url         String   @db.Text
+  contentType  String // 'case-studies' | 'use-cases'
+  url          String  @db.Text
   includePaths String? @db.Text // JSON array of path patterns, for case-studies
-  limit       Int      @default(50)
+  limit        Int     @default(50)
 
-  frequency  String   // 'daily' | 'weekly'
-  lastRunAt  DateTime?
-  nextRunAt  DateTime
+  frequency String // 'daily' | 'weekly'
+  lastRunAt DateTime?
+  nextRunAt DateTime
 
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1150,24 +1155,24 @@ enum ContentImportStatus {
 }
 
 model ContentImport {
-  id                String              @id @default(cuid())
-  userId            String
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceUrl         String              @db.Text
-  industry          String?
-  status            ContentImportStatus @default(PENDING)
-  totalPages        Int                 @default(0)
-  scrapedPages      Int                 @default(0)
-  categorizedPages  Int                 @default(0)
-  discoveredUrls    Json?
-  scrapedContent    Json?
-  categorizedContent Json?   // { products: [], caseStudies: [], events: [], ... }
-  reviewedAt        DateTime?
-  approvedCount     Int                 @default(0)
-  rejectedCount     Int                 @default(0)
-  errors            Json?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                 String              @id @default(cuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceUrl          String              @db.Text
+  industry           String?
+  status             ContentImportStatus @default(PENDING)
+  totalPages         Int                 @default(0)
+  scrapedPages       Int                 @default(0)
+  categorizedPages   Int                 @default(0)
+  discoveredUrls     Json?
+  scrapedContent     Json?
+  categorizedContent Json? // { products: [], caseStudies: [], events: [], ... }
+  reviewedAt         DateTime?
+  approvedCount      Int                 @default(0)
+  rejectedCount      Int                 @default(0)
+  errors             Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@index([userId, status])
 }
@@ -1177,29 +1182,29 @@ model ContentImport {
 // ============================================
 
 model Persona {
-  id                    String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  name                  String            @unique
-  description           String?           @db.Text
+  name        String  @unique
+  description String? @db.Text
 
-  includeTitles         String[]
-  excludeTitles         String[]
+  includeTitles String[]
+  excludeTitles String[]
 
   primaryDepartment    DepartmentType?
-  secondaryDepartments  DepartmentType[]
+  secondaryDepartments DepartmentType[]
 
-  painPoints            String[]
-  successMetrics        String[]
+  painPoints     String[]
+  successMetrics String[]
 
-  contentTypes          String[]
-  messagingTone         String            @default("business")
+  contentTypes  String[]
+  messagingTone String   @default("business")
 
-  preferredChannels     String[]
+  preferredChannels String[]
 
-  contacts              Contact[]
+  contacts Contact[]
 
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([primaryDepartment])
 }
@@ -1222,7 +1227,7 @@ enum ContentItemType {
 }
 
 model ContentItem {
-  id          String          @id @default(cuid())
+  id String @id @default(cuid())
 
   title       String
   description String?         @db.Text
@@ -1236,12 +1241,88 @@ model ContentItem {
   useCases    Json?
   stage       String?
 
-  fullText    String?         @db.Text
+  fullText String? @db.Text
 
-  tags        String[]
+  tags String[]
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([type])
+}
+
+// Landing page visitor authentication (separate from NextAuth User)
+model LandingPageVisitor {
+  id          String               @id @default(cuid())
+  email       String
+  emailDomain String // Extracted domain for matching
+  verified    Boolean              @default(false)
+  verifiedAt  DateTime?
+  campaignId  String // Which campaign/company they're verified for
+  campaign    SegmentCampaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sessions    LandingPageSession[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([email, campaignId])
+  @@index([emailDomain])
+  @@index([campaignId])
+  @@index([verified])
+}
+
+// Magic link tokens for email verification
+model LandingPageMagicLink {
+  id         String    @id @default(cuid())
+  email      String
+  campaignId String
+  token      String    @unique
+  expiresAt  DateTime
+  used       Boolean   @default(false)
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([token])
+  @@index([email, campaignId])
+  @@index([expiresAt])
+}
+
+// Authenticated sessions for landing page access
+model LandingPageSession {
+  id             String             @id @default(cuid())
+  visitorId      String
+  visitor        LandingPageVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  sessionToken   String             @unique
+  campaignId     String
+  ipAddress      String?
+  userAgent      String?
+  expiresAt      DateTime
+  createdAt      DateTime           @default(now())
+  lastActivityAt DateTime           @default(now())
+
+  @@index([sessionToken])
+  @@index([visitorId])
+  @@index([campaignId])
+  @@index([expiresAt])
+}
+
+// Security audit log for tracking security events
+model SecurityAuditLog {
+  id         String   @id @default(cuid())
+  userId     String? // Null for landing page chat
+  visitorId  String? // Landing page visitor ID (if authenticated)
+  campaignId String? // For landing page chat
+  ipAddress  String?
+  sessionId  String?
+  eventType  String // "rate_limit_exceeded", "prompt_injection", "pii_detected", "tool_abuse", "unauthorized_access", "domain_mismatch", "auth_failed"
+  severity   String // "low", "medium", "high", "critical"
+  details    Json // Event-specific data
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([visitorId])
+  @@index([campaignId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([ipAddress])
 }

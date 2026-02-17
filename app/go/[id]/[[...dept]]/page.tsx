@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { CampaignChat } from '@/app/go/CampaignChat';
 import { CampaignTrack } from '@/app/go/CampaignTrack';
+import { requireLandingPageAuth } from '@/lib/auth/landing-page-middleware';
 
 type PageSectionEvent = { title?: string; date?: string; description?: string; url?: string };
 type PageSectionCaseStudy = { title?: string; summary?: string; link?: string };
@@ -29,7 +30,7 @@ async function getCampaign(slugOrId: string) {
       OR: [{ id: slugOrId }, { slug: slugOrId }],
     },
     include: {
-      company: { select: { name: true } },
+      company: { select: { name: true, domain: true } },
       department: { select: { id: true, customName: true, type: true } },
     },
   });
@@ -54,6 +55,17 @@ export default async function CampaignLandingPage({ params }: Props) {
 
   const campaign = await getCampaign(slugOrId);
   if (!campaign) notFound();
+
+  // Check authentication if enabled and company has domain
+  const authEnabled = process.env.ENABLE_LANDING_PAGE_AUTH !== 'false';
+  const companyDomain = campaign.company.domain;
+
+  if (authEnabled && companyDomain) {
+    const auth = await requireLandingPageAuth(campaign.id);
+    if (!auth.authenticated && auth.redirect) {
+      redirect(auth.redirect);
+    }
+  }
 
   const isMulti = Boolean(
     (campaign as { isMultiDepartment?: boolean }).isMultiDepartment &&

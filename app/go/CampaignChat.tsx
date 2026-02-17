@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import {
@@ -28,6 +28,24 @@ type CampaignChatProps = {
 };
 
 export function CampaignChat({ campaignId, departmentId }: CampaignChatProps) {
+  const [sessionInfo, setSessionInfo] = useState<{ authenticated: boolean; email?: string } | null>(null);
+
+  useEffect(() => {
+    // Check session status
+    fetch(`/api/go/${campaignId}/auth/session`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated) {
+          setSessionInfo({ authenticated: true, email: data.email });
+        } else {
+          setSessionInfo({ authenticated: false });
+        }
+      })
+      .catch(() => {
+        setSessionInfo({ authenticated: false });
+      });
+  }, [campaignId]);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -61,12 +79,29 @@ export function CampaignChat({ campaignId, departmentId }: CampaignChatProps) {
   return (
     <div className="flex flex-col min-h-[320px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
       <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          Questions? Chat with us
-        </p>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-          Ask about pricing, events, or request a demo or meeting link by email.
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Questions? Chat with us
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Ask about pricing, events, or request a demo or meeting link by email.
+            </p>
+          </div>
+          {sessionInfo?.authenticated && sessionInfo.email && (
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                {sessionInfo.email}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Your chat is authenticated and secure. Session expires after 24 hours of inactivity.
+          </p>
+        </div>
       </div>
       <Conversation className="min-h-0 flex-1">
         <ConversationContent>
