@@ -10,7 +10,7 @@ type Alert = {
   message: string;
   isRead: boolean;
   createdAt: string;
-  campaign: { name: string; id: string } | null;
+  campaign: { title: string; id: string } | null;
 };
 
 export function AlertsList({ alerts }: { alerts: Alert[] }) {
@@ -45,7 +45,7 @@ export function AlertsList({ alerts }: { alerts: Alert[] }) {
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{alert.message}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
-                {alert.campaign && ` • ${alert.campaign.name}`}
+                {alert.campaign && ` • ${alert.campaign.title}`}
               </p>
             </div>
             {!alert.isRead && (

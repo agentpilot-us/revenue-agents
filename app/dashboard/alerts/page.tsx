@@ -12,7 +12,7 @@ export default async function AlertsPage() {
     prisma.alert.findMany({
       where: { userId: session.user.id },
       include: {
-        campaign: { select: { name: true, id: true } },
+        campaign: { select: { title: true, id: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
