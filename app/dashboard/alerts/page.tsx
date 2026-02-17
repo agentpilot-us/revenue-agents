@@ -8,7 +8,7 @@ export default async function AlertsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/api/auth/signin');
 
-  const [alerts, unreadCount] = await Promise.all([
+  const [alertsData, unreadCount] = await Promise.all([
     prisma.alert.findMany({
       where: { userId: session.user.id },
       include: {
@@ -21,6 +21,12 @@ export default async function AlertsPage() {
       where: { userId: session.user.id, isRead: false },
     }),
   ]);
+
+  // Serialize dates to strings for client component
+  const alerts = alertsData.map((alert) => ({
+    ...alert,
+    createdAt: alert.createdAt.toISOString(),
+  }));
 
   return (
     <div className="p-8 bg-gray-50 dark:bg-zinc-900 min-h-screen">
