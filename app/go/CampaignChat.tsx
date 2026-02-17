@@ -24,20 +24,21 @@ import {
 
 type CampaignChatProps = {
   campaignId: string;
+  departmentId?: string | null;
 };
 
-export function CampaignChat({ campaignId }: CampaignChatProps) {
+export function CampaignChat({ campaignId, departmentId }: CampaignChatProps) {
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: `/api/go/${campaignId}/chat`,
-        body: {},
+        body: departmentId ? { departmentId } : {},
       }),
-    [campaignId]
+    [campaignId, departmentId]
   );
 
   const { messages, sendMessage, status, stop } = useChat({
-    id: `campaign-chat-${campaignId}`,
+    id: `campaign-chat-${campaignId}-${departmentId ?? 'company'}`,
     transport,
     experimental_throttle: 80,
   });

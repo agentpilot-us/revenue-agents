@@ -31,7 +31,7 @@ export async function POST(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    let body: { messages?: unknown[] };
+    let body: { messages?: unknown[]; departmentId?: string };
     try {
       body = await req.json();
     } catch {
@@ -40,9 +40,18 @@ export async function POST(
     const messages = Array.isArray(body.messages) ? body.messages : [];
 
     const companyName = campaign.company.name;
-    const departmentName = campaign.department
+    let departmentName: string | null = campaign.department
       ? (campaign.department.customName ?? campaign.department.type.replace(/_/g, ' '))
       : null;
+    if (!departmentName && body.departmentId) {
+      const dept = await prisma.companyDepartment.findFirst({
+        where: { id: body.departmentId, companyId: campaign.companyId },
+        select: { customName: true, type: true },
+      });
+      if (dept) {
+        departmentName = dept.customName ?? dept.type.replace(/_/g, ' ');
+      }
+    }
 
     const [companyEventsBlock, catalogProducts] = await Promise.all([
       getCompanyEventsBlock(

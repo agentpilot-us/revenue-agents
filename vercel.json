@@ -6,6 +6,8 @@
   "outputDirectory": ".next",
   "crons": [
     { "path": "/api/cron/calculate-engagement", "schedule": "0 2 * * *" },
-    { "path": "/api/cron/content-library/run-schedules", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/aggregate-analytics", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/content-library/run-schedules", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/send-alert-digest", "schedule": "0 14 * * *" }
   ]
 }

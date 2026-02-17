@@ -5,6 +5,7 @@ import type { ContentType } from '@prisma/client';
 import type { GetCompanySetupStateUser } from '@/app/actions/content-library-setup';
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
+import { RecentEventsWithShare } from '@/app/components/content-library/RecentEventsWithShare';
 
 type Props = {
   company: GetCompanySetupStateUser | null;
@@ -14,19 +15,25 @@ export async function ContentLibraryView({ company }: Props) {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const [contentCounts, catalogProductCount, industryPlaybookCount, schedules] =
+  const [contentCounts, productCount, industryPlaybookCount, schedules, recentEvents] =
     await Promise.all([
       prisma.contentLibrary.groupBy({
         by: ['type'],
         where: { userId: session.user.id, isActive: true },
         _count: { id: true },
       }),
-      prisma.catalogProduct.count(),
+      prisma.product.count({ where: { userId: session.user.id } }),
       prisma.industryPlaybook.count({ where: { userId: session.user.id } }),
       prisma.contentCrawlSchedule.findMany({
         where: { userId: session.user.id, isActive: true },
         select: { lastRunAt: true, nextRunAt: true },
         take: 5,
+      }),
+      prisma.contentLibrary.findMany({
+        where: { userId: session.user.id, isActive: true, type: 'CompanyEvent' },
+        select: { id: true, title: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
       }),
     ]);
 
@@ -121,54 +128,44 @@ export async function ContentLibraryView({ company }: Props) {
       {/* Category cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <Link
-          href="/dashboard/content-library?tab=products"
+          href="/dashboard/content-library/products"
           className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
         >
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Products</h3>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{catalogProductCount}</p>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{productCount}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
         </Link>
         <Link
-          href="/dashboard/content-library?tab=industries"
+          href="/dashboard/content-library/industries"
           className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
         >
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Industry playbooks</h3>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{industryPlaybookCount}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
         </Link>
-        <Link
-          href="/dashboard/content-library/frameworks"
-          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
-        >
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Frameworks</h3>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.Framework ?? 0}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
-        </Link>
-        <Link
-          href="/dashboard/content-library/use-cases"
-          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
-        >
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Count</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Use Cases</h3>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.UseCase ?? 0}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
-        </Link>
-        <Link
-          href="/dashboard/content-library/case-studies"
-          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
-        >
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Count</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Case Studies</h3>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.SuccessStory ?? 0}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
-        </Link>
-        <Link
-          href="/dashboard/content-library/events"
-          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 hover:shadow-md transition-shadow block"
-        >
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Count</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Events</h3>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{countByType.CompanyEvent ?? 0}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View · + Add</p>
-        </Link>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Count</p>
+        </div>
       </div>
+
+      <RecentEventsWithShare events={recentEvents} />
 
       {/* Auto-Refresh card */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-zinc-800/50 overflow-hidden px-5 py-4">

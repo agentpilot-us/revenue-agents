@@ -1,5 +1,38 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import type { ContentType } from '@prisma/client';
+
+const SUGGESTED_TYPE_MAP: Record<string, ContentType> = {
+  case_study: 'SuccessStory',
+  success_story: 'SuccessStory',
+  customer_story: 'SuccessStory',
+  event: 'CompanyEvent',
+  webinar: 'CompanyEvent',
+  conference: 'CompanyEvent',
+  product: 'FeatureRelease',
+  feature: 'FeatureRelease',
+  solution: 'UseCase',
+  use_case: 'UseCase',
+  solutionpage: 'UseCase',
+  playbook: 'Framework',
+  framework: 'Framework',
+  methodology: 'Framework',
+  industryplaybook: 'Framework',
+  pricing: 'ResourceLink',
+  whitepaper: 'ResourceLink',
+  guide: 'ResourceLink',
+  other: 'ResourceLink',
+};
+
+/** Map AI suggestedType string to ContentType enum for ContentLibrary. */
+export function suggestedTypeToContentType(suggested: string): ContentType {
+  const normalized = suggested.toLowerCase().replace(/\s+/g, '_');
+  if (normalized in SUGGESTED_TYPE_MAP) return SUGGESTED_TYPE_MAP[normalized];
+  for (const [key, type] of Object.entries(SUGGESTED_TYPE_MAP)) {
+    if (normalized.includes(key)) return type;
+  }
+  return 'ResourceLink';
+}
 
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
+import { getValuePropsForDepartment } from '@/lib/prompt-context';
 
 const postBodySchema = z.object({
   title: z.string().min(1),
@@ -15,6 +16,8 @@ const postBodySchema = z.object({
   body: z.string().optional().nullable(),
   ctaLabel: z.string().optional().nullable(),
   ctaUrl: z.string().optional().nullable(),
+  isMultiDepartment: z.boolean().optional().default(false),
+  departmentIds: z.array(z.string()).max(10).optional().default([]),
 });
 
 function slugify(s: string): string {
@@ -75,6 +78,8 @@ export async function GET(
         body: c.body,
         ctaLabel: c.ctaLabel,
         ctaUrl: c.ctaUrl,
+        isMultiDepartment: (c as { isMultiDepartment?: boolean }).isMultiDepartment ?? false,
+        departmentConfig: (c as { departmentConfig?: unknown }).departmentConfig ?? null,
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
       })),
@@ -102,7 +107,7 @@ export async function POST(
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId: session.user.id },
-      select: { id: true },
+      select: { id: true, industry: true },
     });
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
@@ -115,6 +120,111 @@ export async function POST(
         { error: 'Invalid body', details: parsed.error.flatten() },
         { status: 400 }
       );
+    }
+
+    if (parsed.data.isMultiDepartment && parsed.data.departmentIds.length > 0) {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      const origin = req.headers.get('origin') || baseUrl;
+      const res = await fetch(`${origin}/api/companies/${companyId}/campaigns/generate-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie: req.headers.get('cookie') ?? '' },
+        body: JSON.stringify({
+          scope: 'segments',
+          departmentIds: parsed.data.departmentIds,
+          options: { includeFutureEvents: true, addCaseStudy: false, showSuccessStory: false },
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return NextResponse.json(
+          { error: (err as { error?: string }).error ?? 'Failed to generate drafts' },
+          { status: res.status }
+        );
+      }
+      const { drafts } = (await res.json()) as { drafts: Array<{ departmentId: string | null; segmentName: string; headline: string; body: string; pageSections?: unknown }> };
+      const departments = drafts.map((d) => ({
+        id: d.departmentId ?? '',
+        name: d.segmentName,
+        slug: slugify(d.segmentName).slice(0, 60) || 'dept',
+        headline: d.headline || d.segmentName,
+        body: d.body || null,
+        pageSections: d.pageSections ?? null,
+      }));
+
+      let slug = parsed.data.slug || slugify(parsed.data.title);
+      let existing = await prisma.segmentCampaign.findUnique({
+        where: { userId_slug: { userId: session.user.id, slug } },
+      });
+      let suffix = 0;
+      while (existing) {
+        suffix += 1;
+        slug = `${parsed.data.slug || slugify(parsed.data.title)}-${suffix}`;
+        existing = await prisma.segmentCampaign.findUnique({
+          where: { userId_slug: { userId: session.user.id, slug } },
+        });
+      }
+      const finalUrl = `${baseUrl}/go/${slug}`;
+      const campaign = await prisma.segmentCampaign.create({
+        data: {
+          userId: session.user.id,
+          companyId,
+          departmentId: null,
+          slug,
+          title: parsed.data.title,
+          description: parsed.data.description ?? null,
+          type: parsed.data.type,
+          url: finalUrl,
+          headline: null,
+          body: null,
+          ctaLabel: parsed.data.ctaLabel ?? null,
+          ctaUrl: parsed.data.ctaUrl ?? null,
+          isMultiDepartment: true,
+          departmentConfig: { departments },
+        },
+        include: {
+          department: { select: { id: true, customName: true, type: true } },
+        },
+      });
+      return NextResponse.json({
+        id: campaign.id,
+        slug: campaign.slug,
+        title: campaign.title,
+        description: campaign.description,
+        url: campaign.url,
+        type: campaign.type,
+        departmentId: campaign.departmentId,
+        department: null,
+        headline: campaign.headline,
+        body: campaign.body,
+        ctaLabel: campaign.ctaLabel,
+        ctaUrl: campaign.ctaUrl,
+        isMultiDepartment: true,
+        departmentConfig: (campaign as { departmentConfig?: unknown }).departmentConfig,
+        createdAt: campaign.createdAt.toISOString(),
+        updatedAt: campaign.updatedAt.toISOString(),
+      });
+    }
+
+    let prefillHeadline = parsed.data.headline ?? null;
+    let prefillBody = parsed.data.body ?? null;
+    if (parsed.data.departmentId && (prefillHeadline == null || prefillBody == null)) {
+      const department = await prisma.companyDepartment.findFirst({
+        where: { id: parsed.data.departmentId, companyId },
+        select: { type: true, customName: true },
+      });
+      if (department) {
+        const valueProps = await getValuePropsForDepartment(
+          session.user.id,
+          company.industry ?? null,
+          department
+        );
+        if (valueProps) {
+          if (prefillHeadline == null) prefillHeadline = valueProps.headline || null;
+          if (prefillBody == null) prefillBody = valueProps.pitch || null;
+        }
+      }
     }
 
     let slug = parsed.data.slug || slugify(parsed.data.title);
@@ -156,10 +266,12 @@ export async function POST(
         description: parsed.data.description ?? null,
         type: parsed.data.type,
         url,
-        headline: parsed.data.headline ?? null,
-        body: parsed.data.body ?? null,
+        headline: prefillHeadline ?? parsed.data.headline ?? null,
+        body: prefillBody ?? parsed.data.body ?? null,
         ctaLabel: parsed.data.ctaLabel ?? null,
         ctaUrl: parsed.data.ctaUrl ?? null,
+        isMultiDepartment: false,
+        departmentConfig: null,
       },
       include: {
         department: { select: { id: true, customName: true, type: true } },

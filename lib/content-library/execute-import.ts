@@ -7,6 +7,7 @@ import { startCrawl, getCrawlStatus } from '@/lib/tools/firecrawl';
 import {
   filterByIndustry,
   categorizePage,
+  suggestedTypeToContentType,
   type CategorizedContentPayload,
   type CategorizedContentItem,
 } from '@/lib/content-library/import-pipeline';
@@ -212,15 +213,66 @@ export async function executeContentImport(
     // Brief delay so progress UI can show CATEGORIZING state
     await new Promise((r) => setTimeout(r, 500));
 
+    // Auto-approve: create ContentLibrary rows for all categorized items (userConfirmed: true)
+    let product = await prisma.product.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!product) {
+      product = await prisma.product.create({
+        data: {
+          userId,
+          name: 'Company content',
+          description: 'Content from company setup / website import',
+          category: 'Content',
+        },
+        select: { id: true },
+      });
+    }
+    const urls = items.map((i) => i.url);
+    const existingRows = await prisma.contentLibrary.findMany({
+      where: { userId, sourceUrl: { in: urls }, isActive: true },
+      select: { sourceUrl: true },
+    });
+    const existingUrlSet = new Set(existingRows.map((r) => r.sourceUrl));
+    let created = 0;
+    for (const item of items) {
+      if (existingUrlSet.has(item.url)) continue;
+      try {
+        await prisma.contentLibrary.create({
+          data: {
+            userId,
+            productId: product.id,
+            title: item.title.slice(0, 500),
+            type: suggestedTypeToContentType(item.suggestedType),
+            content: { description: item.description ?? '', suggestedType: item.suggestedType },
+            industry: item.industry ?? null,
+            department: item.department ?? null,
+            sourceUrl: item.url,
+            userConfirmed: true,
+            confidenceScore: 'medium',
+            scrapedAt: new Date(),
+          },
+        });
+        created++;
+        existingUrlSet.add(item.url);
+      } catch (err) {
+        logError('Failed to create content library item for', item.url, err);
+      }
+    }
+
     await prisma.contentImport.update({
       where: { id: importId },
       data: {
-        status: 'REVIEW_PENDING',
+        status: 'APPROVED',
         categorizedContent: { items } as unknown as object,
+        reviewedAt: new Date(),
+        approvedCount: created,
+        rejectedCount: items.length - created,
       },
     });
 
-    log('Import complete. Categorized', items.length, 'pages');
+    log('Import complete. Categorized', items.length, 'pages; auto-approved', created);
     return { ok: true, totalPages: crawlData.length, categorizedCount: items.length };
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);

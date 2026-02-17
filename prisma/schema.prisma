@@ -60,6 +60,9 @@ model User {
   lastActiveAt     DateTime?
   currentStreakDays Int      @default(0)
 
+  alertSettings    Json?     // { enabled, email, slack, inApp, webhookUrl, highValueVisitor, ... }
+  slackWebhookUrl  String?
+
   accounts   Account[]
   sessions   Session[]
   companies  Company[]
@@ -77,6 +80,7 @@ model User {
   contentImportLastId   String?
   outreachSequences OutreachSequence[]
   segmentCampaigns  SegmentCampaign[]
+  alerts            Alert[]
 }
 
 model VerificationToken {
@@ -521,6 +525,7 @@ model CompanyDepartment {
   expansionPlays    ExpansionPlay[]
   useCaseExplorationPlays UseCaseExplorationPlay[]
   segmentCampaigns        SegmentCampaign[]
+  campaignVisits    CampaignVisit[]
 
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -552,17 +557,25 @@ model SegmentCampaign {
   ctaUrl       String?
   pageSections Json?    // { events?: [], caseStudy?: {}, successStory?: {} } for structured blocks
 
+  isMultiDepartment Boolean @default(false)
+  departmentConfig  Json?   // { departments: [{ id, name, slug, headline?, body?, pageSections? }] } when isMultiDepartment
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   leads         CampaignLead[]
   visits       CampaignVisit[]
   shares       CampaignShare[]
+  qrCodes      QRCode[]
+  alerts       Alert[]
+  dailyStats   CampaignDailyStats[]
+  chatAnalytics ChatAnalytics[]
 
   @@unique([userId, slug])
   @@index([companyId])
   @@index([departmentId])
   @@index([userId])
+  @@index([isMultiDepartment])
 }
 
 model CampaignLead {
@@ -583,12 +596,88 @@ model CampaignVisit {
   id         String   @id @default(cuid())
   campaignId String
   campaign   SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   CompanyDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   visitedAt  DateTime @default(now())
   sessionId  String?
   leadId     String?
+  qrCodeId   String?
+  qrCode     QRCode?  @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+
+  visitorEmail    String?
+  visitorName     String?
+  visitorCompany  String?
+  visitorJobTitle String?
+  chatMessages    Int      @default(0)
+  ctaClicked      Boolean  @default(false)
+  formSubmitted   Boolean  @default(false)
+  timeOnPage      Int      @default(0)
+
+  alerts     Alert[]
 
   @@index([campaignId])
   @@index([visitedAt])
+  @@index([qrCodeId])
+  @@index([sessionId])
+}
+
+enum AlertType {
+  HIGH_VALUE_VISITOR
+  EXECUTIVE_VISIT
+  MULTIPLE_CHAT_MESSAGES
+  FORM_SUBMISSION
+  CTA_CLICKED
+  RETURNING_VISITOR
+  COMPETITOR_VISIT
+  BULK_DEPARTMENT_TRAFFIC
+}
+
+model Alert {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         AlertType
+  title        String
+  message      String    @db.Text
+  data         Json?
+  campaignId   String?
+  campaign     SegmentCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  visitId      String?
+  visit        CampaignVisit? @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  isRead       Boolean   @default(false)
+  readAt       DateTime?
+  sentViaEmail Boolean  @default(false)
+  sentViaSlack Boolean  @default(false)
+  sentViaWebhook Boolean @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("alerts")
+}
+
+model QRCode {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name            String
+  shortCode       String   @unique
+  foregroundColor String   @default("#000000")
+  backgroundColor String   @default("#FFFFFF")
+  logoUrl         String?
+  size            Int      @default(512)
+  errorCorrection String   @default("M")
+  departmentId    String?
+  scanCount       Int      @default(0)
+  lastScannedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  visits          CampaignVisit[]
+
+  @@index([campaignId])
+  @@index([shortCode])
+  @@map("qr_codes")
 }
 
 model CampaignShare {
@@ -683,7 +772,7 @@ model IndustryPlaybook {
 
   overview                  String?  @db.Text
   departmentProductMapping  Json?    // array of { department: string, productIds: string[], typicalDealSize: string }
-  valuePropsByDepartment    Json?    // department -> value props / pain points
+  valuePropsByDepartment    Json?    // { [departmentKey: string]: { headline, pitch, bullets?: string[], cta?: string } }
   buyingCommittee           String?  @db.Text
   landmines                 Json?    // array of strings
   relevantCaseStudyIds      Json?    // array of ContentLibrary ids (optional)

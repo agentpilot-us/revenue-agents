@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db';
 import { ContentType } from '@prisma/client';
+import { getDepartmentPlaybookKey } from '@/lib/department-mapping';
+import type { DepartmentValueProps, ValuePropsByDepartment } from '@/lib/types/industry-playbook';
 
 /** Normalize industry string for matching playbook slug/name (e.g. "Automotive OEM" -> "automotive-oem") */
 function normalizeIndustry(industry: string | null): string {
@@ -178,6 +180,54 @@ export async function getIndustryPlaybookBlock(
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Get structured value props for a department from the user's industry playbook.
+ * Returns headline, pitch, bullets, cta for use in campaign prefill and generate-draft.
+ */
+export async function getValuePropsForDepartment(
+  userId: string,
+  industry: string | null,
+  department: { type: string; customName: string | null }
+): Promise<DepartmentValueProps | null> {
+  if (!industry?.trim()) return null;
+
+  const normalized = normalizeIndustry(industry);
+  const playbooks = await prisma.industryPlaybook.findMany({
+    where: { userId },
+  });
+  const playbook = playbooks.find(
+    (p) =>
+      normalizeIndustry(p.slug) === normalized ||
+      normalizeIndustry(p.name) === normalized ||
+      p.slug.toLowerCase() === industry.toLowerCase().trim() ||
+      p.name.toLowerCase() === industry.toLowerCase().trim()
+  );
+  if (!playbook?.valuePropsByDepartment) return null;
+
+  const valuePropsByDept = playbook.valuePropsByDepartment as ValuePropsByDepartment;
+  const key = getDepartmentPlaybookKey(department as { type: import('@prisma/client').DepartmentType; customName: string | null });
+  const exact = valuePropsByDept[key];
+  if (exact && typeof exact === 'object' && (exact.headline ?? exact.pitch)) {
+    return {
+      headline: String(exact.headline ?? ''),
+      pitch: String(exact.pitch ?? ''),
+      bullets: Array.isArray(exact.bullets) ? exact.bullets.map(String) : undefined,
+      cta: typeof exact.cta === 'string' ? exact.cta : undefined,
+    };
+  }
+  for (const [k, v] of Object.entries(valuePropsByDept)) {
+    if (k.toLowerCase() === key.toLowerCase() && v && typeof v === 'object') {
+      return {
+        headline: String((v as DepartmentValueProps).headline ?? ''),
+        pitch: String((v as DepartmentValueProps).pitch ?? ''),
+        bullets: Array.isArray((v as DepartmentValueProps).bullets) ? (v as DepartmentValueProps).bullets!.map(String) : undefined,
+        cta: typeof (v as DepartmentValueProps).cta === 'string' ? (v as DepartmentValueProps).cta : undefined,
+      };
+    }
+  }
+  return null;
 }
 
 /** SuccessStory content shape: optional headline, oneLiner, fullSummary, keyMetrics, whenToUse */

@@ -277,7 +277,13 @@ export function CampaignsTab({
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <Link
+                    href={`/dashboard/companies/${companyId}/campaigns/${c.id}/qr-codes`}
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:underline"
+                  >
+                    QR Codes
+                  </Link>
                   <Link
                     href={`/go/${c.slug}`}
                     target="_blank"

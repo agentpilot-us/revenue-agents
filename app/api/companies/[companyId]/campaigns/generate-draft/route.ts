@@ -7,6 +7,8 @@ import { z } from 'zod';
 import {
   getCompanyEventsBlock,
   getCaseStudiesBlock,
+  getIndustryPlaybookBlock,
+  getValuePropsForDepartment,
 } from '@/lib/prompt-context';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
@@ -118,28 +120,54 @@ export async function POST(
       }));
     }
 
-    const [researchBlock, accountBlock] = await Promise.all([
+    const [researchBlock, accountBlock, industryPlaybookBlock] = await Promise.all([
       getCompanyResearchPromptBlock(companyId, session.user.id),
       getAccountMessagingPromptBlock(companyId, session.user.id),
+      getIndustryPlaybookBlock(session.user.id, company.industry ?? null),
     ]);
 
     const researchSection = researchBlock ? `\n\nTARGET ACCOUNT RESEARCH:\n${researchBlock}` : '';
     const accountSection = accountBlock ? `\n\nACCOUNT MESSAGING:\n${accountBlock}` : '';
+    const playbookSection = industryPlaybookBlock ? `\n\nINDUSTRY PLAYBOOK:\n${industryPlaybookBlock}` : '';
 
     const contextParts: string[] = [
       `Company: ${company.name}`,
       company.industry ? `Industry: ${company.industry}` : '',
       researchSection,
       accountSection,
+      playbookSection,
     ].filter(Boolean);
 
     const draftContexts: Array<{
       target: Target;
       eventsBlock: string | null;
       caseStudiesBlock: string | null;
+      valuePropsBlock: string | null;
     }> = [];
 
     for (const target of targets) {
+      let valuePropsBlock: string | null = null;
+      if (target.departmentId) {
+        const dept = await prisma.companyDepartment.findFirst({
+          where: { id: target.departmentId, companyId },
+          select: { type: true, customName: true },
+        });
+        if (dept) {
+          const valueProps = await getValuePropsForDepartment(
+            session.user.id,
+            company.industry ?? null,
+            dept
+          );
+          if (valueProps && (valueProps.headline || valueProps.pitch)) {
+            valuePropsBlock = [
+              valueProps.headline ? `Headline (use or adapt): ${valueProps.headline}` : '',
+              valueProps.pitch ? `Pitch (use for body): ${valueProps.pitch}` : '',
+              valueProps.bullets?.length ? `Bullets: ${valueProps.bullets.join('; ')}` : '',
+            ].filter(Boolean).join('\n');
+          }
+        }
+      }
+
       const [eventsBlock, caseStudiesBlock] = await Promise.all([
         options.includeFutureEvents
           ? getCompanyEventsBlock(
@@ -157,7 +185,7 @@ export async function POST(
             )
           : Promise.resolve(null),
       ]);
-      draftContexts.push({ target, eventsBlock, caseStudiesBlock });
+      draftContexts.push({ target, eventsBlock, caseStudiesBlock, valuePropsBlock });
     }
 
     const targetsDescription = targets
@@ -177,6 +205,7 @@ export async function POST(
       .map(
         (dc, i) =>
           `--- Target ${i + 1} (${dc.target.segmentName}) ---\n` +
+          (dc.valuePropsBlock ? `VALUE PROPS (align headline/body with this):\n${dc.valuePropsBlock}\n` : '') +
           (dc.eventsBlock ? `EVENTS:\n${dc.eventsBlock}\n` : '') +
           (dc.caseStudiesBlock ? `CASE STUDIES:\n${dc.caseStudiesBlock}\n` : '')
       )
@@ -191,7 +220,8 @@ RULES:
 - Options requested: ${optionsDescription || 'None'}
 - When events are provided, set pageSections.events to an array of objects with title, date, description, url (from the EVENTS block for that target).
 - When case study/success story is requested, set pageSections.caseStudy and/or pageSections.successStory with title, summary, link from the CASE STUDIES block.
-- Use the research and account messaging below to make copy relevant to this account.`;
+- Use the research, account messaging, and industry playbook below to make copy relevant to this account.
+- When VALUE PROPS are provided for a target, align the headline and body with that segment's value props.`;
 
     const userPrompt = `TARGETS:
 ${targetsDescription}
