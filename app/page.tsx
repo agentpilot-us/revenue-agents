@@ -1,659 +1,780 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { DM_Sans, Instrument_Serif } from 'next/font/google';
+import './landing.css';
+
+const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
+const instrumentSerif = Instrument_Serif({ weight: '400', subsets: ['latin'], variable: '--font-instrument' });
+
+function LogoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      <polyline points="21 3 21 12 12 12" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function UsersGroupIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function MessageSquareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
 
 export default function HomePage() {
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [activeTab, setActiveTab] = useState<'enterprise' | 'midmarket'>('enterprise');
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  const toggleFaq = (index: number) => {
-    setOpenFaq(openFaq === index ? null : index);
-  };
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const els = root.querySelectorAll('.landing-reveal');
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+      },
+      { threshold: 0.15 }
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const signInUrl = '/login';
+  const demoUrl = '#cta';
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* NAVIGATION */}
-      <nav className="sticky top-0 z-50 bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                AP
-              </div>
-              <span className="text-2xl font-bold text-gray-900">Agent Pilot</span>
-            </div>
-            <Link
-              href="/dashboard"
-              className="px-6 py-2 text-blue-600 font-semibold hover:text-blue-700 transition"
-            >
-              Sign In
-            </Link>
+    <div
+      ref={rootRef}
+      className={`landing-root ${dmSans.variable} ${instrumentSerif.variable}`}
+      style={
+        {
+          '--sans': 'var(--font-dm-sans), -apple-system, sans-serif',
+          '--serif': 'var(--font-instrument), Georgia, serif',
+        } as React.CSSProperties
+      }
+    >
+      <nav id="nav" className={`landing-nav ${navScrolled ? 'scrolled' : ''}`}>
+        <Link href="/" className="landing-logo">
+          <div className="landing-logo-icon">
+            <LogoIcon />
           </div>
+          AgentPilot
+        </Link>
+        <div className="landing-nav-links">
+          <Link href="#how">How It Works</Link>
+          <Link href="#use-cases">Use Cases</Link>
+          <Link href="#platform">Platform</Link>
+          <Link href="#outreach">Channels</Link>
+          <Link href={signInUrl} className="text-[#6b6b7b] hover:text-[#0a0a0f] transition-colors">
+            Sign In
+          </Link>
+          <Link href={demoUrl} className="landing-btn-primary">
+            Book a Demo
+          </Link>
         </div>
       </nav>
 
-      {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* Eyebrow */}
-          <div className="inline-block bg-white/20 px-4 py-2 rounded-full text-sm mb-6">
-            ✓ Built by GTM experts with 20+ years experience
-          </div>
-
-          {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 max-w-5xl mx-auto">
-            Expand Your Biggest Accounts with AI—Without the Grunt Work
-          </h1>
-
-          {/* Subheadline */}
-          <p className="text-lg sm:text-xl leading-relaxed mb-10 max-w-4xl mx-auto opacity-95">
-            Strategic AEs at leading enterprises trust AgentPilot to identify expansion
-            opportunities, personalize outreach, and close 6-figure deals in target accounts.
-            Start with one rep, scale to your entire team.
-          </p>
-
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-            <Link
-              href="#demo"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-blue-600 rounded-lg text-lg font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all"
-            >
-              Watch 3-Min Demo →
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg text-lg font-semibold hover:bg-white/10 transition"
-            >
-              Get Started Free
-            </Link>
-          </div>
-
-          {/* Feature bullets */}
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 justify-center text-sm opacity-90">
-            <span>✓ Deploy in days, not months</span>
-            <span>✓ Syncs to your CRM</span>
-            <span>✓ Always on-brand messaging</span>
-            <span>✓ No credit card required</span>
-          </div>
+      <section className="landing-hero">
+        <div className="landing-hero-badge">For Strategic AEs & Revenue Teams</div>
+        <h1>
+          AI that researches your accounts, builds personalized pages, and <em>tells you when to follow up</em>
+        </h1>
+        <p className="landing-hero-sub">
+          AgentPilot learns your product, then automatically researches target accounts — mapping buying groups,
+          surfacing initiatives, and generating hyper-personalized landing pages with AI chat. When a high-value
+          prospect engages, you&apos;ll know in real time. Stop spending 10+ hours per account on manual research.
+        </p>
+        <div className="landing-hero-actions">
+          <Link href={demoUrl} className="landing-btn-primary">
+            Book a 15-Min Demo →
+          </Link>
+          <Link href="#how" className="landing-btn-outline">
+            See How It Works
+          </Link>
         </div>
+        <div className="landing-hero-visual" />
       </section>
 
-      {/* TRUST BAR */}
-      <section className="bg-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-gray-600 uppercase tracking-wider mb-6">
-            Trusted by strategic account teams in technology and automotive
-          </p>
-          <div className="flex flex-wrap gap-8 sm:gap-12 justify-center items-center">
-            <div className="w-36 h-10 bg-gray-100 rounded flex items-center justify-center font-semibold text-gray-600">
-              Technology
-            </div>
-            <div className="w-36 h-10 bg-gray-100 rounded flex items-center justify-center font-semibold text-gray-600">
-              SaaS
-            </div>
-            <div className="w-36 h-10 bg-gray-100 rounded flex items-center justify-center font-semibold text-gray-600">
-              Automotive
-            </div>
-            <div className="w-36 h-10 bg-gray-100 rounded flex items-center justify-center font-semibold text-gray-600">
-              Manufacturing
-            </div>
+      <div className="landing-trust-bar">
+        <p className="landing-trust-label">Trusted by GTM teams at</p>
+        <div className="landing-trust-logos">
+          <span>Company</span>
+          <span>Company</span>
+          <span>Company</span>
+          <span>Company</span>
+          <span>Company</span>
+        </div>
+      </div>
+
+      <div className="landing-value-strip">
+        <div className="landing-value-strip-inner">
+          <div className="landing-value-item">
+            <div className="landing-value-number">10+ hrs</div>
+            <div className="landing-value-label">Saved per account on research & personalization</div>
+          </div>
+          <div className="landing-value-item">
+            <div className="landing-value-number">5 min</div>
+            <div className="landing-value-label">To generate personalized campaigns per buying group</div>
+          </div>
+          <div className="landing-value-item">
+            <div className="landing-value-number">Real‑time</div>
+            <div className="landing-value-label">Alerts when executives visit your pages</div>
+          </div>
+          <div className="landing-value-item">
+            <div className="landing-value-number">Auto‑sync</div>
+            <div className="landing-value-label">Pages update as your accounts evolve</div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* PROBLEM SECTION */}
-      <section className="bg-gray-50 py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-6 text-gray-900">
-            The Grunt Work Is Killing Your GTM Productivity
-          </h2>
-          <p className="text-xl text-center text-gray-600 mb-16 max-w-4xl mx-auto leading-relaxed">
-            Your team spends 60-70% of their time on manual research, list building, and
-            repetitive outreach. That&apos;s time they should spend on strategy and building relationships.
-          </p>
-
-          {/* Pain points grid */}
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <div className="bg-white p-8 rounded-xl shadow-sm">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-3xl mb-6">
-                🔍
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Endless LinkedIn Searches</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Hours spent hunting for buying group contacts, switching between LinkedIn,
-                Apollo, and spreadsheets
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-sm">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-3xl mb-6">
-                📋
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Manual Research & Enrichment</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Copy-pasting contact info, researching company news, funding rounds, and
-                tech stacks across multiple sites
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-sm">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-3xl mb-6">
-                ✉️
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Repetitive Outreach</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Writing the same personalized emails over and over, constantly checking
-                your messaging guide
-              </p>
-            </div>
+      <section className="landing-problem landing-reveal">
+        <div className="landing-section-label">The Problem</div>
+        <h2>You know your product. You know your accounts. Connecting the two takes forever.</h2>
+        <div className="landing-problem-grid">
+          <div className="landing-problem-card">
+            <div className="landing-persona-tag">Enterprise & Mid-Market AEs</div>
+            <h3>You spend 10+ hours per account just trying to connect your product to their world</h3>
+            <p>
+              Every target account needs different messaging — their industry, their buying groups, their initiatives.
+              But researching each one (LinkedIn, earnings calls, job boards, org charts) and then translating your
+              product into their language takes so long that by the time you&apos;re ready to reach out, half your
+              intel is already outdated. You end up sending generic pitches because you don&apos;t have time to
+              personalize 40 accounts.
+            </p>
           </div>
-
-          {/* Callout */}
-          <div className="bg-gradient-to-r from-red-50 to-red-100 p-6 rounded-xl max-w-2xl mx-auto flex items-center gap-4 shadow-sm">
-            <div className="text-4xl">⏱️</div>
-            <p className="text-lg font-bold text-red-900">
-              Result: 10-15 hours per account just to start expansion
+          <div className="landing-problem-card">
+            <div className="landing-persona-tag">ABM & Demand Gen Teams</div>
+            <h3>Building personalized landing pages for every segment requires dev resources you don&apos;t have</h3>
+            <p>
+              Your campaigns need different pages for different industries, buying groups, and accounts — but creating
+              custom landing pages for each segment means waiting on design, dev, and approvals. By the time the page
+              is live, the campaign window has closed. You&apos;re forced to send everyone to the same generic page and
+              hope the right message resonates with the right person. It doesn&apos;t.
             </p>
           </div>
         </div>
       </section>
 
-      {/* SOLUTION SECTION */}
-      <section className="bg-white py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-6 text-gray-900">
-            Let AI Handle The Grunt Work
-          </h2>
-          <p className="text-xl text-center text-gray-600 mb-16 max-w-4xl mx-auto leading-relaxed">
-            Our agents do the manual research, data enrichment, and outreach prep—so your
-            team can focus on closing deals and building relationships.
+      <section className="landing-flywheel" id="how">
+        <div className="landing-flywheel-inner">
+          <div className="landing-section-label">How It Works</div>
+          <h2>From account research to personalized page — in 5 minutes, not 5 days</h2>
+          <p className="landing-flywheel-sub">
+            You bring the strategy. AgentPilot does the research, writes the messaging, builds the pages, and tells
+            you when to act.
           </p>
 
-          {/* Features */}
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            <div className="flex gap-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-2xl">
-                👥
-              </div>
-              <div>
-                <h3 className="text-lg font-bold mb-2 text-gray-900">
-                  Discovers buying groups with smart segmentation
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Maps decision-makers by role, seniority, vertical—Enterprise AEs vs SMB,
-                  whatever segments matter for your GTM motion
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-2xl">
-                ✅
-              </div>
-              <div>
-                <h3 className="text-lg font-bold mb-2 text-gray-900">
-                  Auto-enriches contacts with emails & LinkedIn profiles
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  No more toggling between Apollo, RocketReach, and LinkedIn—agents find and
-                  enrich all contacts in one workflow
-                </p>
+          <div className="landing-steps">
+            <div className="landing-step landing-reveal">
+              <div className="landing-step-number">01</div>
+              <h3>AI Learns Your Product</h3>
+              <p>
+                Point AgentPilot at your company and it instantly builds a complete picture of your products, value
+                props, and differentiators. When your messaging evolves, your campaigns update automatically.
+              </p>
+              <span className="landing-step-outcome">→ Never manually write product positioning again</span>
+              <div className="landing-step-detail">
+                <span>Products & Features</span>
+                <span>Value Props</span>
+                <span>Differentiators</span>
+                <span>Auto-Updated</span>
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-2xl">
-                📊
-              </div>
-              <div>
-                <h3 className="text-lg font-bold mb-2 text-gray-900">
-                  Runs deep account research
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Funding rounds, tech stack, recent news, hiring signals, competitive intel—
-                  everything you need to craft relevant outreach
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-2xl">
-                ✉️
-              </div>
-              <div>
-                <h3 className="text-lg font-bold mb-2 text-gray-900">
-                  Drafts personalized outreach
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Multi-channel outreach that stays on-brand by following your messaging
-                  framework—agents never go rogue
-                </p>
+            <div className="landing-step landing-reveal">
+              <div className="landing-step-number">02</div>
+              <h3>1-Click Account Research</h3>
+              <p>
+                Enter a target account and AgentPilot identifies buying groups, surfaces recent news, open roles, and
+                strategic initiatives. AI then maps your product value to each buying group&apos;s priorities.
+              </p>
+              <span className="landing-step-outcome">→ 10 hours of research compressed into 5 minutes</span>
+              <div className="landing-step-detail">
+                <span>Buying Groups</span>
+                <span>Company News</span>
+                <span>Job Listings</span>
+                <span>Initiatives</span>
+                <span>Mapped Value Props</span>
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-2xl">
-                🔄
+            <div className="landing-step landing-reveal">
+              <div className="landing-step-number">03</div>
+              <h3>Personalized Pages & AI Chat</h3>
+              <p>
+                That intelligence becomes a live landing page — each buying group sees exactly why your product matters
+                to them. Built-in AI chat answers questions about pricing, product fit, and events — even building
+                personalized conference agendas.
+              </p>
+              <span className="landing-step-outcome">→ A custom destination for every buying group, no dev needed</span>
+              <div className="landing-step-detail">
+                <span>Personalized Pages</span>
+                <span>AI Chat</span>
+                <span>Event Agendas</span>
+                <span>Product Q&A</span>
+                <span>Pricing Info</span>
               </div>
-              <div>
-                <h3 className="text-lg font-bold mb-2 text-gray-900">
-                  Syncs everything to your CRM
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Contacts, activities, engagement—all logged automatically so your data
-                  stays clean
-                </p>
+            </div>
+
+            <div className="landing-step landing-reveal">
+              <div className="landing-step-number">04</div>
+              <h3>Analytics & Smart Alerts</h3>
+              <p>
+                See exactly who&apos;s visiting, how long they stay, and what they&apos;re asking. AgentPilot identifies
+                high-value prospects and notifies you when it&apos;s time to reach out — with full context on what they
+                engaged with.
+              </p>
+              <span className="landing-step-outcome">→ Follow up with context, not guesswork</span>
+              <div className="landing-step-detail">
+                <span>Visitor Tracking</span>
+                <span>Time on Page</span>
+                <span>Chat Insights</span>
+                <span>Smart Notifications</span>
+                <span>Follow-Up Triggers</span>
               </div>
+            </div>
+          </div>
+
+          <div className="landing-flywheel-loop landing-reveal">
+            <div className="landing-loop-icon">
+              <ClockIcon />
+            </div>
+            <div>
+              <h4>Always current. Never stale.</h4>
+              <p>
+                AgentPilot continuously monitors your product and target accounts. When they announce a new initiative,
+                hire for a new role, or shift priorities — your landing pages, messaging, and value props update
+                automatically. Your accounts always see the latest story, not last quarter&apos;s pitch.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* TIME SAVED SECTION */}
-      <section className="bg-white py-20 lg:py-28 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-12 text-gray-900">
-            95% Time Savings Per Account
-          </h2>
+      <section className="landing-use-cases" id="use-cases">
+        <div className="landing-section-label">In Practice</div>
+        <h2>See what this looks like in the field</h2>
 
-          {/* Badge */}
-          <div className="text-center mb-16">
-            <span className="inline-block bg-gradient-to-r from-green-500 to-green-400 text-white px-6 py-3 rounded-full text-xl font-bold">
-              That&apos;s 95% time savings
-            </span>
-          </div>
-
-          {/* Before/After Comparison */}
-          <div className="grid md:grid-cols-3 gap-8 items-center max-w-5xl mx-auto mb-12">
-            <div className="text-center">
-              <p className="text-sm text-gray-500 uppercase tracking-wider mb-4">Before AgentPilot</p>
-              <p className="text-5xl font-extrabold text-red-600 mb-2">10-15 hours</p>
-              <p className="text-gray-600">per account manually</p>
-            </div>
-
-            <div className="text-center text-5xl text-blue-600">→</div>
-
-            <div className="text-center">
-              <p className="text-sm text-gray-500 uppercase tracking-wider mb-4">With AgentPilot</p>
-              <p className="text-5xl font-extrabold text-green-600 mb-2">15 minutes</p>
-              <p className="text-gray-600">per account (AI-assisted)</p>
-            </div>
-          </div>
-
-          {/* Breakdown table */}
-          <div className="max-w-4xl mx-auto bg-gray-50 rounded-xl overflow-hidden mb-12">
-            <div className="grid grid-cols-3 bg-blue-600 text-white p-4 font-bold">
-              <div>Task</div>
-              <div className="text-center">Manual</div>
-              <div className="text-center">With AI</div>
-            </div>
-            {[
-              { task: 'Buying group discovery', manual: '3-4 hours', ai: '5 min' },
-              { task: 'Data enrichment', manual: '2-3 hours', ai: '3 min' },
-              { task: 'Account research', manual: '3-4 hours', ai: '4 min' },
-              { task: 'Outreach drafts', manual: '2-4 hours', ai: '3 min' },
-            ].map((row, i) => (
-              <div key={i} className="grid grid-cols-3 p-4 border-b border-gray-200 last:border-0">
-                <div className="text-gray-900">{row.task}</div>
-                <div className="text-center text-gray-600">{row.manual}</div>
-                <div className="text-center text-green-600 font-bold">{row.ai}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Focus box */}
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-8 rounded-xl max-w-4xl mx-auto mb-8">
-            <h3 className="text-xl font-bold mb-4 text-blue-900">Your team focuses on:</h3>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-900">
-                <span className="text-green-600 font-bold">✓</span>
-                Strategic account planning
-              </div>
-              <div className="flex items-center gap-2 text-gray-900">
-                <span className="text-green-600 font-bold">✓</span>
-                Building relationships
-              </div>
-              <div className="flex items-center gap-2 text-gray-900">
-                <span className="text-green-600 font-bold">✓</span>
-                Closing deals
-              </div>
-            </div>
-          </div>
-
-          <p className="text-xl text-center text-gray-700">
-            Your Strategic AEs can now manage <strong className="text-blue-600">8-10 target accounts</strong> instead of 2-3
-          </p>
+        <div className="landing-use-case-tabs">
+          <button
+            type="button"
+            className={`landing-tab ${activeTab === 'enterprise' ? 'active' : ''}`}
+            onClick={() => setActiveTab('enterprise')}
+          >
+            Enterprise AE
+          </button>
+          <button
+            type="button"
+            className={`landing-tab ${activeTab === 'midmarket' ? 'active' : ''}`}
+            onClick={() => setActiveTab('midmarket')}
+          >
+            Mid-Market AE
+          </button>
         </div>
-      </section>
 
-      {/* TESTIMONIALS SECTION */}
-      <section className="bg-gray-50 py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-16 text-gray-900">
-            What Strategic AEs Say
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: "AgentPilot gives me back 10 hours per week. I'm managing 8 target accounts instead of 3, and my Q1 pipeline is up 47%.",
-                author: 'Marcus Chen',
-                title: 'Enterprise AE, Automotive',
-                initials: 'MC',
-              },
-              {
-                quote: "The AI understands our value prop better than most new hires. Messaging is spot-on for each microsegment, and the approval queue gives me full control.",
-                author: 'Sarah Martinez',
-                title: 'Strategic Account Director, Mercedes IT',
-                initials: 'SM',
-              },
-              {
-                quote: "We closed a $340K expansion deal in manufacturing that we would've missed without AgentPilot. The agent found stakeholders we didn't know existed.",
-                author: 'James Park',
-                title: 'VP Sales, Automotive AI Platform',
-                initials: 'JP',
-              },
-            ].map((testimonial, i) => (
-              <div key={i} className="bg-white p-8 rounded-xl shadow-sm">
-                <div className="text-4xl text-blue-600 mb-4">&quot;</div>
-                <p className="text-lg text-gray-700 italic mb-6 leading-relaxed">
-                  {testimonial.quote}
+        {activeTab === 'enterprise' && (
+          <div className="landing-use-case-content active">
+            <div className="landing-use-case-narrative">
+              <h3>From 10 hours of research to 5 minutes of personalization — without sacrificing quality</h3>
+              <p>
+                Joe has one strategic account. His old process: two weeks of research — earnings calls, LinkedIn,
+                Glassdoor, industry reports — then manual stakeholder mapping, then building custom decks for each
+                buying group. By the time he&apos;s ready to reach out, someone else has already engaged the account.
+              </p>
+              <p>
+                <strong>With AgentPilot:</strong> Joe enters his account. Within 5 minutes, the platform identifies 5
+                buying groups, surfaces their latest hiring signals and initiatives, and generates personalized value
+                props for each — all mapped to his product.
+              </p>
+              <p>
+                <strong>The result:</strong> Joe sends a landing page link where each buying group sees tailored
+                messaging in their language. When the VP of Engineering spends 8 minutes on the page and asks about
+                deployment timelines, Joe gets an alert with full context. His follow-up isn&apos;t a cold call — it&apos;s a
+                continuation of a conversation already in progress.
+              </p>
+            </div>
+            <div className="landing-use-case-preview landing-lp-preview">
+              <div className="landing-browser-chrome">
+                <div className="landing-browser-dots">
+                  <span style={{ background: '#ff5f57' }} />
+                  <span style={{ background: '#ffbd2e' }} />
+                  <span style={{ background: '#28c840' }} />
+                </div>
+                <div className="landing-browser-url">strategicaccount.agentpilot.ai/engineering</div>
+              </div>
+              <div className="landing-lp-content">
+                <div className="landing-lp-badge-row">
+                  <span className="landing-lp-badge">Built for Your Engineering & R&D Team</span>
+                </div>
+                <h4 className="landing-lp-headline">
+                  Your cloud migration is underway and you&apos;re scaling your ML team — here&apos;s how we accelerate both
+                  without rearchitecting your stack
+                </h4>
+                <p className="landing-lp-body">
+                  With 3 ML engineering roles open and a cloud migration in progress, your team is building for speed
+                  while managing complexity. Enterprise engineering orgs in your industry that deploy our platform see
+                  60% faster release cycles and cut infrastructure overhead by a third — typically within the first
+                  quarter.
                 </p>
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                    {testimonial.initials}
+                <div className="landing-lp-stats-label">Companies in your industry at your scale see:</div>
+                <div className="landing-lp-stats">
+                  <div className="landing-lp-stat">
+                    <span className="landing-lp-stat-number">60%</span>
+                    <span className="landing-lp-stat-label">Faster releases</span>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-900">{testimonial.author}</p>
-                    <p className="text-sm text-gray-600">{testimonial.title}</p>
+                  <div className="landing-lp-stat">
+                    <span className="landing-lp-stat-number">33%</span>
+                    <span className="landing-lp-stat-label">Less infra overhead</span>
+                  </div>
+                  <div className="landing-lp-stat">
+                    <span className="landing-lp-stat-number">&lt; 90 days</span>
+                    <span className="landing-lp-stat-label">To full ROI</span>
+                  </div>
+                </div>
+                <div className="landing-lp-chat-widget">
+                  <div className="landing-lp-chat-header">
+                    <div className="landing-lp-chat-avatar">
+                      <ChatIcon />
+                    </div>
+                    <div>
+                      <div className="landing-lp-chat-title">Ask about product, pricing & events</div>
+                      <div className="landing-lp-chat-status">● Online — powered by AgentPilot</div>
+                    </div>
+                  </div>
+                  <div className="landing-lp-chat-messages">
+                    <div className="landing-chat-bubble landing-chat-visitor">
+                      Our team is attending the Global Infrastructure Summit in March — which sessions should we
+                      prioritize for cloud migration?
+                    </div>
+                    <div className="landing-chat-bubble landing-chat-ai">
+                      Great question. Based on your team&apos;s cloud migration and ML hiring, here&apos;s what I&apos;d prioritize:
+                      <br />
+                      <br />
+                      <strong>Day 1:</strong> &quot;Hybrid Cloud at Scale&quot; keynote (9am) — covers the exact migration
+                      pattern your team is running.
+                      <br />
+                      <br />
+                      <strong>Day 2:</strong> &quot;ML Infrastructure Without the Rearchitecture&quot; workshop (1pm) —
+                      directly relevant to your new ML hires.
+                      <br />
+                      <br />
+                      <strong>Day 3:</strong> Customer panel with a similar-scale engineering org that migrated in 6 weeks.
+                      <br />
+                      <br />
+                      Want me to build a full 3-day agenda for your team and include calendar invites?
+                    </div>
+                    <div className="landing-chat-bubble landing-chat-visitor">
+                      Yes — build it for a group of 4 engineers. And can you flag any sessions on deployment automation?
+                    </div>
+                    <div className="landing-chat-bubble landing-chat-ai">
+                      Done — I&apos;ve added 2 deployment automation sessions on Day 2 (the &quot;Zero-Downtime Deploys&quot;
+                      lab at 3pm is a must). Sending the full 3-day agenda for 4 attendees now. Your AE Joe can also set
+                      up a private demo at the summit — want me to reserve a 30-minute slot?
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+              <div className="landing-preview-alert" style={{ margin: '16px 0 0', borderRadius: '0 0 16px 16px' }}>
+                <AlertIcon />
+                VP Engineering + 3 team members engaged — requested custom summit agenda & private demo slot. High
+                intent — confirm demo before Friday.
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'midmarket' && (
+          <div className="landing-use-case-content active">
+            <div className="landing-use-case-narrative">
+              <h3>40 accounts personalized before lunch — each one speaking the prospect&apos;s language</h3>
+              <p>
+                Chris manages a book of 40+ accounts. His emails have a 4% open rate. Building custom decks for each
+                account isn&apos;t realistic, and marketing is focused on campaigns, not his pipeline.
+              </p>
+              <p>
+                <strong>With AgentPilot:</strong> Chris loads his product once. For each target account, one click
+                triggers the research — buying groups identified, news surfaced, initiatives mapped, and personalized
+                value props generated that connect his product to what each company cares about right now.
+              </p>
+              <p>
+                <strong>The result:</strong> Instead of cold emails with generic decks, Chris sends links to pages that
+                speak each prospect&apos;s language. When an ops leader at one of his accounts visits the page and asks the
+                AI chat about integrations, Chris gets an alert in real time — not a CRM note a week later. His pipeline
+                is built on relevance, not volume.
+              </p>
+            </div>
+            <div className="landing-use-case-preview landing-lp-preview">
+              <div className="landing-browser-chrome">
+                <div className="landing-browser-dots">
+                  <span style={{ background: '#ff5f57' }} />
+                  <span style={{ background: '#ffbd2e' }} />
+                  <span style={{ background: '#28c840' }} />
+                </div>
+                <div className="landing-browser-url">acmecorp.agentpilot.ai/operations</div>
+              </div>
+              <div className="landing-lp-content">
+                <div className="landing-lp-badge-row">
+                  <span className="landing-lp-badge">Built for Acme Corp — Operations Team</span>
+                </div>
+                <h4 className="landing-lp-headline">
+                  Your new COO is focused on operational efficiency — here&apos;s how ops teams at your size eliminate 12+
+                  hours of manual reporting per week
+                </h4>
+                <p className="landing-lp-body">
+                  With new leadership driving a mandate to streamline operations, your team needs fast wins that prove
+                  ROI — not a 6-month implementation. Mid-market operations teams in your industry that deploy our
+                  platform see measurable time savings in the first 30 days and full payback within a quarter.
+                </p>
+                <div className="landing-lp-stats-label">Mid-market ops teams in your industry see:</div>
+                <div className="landing-lp-stats">
+                  <div className="landing-lp-stat">
+                    <span className="landing-lp-stat-number">12+ hrs</span>
+                    <span className="landing-lp-stat-label">Saved weekly</span>
+                  </div>
+                  <div className="landing-lp-stat">
+                    <span className="landing-lp-stat-number">30 days</span>
+                    <span className="landing-lp-stat-label">To first results</span>
+                  </div>
+                  <div className="landing-lp-stat">
+                    <span className="landing-lp-stat-number">3.2x</span>
+                    <span className="landing-lp-stat-label">ROI in year one</span>
+                  </div>
+                </div>
+                <div className="landing-lp-chat-widget">
+                  <div className="landing-lp-chat-header">
+                    <div className="landing-lp-chat-avatar">
+                      <ChatIcon />
+                    </div>
+                    <div>
+                      <div className="landing-lp-chat-title">Ask anything about pricing & fit</div>
+                      <div className="landing-lp-chat-status">● Online — powered by AgentPilot</div>
+                    </div>
+                  </div>
+                  <div className="landing-lp-chat-messages">
+                    <div className="landing-chat-bubble landing-chat-visitor">
+                      What does pricing look like for a 200-person ops team?
+                    </div>
+                    <div className="landing-chat-bubble landing-chat-ai">
+                      For a team of 200, you&apos;d be on our Growth plan at $18/user/month — that includes automated
+                      reporting, real-time dashboards, and integrations with your existing tools. Based on Acme&apos;s
+                      current stack, setup takes about 2 weeks with zero migration. Want me to send a detailed quote to
+                      your COO?
+                    </div>
+                    <div className="landing-chat-bubble landing-chat-visitor">
+                      Yes — and can you include the ROI breakdown?
+                    </div>
+                    <div className="landing-chat-bubble landing-chat-ai">
+                      Absolutely. I&apos;ll include a custom ROI model based on your team size and the manual reporting hours
+                      you&apos;d eliminate. Sending to Sarah Chen now — she&apos;ll have it within the hour. Is there anything
+                      else I can help with?
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="landing-preview-alert" style={{ margin: '16px 0 0', borderRadius: '0 0 16px 16px' }}>
+                <AlertIcon />
+                Acme Corp COO visited 3x this week — asked about pricing for 200 users. High intent — reach out today.
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* PRICING SECTION */}
-      <section className="bg-white py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-6 text-gray-900">
-            Transparent Pricing. No Hidden Fees.
-          </h2>
-          <p className="text-xl text-center text-gray-600 mb-16 max-w-4xl mx-auto">
-            Start with one rep, scale your team. Volume discounts apply automatically.
+      {/* ONE PLATFORM, EVERY TEAM */}
+      <section className="landing-platform" id="platform">
+        <div className="landing-platform-inner">
+          <div className="landing-section-label">Beyond Prospecting</div>
+          <h2>One platform. Every revenue team. Zero burden on rev ops.</h2>
+          <p className="landing-platform-sub">
+            AgentPilot isn&apos;t a sales tool bolted onto your stack. It&apos;s the personalized engagement layer across
+            your entire customer lifecycle — with messaging that stays on-brand, always current, and consistent across
+            every account.
           </p>
 
-          {/* Pricing cards */}
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
-            {/* Starter */}
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 flex flex-col">
-              <h3 className="text-2xl font-bold mb-2 text-gray-900">Starter</h3>
-              <div className="mb-4">
-                <span className="text-5xl font-extrabold text-blue-600">$997</span>
-                <span className="text-gray-600">/month</span>
+          <div className="landing-platform-grid">
+            <div className="landing-platform-card">
+              <div className="landing-platform-icon">
+                <UsersIcon />
               </div>
-              <div className="flex-grow space-y-3 mb-8">
-                {[
-                  '1 Strategic AE',
-                  '5 active target accounts',
-                  '500 contact enrichments/month',
-                  'Email + Chat support',
-                  'Standard integrations',
-                ].map((feature, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold">✓</span>
-                    <span className="text-gray-700">{feature}</span>
-                  </div>
-                ))}
+              <div className="landing-platform-card-label">Sales</div>
+              <h3>Close faster with context, not cold calls</h3>
+              <p>
+                AEs get hyper-personalized landing pages, AI chat that qualifies and educates buyers, and real-time
+                alerts when high-value prospects engage. Every follow-up is a continuation of a conversation — not a shot
+                in the dark.
+              </p>
+              <div className="landing-platform-proof">
+                <span>→ 10+ hrs saved per account</span>
+                <span>→ Real-time buying signals</span>
               </div>
-              <Link
-                href="/dashboard"
-                className="block w-full py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition text-center"
-              >
-                Get Started Free
-              </Link>
             </div>
 
-            {/* Growth - Featured */}
-            <div className="bg-white border-2 border-blue-600 rounded-2xl p-8 flex flex-col relative transform md:scale-105 shadow-xl">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold uppercase">
-                Most Popular
+            <div className="landing-platform-card">
+              <div className="landing-platform-icon">
+                <UsersGroupIcon />
               </div>
-              <h3 className="text-2xl font-bold mb-2 text-gray-900">Growth</h3>
-              <div className="mb-4">
-                <span className="text-5xl font-extrabold text-blue-600">$897</span>
-                <span className="text-gray-600">/rep/month</span>
+              <div className="landing-platform-card-label">Customer Success</div>
+              <h3>Give every account a dedicated AI concierge</h3>
+              <p>
+                Existing customers get a personalized page with AI chat that answers product questions, surfaces relevant
+                updates, and helps them get more value. When questions need a human, the chat escalates to their CSM
+                with full context — no repeat conversations.
+              </p>
+              <div className="landing-platform-proof">
+                <span>→ Reduce support tickets</span>
+                <span>→ Smart escalation to CSMs</span>
               </div>
-              <div className="flex-grow space-y-3 mb-8">
-                {[
-                  '3-10 Strategic AEs',
-                  'Unlimited accounts',
-                  '1,000 enrichments/rep/month',
-                  'Priority support',
-                  'Advanced integrations',
-                ].map((feature, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold">✓</span>
-                    <span className="text-gray-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href="/dashboard"
-                className="block w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-center"
-              >
-                Book Demo
-              </Link>
             </div>
 
-            {/* Enterprise */}
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 flex flex-col">
-              <h3 className="text-2xl font-bold mb-2 text-gray-900">Enterprise</h3>
-              <div className="mb-4">
-                <span className="text-5xl font-extrabold text-blue-600">Custom</span>
+            <div className="landing-platform-card">
+              <div className="landing-platform-icon">
+                <MessageSquareIcon />
               </div>
-              <div className="flex-grow space-y-3 mb-8">
-                {[
-                  '11+ Strategic AEs',
-                  'Unlimited accounts',
-                  'Custom enrichment volume',
-                  'Dedicated CSM + Slack',
-                  'Custom integrations + API',
-                ].map((feature, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-green-600 font-bold">✓</span>
-                    <span className="text-gray-700">{feature}</span>
-                  </div>
-                ))}
+              <div className="landing-platform-card-label">Marketing</div>
+              <h3>On-brand messaging across every account — automatically</h3>
+              <p>
+                Marketing controls the product positioning, value props, and brand voice once. AgentPilot ensures every
+                landing page, every chat response, and every outreach asset stays on-message — across hundreds of
+                accounts. When positioning evolves, every page updates automatically.
+              </p>
+              <div className="landing-platform-proof">
+                <span>→ Brand consistency at scale</span>
+                <span>→ Zero manual page updates</span>
               </div>
-              <Link
-                href="/dashboard"
-                className="block w-full py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition text-center"
-              >
-                Contact Sales
-              </Link>
             </div>
           </div>
 
-          {/* Add-ons */}
-          <div className="bg-gray-50 rounded-xl p-8 max-w-4xl mx-auto mb-12">
-            <h3 className="text-xl font-bold mb-4 text-gray-900">Add-Ons:</h3>
-            <div className="space-y-2 text-gray-700">
-              <p>• Additional accounts: $199/account/month</p>
-              <p>• Extra enrichments: $0.50/contact</p>
-              <p>• LinkedIn Sales Navigator integration: $299/month</p>
-            </div>
-          </div>
-
-          {/* ROI Callout */}
-          <div className="bg-gradient-to-r from-yellow-100 to-yellow-200 p-8 rounded-xl max-w-4xl mx-auto text-center">
-            <div className="text-4xl mb-4">💰</div>
-            <p className="text-lg text-gray-800 leading-relaxed">
-              <strong className="text-orange-700">ROI Calculator:</strong> If your AE expands
-              one $500K account by 20%, you&apos;ve created $100K in new ARR. AgentPilot pays for
-              itself in <strong className="text-orange-700">12 days</strong>.
-            </p>
+          <div className="landing-platform-bottom landing-reveal">
+            <h4>
+              A custom experience for every account across the entire customer lifecycle — with no additional burden on
+              your rev ops team.
+            </h4>
           </div>
         </div>
       </section>
 
-      {/* FAQ SECTION */}
-      <section id="demo" className="bg-gray-50 py-20 lg:py-28">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-16 text-gray-900">
-            Frequently Asked Questions
-          </h2>
+      <section className="landing-outreach" id="outreach">
+        <div className="landing-outreach-inner">
+          <div className="landing-section-label">Drive Traffic</div>
+          <h2>Every channel. Same personalized intelligence. Zero manual work.</h2>
+          <p className="landing-outreach-sub">
+            Every outreach asset is generated from the same account research — your product mapped to their
+            priorities, their language, their moment. Send them somewhere worth going.
+          </p>
 
-          <div className="space-y-4">
-            {[
-              {
-                q: 'Will the AI send emails without my approval?',
-                a: 'No. AgentPilot always requires approval. Every email, calendar invite, and Salesforce update goes to your approval queue. You review, edit, and approve before anything is sent. You maintain full control.',
-              },
-              {
-                q: 'How is this different from AI SDR tools like Artisan?',
-                a: 'AI SDRs focus on top-of-funnel lead generation at scale. AgentPilot is built for strategic AEs doing account expansion—helping them go deep into 5-10 high-value accounts with hyperpersonalized, microsegmented outreach. Think account-based, not lead-based.',
-              },
-              {
-                q: 'Do I need special CRM setup to use the agents?',
-                a: 'No special setup required. AgentPilot works with standard Salesforce objects (Accounts, Contacts, Opportunities, Activities). You manually trigger syncs on-demand during MVP. No complex integration or admin overhead.',
-              },
-              {
-                q: 'How long does it take to deploy?',
-                a: '30 minutes. Upload your company messaging, connect your tools (Salesforce, email, calendar), invite team members, and create your first target account. Your agent is ready to research immediately.',
-              },
-              {
-                q: 'Can multiple reps collaborate on the same account?',
-                a: 'Yes. Multiple users from your team can work on the same target account. Activity feed shows what teammates did (contacts added, emails sent, meetings booked). @mention colleagues in agent chat for handoffs.',
-              },
-            ].map((faq, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleFaq(i)}
-                  className="w-full p-6 text-left flex justify-between items-center hover:bg-gray-50 transition"
+          <div className="landing-channel-grid">
+            <div className="landing-channel-card landing-reveal">
+              <div className="landing-channel-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <span className="text-lg font-semibold text-gray-900">{faq.q}</span>
-                  <span className="text-2xl text-gray-400">
-                    {openFaq === i ? '−' : '+'}
-                  </span>
-                </button>
-                {openFaq === i && (
-                  <div className="px-6 pb-6">
-                    <p className="text-gray-600 leading-relaxed">{faq.a}</p>
-                  </div>
-                )}
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              <h3>Personalized Email</h3>
+              <p>
+                AI writes emails using real account intel — their recent news, their initiatives, their language. Every
+                email links to a landing page built for that buying group. No more &quot;I hope this finds you well.&quot;
+              </p>
+            </div>
 
-      {/* FINAL CTA */}
-      <section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-20 lg:py-28">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl lg:text-5xl font-extrabold mb-6">
-            Ready To Let AI Handle The Grunt Work?
-          </h2>
-          <p className="text-xl mb-10 opacity-95 leading-relaxed">
-            Give your strategic AEs an AI agent that researches accounts, finds contacts, and
-            personalizes outreach—so they can focus on relationships and closing deals.
-          </p>
+            <div className="landing-channel-card landing-reveal">
+              <div className="landing-channel-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+                  <rect x="2" y="9" width="4" height="12" />
+                  <circle cx="4" cy="4" r="2" />
+                </svg>
+              </div>
+              <h3>LinkedIn Posts & InMail</h3>
+              <p>
+                Generate thought leadership and direct messages grounded in real account context — not buzzwords.
+                Position your landing page as a resource built for them, not a pitch aimed at everyone.
+              </p>
+            </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-            <Link
-              href="#demo"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-blue-600 rounded-lg text-lg font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all"
-            >
-              Watch 3-Min Demo →
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg text-lg font-semibold hover:bg-white/10 transition"
-            >
-              Get Started Free
-            </Link>
-          </div>
-
-          <p className="text-sm opacity-90">
-            See AgentPilot expand a real account in your tech stack<br />
-            No credit card required • Deploy in days • Cancel anytime
-          </p>
-
-          <div className="mt-12 pt-8 border-t border-white/20">
-            <p className="text-sm mb-4">Trusted by strategic account teams in technology, automotive, and manufacturing</p>
-            <div className="flex flex-wrap gap-6 justify-center items-center opacity-90">
-              <span className="font-semibold">Technology</span>
-              <span>•</span>
-              <span className="font-semibold">SaaS</span>
-              <span>•</span>
-              <span className="font-semibold">Automotive</span>
-              <span>•</span>
-              <span className="font-semibold">Manufacturing</span>
+            <div className="landing-channel-card landing-reveal">
+              <div className="landing-channel-icon">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M7 7h.01" />
+                  <path d="M7 12h.01" />
+                  <path d="M7 17h.01" />
+                  <path d="M12 7h.01" />
+                  <path d="M12 12h.01" />
+                  <path d="M12 17h.01" />
+                  <path d="M17 7h.01" />
+                  <path d="M17 12h.01" />
+                  <path d="M17 17h.01" />
+                </svg>
+              </div>
+              <h3>Events & QR Codes</h3>
+              <p>
+                At a conference or on-site? Share a QR code that drops your contact into a page built for their team —
+                with AI chat ready to build a personalized event agenda on the spot.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-gray-900 text-gray-400 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            <div>
-              <h3 className="text-white font-bold mb-4">Product</h3>
-              <ul className="space-y-2">
-                <li><Link href="#" className="hover:text-white transition">How It Works</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Features</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Use Cases</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Integrations</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Pricing</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-white font-bold mb-4">Resources</h3>
-              <ul className="space-y-2">
-                <li><Link href="#" className="hover:text-white transition">Blog</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Case Studies</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Documentation</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Help Center</Link></li>
-                <li><Link href="#" className="hover:text-white transition">API Docs</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-white font-bold mb-4">Company</h3>
-              <ul className="space-y-2">
-                <li><Link href="#" className="hover:text-white transition">About Us</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Careers</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Contact Sales</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Partner Program</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-white font-bold mb-4">Support</h3>
-              <ul className="space-y-2">
-                <li><Link href="mailto:support@agentpilot.us" className="hover:text-white transition">support@agentpilot.us</Link></li>
-                <li><Link href="/dashboard" className="hover:text-white transition">Book a Demo</Link></li>
-                <li><Link href="#" className="hover:text-white transition">Community Slack</Link></li>
-                <li><Link href="#" className="hover:text-white transition">GitHub</Link></li>
-              </ul>
+      <section className="landing-testimonials landing-reveal">
+        <div className="landing-section-label">What GTM Teams Say</div>
+        <h2>Built for revenue teams that move fast</h2>
+        <div className="landing-testimonial-grid">
+          <div className="landing-testimonial-card">
+            <div className="landing-testimonial-stars">★★★★★</div>
+            <blockquote>
+              &quot;We cut account research time from 8 hours to under 10 minutes. Our AEs are actually using it because it
+              makes them look smarter — not because we forced them to.&quot;
+            </blockquote>
+            <div className="landing-testimonial-author">
+              <div className="landing-testimonial-avatar" />
+              <div>
+                <div className="landing-testimonial-name">VP of Sales</div>
+                <div className="landing-testimonial-role">Enterprise SaaS Company</div>
+              </div>
             </div>
           </div>
-
-          <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-500">🔒</span>
-              <span>Secure Payment Powered by Stripe</span>
-            </div>
-            <div className="text-sm">
-              © 2026 AgentPilot. All rights reserved.
-              <Link href="#" className="ml-4 hover:text-white transition">Privacy Policy</Link>
-              <Link href="#" className="ml-4 hover:text-white transition">Terms</Link>
+          <div className="landing-testimonial-card">
+            <div className="landing-testimonial-stars">★★★★★</div>
+            <blockquote>
+              &quot;Our landing page conversion rate doubled because every visitor sees messaging built for their team —
+              not a generic product page. The AI chat alone has sourced 3 qualified meetings this quarter.&quot;
+            </blockquote>
+            <div className="landing-testimonial-author">
+              <div className="landing-testimonial-avatar" />
+              <div>
+                <div className="landing-testimonial-name">Director of Demand Gen</div>
+                <div className="landing-testimonial-role">Mid-Market Technology Company</div>
+              </div>
             </div>
           </div>
+          <div className="landing-testimonial-card">
+            <div className="landing-testimonial-stars">★★★★★</div>
+            <blockquote>
+              &quot;The real-time alerts changed how I work. I know exactly when a prospect is engaged and what they
+              care about — my follow-ups close faster because they feel like a conversation, not a cold call.&quot;
+            </blockquote>
+            <div className="landing-testimonial-author">
+              <div className="landing-testimonial-avatar" />
+              <div>
+                <div className="landing-testimonial-name">Strategic Account Executive</div>
+                <div className="landing-testimonial-role">Fortune 500 Technology Company</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-cta" id="cta">
+        <h2>
+          Ready to spend less time researching
+          <br />
+          and more time <em>closing?</em>
+        </h2>
+        <p>
+          See how AgentPilot helps revenue teams personalize at scale — without adding headcount or waiting on
+          marketing.
+        </p>
+        <div className="landing-cta-actions">
+          <Link href={demoUrl} className="landing-btn-primary">
+            Book a 15-Min Demo →
+          </Link>
+          <Link href={signInUrl} className="landing-btn-outline">
+            Sign In
+          </Link>
+        </div>
+      </section>
+
+      <footer className="landing-footer">
+        <p>© 2026 AgentPilot. All rights reserved.</p>
+        <div className="landing-footer-links">
+          <Link href="#">Privacy</Link>
+          <Link href="#">Terms</Link>
+          <Link href="#">Contact</Link>
         </div>
       </footer>
     </div>

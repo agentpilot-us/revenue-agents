@@ -11,8 +11,9 @@ import LayoutShell from './components/LayoutShell';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Agent Pilot',
-  description: 'AI Agents That Do The Grunt Work',
+  title: 'AgentPilot — AI-Native Account Engagement Platform',
+  description:
+    'AI that researches your accounts, builds personalized pages, and tells you when to follow up. For Strategic AEs & Revenue Teams.',
 };
 
 // Mark layout as dynamic since Navigation uses auth

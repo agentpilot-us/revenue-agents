@@ -31,7 +31,7 @@ export function NavigationClient({ isAuthenticated }: NavigationClientProps) {
           </>
         ) : (
           <Link
-            href="/api/auth/signin"
+            href="/login"
             className="px-4 py-2 text-slate-700 hover:text-slate-900 transition-colors"
           >
             Sign In
@@ -58,7 +58,7 @@ export function NavigationClient({ isAuthenticated }: NavigationClientProps) {
           </>
         ) : (
           <Link
-            href="/api/auth/signin"
+            href="/login"
             className="px-3 py-2 text-slate-700 hover:text-slate-900 text-sm"
           >
             Sign In
