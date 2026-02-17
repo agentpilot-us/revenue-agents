@@ -35,6 +35,12 @@ export default async function CampaignQRCodesPage({
 
   const departments = campaign.company.departments;
 
+  // Serialize dates to strings for client component
+  const qrCodes = campaign.qrCodes.map((qr) => ({
+    ...qr,
+    lastScannedAt: qr.lastScannedAt?.toISOString() ?? null,
+  }));
+
   return (
     <QRCodeManager
       companyId={companyId}
@@ -43,7 +49,7 @@ export default async function CampaignQRCodesPage({
         title: campaign.title,
         companyId: campaign.companyId,
       }}
-      qrCodes={campaign.qrCodes}
+      qrCodes={qrCodes}
       departments={departments}
     />
   );
