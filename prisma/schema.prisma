@@ -613,12 +613,66 @@ model CampaignVisit {
   formSubmitted   Boolean  @default(false)
   timeOnPage      Int      @default(0)
 
-  alerts     Alert[]
+  alerts        Alert[]
+  chatAnalytics ChatAnalytics[]
 
   @@index([campaignId])
   @@index([visitedAt])
   @@index([qrCodeId])
   @@index([sessionId])
+}
+
+model CampaignDailyStats {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  date            DateTime @db.Date
+  departmentId    String?  // Empty string "" for overall campaign stats
+  totalVisits     Int      @default(0)
+  uniqueVisitors  Int      @default(0)
+  returningVisitors Int    @default(0)
+  avgTimeOnPage   Int      @default(0)
+  avgScrollDepth   Int      @default(0)
+  bounceRate      Int      @default(0)
+  chatSessions    Int      @default(0)
+  chatMessages    Int      @default(0)
+  ctaClicks       Int      @default(0)
+  formSubmissions Int      @default(0)
+  directTraffic   Int      @default(0)
+  emailTraffic    Int      @default(0)
+  linkedinTraffic Int      @default(0)
+  organicTraffic  Int      @default(0)
+  paidTraffic     Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([campaignId, date, departmentId])
+  @@index([campaignId, date])
+  @@index([date])
+  @@map("campaign_daily_stats")
+}
+
+model ChatAnalytics {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        SegmentCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  visitId         String?
+  visit           CampaignVisit? @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  sessionId       String?
+  departmentId    String?
+  question        String   @db.Text
+  answer          String   @db.Text
+  topic            String?
+  intent           String?
+  messageIndex     Int      @default(0)
+  responseTime     Int?     // milliseconds
+  createdAt        DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([sessionId])
+  @@index([topic])
+  @@index([createdAt])
+  @@map("chat_analytics")
 }
 
 enum AlertType {
