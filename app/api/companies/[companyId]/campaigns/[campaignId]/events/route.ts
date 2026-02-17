@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { ContentType } from '@prisma/client';
+import { ContentType, Prisma } from '@prisma/client';
 
 type PageSectionEvent = { title?: string; date?: string; description?: string; url?: string };
 type PageSections = { events?: PageSectionEvent[]; caseStudy?: unknown; successStory?: unknown };
@@ -86,14 +86,14 @@ export async function POST(
       depts[idx] = { ...dept, pageSections: { ...pageSections, events } };
       await prisma.segmentCampaign.update({
         where: { id: campaignId },
-        data: { departmentConfig: { departments: depts } },
+        data: { departmentConfig: { departments: depts } as Prisma.InputJsonValue },
       });
     } else {
       const pageSections = (campaign.pageSections ?? {}) as PageSections;
       const events = [...(pageSections.events ?? []), eventEntry];
       await prisma.segmentCampaign.update({
         where: { id: campaignId },
-        data: { pageSections: { ...pageSections, events } },
+        data: { pageSections: { ...pageSections, events } as Prisma.InputJsonValue },
       });
     }
 
