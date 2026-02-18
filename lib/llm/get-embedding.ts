@@ -4,7 +4,7 @@
  * otherwise OpenAI text-embedding-3-small.
  *
  * Env:
- * - GOOGLE_GENERATIVE_AI_API_KEY (or LLM_PROVIDER=gemini) → Gemini text-embedding-004, 1536 dim
+ * - GOOGLE_GENERATIVE_AI_API_KEY (or LLM_PROVIDER=gemini) → Gemini gemini-embedding-001, 1536 dim
  * - else → OpenAI text-embedding-3-small (OPENAI_API_KEY)
  *
  * If you switch provider, re-ingest content so all vectors use the same dimension.
@@ -13,7 +13,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 
 const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
-const GEMINI_EMBEDDING_MODEL = 'text-embedding-004';
+const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 const RAG_EMBEDDING_DIMENSION = 1536;
 
 function getGeminiEmbeddingModel() {
