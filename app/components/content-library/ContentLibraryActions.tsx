@@ -34,12 +34,12 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
         body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Scrape failed');
+      if (!res.ok) throw new Error(data.error || 'Get data failed');
       setSuccess(`Added ${data.created ?? 0} page(s).`);
       setUrl('');
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Scrape failed');
+      setError(e instanceof Error ? e.message : 'Get data failed');
     } finally {
       setLoading(false);
     }
@@ -88,12 +88,12 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
         body: JSON.stringify({ urls: urlsToScrape }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Scrape failed');
+      if (!res.ok) throw new Error(data.error || 'Get data failed');
       setSuccess(`Added ${data.created ?? 0} page(s).`);
       setMapLinks([]);
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Scrape failed');
+      setError(e instanceof Error ? e.message : 'Get data failed');
     } finally {
       setLoading(false);
     }
@@ -138,14 +138,14 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
           onClick={() => setMode('url')}
           className={`px-3 py-1.5 rounded text-sm ${mode === 'url' ? 'bg-blue-600 text-white' : 'border border-slate-300 dark:border-slate-600'}`}
         >
-          Scrape URL
+          Single URL
         </button>
         <button
           type="button"
           onClick={() => setMode('site')}
           className={`px-3 py-1.5 rounded text-sm ${mode === 'site' ? 'bg-blue-600 text-white' : 'border border-slate-300 dark:border-slate-600'}`}
         >
-          Scrape site
+          Full site
         </button>
         <button
           type="button"
@@ -171,7 +171,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
             disabled={loading}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? 'Scraping…' : 'Scrape'}
+            {loading ? 'Getting data…' : 'Get Data'}
           </button>
         </div>
       )}
@@ -201,7 +201,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
                 disabled={loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? 'Scraping…' : `Scrape all (${mapLinks.length})`}
+                {loading ? 'Getting data…' : `Get Data (${mapLinks.length})`}
               </button>
             )}
           </div>

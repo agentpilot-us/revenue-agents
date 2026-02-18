@@ -1,12 +1,14 @@
 /**
  * POST /api/cron/content-library/run-schedules
- * Run due Content Library crawl schedules (daily/weekly).
+ * Run due Content Library crawl schedules (daily/weekly): product-linked ContentCrawlSchedule
+ * and URL-update ContentLibrarySchedule (re-fetch sourceUrl and re-ingest).
  * Call from Vercel Cron or external cron; require CRON_SECRET in Authorization header or query.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { crawlAndParseCaseStudies } from '@/lib/content-library/firecrawl-workflows';
 import { importUseCasesFromUrl } from '@/lib/content-library/firecrawl-workflows';
+import { refreshContentLibraryItem } from '@/lib/content-library/refresh-url';
 
 function getCronSecret(): string | null {
   return process.env.CRON_SECRET?.trim() || null;
@@ -156,8 +158,43 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // URL-update schedules: re-fetch sourceUrl and re-ingest for each due ContentLibrarySchedule
+  const urlDue = await prisma.contentLibrarySchedule.findMany({
+    where: { isActive: true, nextRunAt: { lte: now } },
+    select: { id: true, contentLibraryId: true, userId: true, frequency: true },
+  });
+
+  const urlResults: { id: string; ok: boolean; error?: string }[] = [];
+
+  for (const schedule of urlDue) {
+    try {
+      const result = await refreshContentLibraryItem(schedule.contentLibraryId, schedule.userId);
+      if (result.ok) {
+        urlResults.push({ id: schedule.id, ok: true });
+      } else {
+        urlResults.push({ id: schedule.id, ok: false, error: result.error });
+      }
+      await prisma.contentLibrarySchedule.update({
+        where: { id: schedule.id },
+        data: { lastRunAt: now, nextRunAt: nextRunAt(schedule.frequency) },
+      });
+    } catch (error) {
+      urlResults.push({
+        id: schedule.id,
+        ok: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      await prisma.contentLibrarySchedule.update({
+        where: { id: schedule.id },
+        data: { lastRunAt: now, nextRunAt: nextRunAt(schedule.frequency) },
+      });
+    }
+  }
+
   return NextResponse.json({
     ran: due.length,
     results,
+    urlSchedulesRan: urlDue.length,
+    urlResults,
   });
 }

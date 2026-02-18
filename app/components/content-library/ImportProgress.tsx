@@ -16,7 +16,7 @@ type Props = {
 const STEP_LABELS: Record<string, string> = {
   PENDING: 'Starting…',
   DISCOVERING: 'Discovering pages…',
-  SCRAPING: 'Scraping content…',
+  SCRAPING: 'Fetching content…',
   CATEGORIZING: 'Categorizing with AI…',
   REVIEW_PENDING: 'Ready for review',
   APPROVED: 'Complete',
@@ -150,7 +150,7 @@ export function ImportProgress({ importJob }: Props) {
               ✓ Discovering pages
             </li>
             <li className={['SCRAPING', 'CATEGORIZING', 'REVIEW_PENDING', 'APPROVED'].includes(display.status) ? 'text-blue-600 dark:text-blue-400' : ''}>
-              ✓ Scraping content {display.totalPages > 0 && `(${display.scrapedPages}/${display.totalPages})`}
+              ✓ Fetching content {display.totalPages > 0 && `(${display.scrapedPages}/${display.totalPages})`}
             </li>
             <li className={['CATEGORIZING', 'REVIEW_PENDING', 'APPROVED'].includes(display.status) ? 'text-blue-600 dark:text-blue-400' : ''}>
               ✓ Categorizing {display.totalPages > 0 && `(${display.categorizedPages} done)`}

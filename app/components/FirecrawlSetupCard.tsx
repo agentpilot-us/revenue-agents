@@ -2,7 +2,7 @@
 
 /**
  * Shown when Firecrawl is not configured. Walks the user through getting an API key
- * and adding it to .env.local so Import from URL and Scrape site work.
+ * and adding it to .env.local so Import from URL and pull data from your site work.
  */
 export function FirecrawlSetupCard() {
   return (
@@ -15,7 +15,7 @@ export function FirecrawlSetupCard() {
               Set up Firecrawl to enable Import & Sync
             </h2>
             <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-              <strong>Import from URL</strong> and <strong>Scrape site</strong> need a scraping service to fetch web pages.
+              <strong>Import from URL</strong> and <strong>pull data from your site</strong> need a service to fetch web pages.
               Follow these steps to get it working:
             </p>
             <ol className="mt-4 space-y-3 list-decimal list-inside text-sm text-amber-900 dark:text-amber-100">
@@ -42,7 +42,7 @@ export function FirecrawlSetupCard() {
               </li>
             </ol>
             <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
-              After that, &quot;Import from URL&quot; and &quot;Scrape site&quot; will work. You can also check status under Settings → Services.
+              After that, import from URL and pull data from your site will work. You can also check status under Settings → Services.
             </p>
           </div>
         </div>

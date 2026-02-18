@@ -6,6 +6,7 @@ import type { GetCompanySetupStateUser } from '@/app/actions/content-library-set
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
 import { ContentLibraryActions } from '@/app/components/content-library/ContentLibraryActions';
+import { ContentLibraryItemRow } from '@/app/components/content-library/ContentLibraryItemRow';
 
 const SECTION_LABELS: Partial<Record<ContentType, string>> = {
   SuccessStory: 'Case studies',
@@ -53,7 +54,7 @@ export async function ContentLibraryView({ company }: Props) {
             Your company data
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Scrape your site or upload files. The AI uses this content to personalize outreach and value propositions.
+            Pull data from your website or upload files. The AI uses this content to personalize outreach and value propositions.
           </p>
           <Link
             href="/dashboard?skip_content_prompt=1"
@@ -122,22 +123,12 @@ export async function ContentLibraryView({ company }: Props) {
               <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{label}</h2>
               <ul className="space-y-2">
                 {list.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 text-sm">
-                    {item.sourceUrl ? (
-                      <a
-                        href={item.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:underline truncate flex-1"
-                      >
-                        {item.title}
-                      </a>
-                    ) : (
-                      <span className="text-gray-900 dark:text-gray-100 truncate flex-1">
-                        {item.title}
-                      </span>
-                    )}
-                  </li>
+                  <ContentLibraryItemRow
+                    key={item.id}
+                    id={item.id}
+                    title={item.title}
+                    sourceUrl={item.sourceUrl}
+                  />
                 ))}
               </ul>
             </div>
@@ -147,7 +138,7 @@ export async function ContentLibraryView({ company }: Props) {
 
       {items.length === 0 && (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-8 text-center text-gray-500 dark:text-gray-400">
-          <p>No content yet. Scrape a URL, scrape your site, or upload a file above.</p>
+          <p>No content yet. Pull data from a URL or your site, or upload a file above.</p>
         </div>
       )}
     </div>

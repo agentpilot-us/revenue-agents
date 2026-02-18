@@ -145,9 +145,9 @@ export async function POST(req: NextRequest) {
       items: created,
     });
   } catch (error) {
-    console.error('Content library scrape error:', error);
+    console.error('Content library fetch error:', error);
     return NextResponse.json(
-      { error: 'Failed to scrape', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Get data failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
