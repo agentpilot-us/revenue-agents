@@ -167,7 +167,7 @@ export default async function SettingsPage() {
                           href="/dashboard/content-library"
                           className="text-sm font-medium text-blue-600 hover:text-blue-800"
                         >
-                          See step-by-step setup on Content Library →
+                          See step-by-step setup on Your company data →
                         </Link>
                       </div>
                     )}
@@ -184,10 +184,10 @@ export default async function SettingsPage() {
               Complete these once to get the most from the agent:
             </p>
             <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <li>• Set your company name (Profile below) for Content Library matching</li>
-              <li>• Upload content: products, industry playbooks, case studies (Content Library)</li>
+              <li>• Set your company name (Profile below) for your company data matching</li>
+              <li>• Upload content: products, industry playbooks, case studies (Your company data)</li>
               <li>• Connect tools above (Resend, Cal.com, etc.) — via env vars</li>
-              <li>• Add your first account (Companies → Add company), then run Account Intelligence</li>
+              <li>• Add your first target company (Target companies → Add target company), then run Account Intelligence</li>
             </ul>
           </div>
 

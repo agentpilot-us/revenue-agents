@@ -69,7 +69,7 @@ export function CompanyBasicInfoForm({ existingData, message, skipToImport }: Pr
     <div className="p-8 bg-gray-50 dark:bg-zinc-900 min-h-screen">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">
-          Content Library setup
+          Your company data setup
         </h1>
         <p className="text-gray-600 dark:text-gray-300 mb-6">
           Add your company info and we’ll discover and categorize content from your website.

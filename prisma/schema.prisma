@@ -1075,12 +1075,13 @@ enum ContentType {
   EmailContent
   VideoLink
   ResourceLink
+  UploadedDocument
 }
 
 model ContentLibrary {
-  id        String @id @default(cuid())
-  userId    String
-  productId String
+  id         String  @id @default(cuid())
+  userId     String
+  productId  String? // optional: content-first flow uses null
 
   title   String
   type    ContentType
@@ -1106,8 +1107,9 @@ model ContentLibrary {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product  Product?              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  chunks   ContentLibraryChunk[]
 
   @@index([userId, type])
   @@index([productId, persona])
@@ -1115,6 +1117,19 @@ model ContentLibrary {
   @@index([productId, industry])
   @@index([company])
   @@index([confidenceScore])
+}
+
+// RAG: chunk + embedding per ContentLibrary item (pgvector)
+model ContentLibraryChunk {
+  id               String   @id @default(cuid())
+  contentLibraryId String
+  chunkIndex       Int
+  content          String   @db.Text
+  embedding        Unsupported("vector(1536)")?
+
+  contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
+
+  @@index([contentLibraryId])
 }
 
 // Scheduled Firecrawl crawls for Content Library (daily/weekly)

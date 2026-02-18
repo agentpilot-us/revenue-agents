@@ -56,6 +56,61 @@ async function fetchWithRetry(
   throw lastError ?? new Error('Max retries exceeded');
 }
 
+// ----- Map (sitemap / discover links) -----
+
+export type MapParams = {
+  url: string;
+  limit?: number;
+  search?: string;
+  sitemap?: 'skip' | 'include' | 'only';
+};
+
+export type MapLink = {
+  url: string;
+  title?: string;
+  description?: string;
+};
+
+export type MapResult =
+  | { ok: true; links: MapLink[] }
+  | { ok: false; error: string };
+
+/** Discover links on a site via Firecrawl /map (sitemap discovery). */
+export async function mapUrl(params: MapParams): Promise<MapResult> {
+  try {
+    const headers = getHeaders();
+    const res = await fetchWithRetry(`${BASE}/map`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        url: params.url,
+        limit: params.limit ?? 500,
+        ...(params.search && { search: params.search }),
+        ...(params.sitemap && { sitemap: params.sitemap }),
+      }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      links?: Array<{ url?: string; title?: string; description?: string }>;
+      error?: string;
+    };
+    if (!res.ok || !json.success) {
+      return { ok: false, error: json.error ?? res.statusText ?? 'Map failed' };
+    }
+    const links = (json.links ?? []).map((l) => ({
+      url: l.url ?? '',
+      title: l.title,
+      description: l.description,
+    }));
+    return { ok: true, links };
+  } catch (e) {
+    if (e instanceof FirecrawlConfigError) {
+      return { ok: false, error: e.message };
+    }
+    return { ok: false, error: e instanceof Error ? e.message : 'Map failed' };
+  }
+}
+
 // ----- Scrape -----
 
 export type ScrapeUrlParams = {

@@ -5,13 +5,10 @@
  */
 
 import { scrapeUrl } from './tools/firecrawl';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const gtcSessionSchema = z.object({
   title: z.string(),
@@ -121,7 +118,7 @@ export async function syncGTCSessions(sessionCatalogUrl?: string): Promise<{
     console.log('🤖 Extracting sessions with AI...');
 
     const { object: extracted } = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 12000,
       system: `You are extracting session/event information from a session catalog or events page.
 Sessions are organized by TOPIC/INTEREST (e.g., "Autonomous Vehicles", "AI", "Manufacturing", "Healthcare", etc.), NOT by product.
@@ -182,7 +179,7 @@ export async function syncIndustryContent(
     console.log(`🤖 Extracting ${industryName} content with AI...`);
 
     const { object: extracted } = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 8000,
       system: `You are extracting structured content from an industry or solution page.
 Extract:
@@ -240,7 +237,7 @@ export async function syncEventsFromUrl(
     console.log('🤖 Extracting events with AI...');
 
     const { object: extracted } = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 8000,
       system: `You are extracting event/session information from a web page (conference, webinars, events listing, etc.).
 Extract ALL events you can find. For each event include:

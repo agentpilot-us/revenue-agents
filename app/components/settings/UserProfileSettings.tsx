@@ -63,7 +63,7 @@ export function UserProfileSettings({
               className="max-w-md bg-white dark:bg-zinc-700 dark:text-gray-100 dark:border-zinc-600"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Used in Content Library labels (e.g., &quot;{companyName || 'Your company'} Product Marketing Content&quot;)
+              Used in your company data labels (e.g., &quot;{companyName || 'Your company'} Product Marketing Content&quot;)
             </p>
             <div className="flex items-center gap-2">
               <Button

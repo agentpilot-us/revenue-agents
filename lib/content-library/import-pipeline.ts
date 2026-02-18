@@ -1,5 +1,5 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import type { ContentType } from '@prisma/client';
 
 const SUGGESTED_TYPE_MAP: Record<string, ContentType> = {
@@ -34,7 +34,6 @@ export function suggestedTypeToContentType(suggested: string): ContentType {
   return 'ResourceLink';
 }
 
-const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 /** Map industry value to URL/path keywords for filtering. */
 export function industryToKeywords(industry: string): string[] {
@@ -92,7 +91,7 @@ export async function categorizePage(
 ): Promise<CategorizedItem & { title: string }> {
   const excerpt = markdown.slice(0, 8000);
   const { text } = await generateText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     maxOutputTokens: 500,
     system: `You are a content classifier. Given a web page URL and excerpt, output exactly:
 - title: short page title (from content or URL)

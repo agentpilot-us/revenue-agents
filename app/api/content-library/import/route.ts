@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, Output } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const contentTypeEnum = z.enum([
   'Framework',
@@ -122,26 +118,53 @@ export async function POST(req: NextRequest) {
     console.log('✅ Scraped:', markdown.length, 'characters');
 
     // STEP 2: Extract + Infer with Claude via AI SDK
-    console.log('🤖 Extracting with Claude...');
+    console.log('🤖 Extracting with LLM...');
 
     const pageContent = markdown.slice(0, 15000);
-    const { output: extracted } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
-      maxOutputTokens: 4000,
-      system: SYSTEM_PROMPT,
-      prompt: `Extract structured sales enablement content from this page. Include inference (industry, department, persona, confidence, reasoning) based on context clues.
+    const userPrompt = `Extract structured sales enablement content from this page. Include inference (industry, department, persona, confidence, reasoning) based on context clues.
 
 Page content:
-${pageContent}`,
-      output: Output.object({
-        schema: extractionSchema,
-        name: 'ContentExtraction',
-        description:
-          'Structured sales enablement content and inferred organizational tags',
-      }),
-    });
+${pageContent}`;
 
-    console.log('✅ Claude response received');
+    const useLmStudioFallback = process.env.LLM_PROVIDER === 'lmstudio';
+    let extracted: z.infer<typeof extractionSchema>;
+
+    if (useLmStudioFallback) {
+      const jsonHint = `
+Respond with only a single JSON object. No markdown, no code fences. Keys: title, type, valueProp?, inference?: { industry?, department?, persona?, confidence?, reasoning? }, useCases?, benefits?, painPoints?, technicalSpecs?, customers?, proofPoints?, talkingPoints?, successStories?.`;
+      const { text } = await generateText({
+        model: getChatModel(),
+        maxOutputTokens: 4000,
+        system: SYSTEM_PROMPT + jsonHint,
+        prompt: userPrompt,
+      });
+      const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsed = extractionSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        console.error('LM Studio extraction JSON validation failed:', parsed.error.flatten());
+        return NextResponse.json(
+          { error: 'AI returned invalid extraction structure. Try again.', details: parsed.error.flatten() },
+          { status: 500 }
+        );
+      }
+      extracted = parsed.data;
+    } else {
+      const { output } = await generateText({
+        model: getChatModel(),
+        maxOutputTokens: 4000,
+        system: SYSTEM_PROMPT,
+        prompt: userPrompt,
+        output: Output.object({
+          schema: extractionSchema,
+          name: 'ContentExtraction',
+          description:
+            'Structured sales enablement content and inferred organizational tags',
+        }),
+      });
+      extracted = output as z.infer<typeof extractionSchema>;
+    }
+
+    console.log('✅ LLM response received');
 
     const result = {
       success: true,

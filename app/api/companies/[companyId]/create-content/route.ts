@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
@@ -12,10 +12,11 @@ import {
   getCaseStudiesBlock,
   getRelevantProductIdsForIndustry,
 } from '@/lib/prompt-context';
+import {
+  findRelevantContentLibraryChunks,
+  formatRAGChunksForPrompt,
+} from '@/lib/content-library-rag';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const contentTypeSchema = ['email', 'linkedin', 'custom_url'] as const;
 type ContentType = (typeof contentTypeSchema)[number];
@@ -77,6 +78,10 @@ export async function POST(
     const playbookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
     const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
 
+    const ragQuery = `value proposition for ${company.name} ${company.industry ?? ''} for ${contentType}`;
+    const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 8);
+    const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
+
     const contentTypeInstruction =
       contentType === 'email'
         ? 'Generate an email: include a "Subject:" line first, then a blank line, then the email body (plain text, 2-4 short paragraphs). Use the context below for the target account and your company\'s messaging and value props.'
@@ -91,13 +96,14 @@ ${contentTypeInstruction}
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
 2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, and case studies. Use these for value props and tone.
+${ragSection}
 ${productSection}
 ${playbookSection}
 ${caseStudiesSection}
 ${messagingSection}${accountSection}${researchSection}`;
 
     const { text } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 1500,
       system: systemPrompt,
       prompt: `User prompt: ${prompt}\n\nGenerate the content. Output only the requested content, no preamble.`,

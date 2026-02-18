@@ -57,6 +57,13 @@ export function ResearchReviewModal({
   const [whatTheyDo, setWhatTheyDo] = useState(data.whatTheyDo);
   const [microSegments, setMicroSegments] = useState(data.microSegments);
 
+  // Support legacy research data that used nvidiaProductFit
+  const productFitList = Array.isArray(data.productFit)
+    ? data.productFit
+    : Array.isArray((data as unknown as { nvidiaProductFit?: unknown }).nvidiaProductFit)
+      ? (data as unknown as { nvidiaProductFit: { product: string; useCase: string; whyRelevant: string }[] }).nvidiaProductFit
+      : [];
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     setError(null);
@@ -64,7 +71,7 @@ export function ResearchReviewModal({
       const payload = {
         companyBasics,
         whatTheyDo,
-        nvidiaProductFit: data.nvidiaProductFit,
+        productFit: productFitList,
         microSegments,
       };
       const res = await fetch(`/api/companies/${companyId}/apply-research`, {
@@ -96,7 +103,7 @@ export function ResearchReviewModal({
     } finally {
       setSaving(false);
     }
-  }, [companyId, companyBasics, whatTheyDo, microSegments, data.nvidiaProductFit, router, onOpenChange]);
+  }, [companyId, companyBasics, whatTheyDo, microSegments, productFitList, router, onOpenChange]);
 
   const updateInitiative = (index: number, value: string) => {
     const updated = [...whatTheyDo.keyInitiatives];
@@ -292,13 +299,13 @@ export function ResearchReviewModal({
           </section>
 
           {/* Product Fit (Read-only) */}
-          {data.nvidiaProductFit.length > 0 && (
+          {productFitList.length > 0 && (
             <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-gray-50 dark:bg-zinc-800/50">
               <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
                 How They Could Use Your Products
               </h2>
               <div className="space-y-3">
-                {data.nvidiaProductFit.map((fit, i) => (
+                {productFitList.map((fit, i) => (
                   <div key={i} className="border-l-2 border-blue-500 pl-3">
                     <h3 className="font-medium text-gray-900 dark:text-gray-100">{fit.product}</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{fit.useCase}</p>

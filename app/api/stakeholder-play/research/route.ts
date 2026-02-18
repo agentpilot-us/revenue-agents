@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const researchOutputSchema = z.object({
   summary: z.string().optional(),
@@ -62,7 +58,7 @@ export async function POST(req: NextRequest) {
     const context = contextParts.join('\n');
 
     const { object } = await generateObject({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 2000,
       schema: researchOutputSchema,
       system: `You are a sales research assistant. Extract structured research for a new-stakeholder intro.

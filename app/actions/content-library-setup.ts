@@ -7,8 +7,6 @@ import type { ContentType } from '@prisma/client';
 
 export type CompanySetupState =
   | 'needs_company_info'
-  | 'importing'
-  | 'needs_review'
   | 'needs_content'
   | 'ready';
 
@@ -53,39 +51,9 @@ export type GetCompanySetupStateImport = {
   errors: unknown;
 };
 
-const IMPORT_SELECT = {
-  id: true,
-  status: true,
-  totalPages: true,
-  scrapedPages: true,
-  categorizedPages: true,
-  categorizedContent: true,
-  sourceUrl: true,
-  industry: true,
-  errors: true,
-} as const;
-
-function toLatestImport(
-  row: { id: string; status: string; totalPages: number; scrapedPages: number; categorizedPages: number; categorizedContent: unknown; sourceUrl: string; industry: string | null; errors: unknown } | null
-): GetCompanySetupStateImport | null {
-  if (!row) return null;
-  const payload = row.categorizedContent as CategorizedContentPayload | null;
-  return {
-    id: row.id,
-    status: row.status,
-    totalPages: row.totalPages,
-    scrapedPages: row.scrapedPages,
-    categorizedPages: row.categorizedPages,
-    categorizedContent: payload && Array.isArray(payload?.items) ? payload : null,
-    sourceUrl: row.sourceUrl,
-    industry: row.industry,
-    errors: row.errors,
-  };
-}
-
 /**
  * Determine content library setup state for the current user.
- * Uses contentImportLastId when set to avoid race with multiple imports.
+ * State: needs_company_info (no website), needs_content (no items), or ready.
  */
 export async function getCompanySetupState(): Promise<GetCompanySetupStateResult> {
   const session = await auth();
@@ -104,7 +72,6 @@ export async function getCompanySetupState(): Promise<GetCompanySetupStateResult
         primaryIndustrySellTo: true,
         contentRefreshFrequency: true,
         contentRefreshNextAt: true,
-        contentImportLastId: true,
       },
     }),
     prisma.contentLibrary.count({
@@ -114,36 +81,7 @@ export async function getCompanySetupState(): Promise<GetCompanySetupStateResult
 
   if (!user) return { ok: false, error: 'User not found' };
 
-  type ImportRow = {
-    id: string;
-    status: string;
-    totalPages: number;
-    scrapedPages: number;
-    categorizedPages: number;
-    categorizedContent: unknown;
-    sourceUrl: string;
-    industry: string | null;
-    errors: unknown;
-  } | null;
-
-  let latestImportRow: ImportRow = null;
-  if (user.contentImportLastId) {
-    latestImportRow = await prisma.contentImport.findFirst({
-      where: { userId, id: user.contentImportLastId },
-      select: IMPORT_SELECT,
-    }) as ImportRow;
-  }
-  if (!latestImportRow) {
-    latestImportRow = await prisma.contentImport.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: IMPORT_SELECT,
-    }) as ImportRow;
-  }
-  const latestImport = toLatestImport(latestImportRow);
-
-  const hasCompanyInfo =
-    Boolean(user.companyWebsite?.trim()) && Boolean(user.primaryIndustrySellTo?.trim());
+  const hasCompanyInfo = Boolean(user.companyWebsite?.trim());
 
   const userPayload = {
     id: user.id,
@@ -156,23 +94,14 @@ export async function getCompanySetupState(): Promise<GetCompanySetupStateResult
   };
 
   if (!hasCompanyInfo) {
-    return { ok: true, state: 'needs_company_info', user: userPayload, latestImport, contentLibraryTotal };
-  }
-
-  const inProgressStatuses = ['PENDING', 'DISCOVERING', 'SCRAPING', 'CATEGORIZING'];
-  if (latestImport && inProgressStatuses.includes(latestImport.status)) {
-    return { ok: true, state: 'importing', user: userPayload, latestImport, contentLibraryTotal };
-  }
-
-  if (latestImport?.status === 'REVIEW_PENDING') {
-    return { ok: true, state: 'needs_review', user: userPayload, latestImport, contentLibraryTotal };
+    return { ok: true, state: 'needs_company_info', user: userPayload, latestImport: null, contentLibraryTotal };
   }
 
   if (contentLibraryTotal === 0) {
-    return { ok: true, state: 'needs_content', user: userPayload, latestImport, contentLibraryTotal };
+    return { ok: true, state: 'needs_content', user: userPayload, latestImport: null, contentLibraryTotal };
   }
 
-  return { ok: true, state: 'ready', user: userPayload, latestImport, contentLibraryTotal };
+  return { ok: true, state: 'ready', user: userPayload, latestImport: null, contentLibraryTotal };
 }
 
 export type SaveCompanyBasicInfoData = {

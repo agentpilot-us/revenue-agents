@@ -65,13 +65,15 @@ export default async function ContentLibraryEditPage({
   return (
     <div className="p-8 max-w-4xl bg-gray-50 dark:bg-zinc-900 min-h-screen">
       <Link
-        href="/dashboard/content-library?tab=SuccessStory"
+        href="/dashboard/content-library"
         className="text-blue-600 dark:text-blue-400 hover:underline text-sm mb-4 inline-block"
       >
-        ← Back to Case Studies
+        ← Back to Your company data
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Edit case study</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Product: {item.product.name}</p>
+      {item.product && (
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Product: {item.product.name}</p>
+      )}
       <SuccessStoryEditForm
         contentLibraryId={id}
         initialData={initialData}

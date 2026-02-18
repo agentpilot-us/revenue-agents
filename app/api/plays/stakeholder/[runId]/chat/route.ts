@@ -1,12 +1,8 @@
 import { streamText, tool, convertToModelMessages } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
+import { getChatModel } from '@/lib/llm/get-model';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export const maxDuration = 60;
 
@@ -177,7 +173,7 @@ When you return a revised draft, format it clearly (e.g. "Subject: ..." and the 
 
     const modelMessages = await convertToModelMessages(messages as Parameters<typeof convertToModelMessages>[0]);
     const result = streamText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       messages: modelMessages,
       system: systemPrompt,
       tools: playTools,

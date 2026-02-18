@@ -2,14 +2,10 @@
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { DepartmentType, DepartmentStatus, ProductOwnershipStatus } from '@prisma/client';
 import { z } from 'zod';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const researchExtractionSchema = z.object({
   departments: z.array(
@@ -66,7 +62,7 @@ export async function applyDepartmentProductResearch(
     .join('\n');
 
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     schema: researchExtractionSchema,
     prompt: `
 You are extracting structured data from research text about a company. The goal is to identify:

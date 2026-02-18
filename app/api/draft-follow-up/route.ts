@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
@@ -12,10 +12,11 @@ import {
   getCaseStudiesBlock,
   getRelevantProductIdsForIndustry,
 } from '@/lib/prompt-context';
+import {
+  findRelevantContentLibraryChunks,
+  formatRAGChunksForPrompt,
+} from '@/lib/content-library-rag';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -107,6 +108,10 @@ export async function POST(req: NextRequest) {
       relevantProductIds
     );
 
+    const ragQuery = `follow-up email value prop for ${company.name} ${contact?.department ?? departmentName ?? ''}`;
+    const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 8);
+    const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
+
     const contactName = contact
       ? [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'there'
       : 'there';
@@ -132,9 +137,10 @@ export async function POST(req: NextRequest) {
     const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
 
     const { text } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 800,
       system: `You draft a single follow-up or intro email for a B2B sales context. Be concise (2-4 short paragraphs). Use the messaging framework and reference value props/case studies where relevant. Return ONLY a JSON object with "subject" (string) and "body" (string, plain text). No HTML.
+${ragSection}
 ${productKnowledgeSection}
 ${industryPlaybookSection}
 ${caseStudiesSection}

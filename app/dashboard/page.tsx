@@ -565,7 +565,7 @@ export default async function DashboardPage({
                 href="/dashboard/companies"
                 className="inline-block text-xs text-slate-500 hover:text-amber-400 transition-colors"
               >
-                View all companies →
+                View all target companies →
               </Link>
             </div>
           )}
@@ -679,7 +679,7 @@ export default async function DashboardPage({
               href="/dashboard/companies"
               className="ml-3 inline-block text-xs text-slate-500 hover:text-amber-400 transition-colors"
             >
-              Companies →
+              Target companies →
             </Link>
           </div>
 

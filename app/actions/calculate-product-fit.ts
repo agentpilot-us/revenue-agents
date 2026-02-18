@@ -3,14 +3,10 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { researchCompany } from '@/lib/tools/perplexity';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { ProductOwnershipStatus } from '@prisma/client';
 import { z } from 'zod';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const fitScoringSchema = z.object({
   opportunities: z.array(
@@ -129,7 +125,7 @@ Focus on signals that indicate product fit for:
     .join('\n');
 
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     schema: fitScoringSchema,
     prompt: `
 You are an expert at identifying product expansion opportunities.

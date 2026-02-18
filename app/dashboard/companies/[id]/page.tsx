@@ -279,7 +279,7 @@ export default async function CompanyDetailPage({
           href="/dashboard/companies"
           className="flex items-center text-blue-600 hover:text-blue-700 mb-6"
         >
-          ← Back to Companies
+          ← Back to Target companies
         </Link>
 
         {/* Company Header */}

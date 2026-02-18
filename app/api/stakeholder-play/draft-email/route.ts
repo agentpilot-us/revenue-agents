@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +35,7 @@ export async function POST(req: NextRequest) {
     const contactName = [play.contact.firstName, play.contact.lastName].filter(Boolean).join(' ') || research.contactName || 'there';
 
     const { text } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 1000,
       system: `You draft a short, warm intro email for a new executive/stakeholder at an existing account. Tone: professional, congratulatory, one clear value hook. Reference the research brief and any existing relationship. Do not use placeholders like [Company] - use the actual company and contact names.
 ${messagingSection}`,

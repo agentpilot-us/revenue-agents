@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, Output } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const useCaseSchema = z.object({
   name: z.string(),
@@ -79,7 +76,7 @@ export async function POST(req: NextRequest) {
     const truncated = text.slice(0, 50000);
 
     const { output: extracted } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 8000,
       system: SYSTEM_PROMPT,
       prompt: `Extract structured sales enablement content from this pasted text. Split by buying group/department if it is a messaging guide with sections. Set industry (e.g. Automotive) at the top level.

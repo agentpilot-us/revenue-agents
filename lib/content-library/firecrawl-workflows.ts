@@ -8,13 +8,10 @@
  */
 
 import { scrapeUrl, startCrawl, getCrawlStatus, extract, search } from '@/lib/tools/firecrawl';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 // ----- Use Cases (Section 3): scrape URL → extract use cases -----
 
@@ -58,7 +55,7 @@ export async function importUseCasesFromUrl(
 
   const markdown = scrapeResult.markdown.slice(0, 30000);
   const { object: extracted } = await generateObject({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     maxOutputTokens: 4000,
     system: `Extract industry-specific use cases from a company's use-case or solutions page.
 Each use case should have: name, description, optional benefits, targetDepartment, industry.
@@ -157,7 +154,7 @@ export async function parseCaseStudiesFromCrawlPages(
     const text = markdown.slice(0, 15000);
     try {
       const { object: extracted } = await generateObject({
-        model: anthropic('claude-sonnet-4-20250514'),
+        model: getChatModel(),
         maxOutputTokens: 2000,
         system: `Extract customer success stories / case studies from this page.
 Return company name, title, challenge, solution, results, industry, use case.
@@ -367,7 +364,7 @@ export async function searchEventsForContentLibrary(params: {
 
     try {
       const { object: extracted } = await generateObject({
-        model: anthropic('claude-sonnet-4-20250514'),
+        model: getChatModel(),
         maxOutputTokens: 2000,
         system: `Extract event/session information from search result content (conferences, webinars, sessions).
 For each event include: title (required), description, date (if present), url (registration or detail), eventType (e.g. conference, webinar, session).`,

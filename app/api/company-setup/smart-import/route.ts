@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { startCrawl, getCrawlStatus } from '@/lib/tools/firecrawl';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 
-const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const bodySchema = z.object({
   website: z.string().url().or(z.string().min(1).transform((s) => (s.startsWith('http') ? s : `https://${s}`))),
@@ -59,7 +58,7 @@ async function categorizePage(
 ): Promise<{ title: string; description: string; suggestedType: string; industry?: string; department?: string }> {
   const excerpt = markdown.slice(0, 8000);
   const { text } = await generateText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     maxOutputTokens: 500,
     system: `You are a content classifier. Given a web page URL and excerpt, output exactly:
 - title: short page title (from content or URL)

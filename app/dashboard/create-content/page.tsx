@@ -18,17 +18,17 @@ export default async function CreateContentPage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Create content</h1>
         <p className="text-gray-600 dark:text-gray-300 mb-6">
-          Generate email, LinkedIn, or custom copy for your marketing automation. Select a company to use its account intelligence and your content library.
+          Generate email, LinkedIn, or custom copy for your marketing automation. Select a target company to use its account intelligence and your company data.
         </p>
 
         {companies.length === 0 ? (
           <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-8 text-center">
-            <p className="text-gray-600 dark:text-gray-300 mb-4">Add a company first to create content with account context.</p>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">Add a target company first to create content with account context.</p>
             <Link
               href="/dashboard/companies/new"
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
             >
-              Add company
+              Add target company
             </Link>
           </div>
         ) : (
@@ -44,7 +44,7 @@ export default async function CreateContentPage() {
                     {company.domain ?? 'No domain'}
                   </p>
                   <span className="text-sm text-blue-600 dark:text-blue-400 mt-2 inline-block">
-                    Create content for this company →
+                    Create content for this target company →
                   </span>
                 </Link>
               </li>

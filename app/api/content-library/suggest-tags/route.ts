@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, Output } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const suggestTagsSchema = z.object({
   industry: z.string().nullable().optional(),
@@ -52,7 +48,7 @@ export async function POST(req: NextRequest) {
     const contentSnippet = JSON.stringify(content).slice(0, 500);
 
     const { output: suggestions } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: getChatModel(),
       maxOutputTokens: 1000,
       prompt: `Based on how this user has tagged similar content in the past, suggest appropriate tags for new content.
 

@@ -91,7 +91,7 @@ export function ReviewImportedContent({ importJob }: Props) {
           Review imported content
         </h1>
         <p className="text-gray-600 dark:text-gray-300 mb-6">
-          Select the items to add to your Content Library. Unselected items will be skipped.
+          Select the items to add to your company data. Unselected items will be skipped.
         </p>
         {error && (
           <p className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">

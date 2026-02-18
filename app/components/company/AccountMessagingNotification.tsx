@@ -36,7 +36,7 @@ export function AccountMessagingNotification({ companyId }: Props) {
             ✓ Account Messaging Auto-Generated
           </h3>
           <p className="text-sm text-green-800 dark:text-green-200">
-            Account Messaging has been automatically generated from your research data and Content Library.
+            Account Messaging has been automatically generated from your research data and your company data.
             You can review and customize it in the Messaging tab.
           </p>
         </div>

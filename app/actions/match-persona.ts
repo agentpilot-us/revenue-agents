@@ -1,14 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 import { DepartmentType } from '@prisma/client';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const personaMatchSchema = z.object({
   personaId: z.string(),
@@ -41,7 +37,7 @@ export async function matchPersona(contactData: {
 
   // 2. Use Claude to match
   const { object } = await generateObject({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     schema: personaMatchSchema,
     prompt: `
       You are matching a contact to the best persona in our system.

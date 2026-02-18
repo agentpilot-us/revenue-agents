@@ -43,9 +43,9 @@ export default function NewCompanyPage() {
   return (
     <div className="max-w-lg mx-auto py-8 px-6 bg-gray-50 dark:bg-zinc-900 min-h-screen">
       <Link href="/dashboard/companies" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mb-6 inline-block">
-        ← Back to Companies
+        ← Back to Target companies
       </Link>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Add company</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Add target company</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">{error}</p>

@@ -1,11 +1,6 @@
 import { embedMany } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { getEmbeddingModel } from '@/lib/llm/get-embedding';
 
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const EMBEDDING_MODEL = 'text-embedding-3-small';
 const CHUNK_SIZE = 600;
 const CHUNK_OVERLAP = 100;
 const TOP_K = 8;
@@ -44,7 +39,7 @@ export async function embedChunks(texts: string[]): Promise<ChunkWithEmbedding[]
   if (texts.length === 0) return [];
 
   const { embeddings } = await embedMany({
-    model: openai.embedding(EMBEDDING_MODEL),
+    model: getEmbeddingModel(),
     values: texts,
   });
 

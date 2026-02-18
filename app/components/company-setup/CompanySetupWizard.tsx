@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -50,6 +51,7 @@ function parseUrl(url: string): string {
 }
 
 export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfileProp }: Props) {
+  const router = useRouter();
   const onSaveProfile = useCallback(
     async (data: CompanySetupData) => {
       if (onSaveProfileProp) {
@@ -146,6 +148,20 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
     } finally {
       setSaving(false);
       setImporting(false);
+    }
+  };
+
+  const handleSkipAndAddContentLater = async () => {
+    if (!isValid) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      await onSaveProfile(data);
+      router.push('/dashboard/content-library');
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Failed to save' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -265,22 +281,22 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Setup complete!</h1>
         <p className="text-gray-600 dark:text-gray-400">Your content library is ready to use.</p>
         <div className="rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6 text-left">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Your Content Library</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Your company data</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400">{successStats?.created ?? 0} items added.</p>
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Auto-refresh: {data.contentRefreshFrequency || 'Weekly'}. Notifications: {data.notifyOnNewContent ? 'Enabled' : 'Off'} ({initialData.email ?? 'your email'}).</p>
         </div>
         <div className="rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6 text-left">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">What&apos;s next?</h2>
           <ol className="list-decimal list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1 mb-4">
-            <li>Add your first target account (e.g. a company you sell to)</li>
+            <li>Add your first target company (the account you want to engage)</li>
             <li>AI will research the account and create personalized content using your library</li>
             <li>Generate landing pages in minutes</li>
           </ol>
           <div className="flex flex-wrap gap-3 justify-center">
-            <Link href="/dashboard/companies/new"><Button>Create Your First Campaign</Button></Link>
+            <Link href="/dashboard/companies/new"><Button>Add your first target company</Button></Link>
             <Link href="/dashboard"><Button variant="outline">Go to Dashboard</Button></Link>
-            <Link href="/dashboard/content-library"><Button variant="outline">View Content Library</Button></Link>
-            <Link href="/dashboard/content-library/import"><Button variant="outline">Add More Content</Button></Link>
+            <Link href="/dashboard/content-library"><Button variant="outline">View your company data</Button></Link>
+            <Link href="/dashboard/content-library"><Button variant="outline">Add more content</Button></Link>
           </div>
         </div>
       </div>
@@ -290,9 +306,9 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Company Setup</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Set up your company</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Tell us about your company so AI can personalize campaigns for your target accounts.
+          Tell us about your company so AI can personalize campaigns for your target companies.
         </p>
         <Link
           href="/dashboard"
@@ -314,10 +330,10 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         </div>
       )}
 
-      {/* Step 1: Basic Information */}
+      {/* Step 1 of 3: Your company basics */}
       <section className="rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Step 1: Basic Information
+          Step 1 of 3: Your company basics
         </h2>
         <div className="space-y-4">
           <div>
@@ -389,10 +405,10 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         </div>
       </section>
 
-      {/* Step 2: Import Your Content */}
+      {/* Step 2 of 3: Import Your Content */}
       <section className="rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Step 2: Import Your Content
+          Step 2 of 3: Import your content
         </h2>
         <div className="rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-6 space-y-4">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">
@@ -415,13 +431,13 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         </div>
         <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">————— OR —————</p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/dashboard/content-library/import">
+          <Link href="/dashboard/content-library">
             <Button variant="outline">Upload Files</Button>
           </Link>
-          <Link href="/dashboard/content-library/import">
+          <Link href="/dashboard/content-library">
             <Button variant="outline">Add Specific URLs</Button>
           </Link>
-          <Link href="/dashboard/content-library/import">
+          <Link href="/dashboard/content-library">
             <Button variant="outline">Enter Text</Button>
           </Link>
         </div>
@@ -459,10 +475,10 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         </details>
       </section>
 
-      {/* Step 3: Keep Content Fresh */}
+      {/* Step 3 of 3: Keep Content Fresh */}
       <section className="rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Step 3: Keep Content Fresh
+          Step 3 of 3: Keep content fresh
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Auto-refresh your content library to keep it current.
@@ -541,13 +557,18 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <Link href="/dashboard">
           <Button variant="outline">Cancel</Button>
         </Link>
-        <Button onClick={handleContinueToImport} disabled={!isValid || saving}>
-          {saving ? 'Saving…' : 'Continue to Import →'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleSkipAndAddContentLater} disabled={!isValid || saving}>
+            Skip and add content later
+          </Button>
+          <Button onClick={handleContinueToImport} disabled={!isValid || saving}>
+            {saving ? 'Saving…' : 'Continue to Import →'}
+          </Button>
+        </div>
       </div>
     </div>
   );

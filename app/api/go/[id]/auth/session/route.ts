@@ -45,7 +45,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionToken = getSessionTokenFromCookies();
+    const sessionToken = await getSessionTokenFromCookies();
 
     if (sessionToken) {
       await invalidateSession(sessionToken);

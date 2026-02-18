@@ -20,30 +20,30 @@ export default async function CompaniesListPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Target companies</h1>
             <p className="text-gray-600 mt-1">
-              Manage accounts and run expansion, partner, or referral plays from a company.
+              Manage accounts and run expansion, partner, or referral plays from a target company.
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              Open a company to build your contact list, import from CRM (HubSpot/Salesforce), and enrich contacts. Run outbound sequences in your CRM.
+              Open a target company to build your contact list, import from CRM (HubSpot/Salesforce), and enrich contacts. Run outbound sequences in your CRM.
             </p>
           </div>
           <Link
             href="/dashboard/companies/new"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
           >
-            Add company
+            Add target company
           </Link>
         </div>
 
         {companies.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-            <p className="text-gray-600 mb-4">No companies yet. Add one to launch the expansion agent and send emails.</p>
+            <p className="text-gray-600 mb-4">No target companies yet. Add one to launch the expansion agent and send emails.</p>
             <Link
               href="/dashboard/companies/new"
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
             >
-              Add your first company
+              Add your first target company
             </Link>
           </div>
         ) : (

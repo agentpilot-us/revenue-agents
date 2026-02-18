@@ -8,7 +8,7 @@ export const aviationCopy = {
     noCompanies: {
       title: 'Ready for takeoff?',
       body: 'Create your first target account to begin the expansion journey.',
-      cta: 'Add your first company',
+      cta: 'Add your first target company',
     },
     noContacts: {
       title: 'Time to assemble your crew.',

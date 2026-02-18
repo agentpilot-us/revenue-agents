@@ -17,7 +17,7 @@ export const companyResearchSchema = z.object({
     summary: z.string().describe('2-3 sentence description of the company\'s core business'),
     keyInitiatives: z.array(z.string()).describe('Major initiatives with specifics'),
   }),
-  nvidiaProductFit: z.array(
+  productFit: z.array(
     z.object({
       product: z.string().describe('Product name (must match a CatalogProduct name)'),
       useCase: z.string().describe('Specific use case at this company'),

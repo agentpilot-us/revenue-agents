@@ -19,9 +19,9 @@ const navigation: Array<{
   badgeCount?: number;
 }> = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Companies', href: '/dashboard/companies', icon: Building2 },
+  { name: 'Target companies', href: '/dashboard/companies', icon: Building2 },
   { name: 'Create content', href: '/dashboard/create-content', icon: FileText },
-  { name: 'Content Library', href: '/dashboard/content-library', icon: BookOpen },
+  { name: 'Your company data', href: '/dashboard/content-library', icon: BookOpen },
   { name: 'Webhooks', href: '/dashboard/webhooks', icon: Bolt },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   { name: 'Billing', href: '/billing', icon: CreditCard },

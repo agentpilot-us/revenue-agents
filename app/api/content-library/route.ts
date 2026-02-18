@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
       'EmailContent',
       'VideoLink',
       'ResourceLink',
+      'UploadedDocument',
     ];
     const typeFilter =
       type && validTypes.includes(type as ContentType) ? (type as ContentType) : undefined;
@@ -79,17 +80,20 @@ export async function POST(req: NextRequest) {
       confidenceScore,
     } = await req.json();
 
-    const product = await prisma.product.findFirst({
-      where: { id: productId, userId: session.user.id },
-    });
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found or access denied' }, { status: 404 });
+    let resolvedProductId: string | null = productId ?? null;
+    if (resolvedProductId) {
+      const product = await prisma.product.findFirst({
+        where: { id: resolvedProductId, userId: session.user.id },
+      });
+      if (!product) {
+        return NextResponse.json({ error: 'Product not found or access denied' }, { status: 404 });
+      }
     }
 
     const contentItem = await prisma.contentLibrary.create({
       data: {
         userId: session.user.id,
-        productId,
+        productId: resolvedProductId,
         title,
         type,
         content,

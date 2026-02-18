@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, Output } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 import {
   getCompanyEventsBlock,
@@ -12,10 +12,11 @@ import {
 } from '@/lib/prompt-context';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
+import {
+  findRelevantContentLibraryChunks,
+  formatRAGChunksForPrompt,
+} from '@/lib/content-library-rag';
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const bodySchema = z.object({
   scope: z.enum(['company', 'segments']),
@@ -130,9 +131,14 @@ export async function POST(
     const accountSection = accountBlock ? `\n\nACCOUNT MESSAGING:\n${accountBlock}` : '';
     const playbookSection = industryPlaybookBlock ? `\n\nINDUSTRY PLAYBOOK:\n${industryPlaybookBlock}` : '';
 
+    const ragQuery = `landing page value prop for ${company.name} ${targets.map((t) => t.segmentName).join(' ')}`;
+    const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 8);
+    const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
+
     const contextParts: string[] = [
       `Company: ${company.name}`,
       company.industry ? `Industry: ${company.industry}` : '',
+      ragSection,
       researchSection,
       accountSection,
       playbookSection,
@@ -233,19 +239,40 @@ ${contextParts.join('\n')}
 
 Output exactly one draft per target (${targets.length} total). Return valid JSON: { "drafts": [ { "departmentId": null or "id", "segmentName": "...", "headline": "...", "body": "<p>...</p>", "pageSections": { ... } or omit } ] }`;
 
-    const { output } = await generateText({
-      model: anthropic('claude-sonnet-4-20250514'),
-      maxOutputTokens: 8000,
-      system: systemPrompt,
-      prompt: userPrompt,
-      output: Output.object({
-        schema: outputSchema,
-        name: 'CampaignDrafts',
-        description: 'Landing page drafts per segment or company',
-      }),
-    });
+    const useLmStudioFallback = process.env.LLM_PROVIDER === 'lmstudio';
+    let drafts: z.infer<typeof draftSchema>[];
 
-    const drafts = Array.isArray(output.drafts) ? output.drafts : [];
+    if (useLmStudioFallback) {
+      const { text } = await generateText({
+        model: getChatModel(),
+        maxOutputTokens: 8000,
+        system: systemPrompt + '\n\nRespond with only a single JSON object. No markdown, no code fences. Top-level key must be "drafts" (array).',
+        prompt: userPrompt,
+      });
+      const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsed = outputSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        console.error('LM Studio draft JSON validation failed:', parsed.error.flatten());
+        return NextResponse.json(
+          { error: 'AI returned invalid draft structure. Try again.', details: parsed.error.flatten() },
+          { status: 500 }
+        );
+      }
+      drafts = parsed.data.drafts;
+    } else {
+      const { output } = await generateText({
+        model: getChatModel(),
+        maxOutputTokens: 8000,
+        system: systemPrompt,
+        prompt: userPrompt,
+        output: Output.object({
+          schema: outputSchema,
+          name: 'CampaignDrafts',
+          description: 'Landing page drafts per segment or company',
+        }),
+      });
+      drafts = Array.isArray(output.drafts) ? output.drafts : [];
+    }
     if (drafts.length !== targets.length) {
       return NextResponse.json(
         { error: 'AI did not return the expected number of drafts', received: drafts.length, expected: targets.length },

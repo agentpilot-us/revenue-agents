@@ -117,7 +117,7 @@ export function AccountIntelligenceClient({
               )}
             </div>
             <p className="text-sm text-slate-400 mt-1">
-              Auto-generate why-this-company, use cases, success stories, and objection handlers from research and Content Library.
+              Auto-generate why-this-company, use cases, success stories, and objection handlers from research and your company data.
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">

@@ -1,14 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/db';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { ContentItemType } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export async function draftEmail(params: {
   contactId: string;
@@ -81,7 +77,7 @@ export async function draftEmail(params: {
       .join(', ') || 'None';
 
   const { text } = await generateText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     prompt: `
       You are drafting a personalized outreach email for account expansion.
       

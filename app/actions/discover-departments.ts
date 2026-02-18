@@ -3,14 +3,10 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { researchCompany } from '@/lib/tools/perplexity';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, Output } from 'ai';
+import { getChatModel } from '@/lib/llm/get-model';
 import { DepartmentType } from '@prisma/client';
 import { z } from 'zod';
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 const departmentDiscoverySchema = z.object({
   departments: z.array(
@@ -80,7 +76,7 @@ Focus on departments relevant to B2B sales/expansion (not HR, Legal, etc. unless
       : 'No known contacts yet.';
 
   const { output } = await generateText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: getChatModel(),
     maxOutputTokens: 2000,
     prompt: `
 Based on this research about ${company.name}:
