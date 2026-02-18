@@ -112,8 +112,14 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
         method: 'POST',
         body: form,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error('File too large (max 4 MB). Try a smaller file.');
+        }
+        const msg = data?.error || data?.details || 'Upload failed';
+        throw new Error(msg);
+      }
       setSuccess(`Uploaded "${file.name}".`);
       e.target.value = '';
       refresh();
@@ -217,7 +223,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
       {mode === 'upload' && (
         <div>
           <label className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer">
-            {loading ? 'Uploading…' : 'Choose file (PDF, DOCX, TXT)'}
+            {loading ? 'Uploading…' : 'Choose file (PDF, DOCX, TXT, max 4 MB)'}
             <input
               type="file"
               accept=".pdf,.docx,.doc,.txt,.md"

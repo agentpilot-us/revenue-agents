@@ -4,7 +4,8 @@ import { put } from '@vercel/blob';
 import { prisma } from '@/lib/db';
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+// Vercel serverless body limit is 4.5 MB; keep under that for uploads through the API route
+const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,7 +57,8 @@ export async function POST(req: NextRequest) {
       ) {
         const arrayBuffer = await file.arrayBuffer();
         const mammoth = await import('mammoth');
-        const result = await mammoth.extractRawText({ arrayBuffer });
+        // mammoth Node API expects path, buffer, or file — not arrayBuffer
+        const result = await mammoth.extractRawText({ buffer: Buffer.from(arrayBuffer) });
         fullText = (result.value ?? '').trim().slice(0, 500_000);
       } else if (
         mimeType === 'text/plain' ||
@@ -119,11 +121,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ content: row }, { status: 201 });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Content library upload error:', error);
     return NextResponse.json(
       {
-        error: 'Failed to upload',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        error: message,
+        details: message,
       },
       { status: 500 }
     );

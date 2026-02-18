@@ -1,21 +1,24 @@
 /**
- * Central chat model for the app. Use getChatModel() everywhere instead of
- * createAnthropic() / anthropic('...') so we can switch to LM Studio or mocks via env.
+ * Central chat model for the app. Use getChatModel() everywhere so we can switch
+ * provider via env. Default: Gemini when GOOGLE_GENERATIVE_AI_API_KEY is set;
+ * otherwise Anthropic. Mock available for tests.
  *
  * Env:
- * - USE_MOCK_LLM=true → mock model (no API calls; for tests / local dev without credits)
- * - LLM_PROVIDER=lmstudio → LM Studio (or any OpenAI-compatible server) at LM_STUDIO_BASE_URL
- * - else → Anthropic (default)
+ * - USE_MOCK_LLM=true → mock model (no API calls)
+ * - GOOGLE_GENERATIVE_AI_API_KEY → Gemini (default for chat; recommended for low cost / token limits)
+ * - else ANTHROPIC_API_KEY → Anthropic (fallback for teams that prefer it)
  */
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { google } from '@ai-sdk/google';
 import { simulateReadableStream } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 
 const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
+const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL ?? 'gemini-2.5-flash';
 
 function getMockChatModel() {
-  const mockText = 'This is a mock response. Set USE_MOCK_LLM=false and LLM_PROVIDER=lmstudio or use Anthropic for real responses.';
+  const mockText =
+    'This is a mock response. Set USE_MOCK_LLM=false and set GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY for real responses.';
   return new MockLanguageModelV3({
     doGenerate: async () => ({
       content: [{ type: 'text', text: mockText }],
@@ -45,15 +48,8 @@ function getMockChatModel() {
   });
 }
 
-function getLMStudioModel() {
-  const baseURL = process.env.LM_STUDIO_BASE_URL ?? 'http://localhost:1234/v1';
-  const modelId = process.env.LM_STUDIO_MODEL ?? '';
-  const provider = createOpenAICompatible({
-    name: 'lmstudio',
-    baseURL,
-    apiKey: process.env.LM_STUDIO_API_KEY,
-  });
-  return provider.chatModel(modelId || 'local');
+function getGeminiChatModel() {
+  return google(GEMINI_CHAT_MODEL);
 }
 
 function getAnthropicModel() {
@@ -64,15 +60,15 @@ function getAnthropicModel() {
 }
 
 /**
- * Returns the chat model to use for generateText / streamText / generateObject.
- * Respects USE_MOCK_LLM and LLM_PROVIDER (e.g. lmstudio).
+ * Returns the chat model for generateText / streamText / generateObject.
+ * Uses Gemini when GOOGLE_GENERATIVE_AI_API_KEY (or LLM_PROVIDER=gemini) is set; otherwise Anthropic.
  */
 export function getChatModel() {
   if (process.env.USE_MOCK_LLM === 'true') {
     return getMockChatModel();
   }
-  if (process.env.LLM_PROVIDER === 'lmstudio') {
-    return getLMStudioModel();
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini') {
+    return getGeminiChatModel();
   }
   return getAnthropicModel();
 }

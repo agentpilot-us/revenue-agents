@@ -1,31 +1,23 @@
 /**
  * Central embedding model for RAG (content library and messaging).
- * When LLM_PROVIDER=lmstudio, uses the same LM Studio server; otherwise OpenAI.
+ * Default: Gemini when GOOGLE_GENERATIVE_AI_API_KEY is set (1536 dim to match DB);
+ * otherwise OpenAI text-embedding-3-small.
  *
  * Env:
- * - LLM_PROVIDER=lmstudio → LM Studio at LM_STUDIO_BASE_URL, model LM_STUDIO_EMBEDDING_MODEL or LM_STUDIO_MODEL or "local"
- * - else → OpenAI text-embedding-3-small (requires OPENAI_API_KEY)
+ * - GOOGLE_GENERATIVE_AI_API_KEY (or LLM_PROVIDER=gemini) → Gemini text-embedding-004, 1536 dim
+ * - else → OpenAI text-embedding-3-small (OPENAI_API_KEY)
  *
- * If you switch from OpenAI to LM Studio, existing content library chunks may have a different
- * vector dimension; re-import or re-ingest content so all vectors match.
+ * If you switch provider, re-ingest content so all vectors use the same dimension.
  */
 import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { google } from '@ai-sdk/google';
 
 const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+const GEMINI_EMBEDDING_MODEL = 'text-embedding-004';
+const RAG_EMBEDDING_DIMENSION = 1536;
 
-function getLMStudioEmbeddingModel() {
-  const baseURL = process.env.LM_STUDIO_BASE_URL ?? 'http://localhost:1234/v1';
-  const modelId =
-    process.env.LM_STUDIO_EMBEDDING_MODEL ??
-    process.env.LM_STUDIO_MODEL ??
-    'local';
-  const provider = createOpenAICompatible({
-    name: 'lmstudio',
-    baseURL,
-    apiKey: process.env.LM_STUDIO_API_KEY,
-  });
-  return provider.embeddingModel(modelId);
+function getGeminiEmbeddingModel() {
+  return google.embedding(GEMINI_EMBEDDING_MODEL);
 }
 
 function getOpenAIEmbeddingModel() {
@@ -35,11 +27,20 @@ function getOpenAIEmbeddingModel() {
 
 /**
  * Returns the embedding model for embed() / embedMany().
- * Uses LM Studio when LLM_PROVIDER=lmstudio, otherwise OpenAI.
+ * Gemini when Google key is set; otherwise OpenAI.
  */
 export function getEmbeddingModel() {
-  if (process.env.LLM_PROVIDER === 'lmstudio') {
-    return getLMStudioEmbeddingModel();
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini') {
+    return getGeminiEmbeddingModel();
   }
   return getOpenAIEmbeddingModel();
 }
+
+/**
+ * Provider options for RAG embedding calls. Pass to embed() / embedMany() so
+ * Gemini uses 1536 dimensions (matches ContentLibraryChunk.embedding vector).
+ * Safe to pass when using OpenAI (ignored).
+ */
+export const RAG_EMBEDDING_PROVIDER_OPTIONS = {
+  google: { outputDimensionality: RAG_EMBEDDING_DIMENSION },
+} as const;

@@ -1,5 +1,5 @@
 import { embedMany } from 'ai';
-import { getEmbeddingModel } from '@/lib/llm/get-embedding';
+import { getEmbeddingModel, RAG_EMBEDDING_PROVIDER_OPTIONS } from '@/lib/llm/get-embedding';
 
 const CHUNK_SIZE = 600;
 const CHUNK_OVERLAP = 100;
@@ -41,6 +41,7 @@ export async function embedChunks(texts: string[]): Promise<ChunkWithEmbedding[]
   const { embeddings } = await embedMany({
     model: getEmbeddingModel(),
     values: texts,
+    providerOptions: RAG_EMBEDDING_PROVIDER_OPTIONS,
   });
 
   return texts.map((text, i) => ({

@@ -126,43 +126,19 @@ export async function POST(req: NextRequest) {
 Page content:
 ${pageContent}`;
 
-    const useLmStudioFallback = process.env.LLM_PROVIDER === 'lmstudio';
-    let extracted: z.infer<typeof extractionSchema>;
-
-    if (useLmStudioFallback) {
-      const jsonHint = `
-Respond with only a single JSON object. No markdown, no code fences. Keys: title, type, valueProp?, inference?: { industry?, department?, persona?, confidence?, reasoning? }, useCases?, benefits?, painPoints?, technicalSpecs?, customers?, proofPoints?, talkingPoints?, successStories?.`;
-      const { text } = await generateText({
-        model: getChatModel(),
-        maxOutputTokens: 4000,
-        system: SYSTEM_PROMPT + jsonHint,
-        prompt: userPrompt,
-      });
-      const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed = extractionSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) {
-        console.error('LM Studio extraction JSON validation failed:', parsed.error.flatten());
-        return NextResponse.json(
-          { error: 'AI returned invalid extraction structure. Try again.', details: parsed.error.flatten() },
-          { status: 500 }
-        );
-      }
-      extracted = parsed.data;
-    } else {
-      const { output } = await generateText({
-        model: getChatModel(),
-        maxOutputTokens: 4000,
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        output: Output.object({
-          schema: extractionSchema,
-          name: 'ContentExtraction',
-          description:
-            'Structured sales enablement content and inferred organizational tags',
-        }),
-      });
-      extracted = output as z.infer<typeof extractionSchema>;
-    }
+    const { output } = await generateText({
+      model: getChatModel(),
+      maxOutputTokens: 4000,
+      system: SYSTEM_PROMPT,
+      prompt: userPrompt,
+      output: Output.object({
+        schema: extractionSchema,
+        name: 'ContentExtraction',
+        description:
+          'Structured sales enablement content and inferred organizational tags',
+      }),
+    });
+    const extracted = output as z.infer<typeof extractionSchema>;
 
     console.log('✅ LLM response received');
 

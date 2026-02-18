@@ -1,13 +1,10 @@
-import { generateObject, generateText } from 'ai';
+import { generateObject } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 import { researchCompany } from '@/lib/tools/perplexity';
 import { prisma } from '@/lib/db';
 import { companyResearchSchema, type CompanyResearchData } from './company-research-schema';
 import { buildCompanyResearchPrompt } from './company-research-prompt';
-
-/** LM Studio only accepts response_format.type 'json_schema' or 'text'; generateObject sends a different format. Use generateText + parse when using LM Studio. */
-const USE_LMSTUDIO_STRUCTURED_FALLBACK = process.env.LLM_PROVIDER === 'lmstudio';
 
 export type ResearchCompanyResult =
   | { ok: true; data: CompanyResearchData }
@@ -71,8 +68,12 @@ Focus on information relevant to B2B enterprise software sales, particularly AI 
     }));
     const systemPrompt = buildCompanyResearchPrompt(catalogForPrompt);
 
-    if (process.env.USE_MOCK_LLM !== 'true' && process.env.LLM_PROVIDER !== 'lmstudio' && !process.env.ANTHROPIC_API_KEY) {
-      return { ok: false, error: 'ANTHROPIC_API_KEY not configured' };
+    if (
+      process.env.USE_MOCK_LLM !== 'true' &&
+      !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+      !process.env.ANTHROPIC_API_KEY
+    ) {
+      return { ok: false, error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required' };
     }
 
     const userPrompt = `Company Name: ${companyName}
@@ -84,30 +85,14 @@ ${perplexityResult.summary}
 Based on this research, extract and structure the company information according to the schema.`;
 
     try {
-      let object: unknown;
-      if (USE_LMSTUDIO_STRUCTURED_FALLBACK) {
-        console.log('Using generateText + JSON parse for LM Studio...');
-        const jsonHint = `
-Output a single JSON object with exactly these top-level keys: companyBasics (name, website, industry, employees, headquarters, revenue), whatTheyDo (summary, keyInitiatives), productFit (array of { product, useCase, whyRelevant }), microSegments (array of { name, departmentType?, useCase, products, estimatedOpportunity?, roles: { economicBuyer, technicalEvaluator, champion, influencer } }). No markdown, no code fences, no explanation.`;
-        const { text } = await generateText({
-          model: getChatModel(),
-          system: systemPrompt + jsonHint,
-          maxOutputTokens: 4000,
-          prompt: userPrompt,
-        });
-        const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-        object = JSON.parse(raw) as unknown;
-      } else {
-        console.log('Calling generateObject with schema...');
-        const result = await generateObject({
-          model: getChatModel(),
-          schema: companyResearchSchema,
-          system: systemPrompt,
-          maxOutputTokens: 4000,
-          prompt: userPrompt,
-        });
-        object = result.object;
-      }
+      const result = await generateObject({
+        model: getChatModel(),
+        schema: companyResearchSchema,
+        system: systemPrompt,
+        maxOutputTokens: 4000,
+        prompt: userPrompt,
+      });
+      const object = result.object;
 
       console.log('Validating result...');
       const parsed = companyResearchSchema.safeParse(object);

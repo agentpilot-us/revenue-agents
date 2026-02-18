@@ -5,7 +5,7 @@
 import { embed } from 'ai';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { getEmbeddingModel } from '@/lib/llm/get-embedding';
+import { getEmbeddingModel, RAG_EMBEDDING_PROVIDER_OPTIONS } from '@/lib/llm/get-embedding';
 import { chunkText, embedChunks } from '@/lib/rag-messaging';
 
 const DEFAULT_TOP_K = 8;
@@ -58,6 +58,7 @@ export async function findRelevantContentLibraryChunks(
   const { embedding } = await embed({
     model: getEmbeddingModel(),
     value: query.replace(/\s+/g, ' ').trim().slice(0, 8000),
+    providerOptions: RAG_EMBEDDING_PROVIDER_OPTIONS,
   });
   const vectorStr = '[' + (embedding as number[]).join(',') + ']';
 
