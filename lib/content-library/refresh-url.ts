@@ -32,7 +32,8 @@ export async function refreshContentLibraryItem(
   });
 
   if (!scrapeResult.ok || !scrapeResult.markdown) {
-    return { ok: false, error: scrapeResult.error ?? 'Failed to fetch URL' };
+    const message = scrapeResult.ok === false ? scrapeResult.error : 'Failed to fetch URL';
+    return { ok: false, error: message };
   }
 
   const markdown = scrapeResult.markdown.slice(0, 100_000);
