@@ -4,6 +4,21 @@ import { DepartmentType } from '@prisma/client';
 // Create a Zod enum from Prisma enum
 const DepartmentTypeEnum = z.nativeEnum(DepartmentType);
 
+/** Single micro-segment schema; exported for apply-research extend. */
+export const microSegmentSchema = z.object({
+  name: z.string().describe('Department/Division name'),
+  departmentType: DepartmentTypeEnum.optional().describe('DepartmentType enum if matches'),
+  useCase: z.string().describe('What they would use these products for'),
+  products: z.array(z.string()).min(1).describe('Array of product slugs (must match CatalogProduct slugs)'),
+  estimatedOpportunity: z.string().optional().describe('Estimated opportunity size, e.g., "$500K - $2M"'),
+  roles: z.object({
+    economicBuyer: z.array(z.string()).default([]).describe('Job titles for economic buyers, e.g., ["VP Engineering", "CTO"]'),
+    technicalEvaluator: z.array(z.string()).default([]).describe('Job titles for technical evaluators, e.g., ["Director ML", "Director Perception"]'),
+    champion: z.array(z.string()).default([]).describe('Job titles for champions, e.g., ["Senior ML Engineer", "Tech Lead"]'),
+    influencer: z.array(z.string()).default([]).describe('Job titles for influencers, e.g., ["ML Engineer", "Perception Engineer"]'),
+  }),
+});
+
 export const companyResearchSchema = z.object({
   companyBasics: z.object({
     name: z.string().describe('Official company name'),
@@ -24,21 +39,7 @@ export const companyResearchSchema = z.object({
       whyRelevant: z.string().describe('Why this product matters for them specifically'),
     })
   ),
-  microSegments: z.array(
-    z.object({
-      name: z.string().describe('Department/Division name'),
-      departmentType: DepartmentTypeEnum.optional().describe('DepartmentType enum if matches'),
-      useCase: z.string().describe('What they would use these products for'),
-      products: z.array(z.string()).min(1).describe('Array of product slugs (must match CatalogProduct slugs)'),
-      estimatedOpportunity: z.string().optional().describe('Estimated opportunity size, e.g., "$500K - $2M"'),
-      roles: z.object({
-        economicBuyer: z.array(z.string()).default([]).describe('Job titles for economic buyers, e.g., ["VP Engineering", "CTO"]'),
-        technicalEvaluator: z.array(z.string()).default([]).describe('Job titles for technical evaluators, e.g., ["Director ML", "Director Perception"]'),
-        champion: z.array(z.string()).default([]).describe('Job titles for champions, e.g., ["Senior ML Engineer", "Tech Lead"]'),
-        influencer: z.array(z.string()).default([]).describe('Job titles for influencers, e.g., ["ML Engineer", "Perception Engineer"]'),
-      }),
-    })
-  ).default([]),
+  microSegments: z.array(microSegmentSchema).default([]),
 });
 
 export type CompanyResearchData = z.infer<typeof companyResearchSchema>;

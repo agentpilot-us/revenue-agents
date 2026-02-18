@@ -3,12 +3,12 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { DepartmentType, DepartmentStatus } from '@prisma/client';
-import { companyResearchSchema } from '@/lib/research/company-research-schema';
+import { companyResearchSchema, microSegmentSchema } from '@/lib/research/company-research-schema';
 import { autoGenerateAccountMessaging } from '@/lib/account-messaging/auto-generate';
 
 const applyResearchSchema = companyResearchSchema.extend({
   microSegments: z.array(
-    companyResearchSchema.shape.microSegments.element.extend({
+    microSegmentSchema.extend({
       departmentType: z.nativeEnum(DepartmentType).optional(),
     })
   ),
