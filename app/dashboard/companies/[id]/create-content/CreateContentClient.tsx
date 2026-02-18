@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { CreateLandingPageFlow, type ApprovedCampaignItem, type DepartmentOption } from '@/app/components/company/CampaignsTab';
+import { CreateLandingPageFlow, type ApprovedCampaignItem, type DepartmentOption, type LandingPageDraft } from '@/app/components/company/CampaignsTab';
 
 type ContentType = 'email' | 'linkedin' | 'custom_url';
 
@@ -47,7 +47,7 @@ export function CreateContentClient({
     addCaseStudy: false,
     showSuccessStory: false,
   });
-  const [landingDrafts, setLandingDrafts] = useState<{ departmentId: string | null; segmentName: string; headline: string; body: string; pageSections: unknown }[]>([]);
+  const [landingDrafts, setLandingDrafts] = useState<LandingPageDraft[]>([]);
   const [landingGenerating, setLandingGenerating] = useState(false);
   const [landingApproving, setLandingApproving] = useState(false);
   const [landingApproved, setLandingApproved] = useState<ApprovedCampaignItem[] | null>(null);

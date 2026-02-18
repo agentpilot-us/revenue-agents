@@ -23,7 +23,7 @@ export type CampaignItem = {
 };
 
 /** Draft from generate-draft API (optimistic preview, not saved). */
-type LandingPageDraft = {
+export type LandingPageDraft = {
   departmentId: string | null;
   segmentName: string;
   headline: string;
