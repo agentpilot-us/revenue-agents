@@ -38,7 +38,7 @@ export const companyResearchSchema = z.object({
         influencer: z.array(z.string()).default([]).describe('Job titles for influencers, e.g., ["ML Engineer", "Perception Engineer"]'),
       }),
     })
-  ).min(1),
+  ).default([]),
 });
 
 export type CompanyResearchData = z.infer<typeof companyResearchSchema>;
