@@ -3,7 +3,6 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { CompanyTabs } from '@/app/components/company/CompanyTabs';
-import { CompanyGetStarted } from '@/app/components/company/CompanyGetStarted';
 import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { CompanyARRActions } from '@/app/components/company/CompanyARRActions';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
@@ -331,18 +330,6 @@ export default async function CompanyDetailPage({
             </div>
           </div>
         </div>
-
-      
-
-        <CompanyGetStarted
-          companyId={id}
-          companyName={company.name}
-          hasDepartments={departments.length > 0}
-          hasContacts={company.contacts.length > 0}
-          hasMessaging={hasMessaging}
-          hasResearch={!!company.researchData}
-          hasLaunchedCampaign={campaigns.length > 0}
-        />
 
         {initialTab === 'campaigns' && (
           <div className="mb-6">

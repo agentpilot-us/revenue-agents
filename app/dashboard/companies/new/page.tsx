@@ -31,7 +31,7 @@ export default function NewCompanyPage() {
         setError(data.error || 'Failed to create company');
         return;
       }
-      router.push(`/dashboard/companies/${data.company.id}`);
+      router.push(`/dashboard/companies/${data.company.id}/intelligence`);
       router.refresh();
     } catch {
       setError('Something went wrong');

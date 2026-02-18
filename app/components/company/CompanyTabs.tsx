@@ -6,6 +6,7 @@ import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
 import { ProductPenetrationMatrix } from '@/app/components/company/ProductPenetrationMatrix';
 import { AccountMessagingTab } from '@/app/components/company/AccountMessagingTab';
 import { CampaignsTab, type CampaignItem } from '@/app/components/company/CampaignsTab';
+import { CompanyResearchDisplay } from '@/app/components/company/CompanyResearchDisplay';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -108,6 +109,10 @@ export function CompanyTabs({
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Account research</h2>
+            <CompanyResearchDisplay companyId={companyId} />
+          </div>
           {(pipelineByMicrosegment.length > 0 || funnel) && (
             <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Pipeline &amp; funnel</h2>

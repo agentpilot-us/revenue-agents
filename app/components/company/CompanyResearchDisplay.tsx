@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 type CompanyResearchData = {
   employees?: string | null;
@@ -68,7 +69,11 @@ export function CompanyResearchDisplay({ companyId }: Props) {
     return (
       <div className="p-2">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          No research data available. Use &quot;Research with AI&quot; on the company page to generate account intelligence.
+          No research data yet.{' '}
+          <Link href={`/dashboard/companies/${companyId}/intelligence`} className="text-blue-600 dark:text-blue-400 hover:underline">
+            Research target company
+          </Link>{' '}
+          to generate account intelligence.
         </p>
       </div>
     );

@@ -25,6 +25,31 @@ export function AccountIntelligenceClient({
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [oneClickLoading, setOneClickLoading] = useState(false);
+  const [oneClickError, setOneClickError] = useState<string | null>(null);
+
+  const handleOneClickResearchAndApply = async () => {
+    setOneClickLoading(true);
+    setOneClickError(null);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/research`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Research failed');
+      if (!data.data) throw new Error('No research data returned');
+      const applyRes = await fetch(`/api/companies/${companyId}/apply-research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data.data),
+      });
+      const applyData = await applyRes.json();
+      if (!applyRes.ok) throw new Error(applyData.error || 'Apply failed');
+      router.refresh();
+    } catch (e) {
+      setOneClickError(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setOneClickLoading(false);
+    }
+  };
 
   const handleGenerateMessaging = async () => {
     setGenerating(true);
@@ -60,16 +85,16 @@ export function AccountIntelligenceClient({
       <div>
         <h1 className="text-2xl font-bold text-white">Account Intelligence</h1>
         <p className="text-slate-400 mt-1">
-          Research the account, review microsegments (departments), and generate messaging in one flow.
+          Research the account, create buying segments, and generate messaging in one flow.
         </p>
       </div>
 
       <div className="rounded-lg border border-slate-700 bg-zinc-800/50 p-6 space-y-6">
-        {/* Step 1: Research */}
+        {/* Step 1: Research target company */}
         <section className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700 pb-6">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-white">1. Research account</h2>
+              <h2 className="text-lg font-semibold text-white">1. Research target company</h2>
               {hasResearch && (
                 <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
                   Done
@@ -77,17 +102,28 @@ export function AccountIntelligenceClient({
               )}
             </div>
             <p className="text-sm text-slate-400 mt-1">
-              AI researches {companyName}: company basics, business overview, key initiatives, and microsegments (departments/roles) for contact discovery.
+              AI researches the account: basics, initiatives, and product fit.
             </p>
           </div>
-          <ResearchButton companyId={companyId} companyName={companyName} />
+          <div className="flex flex-wrap items-center gap-2">
+            <ResearchButton companyId={companyId} companyName={companyName} />
+            <Button
+              onClick={handleOneClickResearchAndApply}
+              disabled={oneClickLoading || hasResearch}
+              variant="outline"
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              {oneClickLoading ? 'Researching & saving…' : 'Research and set up account intelligence'}
+            </Button>
+          </div>
+          {oneClickError && <p className="text-sm text-red-400 mt-2">{oneClickError}</p>}
         </section>
 
-        {/* Step 2: Review microsegments (apply research) - shown in modal when research just ran */}
+        {/* Step 2: Create buying segments */}
         <section className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-700 pb-6">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-white">2. Review microsegments</h2>
+              <h2 className="text-lg font-semibold text-white">2. Create buying segments</h2>
               {hasDepartments && (
                 <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
                   Done
@@ -95,7 +131,7 @@ export function AccountIntelligenceClient({
               )}
             </div>
             <p className="text-sm text-slate-400 mt-1">
-              After research, review and edit company basics and microsegments. Saving applies them as departments on the account.
+              Review and approve segments (function or division) and contact titles per segment. These drive LinkedIn research and analytics.
             </p>
           </div>
           <p className="text-sm text-slate-500">
@@ -105,11 +141,11 @@ export function AccountIntelligenceClient({
           </p>
         </section>
 
-        {/* Step 3: Generate messaging */}
+        {/* Step 3: Create messaging */}
         <section className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-white">3. Generate account messaging</h2>
+              <h2 className="text-lg font-semibold text-white">3. Create messaging</h2>
               {hasMessaging && (
                 <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
                   Done
@@ -117,7 +153,7 @@ export function AccountIntelligenceClient({
               )}
             </div>
             <p className="text-sm text-slate-400 mt-1">
-              Auto-generate why-this-company, use cases, success stories, and objection handlers from research and your company data.
+              Generate messaging for your approved buying segments. Rerun if you add or change segments.
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -126,7 +162,7 @@ export function AccountIntelligenceClient({
               disabled={generating || !hasResearch}
               className="bg-amber-500 hover:bg-amber-600 text-zinc-900"
             >
-              {generating ? 'Generating…' : hasMessaging ? 'Regenerate messaging' : 'Generate messaging'}
+              {generating ? 'Generating…' : hasMessaging ? 'Regenerate messaging' : 'Create messaging'}
             </Button>
             {hasMessaging && (
               <Link href={`/dashboard/companies/${companyId}?tab=messaging`}>

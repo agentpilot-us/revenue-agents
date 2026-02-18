@@ -32,9 +32,9 @@ type LandingPageDraft = {
 };
 
 /** Result item from approve-draft API. */
-type ApprovedCampaignItem = { id: string; slug: string; url: string; segmentName: string; departmentId: string | null };
+export type ApprovedCampaignItem = { id: string; slug: string; url: string; segmentName: string; departmentId: string | null };
 
-type DepartmentOption = { id: string; customName: string | null; type: string };
+export type DepartmentOption = { id: string; customName: string | null; type: string };
 
 type Props = {
   companyId: string;
@@ -498,7 +498,7 @@ function AddCampaignForm({
   );
 }
 
-function CreateLandingPageFlow({
+export function CreateLandingPageFlow({
   companyId,
   companyName,
   departments,

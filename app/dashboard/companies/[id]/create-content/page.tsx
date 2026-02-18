@@ -20,6 +20,7 @@ export default async function CreateContentPage({
       researchData: true,
       accountMessaging: { select: { id: true } },
       _count: { select: { departments: true } },
+      departments: { select: { id: true, customName: true, type: true } },
     },
   });
 
@@ -30,6 +31,9 @@ export default async function CreateContentPage({
     (company._count?.departments ?? 0) > 0 &&
     !!company.accountMessaging;
 
+  const hasResearch = !!company.researchData;
+  const departments = company.departments;
+
   return (
     <div className="min-h-screen bg-zinc-900 text-slate-200">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -37,6 +41,8 @@ export default async function CreateContentPage({
           companyId={company.id}
           companyName={company.name}
           hasIntelligence={hasIntelligence}
+          hasResearch={hasResearch}
+          departments={departments}
         />
       </div>
     </div>
