@@ -30,7 +30,8 @@ export default async function CompanySetupPage() {
     companyIndustry: user.companyIndustry ?? undefined,
     primaryIndustrySellTo: user.primaryIndustrySellTo ?? undefined,
     contentRefreshFrequency: user.contentRefreshFrequency ?? undefined,
-    contentRefreshNextAt: user.contentRefreshNextAt ?? undefined,
+    contentRefreshNextAt:
+      user.contentRefreshNextAt != null ? user.contentRefreshNextAt.toISOString() : undefined,
     email: session.user.email ?? undefined,
   };
 
