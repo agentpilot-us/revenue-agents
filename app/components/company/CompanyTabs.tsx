@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
-import { ProductPenetrationMatrix } from '@/app/components/company/ProductPenetrationMatrix';
+import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
+import type { EngagementRow } from '@/app/components/company/EngagementByBuyingGroup';
 import { AccountMessagingTab } from '@/app/components/company/AccountMessagingTab';
 import { CampaignsTab, type CampaignItem } from '@/app/components/company/CampaignsTab';
 import { CompanyResearchDisplay } from '@/app/components/company/CompanyResearchDisplay';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-type TabId = 'departments' | 'overview' | 'contacts' | 'products' | 'activity' | 'messaging' | 'campaigns';
+type TabId = 'departments' | 'overview' | 'contacts' | 'engagement' | 'activity' | 'messaging' | 'campaigns';
 
 type AccountMessagingData = {
   id: string;
@@ -45,13 +46,15 @@ type CompanyTabsProps = {
   campaigns?: CampaignItem[];
   /** When this changes (e.g. after applying research), Overview refetches research data */
   researchDataKey?: string | number;
+  /** Engagement metrics per buying group for Engagement tab */
+  engagementByDept?: EngagementRow[];
 };
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'departments', label: 'Departments' },
   { id: 'overview', label: 'Overview' },
   { id: 'contacts', label: 'Contacts' },
-  { id: 'products', label: 'Products' },
+  { id: 'engagement', label: 'Engagement' },
   { id: 'activity', label: 'Activity' },
   { id: 'messaging', label: 'Messaging' },
   { id: 'campaigns', label: 'Campaigns' },
@@ -73,6 +76,7 @@ export function CompanyTabs({
   funnel,
   campaigns = [],
   researchDataKey,
+  engagementByDept = [],
 }: CompanyTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'departments');
 
@@ -202,15 +206,13 @@ export function CompanyTabs({
         </div>
       )}
 
-      {activeTab === 'products' && (
-        <div id="products">
-        <ProductPenetrationMatrix
-          data={{
-            companyId,
-            departments: matrixDepartments as Parameters<typeof ProductPenetrationMatrix>[0]['data']['departments'],
-            products: catalogProducts as Parameters<typeof ProductPenetrationMatrix>[0]['data']['products'],
-          }}
-        />
+      {activeTab === 'engagement' && (
+        <div id="engagement">
+          <EngagementByBuyingGroup
+            companyId={companyId}
+            companyName={companyName}
+            rows={engagementByDept}
+          />
         </div>
       )}
 

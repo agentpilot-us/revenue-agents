@@ -259,17 +259,74 @@ export default async function CompanyDetailPage({
   }).filter((p) => p.pipelineValue > 0);
 
   // Funnel counts: contacted, engaged, meetings, opportunity
-  const [contactedCount, engagedCount, meetingsCount] = await Promise.all([
-    prisma.contact.count({ where: { companyId: id, lastContactedAt: { not: null } } }),
-    prisma.contact.count({ where: { companyId: id, isResponsive: true } }),
-    prisma.activity.count({ where: { companyId: id, type: 'Meeting' } }),
-  ]);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const [contactedCount, engagedCount, meetingsCount, activitiesForEngagement, newContactsRaw] =
+    await Promise.all([
+      prisma.contact.count({ where: { companyId: id, lastContactedAt: { not: null } } }),
+      prisma.contact.count({ where: { companyId: id, isResponsive: true } }),
+      prisma.activity.count({ where: { companyId: id, type: 'Meeting' } }),
+      prisma.activity.findMany({
+        where: { companyId: id, companyDepartmentId: { not: null } },
+        select: { companyDepartmentId: true, type: true },
+      }),
+      prisma.contact.groupBy({
+        by: ['companyDepartmentId'],
+        where: {
+          companyId: id,
+          companyDepartmentId: { not: null },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        _count: true,
+      }),
+    ]);
+
   const funnel = {
     contacted: contactedCount,
     engaged: engagedCount,
     meetings: meetingsCount,
     opportunity: Math.round(expansionOpportunity),
   };
+
+  const newContactCountByDept: Record<string, number> = {};
+  for (const r of newContactsRaw) {
+    if (r.companyDepartmentId) newContactCountByDept[r.companyDepartmentId] = r._count;
+  }
+
+  const activityCountsByDept: Record<
+    string,
+    { emailsSent: number; meetings: number; replies: number }
+  > = {};
+  const emailTypes = ['Email', 'EMAIL_SENT'];
+  const replyTypes = ['EmailReply', 'EMAIL_REPLIED'];
+  for (const a of activitiesForEngagement) {
+    const deptId = a.companyDepartmentId as string;
+    if (!deptId) continue;
+    if (!activityCountsByDept[deptId])
+      activityCountsByDept[deptId] = { emailsSent: 0, meetings: 0, replies: 0 };
+    if (emailTypes.includes(a.type)) activityCountsByDept[deptId].emailsSent++;
+    else if (a.type === 'Meeting') activityCountsByDept[deptId].meetings++;
+    else if (replyTypes.includes(a.type)) activityCountsByDept[deptId].replies++;
+  }
+
+  const engagementByDept = departments.map((d: DeptItem) => {
+    const counts = activityCountsByDept[d.id] ?? {
+      emailsSent: 0,
+      meetings: 0,
+      replies: 0,
+    };
+    return {
+      id: d.id,
+      name: deptLabel(d),
+      contactCount: d._count?.contacts ?? 0,
+      newContactCount: newContactCountByDept[d.id] ?? 0,
+      emailsSent: counts.emailsSent,
+      meetings: counts.meetings,
+      replies: counts.replies,
+      invitesAccepted: 0,
+    };
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
@@ -309,7 +366,7 @@ export default async function CompanyDetailPage({
               <div className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 ${currentARR.toLocaleString()}
               </div>
-              <Link href={`/dashboard/companies/${id}#products`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block">+ Add Current</Link>
+              <Link href={`/dashboard/companies/${id}#engagement`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block">Engagement</Link>
             </div>
             <div>
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Expansion Opportunity</div>
@@ -342,7 +399,7 @@ export default async function CompanyDetailPage({
           </div>
         )}
 
-        {/* Tabs: Departments (default), Overview, Contacts, Products, Activity */}
+        {/* Tabs: Departments, Overview, Contacts, Engagement, Activity, Messaging, Campaigns */}
         <div className="mb-6">
           <CompanyTabs
             companyId={company.id}
@@ -360,6 +417,7 @@ export default async function CompanyDetailPage({
             funnel={funnel}
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}
+            engagementByDept={engagementByDept}
           />
         </div>
       </div>

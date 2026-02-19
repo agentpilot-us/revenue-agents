@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { DashboardProductMatrix } from '@/app/components/company/DashboardProductMatrix';
 import { AccountFlightCard } from '@/app/components/dashboard/AccountFlightCard';
 import {
   getCompanyFlightStage,
@@ -142,9 +141,6 @@ export default async function DashboardPage({
       departments: {
         include: {
           _count: { select: { contacts: true } },
-          companyProducts: {
-            include: { product: { select: { id: true, name: true } } },
-          },
         },
       },
     },
@@ -168,9 +164,7 @@ export default async function DashboardPage({
     companyData
   );
 
-  // Serialize Decimals and shape for DashboardProductMatrix
   type DeptRaw = CompanyRaw['departments'][number];
-  type CpRaw = DeptRaw['companyProducts'][number];
   const companies = companiesRaw.map((c: CompanyRaw) => {
     const params = stageParamsMap.get(c.id);
     const { stage, progress } = params
@@ -198,25 +192,9 @@ export default async function DashboardPage({
         customName: d.customName,
         status: d.status,
         _count: d._count,
-        companyProducts: d.companyProducts.map((cp: CpRaw) => ({
-          productId: cp.productId,
-          status: cp.status,
-          arr: cp.arr != null ? Number(cp.arr) : null,
-          opportunitySize: cp.opportunitySize != null ? Number(cp.opportunitySize) : null,
-          product: cp.product,
-        })),
       })),
     };
   });
-
-  // Catalog products (once) for matrix columns — only this user's products
-  const catalogProductsRaw = await prisma.catalogProduct.findMany({
-    where: { userId: session.user.id },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, slug: true },
-  });
-  type CatalogRaw = (typeof catalogProductsRaw)[number];
-  const catalogProducts = catalogProductsRaw.map((p: CatalogRaw) => ({ id: p.id, name: p.name }));
 
   // Activity stats for instruments
   const activities = await prisma.activity.findMany({
@@ -521,13 +499,6 @@ export default async function DashboardPage({
                     customName: string | null;
                     status: string;
                     _count: { contacts: number };
-                    companyProducts: Array<{
-                      productId: string;
-                      status: string;
-                      arr: number | null;
-                      opportunitySize: number | null;
-                      product: { id: string; name: string };
-                    }>;
                   }>;
                 }) => (
                   <div key={c.id} className="space-y-4">
@@ -549,15 +520,12 @@ export default async function DashboardPage({
                           </li>
                         ))}
                       </ul>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
-                        Product penetration
-                      </p>
-                      <DashboardProductMatrix
-                        companyId={c.id}
-                        companyName={c.name}
-                        departments={c.departments}
-                        products={catalogProducts}
-                      />
+                      <Link
+                        href={`/dashboard/companies/${c.id}#engagement`}
+                        className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                      >
+                        View engagement by buying group (emails, meetings, replies) →
+                      </Link>
                     </div>
                   </div>
                 )
