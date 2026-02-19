@@ -112,6 +112,8 @@ model Company {
   businessOverview String? @db.Text // "What they do" summary
   keyInitiatives   Json? // Array of initiative strings
   researchData     Json? // Store raw AI research response for reference
+  segmentationStrategy  String? // FUNCTIONAL | USE_CASE | DIVISIONAL | HYBRID
+  segmentationRationale String? @db.Text
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -520,9 +522,12 @@ model CompanyDepartment {
   notes         String?  @db.Text
 
   // AI Research fields for micro-segments
-  useCase              String? @db.Text // What this department/division would use NVIDIA products for
-  targetRoles          Json? // Store roles/titles structure: { economicBuyer: string[], technicalEvaluator: string[], champion: string[], influencer: string[] }
-  estimatedOpportunity String? // e.g., "$500K - $2M" (store as text since it's a range)
+  useCase              String? @db.Text // What this department/division would use products for
+  targetRoles          Json? // { economicBuyer: string[], technicalEvaluator: string[], champion: string[], influencer: string[] }
+  estimatedOpportunity String? // e.g., "$500K - $2M"
+  valueProp            String? @db.Text // Segment-specific value proposition
+  proofPoints          Json? // Relevant case studies / proof points (array of strings or refs)
+  objectionHandlers    Json? // [{ objection: string, response: string }]
 
   contacts                Contact[]
   companyProducts         CompanyProduct[]

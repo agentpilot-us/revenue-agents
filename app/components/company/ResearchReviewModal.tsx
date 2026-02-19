@@ -33,9 +33,16 @@ export function ResearchReviewModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Parse and validate research data
-  const data = researchData as CompanyResearchData;
-  if (!data || !data.companyBasics || !data.whatTheyDo || !data.microSegments) {
+  const data = researchData as CompanyResearchData & {
+    companyBasics?: { name: string; website?: string; industry?: string; employees?: string; headquarters?: string; revenue?: string };
+    whatTheyDo?: { summary: string; keyInitiatives: string[] };
+    productFit?: unknown[];
+    microSegments?: unknown[];
+  };
+
+  const isNewShape = data && 'companyName' in data && typeof (data as { companyName?: string }).companyName === 'string' && Array.isArray(data.microSegments);
+
+  if (!data || (!isNewShape && (!data.companyBasics || !data.whatTheyDo || !data.microSegments))) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl bg-white dark:bg-zinc-800">
@@ -53,11 +60,15 @@ export function ResearchReviewModal({
     );
   }
 
-  const [companyBasics, setCompanyBasics] = useState(data.companyBasics);
-  const [whatTheyDo, setWhatTheyDo] = useState(data.whatTheyDo);
-  const [microSegments, setMicroSegments] = useState(data.microSegments);
+  const [companyBasics, setCompanyBasics] = useState(
+    data.companyBasics ?? (isNewShape ? { name: (data as CompanyResearchData).companyName, website: (data as CompanyResearchData).website, industry: (data as CompanyResearchData).industry, employees: (data as CompanyResearchData).employees, headquarters: (data as CompanyResearchData).headquarters, revenue: (data as CompanyResearchData).revenue } : { name: '', website: '', industry: '', employees: '', headquarters: '', revenue: '' })
+  );
+  const [whatTheyDo, setWhatTheyDo] = useState(
+    data.whatTheyDo ?? (isNewShape ? { summary: (data as CompanyResearchData).businessOverview, keyInitiatives: (data as CompanyResearchData).keyInitiatives ?? [] } : { summary: '', keyInitiatives: [] })
+  );
+  const [microSegments, setMicroSegments] = useState(data.microSegments ?? []);
+  const [newShapePayload, setNewShapePayload] = useState<CompanyResearchData | null>(isNewShape ? (data as CompanyResearchData) : null);
 
-  // Support legacy research data that used nvidiaProductFit
   const productFitList = Array.isArray(data.productFit)
     ? data.productFit
     : Array.isArray((data as unknown as { nvidiaProductFit?: unknown }).nvidiaProductFit)
@@ -68,7 +79,7 @@ export function ResearchReviewModal({
     setSaving(true);
     setError(null);
     try {
-      const payload = {
+      const payload = newShapePayload ?? {
         companyBasics,
         whatTheyDo,
         productFit: productFitList,
@@ -103,7 +114,7 @@ export function ResearchReviewModal({
     } finally {
       setSaving(false);
     }
-  }, [companyId, companyBasics, whatTheyDo, microSegments, productFitList, router, onOpenChange]);
+  }, [companyId, companyBasics, whatTheyDo, microSegments, productFitList, newShapePayload, router, onOpenChange]);
 
   const updateInitiative = (index: number, value: string) => {
     const updated = [...whatTheyDo.keyInitiatives];
@@ -125,30 +136,36 @@ export function ResearchReviewModal({
     });
   };
 
+  type SegmentWithRoles = { roles?: Record<string, string[]>; targetRoles?: Record<string, string[]>; [k: string]: unknown };
+  const getSegmentRoles = (seg: SegmentWithRoles) =>
+    seg.roles ?? seg.targetRoles ?? { economicBuyer: [], technicalEvaluator: [], champion: [], influencer: [] };
+
   const updateSegmentRole = (
     segmentIndex: number,
     roleType: 'economicBuyer' | 'technicalEvaluator' | 'champion' | 'influencer',
     roleIndex: number,
     value: string
   ) => {
-    const updated = [...microSegments];
-    const roles = { ...updated[segmentIndex].roles };
-    const roleArray = [...roles[roleType]];
+    const updated = [...microSegments] as SegmentWithRoles[];
+    const seg = updated[segmentIndex];
+    const roles = { ...getSegmentRoles(seg) };
+    const roleArray = [...(roles[roleType] ?? [])];
     roleArray[roleIndex] = value;
     roles[roleType] = roleArray;
-    updated[segmentIndex] = { ...updated[segmentIndex], roles };
-    setMicroSegments(updated);
+    updated[segmentIndex] = { ...seg, roles, targetRoles: roles };
+    setMicroSegments(updated as typeof microSegments);
   };
 
   const addSegmentRole = (
     segmentIndex: number,
     roleType: 'economicBuyer' | 'technicalEvaluator' | 'champion' | 'influencer'
   ) => {
-    const updated = [...microSegments];
-    const roles = { ...updated[segmentIndex].roles };
-    roles[roleType] = [...roles[roleType], ''];
-    updated[segmentIndex] = { ...updated[segmentIndex], roles };
-    setMicroSegments(updated);
+    const updated = [...microSegments] as SegmentWithRoles[];
+    const seg = updated[segmentIndex];
+    const roles = { ...getSegmentRoles(seg) };
+    roles[roleType] = [...(roles[roleType] ?? []), ''];
+    updated[segmentIndex] = { ...seg, roles, targetRoles: roles };
+    setMicroSegments(updated as typeof microSegments);
   };
 
   const removeSegmentRole = (
@@ -156,11 +173,12 @@ export function ResearchReviewModal({
     roleType: 'economicBuyer' | 'technicalEvaluator' | 'champion' | 'influencer',
     roleIndex: number
   ) => {
-    const updated = [...microSegments];
-    const roles = { ...updated[segmentIndex].roles };
-    roles[roleType] = roles[roleType].filter((_, i) => i !== roleIndex);
-    updated[segmentIndex] = { ...updated[segmentIndex], roles };
-    setMicroSegments(updated);
+    const updated = [...microSegments] as SegmentWithRoles[];
+    const seg = updated[segmentIndex];
+    const roles = { ...getSegmentRoles(seg) };
+    roles[roleType] = (roles[roleType] ?? []).filter((_: string, i: number) => i !== roleIndex);
+    updated[segmentIndex] = { ...seg, roles, targetRoles: roles };
+    setMicroSegments(updated as typeof microSegments);
   };
 
   return (
@@ -305,13 +323,16 @@ export function ResearchReviewModal({
                 How They Could Use Your Products
               </h2>
               <div className="space-y-3">
-                {productFitList.map((fit, i) => (
+                {productFitList.map((fitUnknown, i) => {
+                  const fit = fitUnknown as { product?: string; useCase?: string; whyRelevant?: string };
+                  return (
                   <div key={i} className="border-l-2 border-blue-500 pl-3">
                     <h3 className="font-medium text-gray-900 dark:text-gray-100">{fit.product}</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{fit.useCase}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{fit.whyRelevant}</p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -326,49 +347,65 @@ export function ResearchReviewModal({
               Who at {companyName} would buy these products?
             </p>
             <div className="space-y-4">
-              {microSegments.map((segment, segIndex) => (
+              {microSegments.map((segment, segIndex) => {
+                const seg = segment as SegmentWithRoles & { name: string; departmentType?: string; useCase?: string; valueProp?: string; useCasesAtThisCompany?: string[]; products: unknown[]; estimatedOpportunity?: string };
+                return (
                 <div
                   key={segIndex}
                   className="border border-gray-200 dark:border-zinc-600 rounded-lg p-4 bg-gray-50 dark:bg-zinc-700/50"
                 >
                   <div className="mb-3">
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">{segment.name}</h3>
-                    {segment.departmentType && (
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">{seg.name}</h3>
+                    {seg.departmentType && (
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Department Type: {segment.departmentType}
+                        Department Type: {seg.departmentType}
                       </p>
                     )}
                   </div>
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                      Use Case
-                    </label>
-                    <Textarea
-                      value={segment.useCase}
-                      onChange={(e) => {
-                        const updated = [...microSegments];
-                        updated[segIndex] = { ...updated[segIndex], useCase: e.target.value };
-                        setMicroSegments(updated);
-                      }}
-                      rows={2}
-                      className="bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
+                  {(seg.valueProp || seg.useCase || seg.useCasesAtThisCompany) && (
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                        Value prop / Use case
+                      </label>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                        {seg.valueProp ?? (Array.isArray(seg.useCasesAtThisCompany) ? seg.useCasesAtThisCompany.join('\n\n') : seg.useCase)}
+                      </p>
+                    </div>
+                  )}
+                  {!isNewShape && (
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                        Use Case
+                      </label>
+                      <Textarea
+                        value={seg.useCase ?? ''}
+                        onChange={(e) => {
+                          const updated = [...microSegments];
+                          updated[segIndex] = { ...updated[segIndex], useCase: e.target.value };
+                          setMicroSegments(updated);
+                        }}
+                        rows={2}
+                        className="bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
+                      />
+                    </div>
+                  )}
                   <div className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                       Products
                     </label>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {segment.products.join(', ')}
+                      {Array.isArray(seg.products) && seg.products.length > 0 && typeof seg.products[0] === 'object'
+                        ? (seg.products as { productSlug?: string; productName?: string }[]).map((p) => p.productName ?? p.productSlug).filter(Boolean).join(', ')
+                        : ((seg.products as unknown) as string[]).filter(Boolean).join(', ')}
                     </p>
                   </div>
-                  {segment.estimatedOpportunity && (
+                  {seg.estimatedOpportunity && (
                     <div className="mb-3">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         Estimated Opportunity
                       </label>
                       <Input
-                        value={segment.estimatedOpportunity}
+                        value={seg.estimatedOpportunity}
                         onChange={(e) => {
                           const updated = [...microSegments];
                           updated[segIndex] = {
@@ -386,7 +423,7 @@ export function ResearchReviewModal({
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                         Economic Buyer
                       </label>
-                      {segment.roles.economicBuyer.map((title, roleIndex) => (
+                      {(seg.targetRoles ?? seg.roles)?.economicBuyer?.map((title: string, roleIndex: number) => (
                         <div key={roleIndex} className="flex gap-2 mb-2">
                           <Input
                             value={title}
@@ -395,31 +432,36 @@ export function ResearchReviewModal({
                             }
                             placeholder="e.g., VP Engineering"
                             className="flex-1 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
+                            disabled={isNewShape}
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeSegmentRole(segIndex, 'economicBuyer', roleIndex)}
-                          >
-                            Remove
-                          </Button>
+                          {!isNewShape && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeSegmentRole(segIndex, 'economicBuyer', roleIndex)}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addSegmentRole(segIndex, 'economicBuyer')}
-                      >
-                        + Add Title
-                      </Button>
+                      {!isNewShape && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addSegmentRole(segIndex, 'economicBuyer')}
+                        >
+                          + Add Title
+                        </Button>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                         Technical Evaluator
                       </label>
-                      {segment.roles.technicalEvaluator.map((title, roleIndex) => (
+                      {(seg.targetRoles ?? seg.roles)?.technicalEvaluator?.map((title: string, roleIndex: number) => (
                         <div key={roleIndex} className="flex gap-2 mb-2">
                           <Input
                             value={title}
@@ -428,31 +470,36 @@ export function ResearchReviewModal({
                             }
                             placeholder="e.g., Director ML"
                             className="flex-1 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
+                            disabled={isNewShape}
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeSegmentRole(segIndex, 'technicalEvaluator', roleIndex)}
-                          >
-                            Remove
-                          </Button>
+                          {!isNewShape && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeSegmentRole(segIndex, 'technicalEvaluator', roleIndex)}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addSegmentRole(segIndex, 'technicalEvaluator')}
-                      >
-                        + Add Title
-                      </Button>
+                      {!isNewShape && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addSegmentRole(segIndex, 'technicalEvaluator')}
+                        >
+                          + Add Title
+                        </Button>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                         Champion
                       </label>
-                      {segment.roles.champion.map((title, roleIndex) => (
+                      {(seg.targetRoles ?? seg.roles)?.champion?.map((title: string, roleIndex: number) => (
                         <div key={roleIndex} className="flex gap-2 mb-2">
                           <Input
                             value={title}
@@ -461,31 +508,36 @@ export function ResearchReviewModal({
                             }
                             placeholder="e.g., Senior ML Engineer"
                             className="flex-1 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
+                            disabled={isNewShape}
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeSegmentRole(segIndex, 'champion', roleIndex)}
-                          >
-                            Remove
-                          </Button>
+                          {!isNewShape && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeSegmentRole(segIndex, 'champion', roleIndex)}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addSegmentRole(segIndex, 'champion')}
-                      >
-                        + Add Title
-                      </Button>
+                      {!isNewShape && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addSegmentRole(segIndex, 'champion')}
+                        >
+                          + Add Title
+                        </Button>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                         Influencer
                       </label>
-                      {segment.roles.influencer.map((title, roleIndex) => (
+                      {(seg.targetRoles ?? seg.roles)?.influencer?.map((title: string, roleIndex: number) => (
                         <div key={roleIndex} className="flex gap-2 mb-2">
                           <Input
                             value={title}
@@ -494,29 +546,35 @@ export function ResearchReviewModal({
                             }
                             placeholder="e.g., ML Engineer"
                             className="flex-1 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
+                            disabled={isNewShape}
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeSegmentRole(segIndex, 'influencer', roleIndex)}
-                          >
-                            Remove
-                          </Button>
+                          {!isNewShape && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeSegmentRole(segIndex, 'influencer', roleIndex)}
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
                       ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addSegmentRole(segIndex, 'influencer')}
-                      >
-                        + Add Title
-                      </Button>
+                      {!isNewShape && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addSegmentRole(segIndex, 'influencer')}
+                        >
+                          + Add Title
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         </div>

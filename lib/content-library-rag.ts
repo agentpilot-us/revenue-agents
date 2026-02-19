@@ -85,3 +85,28 @@ export function formatRAGChunksForPrompt(chunks: string[]): string {
   if (chunks.length === 0) return '';
   return `Company content (relevant):\n${chunks.map((c) => `- ${c}`).join('\n')}`;
 }
+
+/** Max chunks to include when fetching "all" RAG content for research (avoids token overflow). */
+const MAX_ALL_CHUNKS_FOR_RESEARCH = 60;
+
+/**
+ * Fetch all Content Library chunk contents for a user (from RAG uploads).
+ * Used so the research agent has access to full uploaded file data, not only similarity search.
+ * Limited to MAX_ALL_CHUNKS_FOR_RESEARCH to keep prompt size reasonable.
+ */
+export async function getAllContentLibraryChunkContents(
+  userId: string,
+  maxChunks: number = MAX_ALL_CHUNKS_FOR_RESEARCH
+): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ content: string }[]>`
+    SELECT c.content
+    FROM "ContentLibraryChunk" c
+    INNER JOIN "ContentLibrary" cl ON cl.id = c."contentLibraryId"
+    WHERE cl."userId" = ${userId}
+      AND cl."isActive" = true
+      AND cl."archivedAt" IS NULL
+    ORDER BY cl."updatedAt" DESC, c."chunkIndex" ASC
+    LIMIT ${maxChunks}
+  `;
+  return rows.map((r) => r.content);
+}

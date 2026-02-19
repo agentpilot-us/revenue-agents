@@ -4,22 +4,66 @@ import { z } from 'zod';
 import { researchCompany } from '@/lib/tools/perplexity';
 import { prisma } from '@/lib/db';
 import { companyResearchSchema, type CompanyResearchData } from './company-research-schema';
-import { buildCompanyResearchPrompt } from './company-research-prompt';
+import {
+  buildCompanyResearchPrompt,
+  loadContentLibraryContext,
+} from './company-research-prompt';
+import {
+  findRelevantContentLibraryChunks,
+  getAllContentLibraryChunkContents,
+} from '@/lib/content-library-rag';
 
 export type ResearchCompanyResult =
   | { ok: true; data: CompanyResearchData }
   | { ok: false; error: string };
 
 /**
- * Research a company and return structured data including basics, business overview,
- * Product fit, and micro-segments with roles/titles.
+ * Research a target company and return structured account intelligence.
+ *
+ * Pipeline:
+ * 1. Load seller's Content Library (use cases, case studies, events, etc.) when userId provided
+ * 2. Load catalog products
+ * 3. Research target company via Perplexity (web search)
+ * 4. Synthesize via LLM: map target → buying segments → value props, use cases, objection handlers, roles
+ *
+ * Output includes per-segment value propositions, use cases, proof points, objection handlers,
+ * and searchable contact titles — grounded in the seller's Content Library when available.
  */
 export async function researchCompanyForAccount(
   companyName: string,
-  companyDomain?: string
+  companyDomain?: string,
+  userId?: string
 ): Promise<ResearchCompanyResult> {
   try {
-    // Step 1: Get catalog products for the prompt
+    // Research requires company setup (Content Library): userId and company name are required
+    if (!userId) {
+      return {
+        ok: false,
+        error:
+          'Complete your company setup (Content Library) with your company name and website before running research.',
+      };
+    }
+
+    const [user, contentLibrary] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { companyName: true, companyWebsite: true },
+      }),
+      loadContentLibraryContext(userId).catch(() => null),
+    ]);
+
+    const userCompanyName = user?.companyName?.trim() ?? null;
+    const userCompanyWebsite = user?.companyWebsite?.trim() ?? null;
+
+    if (!userCompanyName) {
+      return {
+        ok: false,
+        error:
+          'Complete your company setup (Content Library) with your company name and website before running research.',
+      };
+    }
+
+    // Step 2: Load catalog products
     const catalogProducts = await prisma.catalogProduct.findMany({
       select: {
         name: true,
@@ -33,19 +77,30 @@ export async function researchCompanyForAccount(
     });
 
     if (catalogProducts.length === 0) {
-      return { ok: false, error: 'No catalog products found. Please set up products first.' };
+      return {
+        ok: false,
+        error: 'No catalog products found. Please set up your products first.',
+      };
     }
 
-    // Step 2: Research company using Perplexity
-    const researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
-1. Company basics: official name, website, industry, employee count, headquarters location, annual revenue
-2. What they do: core business description and key strategic initiatives
-3. Technology focus areas: AI/ML, autonomous vehicles, manufacturing, design/CAD, data center, edge computing
-4. Recent announcements: press releases, earnings calls, job postings that indicate priorities
-5. Organizational structure: departments/divisions that would use enterprise software or AI technology
-6. Buying groups: who makes technology decisions (departments, job titles, roles)
+    // Step 3: Research target company via Perplexity
+    const productNames = catalogProducts.map((p) => p.name).join(', ');
 
-Focus on information relevant to B2B enterprise software sales, particularly AI infrastructure, autonomous vehicle technology, manufacturing automation, design collaboration, and data center solutions.`;
+    const researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
+
+1. COMPANY BASICS: official name, website, industry, employee count, headquarters, annual revenue
+
+2. BUSINESS OVERVIEW: what they do, their core business model, primary markets
+
+3. STRATEGIC PRIORITIES: recent announcements, earnings call themes, job postings that reveal where they are investing (especially in technology, operations, or go-to-market)
+
+4. ORGANIZATIONAL STRUCTURE: how is the company organized? By function, division, product line, or geography? Name the key departments and business units.
+
+5. TECHNOLOGY & BUYING SIGNALS: what tools, platforms, or vendors do they currently use? Any recent tech evaluations, RFPs, or vendor changes mentioned publicly?
+
+6. BUYING GROUPS: which departments or teams at ${companyName} make decisions about B2B software purchases in areas like: ${productNames}? What are their priorities and what titles do the decision-makers hold?
+
+Focus on finding specific, actionable intelligence that would help a B2B sales rep engage the right people at ${companyName} with relevant messaging.`;
 
     const perplexityResult = await researchCompany({
       query: researchQuery,
@@ -57,7 +112,7 @@ Focus on information relevant to B2B enterprise software sales, particularly AI 
       return { ok: false, error: perplexityResult.error };
     }
 
-    // Step 3: Structure the research using Anthropic (map Decimal to number for prompt)
+    // Step 4: Synthesize with LLM (new schema: value props, use cases, objection handlers per segment)
     const catalogForPrompt = catalogProducts.map((p) => ({
       name: p.name,
       slug: p.slug,
@@ -66,36 +121,87 @@ Focus on information relevant to B2B enterprise software sales, particularly AI 
       priceMax: p.priceMax != null ? Number(p.priceMax) : null,
       targetDepartments: p.targetDepartments as string[] | null,
     }));
-    const systemPrompt = buildCompanyResearchPrompt(catalogForPrompt);
+
+    // Company name/website come from company setup only (required above)
+    const sellerDescription =
+      process.env.SELLER_COMPANY_DESCRIPTION ?? null;
+
+    // RAG: relevant chunks + full set so agent has access to all uploaded file data
+    const ragProductNames = catalogProducts.map((p) => p.name).join(' ');
+    const ragQuery = `${companyName} ${ragProductNames} value proposition use cases proof`;
+    const [relevantChunks, allChunks] = await Promise.all([
+      findRelevantContentLibraryChunks(userId, ragQuery, 24),
+      getAllContentLibraryChunkContents(userId, 50),
+    ]);
+    const seen = new Set<string>();
+    const ragChunks: string[] = [];
+    for (const c of [...relevantChunks, ...allChunks]) {
+      const key = c.slice(0, 200);
+      if (!seen.has(key)) {
+        seen.add(key);
+        ragChunks.push(c);
+      }
+    }
+
+    const systemPrompt = buildCompanyResearchPrompt(catalogForPrompt, {
+      sellerCompanyName: userCompanyName,
+      sellerWebsite: userCompanyWebsite ?? undefined,
+      sellerDescription: sellerDescription ?? undefined,
+      contentLibrary: contentLibrary ?? undefined,
+      ragChunks: ragChunks.length > 0 ? ragChunks : undefined,
+    });
 
     if (
       process.env.USE_MOCK_LLM !== 'true' &&
       !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
       !process.env.ANTHROPIC_API_KEY
     ) {
-      return { ok: false, error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required' };
+      return {
+        ok: false,
+        error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required for synthesis.',
+      };
     }
 
-    const userPrompt = `Company Name: ${companyName}
+    const hasContentLibrary =
+      contentLibrary &&
+      (contentLibrary.useCases.length > 0 ||
+        contentLibrary.caseStudies.length > 0 ||
+        contentLibrary.industryPlaybooks.length > 0);
+
+    const contentLibraryNote = hasContentLibrary
+      ? `\nIMPORTANT: Use the Content Library entries above to ground your value propositions and proof points. Reference specific use cases, case studies, or industry playbooks by name where they are relevant to this account.`
+      : `\nNOTE: No Content Library entries are available yet. Generate value propositions based on the product catalog and what you know about the target company's priorities.`;
+
+    const userPrompt = `TARGET COMPANY: ${companyName}
 ${companyDomain ? `Domain: ${companyDomain}` : ''}
 
-Research Summary:
+RESEARCH DATA (from web search):
 ${perplexityResult.summary}
 
-Based on this research, extract and structure the company information according to the schema.`;
+${contentLibraryNote}
+
+Now produce the full account intelligence brief per the schema. For each micro-segment:
+- Write a value proposition that references ${companyName}'s specific context and initiatives
+- List 2–3 concrete use cases (useCasesAtThisCompany) showing HOW they would use our products
+- Include proof points from our Content Library if available
+- Provide objection handlers (objection + response pairs) specific to this type of buyer
+- List searchable LinkedIn job titles for each role category (economicBuyer, technicalEvaluator, champion, influencer) — at least one title per category
+- Set segmentationStrategy and segmentationRationale based on how this company is organized
+
+You MUST output at least one micro-segment. Do not return an empty microSegments array.`;
 
     try {
       const result = await generateObject({
         model: getChatModel(),
         schema: companyResearchSchema,
         system: systemPrompt,
-        maxOutputTokens: 4000,
+        maxOutputTokens: 6000,
         prompt: userPrompt,
       });
-      const object = result.object;
 
-      console.log('Validating result...');
+      const object = result.object;
       const parsed = companyResearchSchema.safeParse(object);
+
       if (!parsed.success) {
         const firstIssue = parsed.error.errors[0];
         const path = firstIssue?.path?.join('.') ?? 'field';
@@ -105,39 +211,44 @@ Based on this research, extract and structure the company information according 
           error: `Research structure invalid (${path}): ${firstIssue?.message ?? 'check format'}. Try again.`,
         };
       }
+
       return { ok: true, data: parsed.data };
     } catch (generateError) {
       console.error('Research LLM error:', generateError);
+
       if (generateError instanceof z.ZodError) {
         const msg = generateError.errors[0]?.message ?? 'Invalid structure';
         return { ok: false, error: `Validation: ${msg}` };
       }
+
       if (generateError instanceof Error) {
-        console.error('Error message:', generateError.message);
         if (generateError.message.includes('schema') || generateError.message.includes('validation')) {
           return { ok: false, error: `Structure error: ${generateError.message}` };
         }
-        if (generateError.message.includes('API') || generateError.message.includes('key') || generateError.message.includes('401') || generateError.message.includes('403')) {
+        if (
+          generateError.message.includes('API') ||
+          generateError.message.includes('key') ||
+          generateError.message.includes('401') ||
+          generateError.message.includes('403')
+        ) {
           return { ok: false, error: `API error: ${generateError.message}` };
         }
         if (generateError.message.includes('429') || generateError.message.includes('rate limit')) {
           return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
         }
         if (generateError.message.includes('timeout') || generateError.message.includes('Timeout')) {
-          return { ok: false, error: 'Research request timed out. Please try again.' };
+          return { ok: false, error: 'Research timed out. Please try again.' };
         }
         return { ok: false, error: generateError.message };
       }
+
       return { ok: false, error: 'Research failed unexpectedly.' };
     }
   } catch (error) {
-    console.error('Research company error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Research failed';
-    const errorDetails = error instanceof Error ? { message: error.message, stack: error.stack } : {};
-    console.error('Error details:', errorDetails);
+    console.error('researchCompanyForAccount error:', error);
     return {
       ok: false,
-      error: errorMessage,
+      error: error instanceof Error ? error.message : 'Research failed',
     };
   }
 }

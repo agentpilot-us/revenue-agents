@@ -26,14 +26,21 @@ export async function POST(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    const result = await researchCompanyForAccount(company.name, company.domain ?? undefined);
+    const result = await researchCompanyForAccount(
+      company.name,
+      company.domain ?? undefined,
+      session.user.id
+    );
 
     if (!result.ok) {
+      const msg = result.error || 'Research failed';
+      const isSetupRequired =
+        msg.includes('company setup') || msg.includes('Content Library');
+      if (isSetupRequired) {
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
       console.error('Research failed:', result.error);
-      return NextResponse.json(
-        { error: result.error || 'Research failed' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
     return NextResponse.json({ data: result.data });
