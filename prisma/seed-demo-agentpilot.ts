@@ -58,9 +58,9 @@ async function main() {
     console.log('Using existing Product: AgentPilot');
   }
 
-  // —— CatalogProduct (global) ——
+  // —— CatalogProduct (global / legacy null userId or user-scoped) ——
   const catalogSlug = 'agentpilot-platform';
-  let catalogProduct = await prisma.catalogProduct.findUnique({
+  let catalogProduct = await prisma.catalogProduct.findFirst({
     where: { slug: catalogSlug },
   });
   if (!catalogProduct) {

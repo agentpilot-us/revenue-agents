@@ -81,7 +81,7 @@ async function main() {
 
   // 4. ProductProfile for AgentPilot Platform (catalog slug) and this user
   const catalog = await prisma.catalogProduct.findUnique({
-    where: { slug: DEMO_CATALOG_SLUG },
+    where: { userId_slug: { userId, slug: DEMO_CATALOG_SLUG } },
     select: { id: true },
   });
   if (catalog) {
@@ -129,7 +129,7 @@ async function deleteDemoContentBySlugAndCatalog() {
     if (deleted.count > 0) console.log('Deleted ContentLibrary (title contains):', title);
   }
 
-  const catalog = await prisma.catalogProduct.findUnique({
+  const catalog = await prisma.catalogProduct.findFirst({
     where: { slug: DEMO_CATALOG_SLUG },
     select: { id: true },
   });

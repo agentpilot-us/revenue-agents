@@ -17,10 +17,10 @@ async function seedTestAccounts() {
   }
   
   // Get catalog products (these are global, not user-scoped)
-  const driveProduct = await prisma.catalogProduct.findUnique({ where: { slug: 'drive-platform' } })
-  const jetsonProduct = await prisma.catalogProduct.findUnique({ where: { slug: 'jetson-edge-ai' } })
-  const omniverseProduct = await prisma.catalogProduct.findUnique({ where: { slug: 'omniverse' } })
-  const dgxProduct = await prisma.catalogProduct.findUnique({ where: { slug: 'dgx-cloud' } })
+  const driveProduct = await prisma.catalogProduct.findFirst({ where: { slug: 'drive-platform' } })
+  const jetsonProduct = await prisma.catalogProduct.findFirst({ where: { slug: 'jetson-edge-ai' } })
+  const omniverseProduct = await prisma.catalogProduct.findFirst({ where: { slug: 'omniverse' } })
+  const dgxProduct = await prisma.catalogProduct.findFirst({ where: { slug: 'dgx-cloud' } })
   
   if (!driveProduct || !jetsonProduct || !omniverseProduct || !dgxProduct) {
     throw new Error('Catalog products not found. Please create them first (e.g., via API or manual seed).')

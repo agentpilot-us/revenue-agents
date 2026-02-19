@@ -76,7 +76,7 @@ async function main() {
 
   for (const slug of productSlugs) {
     const name = slug === 'jetson' ? 'Jetson' : slug === 'omniverse' ? 'Omniverse' : 'DGX Cloud';
-    const existing = await prisma.catalogProduct.findUnique({ where: { slug } });
+    const existing = await prisma.catalogProduct.findFirst({ where: { slug } });
     if (existing) {
       catalogProducts.push({ id: existing.id, name: existing.name, slug: existing.slug });
     } else {
