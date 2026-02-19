@@ -26,6 +26,7 @@ export default async function CompanyDetailPage({
     name: string;
     domain: string | null;
     industry: string | null;
+    updatedAt: Date | null;
     researchData: unknown;
     contacts: Array<{ id: string }>;
     activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
