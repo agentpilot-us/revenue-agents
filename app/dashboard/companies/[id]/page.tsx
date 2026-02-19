@@ -21,34 +21,45 @@ export default async function CompanyDetailPage({
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
   const initialTab = tabParam === 'messaging' ? 'messaging' : tabParam === 'campaigns' ? 'campaigns' : undefined;
-  type CompanyWithRelations = {
-    id: string;
-    name: string;
-    domain: string | null;
-    industry: string | null;
-    updatedAt: Date | null;
-    researchData: unknown;
-    contacts: Array<{ id: string }>;
-    activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
-    accountMessaging: {
-      id: string;
-      whyThisCompany: unknown;
-      useCases: unknown;
-      successStories: unknown;
-      objectionHandlers: unknown;
-      doNotMention: unknown;
-      aiGenerated: boolean;
-      updatedAt: Date;
-    } | null;
-  };
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
-    include: {
-      contacts: { select: { id: true } },
+    select: {
+      id: true,
+      name: true,
+      domain: true,
+      industry: true,
+      website: true,
+      employees: true,
+      headquarters: true,
+      revenue: true,
+      businessOverview: true,
+      keyInitiatives: true,
+      researchData: true,
+      segmentationStrategy: true,
+      segmentationRationale: true,
+      salesforceLastSyncedAt: true,
+      salesforceOpportunityData: true,
+      lastCrawlAt: true,
+      nextCrawlAt: true,
+      lastContentChangeAt: true,
+      updatedAt: true,
+      user: {
+        select: {
+          salesforceAccessToken: true,
+        },
+      },
+      contacts: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+        },
+        take: 1000, // Limit for activity filter dropdown
+      },
       activities: { orderBy: { createdAt: 'desc' } },
       accountMessaging: true,
     },
-  }) as CompanyWithRelations | null;
+  });
 
   if (!company) notFound();
 
@@ -109,6 +120,11 @@ export default async function CompanyDetailPage({
   const departments = departmentsRaw.map(
     (d: (typeof departmentsRaw)[number]) => ({
       ...d,
+      valueProp: d.valueProp,
+      useCase: d.useCase,
+      estimatedOpportunity: d.estimatedOpportunity,
+      objectionHandlers: d.objectionHandlers as Array<{ objection: string; response: string }> | null,
+      proofPoints: d.proofPoints as string[] | null,
       contacts: d.contacts.map((c) => ({
         id: c.id,
         firstName: c.firstName,
@@ -247,27 +263,12 @@ export default async function CompanyDetailPage({
       .map(deptLabel),
   };
 
-  // Pipeline by microsegment (department)
-  const pipelineByMicrosegment = departments.map((d: DeptItem) => {
-    const value = (d.companyProducts as Array<{ status: string; opportunitySize: number | null }>)
-      .filter((cp) => cp.status === 'OPPORTUNITY')
-      .reduce((sum, cp) => sum + Number(cp.opportunitySize ?? 0), 0);
-    return {
-      departmentId: d.id,
-      departmentName: deptLabel(d),
-      pipelineValue: value,
-    };
-  }).filter((p) => p.pipelineValue > 0);
-
-  // Funnel counts: contacted, engaged, meetings, opportunity
+  // Engagement metrics: activities and new contacts by department
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [contactedCount, engagedCount, meetingsCount, activitiesForEngagement, newContactsRaw] =
+  const [activitiesForEngagement, newContactsRaw] =
     await Promise.all([
-      prisma.contact.count({ where: { companyId: id, lastContactedAt: { not: null } } }),
-      prisma.contact.count({ where: { companyId: id, isResponsive: true } }),
-      prisma.activity.count({ where: { companyId: id, type: 'Meeting' } }),
       prisma.activity.findMany({
         where: { companyId: id, companyDepartmentId: { not: null } },
         select: { companyDepartmentId: true, type: true },
@@ -282,13 +283,6 @@ export default async function CompanyDetailPage({
         _count: true,
       }),
     ]);
-
-  const funnel = {
-    contacted: contactedCount,
-    engaged: engagedCount,
-    meetings: meetingsCount,
-    opportunity: Math.round(expansionOpportunity),
-  };
 
   const newContactCountByDept: Record<string, number> = {};
   for (const r of newContactsRaw) {
@@ -405,17 +399,44 @@ export default async function CompanyDetailPage({
           <CompanyTabs
             companyId={company.id}
             companyName={company.name}
+            companyData={{
+              industry: company.industry,
+              website: company.website,
+              employees: company.employees,
+              headquarters: company.headquarters,
+              revenue: company.revenue,
+              businessOverview: company.businessOverview,
+              keyInitiatives: company.keyInitiatives as string[] | null,
+              segmentationStrategy: company.segmentationStrategy,
+              segmentationRationale: company.segmentationRationale,
+              salesforceLastSyncedAt: company.salesforceLastSyncedAt,
+              salesforceOpportunityData: company.salesforceOpportunityData as {
+                opportunityName?: string;
+                stage?: string;
+                amount?: string;
+                closeDate?: string;
+                daysUntilClose?: number;
+                lastActivityDate?: string;
+              } | null,
+              hasSalesforceAccess: !!company.user.salesforceAccessToken,
+              lastCrawlAt: company.lastCrawlAt,
+              nextCrawlAt: company.nextCrawlAt,
+              lastContentChangeAt: company.lastContentChangeAt,
+            }}
             departments={departments}
             matrixDepartments={matrixDepartments}
             catalogProducts={catalogProducts}
             activities={company.activities}
+            contacts={company.contacts.map((c) => ({
+              id: c.id,
+              firstName: c.firstName,
+              lastName: c.lastName,
+            }))}
             contactCount={company.contacts.length}
             expansionStrategy={expansionStrategy}
             accountMessaging={accountMessaging}
             contentLibraryUseCasesAndStories={contentLibraryForMessaging}
             initialTab={initialTab}
-            pipelineByMicrosegment={pipelineByMicrosegment}
-            funnel={funnel}
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}
             engagementByDept={engagementByDept}

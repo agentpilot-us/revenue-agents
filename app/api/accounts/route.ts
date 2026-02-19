@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { addExpansionScore } from '@/lib/gamification/expansion-score';
 
 export async function GET() {
   const session = await auth();
@@ -37,7 +36,6 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
       },
     });
-    void addExpansionScore(prisma, session.user.id, 'account_created').catch(() => {});
     return NextResponse.json({ company });
   } catch (e) {
     console.error('Create company error:', e);

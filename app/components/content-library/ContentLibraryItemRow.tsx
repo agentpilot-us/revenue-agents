@@ -2,17 +2,40 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type Props = {
   id: string;
   title: string;
   sourceUrl: string | null;
+  updatedAt?: Date;
+  isPinned?: boolean;
+  version?: string | null;
+  hasPreviousContent?: boolean;
 };
 
-export function ContentLibraryItemRow({ id, title, sourceUrl }: Props) {
+function getDaysAgo(date: Date): number {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function formatUpdatedBadge(updatedAt: Date): string | null {
+  const daysAgo = getDaysAgo(updatedAt);
+  if (daysAgo <= 7) {
+    if (daysAgo === 0) return 'Updated today';
+    if (daysAgo === 1) return 'Updated yesterday';
+    return `Updated ${daysAgo} days ago`;
+  }
+  return null;
+}
+
+export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinned = false, version, hasPreviousContent = false }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [pinning, setPinning] = useState(false);
+  const [pinned, setPinned] = useState(isPinned);
   const [scheduleFrequency, setScheduleFrequency] = useState<'off' | 'daily' | 'weekly'>('off');
   const [scheduleLoading, setScheduleLoading] = useState(false);
 
@@ -91,19 +114,112 @@ export function ContentLibraryItemRow({ id, title, sourceUrl }: Props) {
     }
   };
 
+  const handleTogglePin = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (pinning) return;
+    setPinning(true);
+    const newPinned = !pinned;
+    try {
+      const res = await fetch(`/api/content-library/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPinned: newPinned }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Pin update failed');
+      }
+      setPinned(newPinned);
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Pin update failed');
+    } finally {
+      setPinning(false);
+    }
+  };
+
+  const updatedBadge = updatedAt ? formatUpdatedBadge(updatedAt) : null;
+  const canViewChanges = hasPreviousContent && version && parseFloat(version) > 1.0;
+
   return (
     <li className="flex items-center gap-2 text-sm group flex-wrap">
-      {sourceUrl ? (
-        <a
-          href={sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-400 hover:underline truncate flex-1 min-w-0"
+      <Link
+        href={`/dashboard/content-library/${id}/edit`}
+        className="text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+        title="Edit"
+      >
+        Edit
+      </Link>
+      {canViewChanges && (
+        <Link
+          href={`/dashboard/content-library/${id}/changes`}
+          className="text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+          title="View changes"
         >
-          {title}
-        </a>
-      ) : (
-        <span className="text-gray-900 dark:text-gray-100 truncate flex-1 min-w-0">{title}</span>
+          Changes
+        </Link>
+      )}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        {sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 hover:underline truncate"
+          >
+            {title}
+          </a>
+        ) : (
+          <span className="text-gray-900 dark:text-gray-100 truncate">{title}</span>
+        )}
+        {updatedBadge && (
+          <span
+            className="shrink-0 px-2 py-0.5 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+            title={`Last updated: ${updatedAt.toLocaleDateString()}`}
+          >
+            {updatedBadge}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleTogglePin}
+        disabled={pinning}
+        className={`shrink-0 p-1 rounded disabled:opacity-50 ${
+          pinned
+            ? 'text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300'
+            : 'text-gray-400 hover:text-yellow-600 dark:hover:text-yellow-400'
+        }`}
+        title={pinned ? 'Unpin' : 'Pin to top'}
+        aria-label={pinned ? 'Unpin' : 'Pin to top'}
+      >
+        {pinning ? (
+          <span className="text-xs">…</span>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill={pinned ? 'currentColor' : 'none'}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="12" y1="17" x2="12" y2="22" />
+            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+          </svg>
+        )}
+      </button>
+      {canViewChanges && (
+        <Link
+          href={`/dashboard/content-library/${id}/changes`}
+          className="shrink-0 text-xs text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
+          title="View changes"
+        >
+          View changes
+        </Link>
       )}
       {sourceUrl && (
         <>

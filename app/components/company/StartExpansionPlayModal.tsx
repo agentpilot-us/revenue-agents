@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type PlayType = 'cross-sell' | 'new-stakeholder' | 'use-case-exploration';
+type PlayType = 'use-case-exploration';
 
 type Props = {
   companyId: string;
@@ -32,7 +32,7 @@ export function StartExpansionPlayModal({
   triggerButton,
 }: Props) {
   const router = useRouter();
-  const [selected, setSelected] = useState<PlayType>('cross-sell');
+  const [selected, setSelected] = useState<PlayType>('use-case-exploration');
   const [loading, setLoading] = useState(false);
 
   const handleStart = () => {
@@ -67,52 +67,6 @@ export function StartExpansionPlayModal({
             <p className="text-sm text-gray-500 mb-4">Product: {productName}</p>
           )}
 
-          <fieldset className="mb-6">
-            <legend className="text-sm font-medium text-gray-700 mb-2">Select play type</legend>
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer mb-2">
-              <input
-                type="radio"
-                name="playType"
-                value="cross-sell"
-                checked={selected === 'cross-sell'}
-                onChange={() => setSelected('cross-sell')}
-                className="mt-1"
-              />
-              <div>
-                <span className="font-medium text-gray-900">Department Cross-Sell</span>
-                <span className="ml-1.5 text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Recommended</span>
-                <p className="text-xs text-gray-500 mt-0.5">Research → Champion intro → Outreach → Case study → Joint meeting</p>
-              </div>
-            </label>
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer mb-2">
-              <input
-                type="radio"
-                name="playType"
-                value="new-stakeholder"
-                checked={selected === 'new-stakeholder'}
-                onChange={() => setSelected('new-stakeholder')}
-                className="mt-1"
-              />
-              <div>
-                <span className="font-medium text-gray-900">New Stakeholder Engagement</span>
-                <p className="text-xs text-gray-500 mt-0.5">New exec joined — research, intro email, LinkedIn, internal intro</p>
-              </div>
-            </label>
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
-              <input
-                type="radio"
-                name="playType"
-                value="use-case-exploration"
-                checked={selected === 'use-case-exploration'}
-                onChange={() => setSelected('use-case-exploration')}
-                className="mt-1"
-              />
-              <div>
-                <span className="font-medium text-gray-900">Use Case Exploration</span>
-                <p className="text-xs text-gray-500 mt-0.5">Find contacts, send emails, invite to events for this department</p>
-              </div>
-            </label>
-          </fieldset>
 
           <div className="flex gap-2 justify-end">
             <button

@@ -92,8 +92,34 @@ export async function GET(
 
   const departments = await prisma.companyDepartment.findMany({
     where: { companyId },
-    include: {
-      contacts: true,
+    select: {
+      id: true,
+      companyId: true,
+      type: true,
+      customName: true,
+      status: true,
+      notes: true,
+      estimatedSize: true,
+      valueProp: true,
+      useCase: true,
+      estimatedOpportunity: true,
+      objectionHandlers: true,
+      proofPoints: true,
+      targetRoles: true,
+      contacts: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          title: true,
+          engagementScore: true,
+          persona: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
       companyProducts: {
         include: { product: true },
       },

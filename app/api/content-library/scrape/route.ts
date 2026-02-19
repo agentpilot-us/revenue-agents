@@ -7,6 +7,7 @@ import {
   suggestedTypeToContentType,
 } from '@/lib/content-library/import-pipeline';
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
+import { calculateContentHash } from '@/lib/content-library/content-hash';
 
 const MAX_FULL_SITE_URLS = 40;
 const SCRAPE_TIMEOUT_MS = 60_000;
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
       mode?: 'full' | 'selected';
       selectedUrls?: string[];
       limit?: number;
+      reviewMode?: boolean; // If true, return items without saving
     };
     try {
       body = await req.json();
@@ -81,7 +83,18 @@ export async function POST(req: NextRequest) {
     });
     const existingSet = new Set(existing.map((r) => r.sourceUrl));
 
+    const reviewMode = body.reviewMode === true;
     const created: { id: string; title: string; type: string; sourceUrl: string | null }[] = [];
+    const reviewItems: {
+      url: string;
+      title: string;
+      description: string;
+      suggestedType: string;
+      type: string;
+      industry?: string;
+      department?: string;
+      contentPayload: unknown;
+    }[] = [];
     const deadline = Date.now() + SCRAPE_TIMEOUT_MS;
 
     for (const pageUrl of urlsToScrape) {
@@ -114,30 +127,54 @@ export async function POST(req: NextRequest) {
         suggestedType: categorized.suggestedType,
       };
 
-      const row = await prisma.contentLibrary.create({
-        data: {
-          userId: session.user.id,
-          productId: null,
+      if (reviewMode) {
+        reviewItems.push({
+          url: pageUrl,
           title: categorized.title.slice(0, 500),
+          description: categorized.description ?? '',
+          suggestedType: categorized.suggestedType,
           type: contentType,
-          content: contentPayload,
-          industry: categorized.industry ?? null,
-          department: categorized.department ?? null,
-          sourceUrl: pageUrl,
-          userConfirmed: true,
-          scrapedAt: new Date(),
-        },
-        select: { id: true, title: true, type: true, sourceUrl: true },
-      });
+          industry: categorized.industry,
+          department: categorized.department,
+          contentPayload,
+        });
+      } else {
+        const contentHash = calculateContentHash(contentPayload);
 
-      try {
-        await ingestContentLibraryChunks(row.id, contentPayload.markdown);
-      } catch (e) {
-        console.error('RAG ingest failed for', row.id, e);
+        const row = await prisma.contentLibrary.create({
+          data: {
+            userId: session.user.id,
+            productId: null,
+            title: categorized.title.slice(0, 500),
+            type: contentType,
+            content: contentPayload,
+            contentHash,
+            version: '1.0',
+            industry: categorized.industry ?? null,
+            department: categorized.department ?? null,
+            sourceUrl: pageUrl,
+            userConfirmed: true,
+            scrapedAt: new Date(),
+          },
+          select: { id: true, title: true, type: true, sourceUrl: true },
+        });
+
+        try {
+          await ingestContentLibraryChunks(row.id, contentPayload.markdown);
+        } catch (e) {
+          console.error('RAG ingest failed for', row.id, e);
+        }
+
+        created.push(row);
       }
-
-      created.push(row);
       existingSet.add(pageUrl);
+    }
+
+    if (reviewMode) {
+      return NextResponse.json({
+        reviewMode: true,
+        items: reviewItems,
+      });
     }
 
     return NextResponse.json({

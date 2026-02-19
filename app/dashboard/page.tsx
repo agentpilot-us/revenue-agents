@@ -2,19 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { AccountFlightCard } from '@/app/components/dashboard/AccountFlightCard';
-import {
-  getCompanyFlightStage,
-  getFlightStageParamsForCompanies,
-  getFlightStageSummary,
-} from '@/lib/gamification/flight-stage';
-import { aviationCopy } from '@/lib/copy/aviation';
-import { getLevelLabel } from '@/lib/gamification/expansion-score';
-import { getBadgeById, type BadgeEntry } from '@/lib/gamification/badges';
-import {
-  getChallengeProgressForUser,
-  grantSeasonalBadgeIfEarned,
-} from '@/lib/gamification/seasonal-challenges';
+import { AccountCard } from '@/app/components/dashboard/AccountCard';
 
 export default async function DashboardPage({
   searchParams,
@@ -27,27 +15,7 @@ export default async function DashboardPage({
     redirect('/api/auth/signin');
   }
 
-  const firstName = session.user.name?.split(' ')[0] ?? 'Pilot';
-
-  const userGamification = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { level: true, expansionScore: true, currentStreakDays: true, badges: true },
-  });
-  const level = userGamification?.level ?? 1;
-  const streakDays = userGamification?.currentStreakDays ?? 0;
-  let earnedBadges = (userGamification?.badges as BadgeEntry[] | null) ?? [];
-
-  const challengeProgress = await getChallengeProgressForUser(prisma, session.user.id);
-  if (challengeProgress?.completed && !challengeProgress.badgeEarned) {
-    const granted = await grantSeasonalBadgeIfEarned(prisma, session.user.id);
-    if (granted) {
-      const u = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { badges: true },
-      });
-      earnedBadges = (u?.badges as BadgeEntry[] | null) ?? [];
-    }
-  }
+  const firstName = session.user.name?.split(' ')[0] ?? 'User';
 
   // Content Library counts: if user has no content, send to Company setup or Content Library
   const [contentLibraryCounts, catalogProductCount, industryPlaybookCount] = await Promise.all([
@@ -74,10 +42,6 @@ export default async function DashboardPage({
     redirect('/dashboard/content-library');
   }
 
-  // Approval queue count
-  const approvalQueueCount = await prisma.pendingAction.count({
-    where: { userId: session.user.id, status: 'pending' },
-  });
 
   // Pipeline and meetings (this month)
   const startOfMonth = new Date();
@@ -131,13 +95,19 @@ export default async function DashboardPage({
     .sort((a, b) => b.pipeline - a.pipeline || b.contactCount - a.contactCount)
     .slice(0, 5);
 
-  // Companies (tracked accounts) with full department + matrix data
+  // Companies (tracked accounts) with data for AccountCard
   const companiesRaw = await prisma.company.findMany({
     where: { userId: session.user.id },
     orderBy: { updatedAt: 'desc' },
     take: 10,
     include: {
-      _count: { select: { contacts: true, departments: true } },
+      _count: { 
+        select: { 
+          contacts: true, 
+          departments: true,
+          activities: true,
+        } 
+      },
       departments: {
         include: {
           _count: { select: { contacts: true } },
@@ -146,46 +116,64 @@ export default async function DashboardPage({
     },
   });
 
-  // Flight stage params for each company (bulk)
-  type CompanyRaw = (typeof companiesRaw)[number];
-  const companyData = new Map(
-    companiesRaw.map((c: CompanyRaw) => [
-      c.id,
-      {
-        researchData: c.researchData,
-        contactCount: c._count.contacts,
-        departmentCount: c._count.departments,
+  // Get campaign counts and last activity per company
+  const companyIds = companiesRaw.map((c) => c.id);
+  const [campaignCounts, lastActivities] = await Promise.all([
+    prisma.segmentCampaign.groupBy({
+      by: ['companyId'],
+      where: { companyId: { in: companyIds } },
+      _count: true,
+    }),
+    prisma.activity.findMany({
+      where: { 
+        companyId: { in: companyIds },
+        userId: session.user.id,
       },
-    ])
-  );
-  const stageParamsMap = await getFlightStageParamsForCompanies(
-    prisma,
-    companiesRaw.map((c: CompanyRaw) => c.id),
-    companyData
-  );
+      select: {
+        companyId: true,
+        createdAt: true,
+        type: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
 
+  const campaignCountByCompany = new Map(
+    campaignCounts.map((c) => [c.companyId, c._count])
+  );
+  
+  const lastActivityByCompany = new Map<string, Date>();
+  for (const activity of lastActivities) {
+    if (activity.companyId && !lastActivityByCompany.has(activity.companyId)) {
+      lastActivityByCompany.set(activity.companyId, activity.createdAt);
+    }
+  }
+
+  // Check for engagement (email or meeting activities)
+  const engagementByCompany = new Set<string>();
+  for (const activity of lastActivities) {
+    if (activity.companyId && (activity.type === 'Email' || activity.type === 'Meeting' || activity.type === 'EMAIL_SENT')) {
+      engagementByCompany.add(activity.companyId);
+    }
+  }
+
+  type CompanyRaw = (typeof companiesRaw)[number];
   type DeptRaw = CompanyRaw['departments'][number];
   const companies = companiesRaw.map((c: CompanyRaw) => {
-    const params = stageParamsMap.get(c.id);
-    const { stage, progress } = params
-      ? getCompanyFlightStage(params)
-      : { stage: 'Runway' as const, progress: 5 };
-    const summary = params
-      ? getFlightStageSummary({
-          stage,
-          contactCount: c._count.contacts,
-          emailActivityCount: params.emailActivityCount,
-          meetingActivityCount: params.meetingActivityCount,
-          hasOpportunity: params.hasOpportunity,
-        })
-      : 'Just created.';
+    const hasResearch = (c.researchData != null && typeof c.researchData === 'object' && Object.keys(c.researchData as object).length > 0) || c._count.departments > 0;
+    const hasCampaigns = (campaignCountByCompany.get(c.id) ?? 0) > 0;
+    const hasEngagement = engagementByCompany.has(c.id);
+    
     return {
       id: c.id,
       name: c.name,
+      industry: c.industry,
+      hasResearch,
+      contactCount: c._count.contacts,
+      hasCampaigns,
+      hasEngagement,
+      lastActivity: lastActivityByCompany.get(c.id) ?? c.updatedAt,
       _count: c._count,
-      stage,
-      progress,
-      summary,
       departments: c.departments.map((d: DeptRaw) => ({
         id: d.id,
         type: d.type,
@@ -283,37 +271,17 @@ export default async function DashboardPage({
       />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Flight deck headline */}
+        {/* Dashboard headline */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
-              Flight deck, {firstName}
+              Dashboard
             </h1>
-            <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-slate-400">
-              <span>Level {level} {getLevelLabel(level)}</span>
-              {streakDays > 0 && (
-                <span className="flex items-center gap-1">
-                  <span aria-hidden>🔥</span>
-                  {streakDays}-day streak
-                </span>
-              )}
-            </div>
             <p className="text-slate-400 mt-1 text-sm">
-              Accounts, pipeline, and approval queue
+              Accounts and pipeline
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {approvalQueueCount > 0 && (
-              <Link
-                href="/dashboard/approvals"
-                className="inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20"
-              >
-                <span>Approval queue</span>
-                <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-zinc-900">
-                  {approvalQueueCount}
-                </span>
-              </Link>
-            )}
             {dueForNextTouchWithCompany.length > 0 && (
               <Link
                 href={dueForNextTouchWithCompany[0]?.companyId ? `/chat?play=expansion&accountId=${dueForNextTouchWithCompany[0].companyId}` : '/dashboard/companies'}
@@ -328,91 +296,6 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        {/* Achievements (badges) - private */}
-        {earnedBadges.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Achievements
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {earnedBadges.map((entry) => {
-                const def = getBadgeById(entry.id);
-                return (
-                  <div
-                    key={entry.id}
-                    className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"
-                    title={def?.description}
-                  >
-                    <span className="font-medium text-amber-400">{def?.name ?? entry.id}</span>
-                    {def?.description && (
-                      <p className="text-slate-500 text-xs mt-0.5">{def.description}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Seasonal challenge */}
-        {challengeProgress && (
-          <section className="mb-8">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Seasonal challenge
-            </h2>
-            <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
-              <p className="font-medium text-slate-200">
-                {challengeProgress.challengeName}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">
-                Get {challengeProgress.goalEventAttendees} contacts to events and {challengeProgress.goalMeetingsBooked} meetings
-                booked by {challengeProgress.endsAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} to earn Winter Ace 2026.
-              </p>
-              <div className="mt-4 space-y-3">
-                <div>
-                  <div className="flex justify-between text-xs text-slate-400 mb-1">
-                    <span>Contacts at events</span>
-                    <span>{challengeProgress.eventAttendees} / {challengeProgress.goalEventAttendees}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-                    <div
-                      className="h-full bg-sky-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, (challengeProgress.eventAttendees / challengeProgress.goalEventAttendees) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs text-slate-400 mb-1">
-                    <span>Meetings booked</span>
-                    <span>{challengeProgress.meetingsBooked} / {challengeProgress.goalMeetingsBooked}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, (challengeProgress.meetingsBooked / challengeProgress.goalMeetingsBooked) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  Time left: {Math.ceil((challengeProgress.endsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))} days
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${
-                    challengeProgress.badgeEarned
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                      : 'bg-slate-700 text-slate-500 border border-slate-600'
-                  }`}
-                  title={challengeProgress.badgeEarned ? 'Winter Ace 2026 earned' : 'Complete all goals to unlock'}
-                >
-                  {challengeProgress.badgeEarned ? '✓ Winter Ace 2026' : '🔒 Winter Ace 2026'}
-                </span>
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* Success metrics: pipeline, meetings, top microsegments */}
         <section className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
@@ -424,15 +307,6 @@ export default async function DashboardPage({
           <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Meetings this month</p>
             <p className="mt-1 text-xl font-bold text-emerald-400 tabular-nums">{meetingsThisMonth}</p>
-          </div>
-          <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending approvals</p>
-            <p className="mt-1 text-xl font-bold text-sky-400 tabular-nums">{approvalQueueCount}</p>
-            {approvalQueueCount > 0 && (
-              <Link href="/dashboard/approvals" className="mt-2 inline-block text-xs text-slate-400 hover:text-amber-400">
-                Review queue →
-              </Link>
-            )}
           </div>
         </section>
 
@@ -474,13 +348,13 @@ export default async function DashboardPage({
           </h2>
           {companies.length === 0 ? (
             <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-8 text-center">
-              <p className="text-slate-300 font-medium mb-1">{aviationCopy.empty.noCompanies.title}</p>
-              <p className="text-slate-500 text-sm mb-4">{aviationCopy.empty.noCompanies.body}</p>
+              <p className="text-slate-300 font-medium mb-1">Ready to get started?</p>
+              <p className="text-slate-500 text-sm mb-4">Create your first target account to begin tracking engagement.</p>
               <Link
                 href="/dashboard/companies/new"
                 className="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30"
               >
-                {aviationCopy.empty.noCompanies.cta}
+                Add your first target company
               </Link>
             </div>
           ) : (
@@ -489,9 +363,12 @@ export default async function DashboardPage({
                 (c: {
                   id: string;
                   name: string;
-                  stage: string;
-                  progress: number;
-                  summary: string;
+                  industry: string | null;
+                  hasResearch: boolean;
+                  contactCount: number;
+                  hasCampaigns: boolean;
+                  hasEngagement: boolean;
+                  lastActivity: Date | null;
                   _count: { departments: number; contacts: number };
                   departments: Array<{
                     id: string;
@@ -502,12 +379,15 @@ export default async function DashboardPage({
                   }>;
                 }) => (
                   <div key={c.id} className="space-y-4">
-                    <AccountFlightCard
+                    <AccountCard
                       companyId={c.id}
                       companyName={c.name}
-                      stage={c.stage as 'Runway' | 'Taxiing' | 'Takeoff' | 'Cruising' | 'Approach' | 'Landing'}
-                      progress={c.progress}
-                      summary={c.summary}
+                      industry={c.industry}
+                      hasResearch={c.hasResearch}
+                      contactCount={c.contactCount}
+                      hasCampaigns={c.hasCampaigns}
+                      hasEngagement={c.hasEngagement}
+                      lastActivity={c.lastActivity}
                     />
                     <div className="rounded-lg border border-slate-700 bg-zinc-800/60 p-4">
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
@@ -638,12 +518,6 @@ export default async function DashboardPage({
             ) : (
               <p className="text-slate-500 text-sm py-2">No recent activity</p>
             )}
-            <Link
-              href="/dashboard/approvals"
-              className="mt-3 inline-block text-xs text-slate-500 hover:text-amber-400 transition-colors"
-            >
-              Approval queue →
-            </Link>
             <Link
               href="/dashboard/companies"
               className="ml-3 inline-block text-xs text-slate-500 hover:text-amber-400 transition-colors"

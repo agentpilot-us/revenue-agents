@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import type { ContentType } from '@prisma/client';
+import { calculateContentHash } from '@/lib/content-library/content-hash';
 
 export async function GET(req: NextRequest) {
   try {
@@ -90,6 +91,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const contentHash = calculateContentHash(content);
+
     const contentItem = await prisma.contentLibrary.create({
       data: {
         userId: session.user.id,
@@ -97,6 +100,8 @@ export async function POST(req: NextRequest) {
         title,
         type,
         content,
+        contentHash,
+        version: '1.0',
         persona,
         department,
         industry,

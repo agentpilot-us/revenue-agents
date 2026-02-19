@@ -5,6 +5,17 @@ import { useRouter } from 'next/navigation';
 
 type Mode = 'url' | 'site' | 'upload';
 
+type ReviewItem = {
+  url: string;
+  title: string;
+  description: string;
+  suggestedType: string;
+  type: string;
+  industry?: string;
+  department?: string;
+  contentPayload: unknown;
+};
+
 export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void }) {
   const router = useRouter();
   const refresh = () => {
@@ -18,6 +29,9 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [selectedReviewItems, setSelectedReviewItems] = useState<Set<number>>(new Set());
+  const [approving, setApproving] = useState(false);
 
   const handleScrapeUrl = async () => {
     if (!url.trim()) {
@@ -31,13 +45,19 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
       const res = await fetch('/api/content-library/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), reviewMode: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Get data failed');
-      setSuccess(`Added ${data.created ?? 0} page(s).`);
-      setUrl('');
-      refresh();
+      if (data.reviewMode && data.items) {
+        setReviewItems(data.items);
+        setSelectedReviewItems(new Set(data.items.map((_: unknown, i: number) => i)));
+        setUrl('');
+      } else {
+        setSuccess(`Added ${data.created ?? 0} page(s).`);
+        setUrl('');
+        refresh();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Get data failed');
     } finally {
@@ -85,18 +105,71 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
       const res = await fetch('/api/content-library/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls: urlsToScrape }),
+        body: JSON.stringify({ urls: urlsToScrape, reviewMode: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Get data failed');
-      setSuccess(`Added ${data.created ?? 0} page(s).`);
-      setMapLinks([]);
-      refresh();
+      if (data.reviewMode && data.items) {
+        setReviewItems(data.items);
+        setSelectedReviewItems(new Set(data.items.map((_: unknown, i: number) => i)));
+        setMapLinks([]);
+      } else {
+        setSuccess(`Added ${data.created ?? 0} page(s).`);
+        setMapLinks([]);
+        refresh();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Get data failed');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApproveSelected = async () => {
+    if (selectedReviewItems.size === 0) {
+      setError('Select at least one item to approve');
+      return;
+    }
+    setApproving(true);
+    setError('');
+    try {
+      const itemsToApprove = reviewItems.filter((_, i) => selectedReviewItems.has(i));
+      const res = await fetch('/api/content-library/scrape/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsToApprove }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Approve failed');
+      setSuccess(`Added ${data.created ?? 0} page(s).`);
+      setReviewItems([]);
+      setSelectedReviewItems(new Set());
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Approve failed');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const toggleReviewItem = (index: number) => {
+    setSelectedReviewItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const selectAllReviewItems = () => {
+    setSelectedReviewItems(new Set(reviewItems.map((_, i) => i)));
+  };
+
+  const deselectAllReviewItems = () => {
+    setSelectedReviewItems(new Set());
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -237,6 +310,105 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
 
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {success && <p className="mt-2 text-sm text-green-600 dark:text-green-400">{success}</p>}
+
+      {/* Review Panel */}
+      {reviewItems.length > 0 && (
+        <div className="mt-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+              Review scraped content ({reviewItems.length} items)
+            </h3>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={selectAllReviewItems}
+                className="text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700"
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={deselectAllReviewItems}
+                className="text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700"
+              >
+                Deselect all
+              </button>
+            </div>
+          </div>
+          <div className="max-h-96 overflow-y-auto space-y-2 mb-4">
+            {reviewItems.map((item, index) => (
+              <label
+                key={index}
+                className="flex items-start gap-3 p-3 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-zinc-700/50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedReviewItems.has(index)}
+                  onChange={() => toggleReviewItem(index)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-zinc-600 text-blue-600"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</h4>
+                  {item.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">
+                      {item.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span className="px-2 py-0.5 text-xs rounded bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-slate-300">
+                      {item.type}
+                    </span>
+                    {item.industry && (
+                      <span className="px-2 py-0.5 text-xs rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                        {item.industry}
+                      </span>
+                    )}
+                    {item.department && (
+                      <span className="px-2 py-0.5 text-xs rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                        {item.department}
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block truncate max-w-full"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {item.url}
+                  </a>
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              {selectedReviewItems.size} of {reviewItems.length} selected
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setReviewItems([]);
+                  setSelectedReviewItems(new Set());
+                }}
+                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApproveSelected}
+                disabled={approving || selectedReviewItems.size === 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {approving ? 'Adding…' : `Approve selected (${selectedReviewItems.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

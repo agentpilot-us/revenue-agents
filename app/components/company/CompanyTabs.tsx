@@ -8,10 +8,15 @@ import type { EngagementRow } from '@/app/components/company/EngagementByBuyingG
 import { AccountMessagingTab } from '@/app/components/company/AccountMessagingTab';
 import { CampaignsTab, type CampaignItem } from '@/app/components/company/CampaignsTab';
 import { CompanyResearchDisplay } from '@/app/components/company/CompanyResearchDisplay';
+import { SalesforceBlock } from '@/app/components/company/SalesforceBlock';
+import { CrawlStatus } from '@/app/components/company/CrawlStatus';
+import { ContactsByBuyingGroup } from '@/app/components/company/ContactsByBuyingGroup';
+import { ContentTab } from '@/app/components/company/ContentTab';
+import { ActivityTimeline } from '@/app/components/company/ActivityTimeline';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-type TabId = 'departments' | 'overview' | 'contacts' | 'engagement' | 'activity' | 'messaging' | 'campaigns';
+type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns';
 
 type AccountMessagingData = {
   id: string;
@@ -26,23 +31,43 @@ type AccountMessagingData = {
 
 type ContentItem = { id: string; title: string; type: string };
 
-type PipelineByMicrosegment = Array<{ departmentId: string; departmentName: string; pipelineValue: number }>;
-type Funnel = { contacted: number; engaged: number; meetings: number; opportunity: number };
-
 type CompanyTabsProps = {
   companyId: string;
   companyName: string;
+  companyData?: {
+    industry: string | null;
+    website: string | null;
+    employees: string | null;
+    headquarters: string | null;
+    revenue: string | null;
+    businessOverview: string | null;
+    keyInitiatives: string[] | null;
+    segmentationStrategy: string | null;
+    segmentationRationale: string | null;
+    salesforceLastSyncedAt: Date | null;
+    salesforceOpportunityData: {
+      opportunityName?: string;
+      stage?: string;
+      amount?: string;
+      closeDate?: string;
+      daysUntilClose?: number;
+      lastActivityDate?: string;
+    } | null;
+    hasSalesforceAccess: boolean;
+    lastCrawlAt: Date | null;
+    nextCrawlAt: Date | null;
+    lastContentChangeAt: Date | null;
+  };
   departments: unknown[];
   matrixDepartments: unknown[];
   catalogProducts: unknown[];
   activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
+  contacts?: Array<{ id: string; firstName: string | null; lastName: string | null }>;
   contactCount: number;
   expansionStrategy: { phase1: string[]; phase2: string[]; phase3: string[] };
   accountMessaging: AccountMessagingData;
   contentLibraryUseCasesAndStories: ContentItem[];
   initialTab?: TabId;
-  pipelineByMicrosegment?: PipelineByMicrosegment;
-  funnel?: Funnel;
   campaigns?: CampaignItem[];
   /** When this changes (e.g. after applying research), Overview refetches research data */
   researchDataKey?: string | number;
@@ -51,13 +76,14 @@ type CompanyTabsProps = {
 };
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'departments', label: 'Departments' },
+  { id: 'departments', label: 'Buying Groups' },
   { id: 'overview', label: 'Overview' },
   { id: 'contacts', label: 'Contacts' },
+  { id: 'content', label: 'Content' },
   { id: 'engagement', label: 'Engagement' },
   { id: 'activity', label: 'Activity' },
   { id: 'messaging', label: 'Messaging' },
-  { id: 'campaigns', label: 'Campaigns' },
+  { id: 'campaigns', label: 'Sales Page' },
 ];
 
 export function CompanyTabs({
@@ -72,8 +98,6 @@ export function CompanyTabs({
   accountMessaging,
   contentLibraryUseCasesAndStories,
   initialTab,
-  pipelineByMicrosegment = [],
-  funnel,
   campaigns = [],
   researchDataKey,
   engagementByDept = [],
@@ -109,67 +133,112 @@ export function CompanyTabs({
 
       {activeTab === 'departments' && (
         <div className="space-y-6">
-          <DepartmentsTab companyId={companyId} departments={departments as Parameters<typeof DepartmentsTab>[0]['departments']} />
+          <DepartmentsTab
+            companyId={companyId}
+            departments={departments as Parameters<typeof DepartmentsTab>[0]['departments']}
+            segmentationStrategy={companyData?.segmentationStrategy}
+            segmentationRationale={companyData?.segmentationRationale}
+          />
           <ExpansionStrategySection strategy={expansionStrategy} companyId={companyId} />
         </div>
       )}
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Account research</h2>
-            <CompanyResearchDisplay key={researchDataKey} companyId={companyId} />
-          </div>
-          {(pipelineByMicrosegment.length > 0 || funnel) && (
+          {/* Company Snapshot */}
+          {companyData && (
             <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Pipeline &amp; funnel</h2>
-              {funnel != null && (
-                <div className="mb-6">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Funnel</p>
-                  <div className="flex flex-wrap gap-4">
-                    <div className="rounded border border-gray-200 dark:border-zinc-600 px-4 py-2">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{funnel.contacted}</span>
-                      <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Contacted</span>
-                    </div>
-                    <div className="rounded border border-gray-200 dark:border-zinc-600 px-4 py-2">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{funnel.engaged}</span>
-                      <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Engaged</span>
-                    </div>
-                    <div className="rounded border border-gray-200 dark:border-zinc-600 px-4 py-2">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{funnel.meetings}</span>
-                      <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Meetings</span>
-                    </div>
-                    <div className="rounded border border-amber-200 dark:border-amber-800 px-4 py-2">
-                      <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
-                        ${(funnel.opportunity / 1000).toFixed(0)}K
-                      </span>
-                      <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Pipeline</span>
-                    </div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Company Snapshot</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                {companyData.industry && (
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Industry:</span>{' '}
+                    <span className="text-gray-600 dark:text-gray-400">{companyData.industry}</span>
                   </div>
+                )}
+                {companyData.revenue && (
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Revenue:</span>{' '}
+                    <span className="text-gray-600 dark:text-gray-400">{companyData.revenue}</span>
+                  </div>
+                )}
+                {companyData.employees && (
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Employees:</span>{' '}
+                    <span className="text-gray-600 dark:text-gray-400">{companyData.employees}</span>
+                  </div>
+                )}
+                {companyData.headquarters && (
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">HQ:</span>{' '}
+                    <span className="text-gray-600 dark:text-gray-400">{companyData.headquarters}</span>
+                  </div>
+                )}
+                {companyData.website && (
+                  <div className="md:col-span-2">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Website:</span>{' '}
+                    <a
+                      href={companyData.website.startsWith('http') ? companyData.website : `https://${companyData.website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {companyData.website}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Business Overview and Key Initiatives */}
+          {companyData && (companyData.businessOverview || (companyData.keyInitiatives && companyData.keyInitiatives.length > 0)) && (
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Business Overview & Key Initiatives</h2>
+              {companyData.businessOverview && (
+                <div className="mb-4">
+                  <p className="text-gray-600 dark:text-gray-300">{companyData.businessOverview}</p>
                 </div>
               )}
-              {pipelineByMicrosegment.length > 0 && (
+              {companyData.keyInitiatives && companyData.keyInitiatives.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Pipeline by microsegment</p>
-                  <ul className="space-y-2">
-                    {pipelineByMicrosegment.map((p) => (
-                      <li key={p.departmentId} className="flex items-center justify-between py-1.5 border-b border-gray-100 dark:border-zinc-700 last:border-0">
-                        <Link
-                          href={`/dashboard/companies/${companyId}/departments/${p.departmentId}`}
-                          className="text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400"
-                        >
-                          {p.departmentName}
-                        </Link>
-                        <span className="font-medium text-amber-600 dark:text-amber-400 tabular-nums">
-                          ${(p.pipelineValue / 1000).toFixed(0)}K
-                        </span>
-                      </li>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Key Initiatives</h3>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
+                    {companyData.keyInitiatives.map((initiative, i) => (
+                      <li key={i}>{initiative}</li>
                     ))}
                   </ul>
                 </div>
               )}
             </div>
           )}
+
+          {/* Salesforce Block */}
+          {companyData && (
+            <SalesforceBlock
+              companyId={companyId}
+              salesforceLastSyncedAt={companyData.salesforceLastSyncedAt}
+              salesforceOpportunityData={companyData.salesforceOpportunityData}
+              hasSalesforceAccess={companyData.hasSalesforceAccess}
+            />
+          )}
+
+          {/* Crawl Status */}
+          {companyData && (
+            <CrawlStatus
+              lastCrawlAt={companyData.lastCrawlAt}
+              nextCrawlAt={companyData.nextCrawlAt}
+              lastContentChangeAt={companyData.lastContentChangeAt}
+            />
+          )}
+
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Account research</h2>
+              <ResearchWithAIButton companyId={companyId} />
+            </div>
+            <CompanyResearchDisplay key={researchDataKey} companyId={companyId} />
+          </div>
           <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
             <div className="space-y-4">
@@ -195,15 +264,19 @@ export function CompanyTabs({
       )}
 
       {activeTab === 'contacts' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Contacts</h2>
-          <p className="text-gray-600 mb-4">
-            {contactCount} contact{contactCount !== 1 ? 's' : ''} at {companyName}
-          </p>
-          <Link href={`/dashboard/companies/${companyId}/contacts`}>
-            <Button>View all contacts</Button>
-          </Link>
-        </div>
+        <ContactsByBuyingGroup companyId={companyId} companyName={companyName} />
+      )}
+
+      {activeTab === 'content' && (
+        <ContentTab
+          companyId={companyId}
+          companyName={companyName}
+          departments={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
+            id: d.id,
+            customName: d.customName ?? null,
+            type: d.type,
+          }))}
+        />
       )}
 
       {activeTab === 'engagement' && (
@@ -235,46 +308,56 @@ export function CompanyTabs({
             customName: d.customName ?? null,
             type: d.type,
           }))}
+          companyData={companyData ? {
+            name: companyName,
+            website: companyData.website,
+            keyInitiatives: companyData.keyInitiatives,
+          } : undefined}
         />
-      )}
 
       {activeTab === 'activity' && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow divide-y dark:divide-zinc-700">
-            <h2 className="text-xl font-semibold text-gray-900 p-4">Recent Agent Activity</h2>
-            {activities.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">No activity yet. Launch a play to get started.</div>
-            ) : (
-              activities.slice(0, 10).map((activity) => (
-                <div key={activity.id} className="p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">
-                      {activity.type === 'EMAIL_SENT' || activity.type === 'Email' ? '📧' :
-                        activity.type === 'Research' ? '🔍' :
-                          activity.type === 'ContactDiscovered' ? '👥' : '📝'}
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-medium">{activity.summary}</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {new Date(activity.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Engagement Summary</h2>
-            <ul className="space-y-2 text-gray-700">
-              <li>{contactCount} total contacts</li>
-              <li>{activities.filter((a) => a.type === 'EMAIL_SENT' || a.type === 'Email').length} emails sent</li>
-              <li>{activities.filter((a) => a.type === 'EMAIL_REPLIED' || a.type === 'EmailReply').length} replies received</li>
-            </ul>
-          </div>
-        </div>
+        <ActivityTimeline
+          companyId={companyId}
+          initialActivities={activities}
+          departments={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
+            id: d.id,
+            customName: d.customName ?? null,
+            type: d.type,
+          }))}
+          contacts={contacts}
+        />
       )}
     </div>
+  );
+}
+
+function ResearchWithAIButton({ companyId }: { companyId: string }) {
+  const [researching, setResearching] = useState(false);
+
+  const handleResearch = async () => {
+    setResearching(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/research`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        // Refresh the page to show updated research data
+        window.location.reload();
+      } else {
+        alert('Failed to run research. Please try again.');
+      }
+    } catch (error) {
+      console.error('Research error:', error);
+      alert('Failed to run research. Please try again.');
+    } finally {
+      setResearching(false);
+    }
+  };
+
+  return (
+    <Button onClick={handleResearch} disabled={researching} size="sm">
+      {researching ? 'Researching...' : 'Research with AI'}
+    </Button>
   );
 }
 

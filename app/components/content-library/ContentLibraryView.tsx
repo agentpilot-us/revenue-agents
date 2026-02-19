@@ -26,11 +26,23 @@ export async function ContentLibraryView({ company }: Props) {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const items = await prisma.contentLibrary.findMany({
-    where: { userId: session.user.id, isActive: true, archivedAt: null },
-    select: { id: true, title: true, type: true, sourceUrl: true },
-    orderBy: { updatedAt: 'desc' },
-  });
+  const [items, products, playbooks] = await Promise.all([
+    prisma.contentLibrary.findMany({
+      where: { userId: session.user.id, isActive: true, archivedAt: null },
+      select: { id: true, title: true, type: true, sourceUrl: true, updatedAt: true, isPinned: true, version: true, previousContent: true },
+      orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
+    }),
+    prisma.product.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, description: true, category: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.industryPlaybook.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, slug: true, overview: true, createdAt: true },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
 
   const byType = items.reduce(
     (acc, item) => {
@@ -114,23 +126,55 @@ export async function ContentLibraryView({ company }: Props) {
         ).map((type) => {
           const list = byType[type] ?? [];
           const label = SECTION_LABELS[type] ?? type;
-          if (list.length === 0) return null;
+          const canCreateManually = ['UseCase', 'CompanyEvent', 'Framework', 'FeatureRelease', 'ResourceLink'].includes(type);
           return (
             <div
               key={type}
               className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5"
             >
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{label}</h2>
-              <ul className="space-y-2">
-                {list.map((item) => (
-                  <ContentLibraryItemRow
-                    key={item.id}
-                    id={item.id}
-                    title={item.title}
-                    sourceUrl={item.sourceUrl}
-                  />
-                ))}
-              </ul>
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">{label}</h2>
+                {canCreateManually && (
+                  <Link
+                    href={`/dashboard/content-library/new?type=${type}`}
+                    className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    + Create new
+                  </Link>
+                )}
+              </div>
+              {list.length > 0 ? (
+                <ul className="space-y-2">
+                  {list.map((item) => (
+                    <ContentLibraryItemRow
+                      key={item.id}
+                      id={item.id}
+                      title={item.title}
+                      sourceUrl={item.sourceUrl}
+                      updatedAt={item.updatedAt}
+                      isPinned={item.isPinned}
+                      version={item.version}
+                      hasPreviousContent={!!item.previousContent}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No {label.toLowerCase()} yet.
+                  {canCreateManually && (
+                    <>
+                      {' '}
+                      <Link
+                        href={`/dashboard/content-library/new?type=${type}`}
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Create one
+                      </Link>
+                      .
+                    </>
+                  )}
+                </p>
+              )}
             </div>
           );
         })}
@@ -141,6 +185,67 @@ export async function ContentLibraryView({ company }: Props) {
           <p>No content yet. Pull data from a URL or your site, or upload a file above.</p>
         </div>
       )}
+
+      {/* Products Section */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mt-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Products</h2>
+        </div>
+        {products.length > 0 ? (
+          <ul className="space-y-2">
+            {products.map((product) => (
+              <li
+                key={product.id}
+                className="flex items-center justify-between text-sm p-2 rounded hover:bg-slate-50 dark:hover:bg-zinc-700/50"
+              >
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{product.name}</span>
+                  {product.category && (
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      ({product.category})
+                    </span>
+                  )}
+                  {product.description && (
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 line-clamp-1">
+                      {product.description}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400">No products yet.</p>
+        )}
+      </div>
+
+      {/* Industry Playbooks Section */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mt-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Industry Playbooks</h2>
+        </div>
+        {playbooks.length > 0 ? (
+          <ul className="space-y-2">
+            {playbooks.map((playbook) => (
+              <li
+                key={playbook.id}
+                className="flex items-center justify-between text-sm p-2 rounded hover:bg-slate-50 dark:hover:bg-zinc-700/50"
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{playbook.name}</span>
+                  {playbook.overview && (
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 line-clamp-1">
+                      {playbook.overview}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400">No industry playbooks yet.</p>
+        )}
+      </div>
     </div>
   );
 }

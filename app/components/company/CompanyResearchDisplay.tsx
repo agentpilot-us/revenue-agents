@@ -9,6 +9,7 @@ type CompanyResearchData = {
   revenue?: string | null;
   businessOverview?: string | null;
   keyInitiatives?: string[] | null;
+  techStack?: string[] | null;
   departments?: Array<{
     type: string;
     customName?: string | null;
@@ -85,6 +86,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
     researchData.revenue ||
     researchData.businessOverview ||
     (researchData.keyInitiatives && researchData.keyInitiatives.length > 0) ||
+    (researchData.techStack && researchData.techStack.length > 0) ||
     (researchData.departments && researchData.departments.length > 0);
 
   if (!hasData) {
@@ -138,6 +140,23 @@ export function CompanyResearchDisplay({ companyId }: Props) {
                 <li key={i}>{initiative}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Tech Stack Hints */}
+        {researchData.techStack && researchData.techStack.length > 0 && (
+          <div>
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Tech Stack Hints</h4>
+            <div className="flex flex-wrap gap-2">
+              {researchData.techStack.map((tech, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs"
+                >
+                  {tech}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 

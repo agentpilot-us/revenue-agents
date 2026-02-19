@@ -5,8 +5,9 @@
 import { prisma } from '@/lib/db';
 import { scrapeUrl } from '@/lib/tools/firecrawl';
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
+import { calculateContentHash } from './content-hash';
 
-export type RefreshResult = { ok: true; title: string } | { ok: false; error: string };
+export type RefreshResult = { ok: true; title: string; changed: boolean } | { ok: false; error: string };
 
 export async function refreshContentLibraryItem(
   contentLibraryId: string,
@@ -14,7 +15,7 @@ export async function refreshContentLibraryItem(
 ): Promise<RefreshResult> {
   const item = await prisma.contentLibrary.findFirst({
     where: { id: contentLibraryId, userId, isActive: true, archivedAt: null },
-    select: { id: true, title: true, sourceUrl: true, content: true },
+    select: { id: true, title: true, sourceUrl: true, content: true, contentHash: true, version: true, previousContent: true },
   });
 
   if (!item) {
@@ -43,10 +44,29 @@ export async function refreshContentLibraryItem(
     markdown,
   };
 
+  // Calculate hash of new content
+  const newHash = calculateContentHash(newContent);
+  const hasChanged = item.contentHash !== newHash;
+
+  // Increment version if content changed
+  let newVersion = item.version;
+  let previousContent = item.previousContent;
+  if (hasChanged && item.contentHash) {
+    const currentVersion = item.version ? parseFloat(item.version) : 1;
+    newVersion = String((currentVersion + 0.1).toFixed(1));
+    // Store previous content for diff comparison
+    previousContent = item.content as object;
+  } else if (!item.version) {
+    newVersion = '1.0';
+  }
+
   await prisma.contentLibrary.update({
     where: { id: contentLibraryId },
     data: {
       content: newContent,
+      contentHash: newHash,
+      previousContent: previousContent ?? undefined,
+      version: newVersion,
       scrapedAt: new Date(),
       updatedAt: new Date(),
     },
@@ -59,5 +79,5 @@ export async function refreshContentLibraryItem(
     // Still return ok – content was updated
   }
 
-  return { ok: true, title: item.title };
+  return { ok: true, title: item.title, changed: hasChanged };
 }

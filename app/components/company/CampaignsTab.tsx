@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { CampaignPagePreview, type PageSections } from '@/app/components/company/CampaignPagePreview';
+import { CampaignEngagementPreview } from '@/app/components/company/CampaignEngagementPreview';
 
 export type CampaignItem = {
   id: string;
@@ -60,6 +61,7 @@ export function CampaignsTab({
   companyName,
   initialCampaigns,
   departments,
+  companyData,
 }: Props) {
   const [campaigns, setCampaigns] = useState<CampaignItem[]>(initialCampaigns);
   const [loading, setLoading] = useState(false);
@@ -253,53 +255,56 @@ export function CampaignsTab({
         ) : (
           <ul className="divide-y divide-gray-200 dark:divide-zinc-600">
             {campaigns.map((c) => (
-              <li key={c.id} className="py-3 first:pt-0 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{c.title}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {c.department ? deptLabel(c.department) : 'Account'} · {c.type.replace(/_/g, ' ')}
+              <li key={c.id} className="py-4 first:pt-0">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{c.title}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {c.department ? deptLabel(c.department) : 'Account'} · {c.type.replace(/_/g, ' ')}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <a
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-md"
+                      >
+                        {c.url}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(c.url)}
+                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+                      >
+                        Copy URL
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 flex-wrap">
-                    <a
-                      href={c.url}
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <Link
+                      href={`/dashboard/companies/${companyId}/campaigns/${c.id}/qr-codes`}
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:underline"
+                    >
+                      QR Codes
+                    </Link>
+                    <Link
+                      href={`/go/${c.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-md"
+                      className="text-sm font-medium text-amber-600 dark:text-amber-400 hover:underline"
                     >
-                      {c.url}
-                    </a>
+                      Launch / Open
+                    </Link>
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard.writeText(c.url)}
-                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+                      onClick={() => handleDelete(c.id)}
+                      className="text-sm text-red-600 dark:text-red-400 hover:underline"
                     >
-                      Copy URL
+                      Delete
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                  <Link
-                    href={`/dashboard/companies/${companyId}/campaigns/${c.id}/qr-codes`}
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:underline"
-                  >
-                    QR Codes
-                  </Link>
-                  <Link
-                    href={`/go/${c.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-amber-600 dark:text-amber-400 hover:underline"
-                  >
-                    Launch / Open
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(c.id)}
-                    className="text-sm text-red-600 dark:text-red-400 hover:underline"
-                  >
-                    Delete
-                  </button>
-                </div>
+                <CampaignEngagementPreview campaignId={c.id} companyId={companyId} />
               </li>
             ))}
           </ul>
@@ -791,6 +796,8 @@ export function CreateLandingPageFlow({
                     body={draft.body}
                     pageSections={draft.pageSections}
                     isPreview
+                    companyWebsite={companyData?.website || null}
+                    keyInitiative={companyData?.keyInitiatives?.[0] || null}
                   />
                 </div>
               </div>

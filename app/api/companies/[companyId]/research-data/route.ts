@@ -23,6 +23,7 @@ export async function GET(
         revenue: true,
         businessOverview: true,
         keyInitiatives: true,
+        researchData: true,
         departments: {
           where: {
             OR: [
@@ -55,12 +56,20 @@ export async function GET(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
+    // Extract techStack from researchData JSON if available
+    let techStack: string[] | null = null;
+    if (company.researchData && typeof company.researchData === 'object') {
+      const researchData = company.researchData as { techStack?: string[] };
+      techStack = researchData.techStack || null;
+    }
+
     return NextResponse.json({
       employees: company.employees,
       headquarters: company.headquarters,
       revenue: company.revenue,
       businessOverview: company.businessOverview,
       keyInitiatives: company.keyInitiatives,
+      techStack,
       departments: company.departments,
     });
   } catch (error) {

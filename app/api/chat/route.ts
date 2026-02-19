@@ -33,8 +33,6 @@ import {
 } from '@/lib/tools';
 import { sendEmail as resendSendEmail } from '@/lib/tools/resend';
 import { createCalendarEvent } from '@/lib/tools/cal';
-import { addExpansionScore } from '@/lib/gamification/expansion-score';
-import { updateUserStreak } from '@/lib/gamification/streaks';
 import { isToolConfigured } from '@/lib/service-config';
 import { chatTools } from '@/app/api/chat/tools';
 import {
@@ -662,10 +660,6 @@ Work step-by-step and explain what you're doing.`;
                 },
               });
               const uid = opts?.experimental_context?.userId;
-              if (uid) {
-                void addExpansionScore(prisma, uid, 'contacts_discovered').catch(() => {});
-                void updateUserStreak(prisma, uid).catch(() => {});
-              }
               return { contactId: contact.id, ...data };
             } catch (e) {
               throw new Error(e instanceof Error ? e.message : 'Failed to save contact');
@@ -703,8 +697,6 @@ Work step-by-step and explain what you're doing.`;
                 agentUsed: 'expansion',
               },
             });
-            void addExpansionScore(prisma, ctx.userId, 'research_completed').catch(() => {});
-            void updateUserStreak(prisma, ctx.userId).catch(() => {});
           }
           return { summary: res.summary };
         },
@@ -944,8 +936,6 @@ Work step-by-step and explain what you're doing.`;
                 console.error('SequenceTouch/advance after send_email:', e);
               }
             }
-            void addExpansionScore(prisma, ctx.userId, 'email_sent').catch(() => {});
-            void updateUserStreak(prisma, ctx.userId).catch(() => {});
           }
           return { sent: true, messageId: result.id, message: 'Email sent.' };
         },
@@ -1020,8 +1010,6 @@ Work step-by-step and explain what you're doing.`;
                   console.error('SequenceTouch/advance after create_calendar_event:', e);
                 }
               }
-              void addExpansionScore(prisma, userId, 'meeting_booked').catch(() => {});
-              void updateUserStreak(prisma, userId).catch(() => {});
             } catch (e) {
               console.error('Failed to create activity for calendar event:', e);
             }

@@ -18,6 +18,8 @@ type Props = {
   ctaUrl?: string | null;
   /** When true, show "This is a preview" banner and chat placeholder instead of real chat. */
   isPreview?: boolean;
+  companyWebsite?: string | null;
+  keyInitiative?: string | null;
 };
 
 export function CampaignPagePreview({
@@ -29,6 +31,8 @@ export function CampaignPagePreview({
   ctaLabel,
   ctaUrl,
   isPreview = false,
+  companyWebsite,
+  keyInitiative,
 }: Props) {
   const sections = pageSections ?? null;
   const hasEvents = sections?.events && sections.events.length > 0;
@@ -44,12 +48,26 @@ export function CampaignPagePreview({
           </div>
         )}
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-8">
-          {segmentName && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-2">
-              {companyName}
-              {segmentName ? ` · ${segmentName}` : ''}
-            </p>
-          )}
+          <div className="flex items-center gap-3 mb-4">
+            {companyWebsite && (
+              <div className="w-10 h-10 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                <span className="text-lg font-semibold text-zinc-600 dark:text-zinc-300">
+                  {companyName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {companyName}
+                {segmentName ? ` · ${segmentName}` : ''}
+              </p>
+              {keyInitiative && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  {keyInitiative}
+                </p>
+              )}
+            </div>
+          </div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
             {headline}
           </h1>

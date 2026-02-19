@@ -3,7 +3,7 @@
  * Does not include chat/agent config (see lib/plays).
  */
 
-export type PlayCategoryId = 'expansion' | 'cross-sell' | 'renewal' | 'event';
+export type PlayCategoryId = 'expansion' | 'event';
 
 export type PlayCard = {
   id: string;
@@ -38,73 +38,11 @@ export const PLAY_CATEGORIES: PlayCategory[] = [
         hasExecutionFlow: false,
       },
       {
-        id: 'new-stakeholder-engagement',
-        name: 'New Stakeholder Engagement',
-        tagline: 'Welcome + Map',
-        description: 'New VP/Director/C-level joins a tracked account. Research, intro email, LinkedIn, internal intro, follow-up.',
-        href: '/dashboard/plays/new-stakeholder-engagement',
-        hasExecutionFlow: true,
-      },
-      {
         id: 'executive-business-review',
         name: 'Executive Business Review',
         tagline: 'Strategic QBR',
         description: 'Executive-level business review and strategic QBR.',
         href: '/dashboard/plays/expansion/executive-qbr',
-        hasExecutionFlow: false,
-      },
-    ],
-  },
-  {
-    id: 'cross-sell',
-    name: 'Cross-Sell Plays',
-    description: 'Drive adoption of new products/departments',
-    plays: [
-      {
-        id: 'use-case-exploration',
-        name: 'Use Case Exploration',
-        tagline: 'Find contacts, send emails, invite to events',
-        description: 'Focus on a department with messaging and product info, find contacts, send AI-drafted emails, invite to dinners and events. Start from a department page.',
-        href: '/dashboard/companies',
-        hasExecutionFlow: true,
-      },
-      {
-        id: 'customer-qualified-lead',
-        name: 'Customer Qualified Lead',
-        tagline: 'CSM → AE Handoff',
-        description: 'Hand off qualified leads from CSM to AE.',
-        href: '/dashboard/plays/cross-sell/cql',
-        hasExecutionFlow: false,
-      },
-      {
-        id: 'product-led-education',
-        name: 'Product-Led Education',
-        tagline: 'New Dept Target',
-        description: 'Educate and target new departments with product-led motion.',
-        href: '/dashboard/plays/cross-sell/ple',
-        hasExecutionFlow: false,
-      },
-    ],
-  },
-  {
-    id: 'renewal',
-    name: 'Renewal Plays',
-    description: 'Secure and protect existing revenue',
-    plays: [
-      {
-        id: 'proactive-renewal-audit',
-        name: 'Proactive Renewal Audit',
-        tagline: '90-day trigger',
-        description: 'Proactive renewal audit triggered 90 days before renewal.',
-        href: '/dashboard/plays/renewal/audit',
-        hasExecutionFlow: true,
-      },
-      {
-        id: 'executive-alignment',
-        name: 'Executive Alignment',
-        tagline: 'C-suite to C',
-        description: 'Executive alignment and C-suite engagement.',
-        href: '/dashboard/plays/renewal/executive-alignment',
         hasExecutionFlow: false,
       },
     ],

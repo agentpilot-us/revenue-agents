@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { put } from '@vercel/blob';
 import { prisma } from '@/lib/db';
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
+import { calculateContentHash } from '@/lib/content-library/content-hash';
 
 // Vercel serverless body limit is 4.5 MB; keep under that for uploads through the API route
 const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB
@@ -99,6 +100,8 @@ export async function POST(req: NextRequest) {
       mimeType,
     };
 
+    const contentHash = calculateContentHash(contentPayload);
+
     const row = await prisma.contentLibrary.create({
       data: {
         userId: session.user.id,
@@ -106,6 +109,8 @@ export async function POST(req: NextRequest) {
         title: fileName,
         type: 'UploadedDocument',
         content: contentPayload,
+        contentHash,
+        version: '1.0',
         sourceUrl: blobUrl ?? null,
         userConfirmed: true,
         scrapedAt: null,
