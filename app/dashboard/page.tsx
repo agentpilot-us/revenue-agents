@@ -209,8 +209,9 @@ export default async function DashboardPage({
     };
   });
 
-  // Catalog products (once) for matrix columns
+  // Catalog products (once) for matrix columns — only this user's products
   const catalogProductsRaw = await prisma.catalogProduct.findMany({
+    where: { userId: session.user.id },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, slug: true },
   });

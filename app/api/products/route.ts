@@ -24,6 +24,7 @@ export async function GET() {
   }
 
   const products = await prisma.catalogProduct.findMany({
+    where: { userId: session.user.id },
     orderBy: { name: 'asc' },
   });
   return NextResponse.json(products);
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
 
     const product = await prisma.catalogProduct.create({
       data: {
+        userId: session.user.id,
         name: validated.name,
         slug: validated.slug,
         description: validated.description,

@@ -53,6 +53,7 @@ export async function applyDepartmentProductResearch(
   }
 
   const catalogProducts = await prisma.catalogProduct.findMany({
+    where: { userId: session.user.id },
     orderBy: { name: 'asc' },
     select: { id: true, slug: true, name: true },
   });

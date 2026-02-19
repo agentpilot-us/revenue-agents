@@ -32,6 +32,7 @@ export default async function ExpansionPage({
   if (!company) notFound();
 
   const products = await prisma.catalogProduct.findMany({
+    where: { userId: session.user.id },
     orderBy: { name: 'asc' },
   });
 

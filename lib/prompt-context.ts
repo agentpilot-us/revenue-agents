@@ -143,7 +143,7 @@ export async function getIndustryPlaybookBlock(
     const productNames: Record<string, string> = {};
     if (productIds.size > 0) {
       const products = await prisma.catalogProduct.findMany({
-        where: { id: { in: [...productIds] } },
+        where: { id: { in: [...productIds] }, userId: playbook.userId },
         select: { id: true, name: true },
       });
       products.forEach((p) => (productNames[p.id] = p.name));

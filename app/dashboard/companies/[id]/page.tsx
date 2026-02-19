@@ -148,6 +148,7 @@ export default async function CompanyDetailPage({
   });
 
   const catalogProductsRaw = await prisma.catalogProduct.findMany({
+    where: { userId: session.user.id },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, slug: true, priceMin: true, priceMax: true },
   });
@@ -358,6 +359,7 @@ export default async function CompanyDetailPage({
             pipelineByMicrosegment={pipelineByMicrosegment}
             funnel={funnel}
             campaigns={campaigns}
+            researchDataKey={company.updatedAt?.getTime() ?? 0}
           />
         </div>
       </div>

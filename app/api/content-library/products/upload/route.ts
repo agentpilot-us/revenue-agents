@@ -96,7 +96,9 @@ export async function POST(req: NextRequest) {
 
       let slug = slugify(name);
       if (!slug) slug = `product-${r}`;
-      const existing = await prisma.catalogProduct.findUnique({ where: { slug } });
+      const existing = await prisma.catalogProduct.findFirst({
+        where: { userId: session.user.id, slug },
+      });
       if (existing) {
         errors.push(`Row ${r + 1}: product "${name}" already exists (slug: ${slug}). Skipped.`);
         continue;
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
       try {
         await prisma.catalogProduct.create({
           data: {
+            userId: session.user.id,
             name,
             slug,
             description,

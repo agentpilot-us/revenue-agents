@@ -66,6 +66,7 @@ export async function POST(
 
     const body = await req.json();
     const catalogProducts = await prisma.catalogProduct.findMany({
+      where: { userId: session.user.id },
       select: { id: true, slug: true, name: true },
     });
     const productSlugToId = new Map(catalogProducts.map((p) => [p.slug, p.id]));

@@ -63,8 +63,9 @@ export async function researchCompanyForAccount(
       };
     }
 
-    // Step 2: Load catalog products
+    // Step 2: Load catalog products (only this user's products — not legacy/NVIDIA seed)
     const catalogProducts = await prisma.catalogProduct.findMany({
+      where: { userId: userId },
       select: {
         name: true,
         slug: true,

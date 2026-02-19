@@ -7,6 +7,7 @@ import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
 import { ContentLibraryActions } from '@/app/components/content-library/ContentLibraryActions';
 import { ContentLibraryItemRow } from '@/app/components/content-library/ContentLibraryItemRow';
+import { ProductsUploadCard } from '@/app/components/content-library/ProductsUploadCard';
 
 const SECTION_LABELS: Partial<Record<ContentType, string>> = {
   SuccessStory: 'Case studies',
@@ -26,11 +27,18 @@ export async function ContentLibraryView({ company }: Props) {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const items = await prisma.contentLibrary.findMany({
-    where: { userId: session.user.id, isActive: true, archivedAt: null },
-    select: { id: true, title: true, type: true, sourceUrl: true },
-    orderBy: { updatedAt: 'desc' },
-  });
+  const [items, catalogProducts] = await Promise.all([
+    prisma.contentLibrary.findMany({
+      where: { userId: session.user.id, isActive: true, archivedAt: null },
+      select: { id: true, title: true, type: true, sourceUrl: true },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    prisma.catalogProduct.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
 
   const byType = items.reduce(
     (acc, item) => {
@@ -66,6 +74,26 @@ export async function ContentLibraryView({ company }: Props) {
       </div>
 
       <ContentLibraryActions />
+
+      {/* Products & services */}
+      <div className="mb-6">
+        <ProductsUploadCard />
+        {catalogProducts.length > 0 && (
+          <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+              Your products ({catalogProducts.length})
+            </h3>
+            <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+              {catalogProducts.map((p) => (
+                <li key={p.id}>
+                  <span className="font-medium">{p.name}</span>
+                  <span className="text-gray-500 dark:text-gray-400 ml-2">({p.slug})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {/* Company info */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6">

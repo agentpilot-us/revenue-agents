@@ -108,6 +108,7 @@ export const chatTools = {
       const session = await auth();
       if (!session?.user?.id) return { error: 'Unauthorized' };
       const products = await prisma.catalogProduct.findMany({
+        where: { userId: session.user.id },
         orderBy: { name: 'asc' },
       });
       return { products };
@@ -157,6 +158,7 @@ export const chatTools = {
       if (!company) return { error: 'Company not found' };
 
       const catalogProducts = await prisma.catalogProduct.findMany({
+        where: { userId: session.user.id },
         orderBy: { name: 'asc' },
         select: { id: true, name: true },
       });

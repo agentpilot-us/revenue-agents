@@ -46,7 +46,7 @@ export async function POST(
     }
 
     const product = await prisma.catalogProduct.findFirst({
-      where: { id: validated.productId },
+      where: { id: validated.productId, userId: session.user.id },
     });
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });

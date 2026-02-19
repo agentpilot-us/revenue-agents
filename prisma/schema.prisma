@@ -83,6 +83,7 @@ model User {
   outreachSequences       OutreachSequence[]
   segmentCampaigns        SegmentCampaign[]
   alerts                  Alert[]
+  catalogProducts         CatalogProduct[]
 }
 
 model VerificationToken {
@@ -806,10 +807,12 @@ enum ProductOwnershipStatus {
 }
 
 model CatalogProduct {
-  id String @id @default(cuid())
+  id     String  @id @default(cuid())
+  userId String? // null = legacy/seed data (excluded from user-scoped queries)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name        String  @unique
-  slug        String  @unique
+  name        String
+  slug        String
   description String? @db.Text
 
   priceMin     Decimal? @db.Decimal(18, 2)
@@ -829,6 +832,8 @@ model CatalogProduct {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([userId, slug])
+  @@index([userId])
   @@index([slug])
 }
 

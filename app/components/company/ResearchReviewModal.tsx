@@ -79,12 +79,26 @@ export function ResearchReviewModal({
     setSaving(true);
     setError(null);
     try {
-      const payload = newShapePayload ?? {
-        companyBasics,
-        whatTheyDo,
-        productFit: productFitList,
-        microSegments,
-      };
+      // Use edited state (e.g. keyInitiatives after removals) when building payload
+      const payload = newShapePayload
+        ? {
+            ...newShapePayload,
+            companyName: companyBasics.name,
+            website: companyBasics.website || undefined,
+            industry: companyBasics.industry || undefined,
+            employees: companyBasics.employees || undefined,
+            headquarters: companyBasics.headquarters || undefined,
+            revenue: companyBasics.revenue || undefined,
+            businessOverview: whatTheyDo.summary || newShapePayload.businessOverview,
+            keyInitiatives: whatTheyDo.keyInitiatives.filter(Boolean),
+            microSegments,
+          }
+        : {
+            companyBasics,
+            whatTheyDo,
+            productFit: productFitList,
+            microSegments,
+          };
       const res = await fetch(`/api/companies/${companyId}/apply-research`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

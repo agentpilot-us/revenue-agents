@@ -247,6 +247,7 @@ export async function POST(
           null
         ),
         prisma.catalogProduct.findMany({
+          where: { userId: campaign.userId },
           select: { name: true, slug: true, description: true, priceMin: true, priceMax: true },
           orderBy: { name: 'asc' },
         }),
