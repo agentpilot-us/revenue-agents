@@ -31,8 +31,8 @@ export type TargetRoles = z.infer<typeof targetRolesSchema>;
 // ─────────────────────────────────────────────────────────────
 
 const productFitSchema = z.object({
-  productSlug: z.string().describe('Exact slug from our catalog'),
-  productName: z.string().describe('Exact name from our catalog'),
+  productSlug: z.string().optional().describe('Deprecated: use productName'),
+  productName: z.string().describe('Exact product name from our catalog'),
   relevance: z
     .string()
     .describe('Why this product is relevant to this specific segment at this specific company'),

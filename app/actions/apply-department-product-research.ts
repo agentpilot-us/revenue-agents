@@ -19,7 +19,7 @@ const researchExtractionSchema = z.object({
   productInterests: z.array(
     z.object({
       departmentType: z.nativeEnum(DepartmentType),
-      productSlug: z.string(),
+      productName: z.string().describe('Exact product name from the catalog'),
       valueProp: z.string(),
       opportunitySize: z.number().optional().nullable(),
     })
@@ -58,9 +58,7 @@ export async function applyDepartmentProductResearch(
     select: { id: true, slug: true, name: true },
   });
 
-  const productListForPrompt = catalogProducts
-    .map((p) => `- ${p.name} (slug: ${p.slug})`)
-    .join('\n');
+  const productListForPrompt = catalogProducts.map((p) => `- ${p.name}`).join('\n');
 
   const { object } = await generateObject({
     model: getChatModel(),
@@ -74,7 +72,7 @@ RESEARCH TEXT:
 ${researchText}
 ${productFocus ? `\nPRODUCT FOCUS (emphasize interests related to): ${productFocus}` : ''}
 
-AVAILABLE PRODUCTS (use exact slug in productInterests):
+AVAILABLE PRODUCTS (use exact product name in productInterests):
 ${productListForPrompt}
 
 DEPARTMENT TYPES (use exactly one of these for type/departmentType):
@@ -82,7 +80,7 @@ ${Object.values(DepartmentType).join(', ')}
 
 INSTRUCTIONS:
 - Extract every department mentioned or implied. Use notes to store context or value prop for that department.
-- For productInterests: each entry links a department (by departmentType) to a product (by productSlug) with a short valueProp (why they care / use case). Only include products from the list above; if the research mentions a product not in the list, skip it or map to the closest slug.
+- For productInterests: each entry links a department (by departmentType) to a product (by productName) with a short valueProp (why they care / use case). Use the exact product name from the list above.
 - If the research does not mention specific products, you may still extract departments with notes.
 - Keep valueProp concise (1-2 sentences).
     `.trim(),
@@ -131,7 +129,9 @@ INSTRUCTIONS:
   const productInterestSummary: Array<{ department: string; product: string; valueProp: string }> = [];
 
   for (const pi of object.productInterests) {
-    const product = catalogProducts.find((p) => p.slug === pi.productSlug);
+    const product = catalogProducts.find(
+      (p) => p.name.trim().toLowerCase() === (pi.productName ?? '').trim().toLowerCase()
+    );
     const departmentId = departmentIdsByType[pi.departmentType];
     if (!product || !departmentId) continue;
 

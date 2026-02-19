@@ -41,10 +41,10 @@ export async function draftEmail(params: {
     ? await prisma.persona.findUnique({ where: { id: contact.personaId } })
     : null;
 
-  // 3. Fetch product (if specified) — catalog product by slug
-  const product = params.productSlug
-    ? await prisma.catalogProduct.findUnique({
-        where: { slug: params.productSlug },
+  // 3. Fetch product (if specified) — catalog product by slug (scoped to company owner)
+  const product = params.productSlug && contact.company?.userId
+    ? await prisma.catalogProduct.findFirst({
+        where: { userId: contact.company.userId, slug: params.productSlug },
       })
     : null;
 

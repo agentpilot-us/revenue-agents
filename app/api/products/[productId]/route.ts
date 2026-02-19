@@ -4,9 +4,16 @@ import { prisma } from '@/lib/db';
 import { DepartmentType } from '@prisma/client';
 import { z } from 'zod';
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
 const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
-  slug: z.string().min(1).regex(/^[a-z0-9-]+$/).optional(),
   description: z.string().optional().nullable(),
   priceMin: z.number().optional().nullable(),
   priceMax: z.number().optional().nullable(),
@@ -28,8 +35,8 @@ export async function GET(
 
   const { productId } = await params;
 
-  const product = await prisma.catalogProduct.findUnique({
-    where: { id: productId },
+  const product = await prisma.catalogProduct.findFirst({
+    where: { id: productId, userId: session.user.id },
     include: {
       companyProducts: {
         include: {
@@ -63,7 +70,6 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = {};
     if (validated.name !== undefined) updateData.name = validated.name;
-    if (validated.slug !== undefined) updateData.slug = validated.slug;
     if (validated.description !== undefined) updateData.description = validated.description;
     if (validated.priceMin !== undefined) updateData.priceMin = validated.priceMin;
     if (validated.priceMax !== undefined) updateData.priceMax = validated.priceMax;
@@ -73,12 +79,38 @@ export async function PATCH(
     if (validated.useCases !== undefined) updateData.useCases = validated.useCases;
     if (validated.contentTags !== undefined) updateData.contentTags = validated.contentTags;
 
-    const product = await prisma.catalogProduct.update({
-      where: { id: productId },
+    if (validated.name !== undefined) {
+      const baseSlug = slugify(validated.name) || 'product';
+      let slug = baseSlug;
+      let suffix = 1;
+      let exists = await prisma.catalogProduct.findFirst({
+        where: { userId: session.user.id, slug },
+      });
+      if (exists && exists.id !== productId) {
+        while (exists) {
+          slug = `${baseSlug}-${suffix}`;
+          exists = await prisma.catalogProduct.findFirst({
+            where: { userId: session.user.id, slug },
+          });
+          if (!exists || exists.id === productId) break;
+          suffix++;
+        }
+      }
+      if (!exists || exists.id === productId) updateData.slug = slug;
+    }
+
+    const product = await prisma.catalogProduct.updateMany({
+      where: { id: productId, userId: session.user.id },
       data: updateData,
     });
+    if (product.count === 0) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+    const updated = await prisma.catalogProduct.findUnique({
+      where: { id: productId },
+    });
 
-    return NextResponse.json(product);
+    return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -92,7 +124,7 @@ export async function PATCH(
       }
       if (error.code === 'P2002') {
         return NextResponse.json(
-          { error: 'A product with this name or slug already exists' },
+          { error: 'A product with this name already exists' },
           { status: 409 }
         );
       }

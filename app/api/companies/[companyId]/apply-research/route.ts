@@ -69,6 +69,9 @@ export async function POST(
       where: { userId: session.user.id },
       select: { id: true, slug: true, name: true },
     });
+    const productNameToId = new Map(
+      catalogProducts.map((p) => [p.name.trim().toLowerCase(), p.id])
+    );
     const productSlugToId = new Map(catalogProducts.map((p) => [p.slug, p.id]));
     const summary = {
       departmentsCreated: 0,
@@ -142,7 +145,9 @@ export async function POST(
         }
 
         for (const pf of segment.products) {
-          const productId = productSlugToId.get(pf.productSlug);
+          const productId =
+            productNameToId.get((pf.productName ?? pf.productSlug ?? '').trim().toLowerCase()) ??
+            productSlugToId.get(pf.productSlug ?? '');
           if (productId) {
             await prisma.companyProduct.upsert({
               where: {

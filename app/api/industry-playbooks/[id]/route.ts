@@ -4,9 +4,16 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
 const putBodySchema = z.object({
   name: z.string().min(1).optional(),
-  slug: z.string().min(1).optional(),
   overview: z.string().optional().nullable(),
   departmentProductMapping: z
     .array(
@@ -92,18 +99,25 @@ export async function PUT(
       );
     }
 
-    if (parsed.data.slug !== undefined && parsed.data.slug !== playbook.slug) {
-      const existing = await prisma.industryPlaybook.findUnique({
-        where: {
-          userId_slug: { userId: session.user.id, slug: parsed.data.slug },
-        },
+    let slugUpdate: string | undefined;
+    if (parsed.data.name !== undefined) {
+      const baseSlug = slugify(parsed.data.name) || 'playbook';
+      let slug = baseSlug;
+      let suffix = 1;
+      let exists = await prisma.industryPlaybook.findFirst({
+        where: { userId: session.user.id, slug },
       });
-      if (existing) {
-        return NextResponse.json(
-          { error: 'An industry playbook with this slug already exists' },
-          { status: 409 }
-        );
+      if (exists && exists.id !== id) {
+        while (exists) {
+          slug = `${baseSlug}-${suffix}`;
+          exists = await prisma.industryPlaybook.findFirst({
+            where: { userId: session.user.id, slug },
+          });
+          if (!exists || exists.id === id) break;
+          suffix++;
+        }
       }
+      if (!exists || exists.id === id) slugUpdate = slug;
     }
 
     const toJson = (v: unknown) => (v === null ? Prisma.JsonNull : (v as Prisma.InputJsonValue));
@@ -111,7 +125,7 @@ export async function PUT(
       where: { id },
       data: {
         ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-        ...(parsed.data.slug !== undefined && { slug: parsed.data.slug }),
+        ...(slugUpdate !== undefined && { slug: slugUpdate }),
         ...(parsed.data.overview !== undefined && { overview: parsed.data.overview }),
         ...(parsed.data.departmentProductMapping !== undefined && {
           departmentProductMapping: toJson(parsed.data.departmentProductMapping),

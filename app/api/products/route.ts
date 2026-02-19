@@ -4,9 +4,17 @@ import { prisma } from '@/lib/db';
 import { DepartmentType } from '@prisma/client';
 import { z } from 'zod';
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
 const createProductSchema = z.object({
   name: z.string().min(1),
-  slug: z.string().min(1).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens only'),
+  slug: z.string().min(1).regex(/^[a-z0-9-]+$/).optional(),
   description: z.string().optional(),
   priceMin: z.number().optional(),
   priceMax: z.number().optional(),
@@ -40,11 +48,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = createProductSchema.parse(body);
 
+    let slug = validated.slug?.trim() || slugify(validated.name) || 'product';
+    let exists = await prisma.catalogProduct.findFirst({
+      where: { userId: session.user.id, slug },
+    });
+    let suffix = 1;
+    while (exists) {
+      slug = `${slugify(validated.name) || 'product'}-${suffix}`;
+      exists = await prisma.catalogProduct.findFirst({
+        where: { userId: session.user.id, slug },
+      });
+      suffix++;
+    }
+
     const product = await prisma.catalogProduct.create({
       data: {
         userId: session.user.id,
         name: validated.name,
-        slug: validated.slug,
+        slug,
         description: validated.description,
         priceMin: validated.priceMin,
         priceMax: validated.priceMax,
@@ -66,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
-        { error: 'A product with this name or slug already exists' },
+        { error: 'A product with this name already exists' },
         { status: 409 }
       );
     }

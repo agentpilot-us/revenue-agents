@@ -4,9 +4,17 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
 const postBodySchema = z.object({
   name: z.string().min(1),
-  slug: z.string().min(1),
+  slug: z.string().min(1).optional(),
   overview: z.string().optional().nullable(),
   departmentProductMapping: z
     .array(
@@ -99,23 +107,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existing = await prisma.industryPlaybook.findUnique({
-      where: {
-        userId_slug: { userId: session.user.id, slug: parsed.data.slug },
-      },
+    let slug = (parsed.data.slug ?? slugify(parsed.data.name)).trim() || 'playbook';
+    let exists = await prisma.industryPlaybook.findFirst({
+      where: { userId: session.user.id, slug },
     });
-    if (existing) {
-      return NextResponse.json(
-        { error: 'An industry playbook with this slug already exists' },
-        { status: 409 }
-      );
+    let suffix = 1;
+    while (exists) {
+      slug = `${slugify(parsed.data.name) || 'playbook'}-${suffix}`;
+      exists = await prisma.industryPlaybook.findFirst({
+        where: { userId: session.user.id, slug },
+      });
+      suffix++;
     }
 
     const playbook = await prisma.industryPlaybook.create({
       data: {
         userId: session.user.id,
         name: parsed.data.name,
-        slug: parsed.data.slug,
+        slug,
         overview: parsed.data.overview ?? undefined,
         departmentProductMapping: (parsed.data.departmentProductMapping ?? undefined) as
           | Prisma.InputJsonValue

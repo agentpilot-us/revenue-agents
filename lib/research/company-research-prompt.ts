@@ -107,7 +107,7 @@ Given the target company research below, produce the following sections:
 6. techStack (optional): known tools/vendors for integration messaging.
 
 RULES:
-- All product names and slugs must match the catalog exactly.
+- All product names must match the catalog exactly.
 - Value propositions must reference the target company's actual context.
 - Use the RAG (uploaded file content) section when present to ground value propositions and proof points; cite or paraphrase from it where relevant.
 - Roles must be real, searchable LinkedIn titles.
@@ -145,14 +145,14 @@ function buildProductBlock(catalogProducts: CatalogProduct[]): string {
   const productList = catalogProducts
     .map(
       (p) =>
-        `  • ${p.name} (slug: ${p.slug})
+        `  • ${p.name}
     Description: ${p.description || 'No description'}
     Price: ${p.priceMin ? `$${p.priceMin.toLocaleString()}` : '—'} – ${p.priceMax ? `$${p.priceMax.toLocaleString()}` : '—'}
     Best for departments: ${p.targetDepartments?.join(', ') || 'Various'}`
     )
     .join('\n\n');
 
-  return `OUR PRODUCT CATALOG (use exact names and slugs):
+  return `OUR PRODUCT CATALOG (use exact product name when referencing products):
 ${productList}`;
 }
 
