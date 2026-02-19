@@ -4,6 +4,9 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { isServiceConfigured, type ServiceId } from '@/lib/service-config';
 import { UserProfileSettings } from '@/app/components/settings/UserProfileSettings';
+import { SalesforceSettingsBlock } from '@/app/components/settings/SalesforceSettingsBlock';
+import { TestConnectionButton } from '@/app/components/settings/TestConnectionButton';
+import { NightlyCrawlSettings } from '@/app/components/settings/NightlyCrawlSettings';
 
 function serviceStatus(id: ServiceId, optional = false) {
   const connected = isServiceConfigured(id);
@@ -26,8 +29,36 @@ export default async function SettingsPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, companyName: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      companyName: true,
+      companyWebsite: true,
+      companyLogoUrl: true,
+      salesforceAccessToken: true,
+      contentRefreshFrequency: true,
+      contentRefreshNextAt: true,
+      nightlyCrawlPreferredHour: true,
+      crawlPaused: true,
+    },
   });
+
+  // Get Salesforce last sync status (most recent sync across user's companies)
+  const lastSalesforceSync = await prisma.company.findFirst({
+    where: {
+      userId: session.user.id,
+      salesforceLastSyncedAt: { not: null },
+    },
+    select: {
+      salesforceLastSyncedAt: true,
+    },
+    orderBy: {
+      salesforceLastSyncedAt: 'desc',
+    },
+  });
+
+  const isSalesforceConnected = !!user?.salesforceAccessToken;
 
   const services = [
     {
@@ -117,7 +148,18 @@ export default async function SettingsPage() {
 
         {/* Agent Configuration / Connected tools */}
         <div id="services" className="space-y-8">
-          <h2 className="text-xl font-semibold text-gray-900">Agent Configuration</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Integrations</h2>
+
+          {/* Salesforce */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-900">CRM</h3>
+            <SalesforceSettingsBlock
+              isConnected={isSalesforceConnected}
+              lastSyncedAt={lastSalesforceSync?.salesforceLastSyncedAt ?? null}
+            />
+          </div>
+
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">Agent Configuration</h2>
           <p className="text-gray-600 text-sm max-w-2xl">
             These connected tools are used by the expansion agent across all your accounts. They are configured once per workspace via environment variables (by your administrator). There is no per-account tool configuration.
           </p>
@@ -158,6 +200,16 @@ export default async function SettingsPage() {
                         )}
                       </div>
                     </div>
+                    {/* Test connection button for Resend, Cal.com, PhantomBuster */}
+                    {(service.name === 'Resend' ||
+                      service.name === 'Cal.com' ||
+                      service.name === 'PhantomBuster') && (
+                      <TestConnectionButton
+                        serviceName={service.name}
+                        testEndpoint={`/api/integrations/${service.name.toLowerCase().replace('.', '')}/test`}
+                        isConfigured={service.status === 'connected'}
+                      />
+                    )}
                     {service.name === 'Firecrawl' && service.status === 'not_configured' && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <p className="text-sm text-gray-600 mb-2">
@@ -206,6 +258,14 @@ export default async function SettingsPage() {
           </div>
         </div>
 
+        {/* Nightly Crawl Settings */}
+        <div className="mt-12 pt-8 border-t border-gray-200">
+          <NightlyCrawlSettings
+            initialPreferredHour={user?.nightlyCrawlPreferredHour ?? null}
+            initialCrawlPaused={user?.crawlPaused ?? false}
+          />
+        </div>
+
         {/* Profile section */}
         <div id="profile" className="mt-12 pt-8 border-t border-gray-200">
           <h2 className="text-xl font-semibold mb-4 text-gray-900">Profile</h2>
@@ -214,7 +274,25 @@ export default async function SettingsPage() {
             initialName={user?.name ?? session.user?.name ?? ''}
             initialEmail={user?.email ?? session.user?.email ?? ''}
             initialCompanyName={user?.companyName ?? ''}
+            initialCompanyWebsite={user?.companyWebsite ?? ''}
+            initialCompanyLogoUrl={user?.companyLogoUrl ?? undefined}
           />
+        </div>
+
+        {/* Billing section */}
+        <div className="mt-12 pt-8 border-t border-gray-200">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900">Billing</h2>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 dark:bg-zinc-800 dark:border-zinc-700">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Manage your subscription, view usage, and upgrade your plan.
+            </p>
+            <Link
+              href="/billing"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            >
+              Go to Billing →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

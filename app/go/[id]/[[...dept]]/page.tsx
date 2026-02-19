@@ -30,11 +30,31 @@ async function getCampaign(slugOrId: string) {
       OR: [{ id: slugOrId }, { slug: slugOrId }],
     },
     include: {
-      company: { select: { name: true, domain: true } },
+      company: {
+        select: {
+          name: true,
+          domain: true,
+          userId: true,
+        },
+      },
       department: { select: { id: true, customName: true, type: true } },
     },
   });
-  return campaign;
+  if (!campaign) return null;
+
+  // Fetch user's logo URL
+  const user = await prisma.user.findUnique({
+    where: { id: campaign.company.userId },
+    select: { companyLogoUrl: true },
+  });
+
+  return {
+    ...campaign,
+    company: {
+      ...campaign.company,
+      logoUrl: user?.companyLogoUrl ?? undefined,
+    },
+  };
 }
 
 function slugify(s: string): string {
@@ -85,6 +105,15 @@ export default async function CampaignLandingPage({ params }: Props) {
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
         <div className="max-w-2xl mx-auto px-6 py-12">
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-8">
+            {campaign.company.logoUrl && (
+              <div className="mb-3">
+                <img
+                  src={campaign.company.logoUrl}
+                  alt={campaign.company.name}
+                  className="h-8 w-auto object-contain"
+                />
+              </div>
+            )}
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
               {campaign.company.name}
             </p>
@@ -203,11 +232,22 @@ export default async function CampaignLandingPage({ params }: Props) {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <div className="max-w-2xl mx-auto px-6 py-12">
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-8">
-          {segmentName && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-2">
-              {campaign.company.name}
-              {segmentName ? ` · ${segmentName}` : ''}
-            </p>
+          {(campaign.company.logoUrl || segmentName) && (
+            <div className="mb-4 flex items-center gap-3">
+              {campaign.company.logoUrl && (
+                <img
+                  src={campaign.company.logoUrl}
+                  alt={campaign.company.name}
+                  className="h-8 w-auto object-contain"
+                />
+              )}
+              {segmentName && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {campaign.company.name}
+                  {segmentName ? ` · ${segmentName}` : ''}
+                </p>
+              )}
+            </div>
           )}
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
             {campaign.headline || campaign.title}

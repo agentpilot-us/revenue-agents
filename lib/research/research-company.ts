@@ -17,6 +17,279 @@ export type ResearchCompanyResult =
   | { ok: true; data: CompanyResearchData }
   | { ok: false; error: string };
 
+export type PerplexityOnlyResult =
+  | { ok: true; summary: string }
+  | { ok: false; error: string };
+
+/**
+ * Run only the Perplexity (web search) step. Use with structureResearchWithClaude for two-phase research with UI status.
+ */
+export async function runPerplexityResearchOnly(
+  companyName: string,
+  companyDomain: string | undefined,
+  userId: string
+): Promise<PerplexityOnlyResult> {
+  if (!userId) {
+    return {
+      ok: false,
+      error:
+        'Complete your company setup (Content Library) with your company name and website before running research.',
+    };
+  }
+
+  const [user, contentLibrary] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { companyName: true, companyWebsite: true },
+    }),
+    loadContentLibraryContext(userId).catch(() => null),
+  ]);
+
+  const userCompanyName = user?.companyName?.trim() ?? null;
+  if (!userCompanyName) {
+    return {
+      ok: false,
+      error:
+        'Complete your company setup (Content Library) with your company name and website before running research.',
+    };
+  }
+
+  const catalogProducts = await prisma.catalogProduct.findMany({
+    where: { userId } as { userId: string },
+    select: {
+      name: true,
+      slug: true,
+      description: true,
+      priceMin: true,
+      priceMax: true,
+      targetDepartments: true,
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  if (catalogProducts.length === 0) {
+    return {
+      ok: false,
+      error: 'No catalog products found. Please set up your products first.',
+    };
+  }
+
+  const productNames = catalogProducts.map((p) => p.name).join(', ');
+  const researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
+
+1. COMPANY BASICS: official name, website, industry, employee count, headquarters, annual revenue
+
+2. BUSINESS OVERVIEW: what they do, their core business model, primary markets
+
+3. STRATEGIC PRIORITIES: recent announcements, earnings call themes, job postings that reveal where they are investing (especially in technology, operations, or go-to-market)
+
+4. ORGANIZATIONAL STRUCTURE: how is the company organized? By function, division, product line, or geography? Name the key departments and business units.
+
+5. TECHNOLOGY & BUYING SIGNALS: what tools, platforms, or vendors do they currently use? Any recent tech evaluations, RFPs, or vendor changes mentioned publicly?
+
+6. BUYING GROUPS: which departments or teams at ${companyName} make decisions about B2B software purchases in areas like: ${productNames}? What are their priorities and what titles do the decision-makers hold?
+
+Focus on finding specific, actionable intelligence that would help a B2B sales rep engage the right people at ${companyName} with relevant messaging.`;
+
+  const perplexityResult = await researchCompany({
+    query: researchQuery,
+    companyName,
+    companyDomain,
+  });
+
+  if (!perplexityResult.ok) {
+    return { ok: false, error: perplexityResult.error };
+  }
+
+  return { ok: true, summary: perplexityResult.summary };
+}
+
+/**
+ * Run only the LLM structuring step using a pre-fetched Perplexity summary. Use after runPerplexityResearchOnly for two-phase research with UI status.
+ */
+export async function structureResearchWithClaude(
+  companyName: string,
+  companyDomain: string | undefined,
+  perplexitySummary: string,
+  userId: string
+): Promise<ResearchCompanyResult> {
+  try {
+    if (!userId) {
+      return {
+        ok: false,
+        error:
+          'Complete your company setup (Content Library) with your company name and website before running research.',
+      };
+    }
+
+    const [user, contentLibrary] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { companyName: true, companyWebsite: true },
+      }),
+      loadContentLibraryContext(userId).catch(() => null),
+    ]);
+
+    const userCompanyName = user?.companyName?.trim() ?? null;
+    const userCompanyWebsite = user?.companyWebsite?.trim() ?? null;
+
+    if (!userCompanyName) {
+      return {
+        ok: false,
+        error:
+          'Complete your company setup (Content Library) with your company name and website before running research.',
+      };
+    }
+
+    const catalogProducts = await prisma.catalogProduct.findMany({
+      where: { userId } as { userId: string },
+      select: {
+        name: true,
+        slug: true,
+        description: true,
+        priceMin: true,
+        priceMax: true,
+        targetDepartments: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    if (catalogProducts.length === 0) {
+      return {
+        ok: false,
+        error: 'No catalog products found. Please set up your products first.',
+      };
+    }
+
+    const catalogForPrompt = catalogProducts.map((p) => ({
+      name: p.name,
+      slug: p.slug,
+      description: p.description,
+      priceMin: p.priceMin != null ? Number(p.priceMin) : null,
+      priceMax: p.priceMax != null ? Number(p.priceMax) : null,
+      targetDepartments: p.targetDepartments as string[] | null,
+    }));
+
+    const sellerDescription = process.env.SELLER_COMPANY_DESCRIPTION ?? null;
+
+    const ragProductNames = catalogProducts.map((p) => p.name).join(' ');
+    const ragQuery = `${companyName} ${ragProductNames} value proposition use cases proof`;
+    const [relevantChunks, allChunks] = await Promise.all([
+      findRelevantContentLibraryChunks(userId, ragQuery, 24),
+      getAllContentLibraryChunkContents(userId, 50),
+    ]);
+    const seen = new Set<string>();
+    const ragChunks: string[] = [];
+    for (const c of [...relevantChunks, ...allChunks]) {
+      const key = c.slice(0, 200);
+      if (!seen.has(key)) {
+        seen.add(key);
+        ragChunks.push(c);
+      }
+    }
+
+    const systemPrompt = buildCompanyResearchPrompt(catalogForPrompt, {
+      sellerCompanyName: userCompanyName,
+      sellerWebsite: userCompanyWebsite ?? undefined,
+      sellerDescription: sellerDescription ?? undefined,
+      contentLibrary: contentLibrary ?? undefined,
+      ragChunks: ragChunks.length > 0 ? ragChunks : undefined,
+    });
+
+    if (
+      process.env.USE_MOCK_LLM !== 'true' &&
+      !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+      !process.env.ANTHROPIC_API_KEY
+    ) {
+      return {
+        ok: false,
+        error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required for synthesis.',
+      };
+    }
+
+    const hasContentLibrary =
+      contentLibrary &&
+      (contentLibrary.useCases.length > 0 ||
+        contentLibrary.caseStudies.length > 0 ||
+        contentLibrary.industryPlaybooks.length > 0);
+
+    const contentLibraryNote = hasContentLibrary
+      ? `\nIMPORTANT: Use the Content Library entries above to ground your value propositions and proof points. Reference specific use cases, case studies, or industry playbooks by name where they are relevant to this account.`
+      : `\nNOTE: No Content Library entries are available yet. Generate value propositions based on the product catalog and what you know about the target company's priorities.`;
+
+    const userPrompt = `TARGET COMPANY: ${companyName}
+${companyDomain ? `Domain: ${companyDomain}` : ''}
+
+RESEARCH DATA (from web search):
+${perplexitySummary}
+
+${contentLibraryNote}
+
+Now produce the full account intelligence brief per the schema. For each micro-segment:
+- Write a value proposition that references ${companyName}'s specific context and initiatives
+- List 2–3 concrete use cases (useCasesAtThisCompany) showing HOW they would use our products
+- Include proof points from our Content Library if available
+- Provide objection handlers (objection + response pairs) specific to this type of buyer
+- List searchable LinkedIn job titles for each role category (economicBuyer, technicalEvaluator, champion, influencer) — at least one title per category
+- Set segmentationStrategy and segmentationRationale based on how this company is organized
+
+You MUST output at least one micro-segment. Do not return an empty microSegments array.`;
+
+    const result = await generateObject({
+      model: getChatModel(),
+      schema: companyResearchSchema,
+      system: systemPrompt,
+      maxOutputTokens: 6000,
+      prompt: userPrompt,
+    });
+
+    const object = result.object;
+    const parsed = companyResearchSchema.safeParse(object);
+
+    if (!parsed.success) {
+      const firstIssue = parsed.error.errors[0];
+      const path = firstIssue?.path?.join('.') ?? 'field';
+      console.error('Research schema validation failed:', parsed.error.flatten());
+      return {
+        ok: false,
+        error: `Research structure invalid (${path}): ${firstIssue?.message ?? 'check format'}. Try again.`,
+      };
+    }
+
+    return { ok: true, data: parsed.data };
+  } catch (generateError) {
+    console.error('structureResearchWithClaude error:', generateError);
+
+    if (generateError instanceof z.ZodError) {
+      const msg = generateError.errors[0]?.message ?? 'Invalid structure';
+      return { ok: false, error: `Validation: ${msg}` };
+    }
+
+    if (generateError instanceof Error) {
+      if (generateError.message.includes('schema') || generateError.message.includes('validation')) {
+        return { ok: false, error: `Structure error: ${generateError.message}` };
+      }
+      if (
+        generateError.message.includes('API') ||
+        generateError.message.includes('key') ||
+        generateError.message.includes('401') ||
+        generateError.message.includes('403')
+      ) {
+        return { ok: false, error: `API error: ${generateError.message}` };
+      }
+      if (generateError.message.includes('429') || generateError.message.includes('rate limit')) {
+        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
+      }
+      if (generateError.message.includes('timeout') || generateError.message.includes('Timeout')) {
+        return { ok: false, error: 'Research timed out. Please try again.' };
+      }
+      return { ok: false, error: generateError.message };
+    }
+
+    return { ok: false, error: 'Research failed unexpectedly.' };
+  }
+}
+
 /**
  * Research a target company and return structured account intelligence.
  *
@@ -65,7 +338,7 @@ export async function researchCompanyForAccount(
 
     // Step 2: Load catalog products (only this user's products — not legacy/NVIDIA seed)
     const catalogProducts = await prisma.catalogProduct.findMany({
-      where: { userId: userId },
+      where: { userId } as { userId: string },
       select: {
         name: true,
         slug: true,

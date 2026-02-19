@@ -37,22 +37,25 @@ model Session {
 }
 
 model User {
-  id                      String    @id @default(cuid())
-  name                    String?
-  email                   String    @unique
-  emailVerified           DateTime?
-  image                   String?
-  companyName             String? // User's company name for Content Library labels
-  companyWebsite          String? // Company website for smart import
-  companyIndustry         String? // User's industry (e.g. Technology, Software)
-  primaryIndustrySellTo   String? // Primary target industry (e.g. Automotive, Healthcare)
-  contentRefreshFrequency String? // daily | weekly | monthly | manual
-  contentRefreshNextAt    DateTime? // Next scheduled refresh
-  notifyOnNewContent      Boolean?  @default(true)
-  notifyOnUpdatedContent  Boolean?  @default(true)
-  notifyOnRemovedContent  Boolean?  @default(false)
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                        String    @id @default(cuid())
+  name                      String?
+  email                     String    @unique
+  emailVerified             DateTime?
+  image                     String?
+  companyName               String? // User's company name for Content Library labels
+  companyWebsite            String? // Company website for smart import
+  companyLogoUrl            String? // Company logo URL (used on landing pages)
+  companyIndustry           String? // User's industry (e.g. Technology, Software)
+  primaryIndustrySellTo     String? // Primary target industry (e.g. Automotive, Healthcare)
+  contentRefreshFrequency   String? // daily | weekly | monthly | manual
+  contentRefreshNextAt      DateTime? // Next scheduled refresh
+  nightlyCrawlPreferredHour Int? // Preferred hour for nightly crawl (0-23, UTC)
+  crawlPaused               Boolean?  @default(false) // Pause all scheduled crawls
+  notifyOnNewContent        Boolean?  @default(true)
+  notifyOnUpdatedContent    Boolean?  @default(true)
+  notifyOnRemovedContent    Boolean?  @default(false)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   // Gamification (Flight Deck)
   expansionScore    Int       @default(0)
@@ -69,26 +72,26 @@ model User {
   companies               Company[]
   activities              Activity[]
   pendingActionsRequested PendingAction[]
-  pendingActionsResolved  PendingAction[]        @relation("ResolvedBy")
+  pendingActionsResolved  PendingAction[]          @relation("ResolvedBy")
   messagingFrameworks     MessagingFramework[]
   orgs                    Org[]
   products                Product[]
   contentLibraries        ContentLibrary[]
   productProfiles         ProductProfile[]
   industryPlaybooks       IndustryPlaybook[]
-  contentCrawlSchedules     ContentCrawlSchedule[]
-  contentLibrarySchedules  ContentLibrarySchedule[]
+  contentCrawlSchedules   ContentCrawlSchedule[]
+  contentLibrarySchedules ContentLibrarySchedule[]
   contentImports          ContentImport[]
   contentImportLastId     String?
   outreachSequences       OutreachSequence[]
   segmentCampaigns        SegmentCampaign[]
   alerts                  Alert[]
   catalogProducts         CatalogProduct[]
-  
+
   // Salesforce OAuth tokens (per-user)
-  salesforceAccessToken   String? @db.Text
-  salesforceRefreshToken  String? @db.Text
-  salesforceInstanceUrl   String?
+  salesforceAccessToken    String?   @db.Text
+  salesforceRefreshToken   String?   @db.Text
+  salesforceInstanceUrl    String?
   salesforceTokenExpiresAt DateTime?
 }
 
@@ -113,12 +116,12 @@ model Company {
   hubspotId    String? // HubSpot company Id when crmSource = hubspot
 
   // AI Research fields
-  employees        String? // e.g., "~167,000"
-  headquarters     String? // e.g., "Detroit, Michigan"
-  revenue          String? // e.g., "$171.8B (2024)"
-  businessOverview String? @db.Text // "What they do" summary
-  keyInitiatives   Json? // Array of initiative strings
-  researchData     Json? // Store raw AI research response for reference
+  employees             String? // e.g., "~167,000"
+  headquarters          String? // e.g., "Detroit, Michigan"
+  revenue               String? // e.g., "$171.8B (2024)"
+  businessOverview      String? @db.Text // "What they do" summary
+  keyInitiatives        Json? // Array of initiative strings
+  researchData          Json? // Store raw AI research response for reference
   segmentationStrategy  String? // FUNCTIONAL | USE_CASE | DIVISIONAL | HYBRID
   segmentationRationale String? @db.Text
 
@@ -148,12 +151,12 @@ model Company {
   draftData                      Json? // Auto-save / wizard draft payload
 
   // Salesforce sync cache
-  salesforceLastSyncedAt DateTime? // Last time Salesforce data was synced
+  salesforceLastSyncedAt    DateTime? // Last time Salesforce data was synced
   salesforceOpportunityData Json? // Cached opportunity data: { opportunityName, stage, amount, closeDate, daysUntilClose, lastActivityDate }
 
   // Content crawl tracking
-  lastCrawlAt DateTime? // Last time content was crawled for this company
-  nextCrawlAt DateTime? // Next scheduled crawl
+  lastCrawlAt         DateTime? // Last time content was crawled for this company
+  nextCrawlAt         DateTime? // Next scheduled crawl
   lastContentChangeAt DateTime? // Last time content change was detected
 
   createdAt DateTime @default(now())
@@ -563,13 +566,13 @@ model CompanyDepartment {
 }
 
 model CompanyDepartmentContent {
-  id String @id @default(cuid())
+  id                  String            @id @default(cuid())
   companyDepartmentId String
-  companyDepartment CompanyDepartment @relation(fields: [companyDepartmentId], references: [id], onDelete: Cascade)
-  contentType String // email_subject, email_body, linkedin_message, talk_track
-  content String @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  companyDepartment   CompanyDepartment @relation(fields: [companyDepartmentId], references: [id], onDelete: Cascade)
+  contentType         String // email_subject, email_body, linkedin_message, talk_track
+  content             String            @db.Text
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@unique([companyDepartmentId, contentType])
   @@index([companyDepartmentId])
@@ -1119,9 +1122,9 @@ enum ContentType {
 }
 
 model ContentLibrary {
-  id         String  @id @default(cuid())
-  userId     String
-  productId  String? // optional: content-first flow uses null
+  id        String  @id @default(cuid())
+  userId    String
+  productId String? // optional: content-first flow uses null
 
   title   String
   type    ContentType
@@ -1140,12 +1143,12 @@ model ContentLibrary {
   sourceUrl String?
   scrapedAt DateTime?
 
-  contentHash String? // SHA-256 hash of content for change detection
+  contentHash     String? // SHA-256 hash of content for change detection
   previousContent Json? // Previous version of content for diff comparison
-  version    String? // e.g. "1.2", "2.0" for versioning
-  archivedAt DateTime? // when set, excluded from "current" content; show as Archived in UI
+  version         String? // e.g. "1.2", "2.0" for versioning
+  archivedAt      DateTime? // when set, excluded from "current" content; show as Archived in UI
 
-  isPinned Boolean @default(false) // Pin important content to top
+  isPinned  Boolean  @default(false) // Pin important content to top
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1165,10 +1168,10 @@ model ContentLibrary {
 
 // RAG: chunk + embedding per ContentLibrary item (pgvector)
 model ContentLibraryChunk {
-  id               String   @id @default(cuid())
+  id               String                       @id @default(cuid())
   contentLibraryId String
   chunkIndex       Int
-  content          String   @db.Text
+  content          String                       @db.Text
   embedding        Unsupported("vector(1536)")?
 
   contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
@@ -1178,15 +1181,15 @@ model ContentLibraryChunk {
 
 // Schedule updates for a single Content Library item (re-fetch sourceUrl on interval)
 model ContentLibrarySchedule {
-  id               String   @id @default(cuid())
-  contentLibraryId String   @unique
+  id               String    @id @default(cuid())
+  contentLibraryId String    @unique
   userId           String
-  frequency        String   // 'daily' | 'weekly'
+  frequency        String // 'daily' | 'weekly'
   lastRunAt        DateTime?
   nextRunAt        DateTime
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   contentLibrary ContentLibrary @relation(fields: [contentLibraryId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)

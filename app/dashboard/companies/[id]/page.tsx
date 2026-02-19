@@ -6,6 +6,7 @@ import { CompanyTabs } from '@/app/components/company/CompanyTabs';
 import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { CompanyARRActions } from '@/app/components/company/CompanyARRActions';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
+import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
 import { DepartmentStatus, ContentType } from '@prisma/client';
 
 export default async function CompanyDetailPage({
@@ -20,7 +21,16 @@ export default async function CompanyDetailPage({
 
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
-  const initialTab = tabParam === 'messaging' ? 'messaging' : tabParam === 'campaigns' ? 'campaigns' : undefined;
+  const initialTab =
+    tabParam === 'messaging'
+      ? 'messaging'
+      : tabParam === 'campaigns'
+        ? 'campaigns'
+        : tabParam === 'contacts'
+          ? 'contacts'
+          : tabParam === 'content'
+            ? 'content'
+            : undefined;
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     select: {
@@ -212,6 +222,11 @@ export default async function CompanyDetailPage({
     : null;
 
   const hasMessaging = !!accountMessaging;
+  const hasResearch = !!company.researchData;
+  const hasDepartments = departments.length > 0;
+  const hasContacts = company.contacts.length > 0;
+  const hasContent = contentCount > 0;
+  const hasCampaign = campaigns.length > 0;
 
   const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
     where: {
@@ -224,11 +239,16 @@ export default async function CompanyDetailPage({
     take: 100,
   });
 
-  const segmentCampaigns = await prisma.segmentCampaign.findMany({
-    where: { companyId: id, userId: session.user.id },
-    include: { department: { select: { id: true, customName: true, type: true } } },
-    orderBy: [{ departmentId: 'asc' }, { createdAt: 'desc' }],
-  });
+  const [segmentCampaigns, contentCount] = await Promise.all([
+    prisma.segmentCampaign.findMany({
+      where: { companyId: id, userId: session.user.id },
+      include: { department: { select: { id: true, customName: true, type: true } } },
+      orderBy: [{ departmentId: 'asc' }, { createdAt: 'desc' }],
+    }),
+    prisma.companyDepartmentContent.count({
+      where: { companyDepartment: { companyId: id } },
+    }),
+  ]);
   const campaigns = segmentCampaigns.map((c) => ({
     id: c.id,
     slug: c.slug,
@@ -440,9 +460,21 @@ export default async function CompanyDetailPage({
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}
             engagementByDept={engagementByDept}
+            nextStepBar={{
+              hasResearch,
+              hasDepartments,
+              hasMessaging,
+              hasContacts,
+              hasContent,
+              hasCampaign,
+              campaignUrl: campaigns[0]?.url ?? null,
+            }}
           />
         </div>
       </div>
+
+      {/* Chat Agent Widget */}
+      <AccountChatWidget accountId={company.id} companyName={company.name} />
     </div>
   );
 }

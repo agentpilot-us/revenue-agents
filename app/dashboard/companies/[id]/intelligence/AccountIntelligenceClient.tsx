@@ -4,8 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ResearchButton } from '@/app/components/company/ResearchButton';
+import { InlineResearchReviewPanel } from '@/app/components/company/InlineResearchReviewPanel';
 import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { Button } from '@/components/ui/button';
+import type { CompanyResearchData } from '@/lib/research/company-research-schema';
 
 type Props = {
   companyId: string;
@@ -26,30 +28,63 @@ export function AccountIntelligenceClient({
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [oneClickLoading, setOneClickLoading] = useState(false);
+  const [oneClickStatus, setOneClickStatus] = useState<'perplexity' | 'structure' | 'apply' | null>(null);
   const [oneClickError, setOneClickError] = useState<string | null>(null);
+  const [pendingResearchData, setPendingResearchData] = useState<CompanyResearchData | null>(null);
 
   const handleOneClickResearchAndApply = async () => {
     setOneClickLoading(true);
     setOneClickError(null);
     try {
-      const res = await fetch(`/api/companies/${companyId}/research`, { method: 'POST' });
+      setOneClickStatus('perplexity');
+      const res = await fetch(`/api/companies/${companyId}/research/perplexity`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Research failed');
-      if (!data.data) throw new Error('No research data returned');
+      if (!data.summary) throw new Error('No research summary returned');
+
+      setOneClickStatus('structure');
+      const structureRes = await fetch(`/api/companies/${companyId}/research/structure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary: data.summary }),
+      });
+      const structureData = await structureRes.json();
+      if (!structureRes.ok) throw new Error(structureData.error || 'Structuring failed');
+      if (!structureData.data) throw new Error('No research data returned');
+
+      setOneClickStatus('apply');
       const applyRes = await fetch(`/api/companies/${companyId}/apply-research`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data.data),
+        body: JSON.stringify(structureData.data),
       });
       const applyData = await applyRes.json();
       if (!applyRes.ok) throw new Error(applyData.error || 'Apply failed');
+
+      const msgRes = await fetch(`/api/companies/${companyId}/account-messaging/generate`, {
+        method: 'POST',
+      });
+      if (!msgRes.ok) {
+        const msgResult = await msgRes.json();
+        throw new Error(msgResult.error ?? 'Failed to generate messaging');
+      }
       router.refresh();
     } catch (e) {
       setOneClickError(e instanceof Error ? e.message : 'Failed');
     } finally {
       setOneClickLoading(false);
+      setOneClickStatus(null);
     }
   };
+
+  const oneClickStatusLabel =
+    oneClickStatus === 'perplexity'
+      ? `Researching ${companyName}...`
+      : oneClickStatus === 'structure'
+        ? 'Analyzing buying groups...'
+        : oneClickStatus === 'apply'
+          ? 'Saving & generating messaging…'
+          : null;
 
   const handleGenerateMessaging = async () => {
     setGenerating(true);
@@ -104,19 +139,60 @@ export function AccountIntelligenceClient({
             <p className="text-sm text-slate-400 mt-1">
               AI researches the account: basics, initiatives, and product fit.
             </p>
+            {!hasResearch && (
+              <p className="text-sm text-slate-500 mt-2">
+                Research pulls in company context and suggests buying groups and messaging. It usually takes about 2 minutes. You’ll get segment ideas and ready-to-use copy for outreach.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <ResearchButton companyId={companyId} companyName={companyName} />
+            <ResearchButton
+              companyId={companyId}
+              companyName={companyName}
+              onComplete={(data) => {
+                const parsed = data as CompanyResearchData;
+                if (parsed && Array.isArray(parsed.microSegments) && parsed.microSegments.length > 0) {
+                  setPendingResearchData(parsed);
+                }
+              }}
+            />
             <Button
               onClick={handleOneClickResearchAndApply}
               disabled={oneClickLoading || hasResearch}
               variant="outline"
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
-              {oneClickLoading ? 'Researching & saving…' : 'Research and set up account intelligence'}
+              {oneClickLoading ? oneClickStatusLabel : 'Research and set up account intelligence'}
             </Button>
           </div>
-          {oneClickError && <p className="text-sm text-red-400 mt-2">{oneClickError}</p>}
+          {oneClickError && (
+            <p className="text-sm text-red-400 mt-2 flex items-center gap-2">
+              {oneClickError}
+              <button
+                type="button"
+                onClick={() => setOneClickError(null)}
+                className="text-xs underline"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={handleOneClickResearchAndApply}
+                className="text-xs font-medium underline"
+              >
+                Retry
+              </button>
+            </p>
+          )}
+
+          {pendingResearchData && (
+            <InlineResearchReviewPanel
+              companyId={companyId}
+              companyName={companyName}
+              researchData={pendingResearchData}
+              onSaved={() => setPendingResearchData(null)}
+            />
+          )}
         </section>
 
         {/* Step 2: Create buying segments */}
@@ -190,9 +266,9 @@ export function AccountIntelligenceClient({
             <p className="text-slate-400 text-sm mb-4">
               Find stakeholders in each department. Import from LinkedIn, paste from a list, or let AI discover them.
             </p>
-            <Link href={`/dashboard/companies/${companyId}/contacts`}>
+            <Link href={`/dashboard/companies/${companyId}?tab=contacts`}>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                Build Contact List →
+                Continue →
               </Button>
             </Link>
           </div>

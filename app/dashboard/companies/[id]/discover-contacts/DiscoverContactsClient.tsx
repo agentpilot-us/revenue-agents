@@ -70,6 +70,7 @@ export function DiscoverContactsClient({
       setResults(res.results);
       setSelectedIds(new Set(res.results.map((r) => r.id)));
       setStep('results');
+      if (res.results.length > 0) setErrorMessage(null);
     } catch (e) {
       setErrorMessage(e instanceof Error ? e.message : 'Discovery failed');
       setStep('error');
@@ -201,13 +202,37 @@ export function DiscoverContactsClient({
       {step === 'error' && (
         <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4">
           <p className="text-red-800 dark:text-red-200">{errorMessage}</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => setStep('config')}>
-            Try again
-          </Button>
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" size="sm" onClick={() => setStep('config')}>
+              Dismiss
+            </Button>
+            <Button size="sm" onClick={runDiscovery}>
+              Retry
+            </Button>
+          </div>
         </div>
       )}
 
-      {step === 'results' && (
+      {step === 'results' && results.length === 0 && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 p-4">
+          <p className="text-amber-800 dark:text-amber-200">
+            No contacts found for this group. Try a different buying group or add contacts manually.
+          </p>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            <Button size="sm" onClick={runDiscovery}>
+              Retry
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setStep('config')}>
+              Back to setup
+            </Button>
+            <Link href={`/dashboard/companies/${companyId}/add-contacts`}>
+              <Button variant="outline" size="sm">Add contacts manually</Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {step === 'results' && results.length > 0 && (
         <div className="space-y-4">
           {steps.length > 0 && (
             <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">

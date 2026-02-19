@@ -13,6 +13,7 @@ import { CrawlStatus } from '@/app/components/company/CrawlStatus';
 import { ContactsByBuyingGroup } from '@/app/components/company/ContactsByBuyingGroup';
 import { ContentTab } from '@/app/components/company/ContentTab';
 import { ActivityTimeline } from '@/app/components/company/ActivityTimeline';
+import { NextStepBar } from '@/app/components/company/NextStepBar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -73,6 +74,18 @@ type CompanyTabsProps = {
   researchDataKey?: string | number;
   /** Engagement metrics per buying group for Engagement tab */
   engagementByDept?: EngagementRow[];
+  /** Optional: called when user switches tab (e.g. for NextStepBar to show status) */
+  onTabChange?: (tab: TabId) => void;
+  /** When provided, show NextStepBar above tabs (guided flow) */
+  nextStepBar?: {
+    hasResearch: boolean;
+    hasDepartments: boolean;
+    hasMessaging: boolean;
+    hasContacts: boolean;
+    hasContent: boolean;
+    hasCampaign: boolean;
+    campaignUrl?: string | null;
+  };
 };
 
 const TABS: { id: TabId; label: string }[] = [
@@ -101,23 +114,46 @@ export function CompanyTabs({
   campaigns = [],
   researchDataKey,
   engagementByDept = [],
+  onTabChange,
+  nextStepBar,
 }: CompanyTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'departments');
 
   useEffect(() => {
     if (initialTab === 'messaging') setActiveTab('messaging');
     if (initialTab === 'campaigns') setActiveTab('campaigns');
+    if (initialTab === 'contacts') setActiveTab('contacts');
+    if (initialTab === 'content') setActiveTab('content');
   }, [initialTab]);
+
+  const setTab = (tabId: TabId) => {
+    setActiveTab(tabId);
+    onTabChange?.(tabId);
+  };
 
   return (
     <div className="space-y-4">
+      {nextStepBar && (
+        <NextStepBar
+          companyId={companyId}
+          companyName={companyName}
+          currentTab={activeTab}
+          hasResearch={nextStepBar.hasResearch}
+          hasDepartments={nextStepBar.hasDepartments}
+          hasMessaging={nextStepBar.hasMessaging}
+          hasContacts={nextStepBar.hasContacts}
+          hasContent={nextStepBar.hasContent}
+          hasCampaign={nextStepBar.hasCampaign}
+          campaignUrl={nextStepBar.campaignUrl}
+        />
+      )}
       <div className="border-b border-gray-200">
         <nav className="flex gap-1" aria-label="Tabs">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setTab(tab.id)}
               className={cn(
                 'px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
@@ -276,6 +312,7 @@ export function CompanyTabs({
             customName: d.customName ?? null,
             type: d.type,
           }))}
+          hasMessaging={!!accountMessaging}
         />
       )}
 

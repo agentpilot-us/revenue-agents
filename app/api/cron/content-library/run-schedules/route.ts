@@ -38,8 +38,21 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date();
+  // Get users who have not paused crawls
+  const activeUsers = await prisma.user.findMany({
+    where: {
+      crawlPaused: { not: true },
+    },
+    select: { id: true },
+  });
+  const activeUserIds = activeUsers.map((u) => u.id);
+
   const due = await prisma.contentCrawlSchedule.findMany({
-    where: { isActive: true, nextRunAt: { lte: now } },
+    where: {
+      isActive: true,
+      nextRunAt: { lte: now },
+      userId: { in: activeUserIds },
+    },
     include: { product: { select: { id: true } } },
   });
 
@@ -160,7 +173,11 @@ export async function POST(req: NextRequest) {
 
   // URL-update schedules: re-fetch sourceUrl and re-ingest for each due ContentLibrarySchedule
   const urlDue = await prisma.contentLibrarySchedule.findMany({
-    where: { isActive: true, nextRunAt: { lte: now } },
+    where: {
+      isActive: true,
+      nextRunAt: { lte: now },
+      userId: { in: activeUserIds },
+    },
     select: { id: true, contentLibraryId: true, userId: true, frequency: true },
   });
 

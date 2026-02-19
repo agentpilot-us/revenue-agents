@@ -81,8 +81,22 @@ export function CampaignsTab({
   const [landingGenerating, setLandingGenerating] = useState(false);
   const [landingApproving, setLandingApproving] = useState(false);
   const [landingApproved, setLandingApproved] = useState<ApprovedCampaignItem[] | null>(null);
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState<number | null>(null);
   const [selectedDraftIndexes, setSelectedDraftIndexes] = useState<number[]>([]);
   const [landingActiveTab, setLandingActiveTab] = useState(0);
+
+  // 30s undo window after going live
+  useEffect(() => {
+    if (!landingApproved?.length) {
+      setUndoSecondsLeft(null);
+      return;
+    }
+    setUndoSecondsLeft(30);
+    const interval = setInterval(() => {
+      setUndoSecondsLeft((s) => (s == null || s <= 1 ? null : s - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [landingApproved?.length]);
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -149,9 +163,14 @@ export function CampaignsTab({
 
         {message && (
           <div
-            className={`mb-4 p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}`}
+            className={`mb-4 p-3 rounded text-sm flex items-center justify-between gap-2 flex-wrap ${message.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}`}
           >
-            {message.text}
+            <span>{message.text}</span>
+            {message.type === 'error' && showCreateLanding && (
+              <Button variant="outline" size="sm" onClick={() => setMessage(null)}>
+                Retry
+              </Button>
+            )}
           </div>
         )}
 
@@ -177,6 +196,8 @@ export function CampaignsTab({
               fetchCampaigns();
             }}
             onError={(err) => setMessage({ type: 'error', text: err })}
+            errorFromParent={message?.type === 'error' ? message.text : null}
+            onClearError={() => setMessage(null)}
             selectedDraftIndexes={selectedDraftIndexes}
             setSelectedDraftIndexes={setSelectedDraftIndexes}
             activeTab={landingActiveTab}
@@ -187,43 +208,79 @@ export function CampaignsTab({
 
         {showCreateLanding && landingApproved && landingApproved.length > 0 && (
           <div className="mb-6 p-4 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30">
-            <h3 className="font-medium text-green-800 dark:text-green-200 mb-2">Landing pages live</h3>
-            <p className="text-sm text-green-700 dark:text-green-300 mb-3">Share these URLs:</p>
-            <ul className="space-y-2 mb-3">
-              {landingApproved.map((c) => (
-                <li key={c.id} className="flex items-center gap-2 flex-wrap">
-                  <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-md">
-                    {c.url}
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(c.url)}
-                    className="text-xs text-gray-600 dark:text-gray-400 hover:underline"
-                  >
-                    Copy
-                  </button>
-                  {c.segmentName && <span className="text-xs text-gray-500 dark:text-gray-400">({c.segmentName})</span>}
-                </li>
-              ))}
-            </ul>
-            <div className="flex gap-2">
+            <h3 className="font-medium text-green-800 dark:text-green-200 mb-2">Your page is live</h3>
+            <p className="text-sm text-green-700 dark:text-green-300 mb-3">Copy and share your link:</p>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               <Button
-                variant="outline"
                 size="sm"
                 onClick={() => {
-                  const all = landingApproved!.map((c) => c.url).join('\n');
-                  navigator.clipboard.writeText(all);
-                  setMessage({ type: 'success', text: 'All URLs copied.' });
+                  const url = landingApproved[0].url;
+                  navigator.clipboard.writeText(url);
+                  setMessage({ type: 'success', text: 'Link copied to clipboard.' });
                 }}
               >
-                Copy all URLs
+                Copy URL
               </Button>
+              {undoSecondsLeft != null && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    for (const c of landingApproved!) {
+                      await fetch(`/api/companies/${companyId}/campaigns/${c.id}`, { method: 'DELETE' });
+                    }
+                    setLandingApproved(null);
+                    setLandingDrafts([]);
+                    setUndoSecondsLeft(null);
+                    await fetchCampaigns();
+                    setMessage({ type: 'success', text: 'Page removed.' });
+                  }}
+                >
+                  Undo ({undoSecondsLeft}s)
+                </Button>
+              )}
+            </div>
+            {landingApproved.length > 1 && (
+              <>
+                <p className="text-sm text-green-700 dark:text-green-300 mb-2">All URLs:</p>
+                <ul className="space-y-2 mb-3">
+                  {landingApproved.map((c) => (
+                    <li key={c.id} className="flex items-center gap-2 flex-wrap">
+                      <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-md">
+                        {c.url}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(c.url)}
+                        className="text-xs text-gray-600 dark:text-gray-400 hover:underline"
+                      >
+                        Copy
+                      </button>
+                      {c.segmentName && <span className="text-xs text-gray-500 dark:text-gray-400">({c.segmentName})</span>}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const all = landingApproved!.map((c) => c.url).join('\n');
+                    navigator.clipboard.writeText(all);
+                    setMessage({ type: 'success', text: 'All URLs copied.' });
+                  }}
+                >
+                  Copy all URLs
+                </Button>
+              </>
+            )}
+            <div className="mt-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   setLandingApproved(null);
                   setLandingDrafts([]);
+                  setUndoSecondsLeft(null);
                   setShowCreateLanding(false);
                 }}
               >
@@ -521,6 +578,8 @@ export function CreateLandingPageFlow({
   setApproving,
   onApproved,
   onError,
+  errorFromParent = null,
+  onClearError,
   selectedDraftIndexes,
   setSelectedDraftIndexes,
   activeTab,
@@ -544,6 +603,8 @@ export function CreateLandingPageFlow({
   setApproving: (v: boolean) => void;
   onApproved: (campaigns: ApprovedCampaignItem[]) => void;
   onError: (err: string) => void;
+  errorFromParent?: string | null;
+  onClearError?: () => void;
   selectedDraftIndexes: number[];
   setSelectedDraftIndexes: (v: number[]) => void;
   activeTab: number;
@@ -570,9 +631,34 @@ export function CreateLandingPageFlow({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to generate drafts');
       if (!Array.isArray(data.drafts)) throw new Error('Invalid response');
-      setDrafts(data.drafts);
-      setSelectedDraftIndexes(data.drafts.map((_: unknown, i: number) => i));
-      setActiveTab(0);
+      // Create live immediately: approve all drafts and show URL + undo
+      setApproving(true);
+      try {
+        const approveRes = await fetch(`/api/companies/${companyId}/campaigns/approve-draft`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            drafts: data.drafts.map((d: LandingPageDraft) => ({
+              departmentId: d.departmentId,
+              segmentName: d.segmentName,
+              headline: d.headline,
+              body: d.body,
+              pageSections: d.pageSections ?? undefined,
+            })),
+          }),
+        });
+        const approveData = await approveRes.json();
+        if (!approveRes.ok) throw new Error(approveData.error || 'Failed to launch');
+        if (!Array.isArray(approveData.campaigns)) throw new Error('Invalid response');
+        onApproved(approveData.campaigns);
+      } catch (approveErr) {
+        onError(approveErr instanceof Error ? approveErr.message : 'Failed to launch');
+        setDrafts(data.drafts);
+        setSelectedDraftIndexes(data.drafts.map((_: unknown, i: number) => i));
+        setActiveTab(0);
+      } finally {
+        setApproving(false);
+      }
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Failed to generate drafts');
     } finally {
@@ -701,11 +787,31 @@ export function CreateLandingPageFlow({
             </div>
           </div>
           <Button onClick={handleGenerate} disabled={generating || (scope === 'segments' && departmentIds.length === 0)}>
-            {generating ? 'Generating…' : scope === 'company' ? 'Make page' : 'Generate pages'}
+            {generating ? (approving ? 'Launching…' : 'Generating…') : scope === 'company' ? 'Make page' : 'Generate pages'}
           </Button>
         </>
       ) : (
         <>
+          {errorFromParent && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 flex items-center justify-between gap-2 mb-4">
+              <span className="text-sm text-red-800 dark:text-red-200">Couldn’t create page. {errorFromParent}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => onClearError?.()}>
+                  Dismiss
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    onClearError?.();
+                    handleApprove(selectedDraftIndexes);
+                  }}
+                  disabled={approving || selectedDraftIndexes.length === 0}
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex gap-1 border-b border-gray-200 dark:border-zinc-600 overflow-x-auto">
               {drafts.map((d, i) => (

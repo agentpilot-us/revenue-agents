@@ -4,36 +4,67 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ResearchReviewModal } from './ResearchReviewModal';
 
+type ResearchStatus = null | 'perplexity' | 'structure';
+
 type Props = {
   companyId: string;
   companyName: string;
+  /** When set, research result is passed here instead of opening the modal (e.g. for inline review on Intelligence page). */
+  onComplete?: (data: unknown) => void;
 };
 
-export function ResearchButton({ companyId, companyName }: Props) {
-  const [researching, setResearching] = useState(false);
+export function ResearchButton({ companyId, companyName, onComplete }: Props) {
+  const [researchStatus, setResearchStatus] = useState<ResearchStatus>(null);
   const [researchData, setResearchData] = useState<unknown>(null);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const researching = researchStatus !== null;
+
   const handleResearch = async () => {
-    setResearching(true);
+    setResearchStatus('perplexity');
     setError(null);
     try {
-      const res = await fetch(`/api/companies/${companyId}/research`, {
+      const res = await fetch(`/api/companies/${companyId}/research/perplexity`, {
         method: 'POST',
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Research failed');
       }
-      setResearchData(data.data);
-      setShowModal(true);
+      if (!data.summary) {
+        throw new Error('No research summary returned');
+      }
+
+      setResearchStatus('structure');
+      const structureRes = await fetch(`/api/companies/${companyId}/research/structure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary: data.summary }),
+      });
+      const structureData = await structureRes.json();
+      if (!structureRes.ok) {
+        throw new Error(structureData.error || 'Structuring failed');
+      }
+      setResearchData(structureData.data);
+      if (onComplete) {
+        onComplete(structureData.data);
+      } else {
+        setShowModal(true);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Research failed');
     } finally {
-      setResearching(false);
+      setResearchStatus(null);
     }
   };
+
+  const statusLabel =
+    researchStatus === 'perplexity'
+      ? `Researching ${companyName}...`
+      : researchStatus === 'structure'
+        ? 'Analyzing buying groups...'
+        : null;
 
   return (
     <>
@@ -45,7 +76,7 @@ export function ResearchButton({ companyId, companyName }: Props) {
         {researching ? (
           <>
             <span className="mr-2">🔍</span>
-            Researching...
+            {statusLabel}
           </>
         ) : (
           <>
@@ -55,8 +86,22 @@ export function ResearchButton({ companyId, companyName }: Props) {
         )}
       </Button>
       {error && (
-        <div className="mt-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-200 p-2 rounded">
+        <div className="mt-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-200 p-2 rounded flex items-center gap-2">
           {error}
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-xs underline"
+          >
+            Dismiss
+          </button>
+          <button
+            type="button"
+            onClick={handleResearch}
+            className="text-xs font-medium underline"
+          >
+            Retry
+          </button>
         </div>
       )}
       {showModal && researchData && (
@@ -64,7 +109,6 @@ export function ResearchButton({ companyId, companyName }: Props) {
           open={showModal}
           onOpenChange={(open) => {
             setShowModal(open);
-            // Clear research data when modal closes
             if (!open) {
               setResearchData(null);
             }

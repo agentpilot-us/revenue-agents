@@ -10,6 +10,7 @@ import {
   CreditCard,
   Bolt,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 
 const navigation: Array<{
@@ -22,6 +23,7 @@ const navigation: Array<{
   { name: 'Target companies', href: '/dashboard/companies', icon: Building2 },
   { name: 'Create content', href: '/dashboard/create-content', icon: FileText },
   { name: 'Your company data', href: '/dashboard/content-library', icon: BookOpen },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Webhooks', href: '/dashboard/webhooks', icon: Bolt },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   { name: 'Billing', href: '/billing', icon: CreditCard },

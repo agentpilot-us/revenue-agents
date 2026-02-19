@@ -175,8 +175,16 @@ export function FindContactsModal({
         </DialogHeader>
 
         {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 text-red-800 text-sm p-3">
-            {error}
+          <div className="rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-sm p-3 flex items-center justify-between gap-2 flex-wrap">
+            <span>{error}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setError(null)}>
+                Dismiss
+              </Button>
+              <Button size="sm" onClick={() => { setError(null); handleSearch(); }}>
+                Retry
+              </Button>
+            </div>
           </div>
         )}
 

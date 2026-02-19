@@ -17,6 +17,7 @@ export async function GET() {
         email: true,
         companyName: true,
         companyWebsite: true,
+        companyLogoUrl: true,
         companyIndustry: true,
         primaryIndustrySellTo: true,
         contentRefreshFrequency: true,
@@ -24,6 +25,8 @@ export async function GET() {
         notifyOnNewContent: true,
         notifyOnUpdatedContent: true,
         notifyOnRemovedContent: true,
+        nightlyCrawlPreferredHour: true,
+        crawlPaused: true,
       },
     });
 
@@ -59,6 +62,8 @@ export async function PUT(req: NextRequest) {
       notifyOnNewContent,
       notifyOnUpdatedContent,
       notifyOnRemovedContent,
+      nightlyCrawlPreferredHour,
+      crawlPaused,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -73,6 +78,15 @@ export async function PUT(req: NextRequest) {
     if (notifyOnNewContent !== undefined) data.notifyOnNewContent = typeof notifyOnNewContent === 'boolean' ? notifyOnNewContent : undefined;
     if (notifyOnUpdatedContent !== undefined) data.notifyOnUpdatedContent = typeof notifyOnUpdatedContent === 'boolean' ? notifyOnUpdatedContent : undefined;
     if (notifyOnRemovedContent !== undefined) data.notifyOnRemovedContent = typeof notifyOnRemovedContent === 'boolean' ? notifyOnRemovedContent : undefined;
+    if (nightlyCrawlPreferredHour !== undefined) {
+      const hour = typeof nightlyCrawlPreferredHour === 'number' ? nightlyCrawlPreferredHour : (typeof nightlyCrawlPreferredHour === 'string' ? parseInt(nightlyCrawlPreferredHour, 10) : undefined);
+      if (hour !== undefined && !isNaN(hour) && hour >= 0 && hour <= 23) {
+        data.nightlyCrawlPreferredHour = hour;
+      } else if (nightlyCrawlPreferredHour === null || nightlyCrawlPreferredHour === '') {
+        data.nightlyCrawlPreferredHour = null;
+      }
+    }
+    if (crawlPaused !== undefined) data.crawlPaused = typeof crawlPaused === 'boolean' ? crawlPaused : undefined;
 
     const user = await prisma.user.update({
       where: { id: session.user.id },
@@ -83,6 +97,7 @@ export async function PUT(req: NextRequest) {
         email: true,
         companyName: true,
         companyWebsite: true,
+        companyLogoUrl: true,
         companyIndustry: true,
         primaryIndustrySellTo: true,
         contentRefreshFrequency: true,
@@ -90,6 +105,8 @@ export async function PUT(req: NextRequest) {
         notifyOnNewContent: true,
         notifyOnUpdatedContent: true,
         notifyOnRemovedContent: true,
+        nightlyCrawlPreferredHour: true,
+        crawlPaused: true,
       },
     });
 

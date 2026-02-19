@@ -482,4 +482,384 @@ export const chatTools = {
       }
     },
   }),
+
+  get_campaign_engagement: tool({
+    description:
+      'Get landing page performance metrics for campaigns. Returns visits, unique visitors, chat messages, and CTA clicks per campaign. Use when the user asks about landing page performance, campaign engagement, or "who has viewed the landing page".',
+    inputSchema: z.object({
+      companyId: z.string().describe('The company ID (current account)'),
+      days: z.number().optional().default(7).describe('Number of days to look back (default: 7)'),
+      campaignId: z.string().optional().describe('Optional: specific campaign ID to filter'),
+    }),
+    execute: async ({ companyId, days = 7, campaignId }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+      });
+      if (!company) return { error: 'Company not found' };
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      const endDate = new Date();
+
+      const visits = await prisma.campaignVisit.findMany({
+        where: {
+          campaign: {
+            companyId,
+            ...(campaignId ? { id: campaignId } : {}),
+          },
+          visitedAt: { gte: startDate, lte: endDate },
+        },
+        include: {
+          campaign: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+            },
+          },
+        },
+      });
+
+      // Aggregate by campaign
+      const campaignPerformance: Record<
+        string,
+        {
+          campaignId: string;
+          campaignTitle: string;
+          campaignSlug: string;
+          visits: number;
+          uniqueVisitors: Set<string>;
+          chatMessages: number;
+          ctaClicks: number;
+        }
+      > = {};
+
+      for (const visit of visits) {
+        const id = visit.campaignId;
+        if (!campaignPerformance[id]) {
+          campaignPerformance[id] = {
+            campaignId: id,
+            campaignTitle: visit.campaign.title,
+            campaignSlug: visit.campaign.slug,
+            visits: 0,
+            uniqueVisitors: new Set(),
+            chatMessages: 0,
+            ctaClicks: 0,
+          };
+        }
+        campaignPerformance[id].visits++;
+        if (visit.sessionId) {
+          campaignPerformance[id].uniqueVisitors.add(visit.sessionId);
+        }
+        campaignPerformance[id].chatMessages += visit.chatMessages || 0;
+        if (visit.ctaClicked) {
+          campaignPerformance[id].ctaClicks++;
+        }
+      }
+
+      const results = Object.values(campaignPerformance).map((cp) => ({
+        campaignId: cp.campaignId,
+        campaignTitle: cp.campaignTitle,
+        campaignSlug: cp.campaignSlug,
+        visits: cp.visits,
+        uniqueVisitors: cp.uniqueVisitors.size,
+        chatMessages: cp.chatMessages,
+        ctaClicks: cp.ctaClicks,
+        dateRange: {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
+      }));
+
+      return { campaigns: results };
+    },
+  }),
+
+  list_campaigns: tool({
+    description:
+      'List all campaigns (landing pages) for a company. Returns campaign details including title, URL, department, type, and optional engagement summary. Use when the user asks about campaigns or landing pages.',
+    inputSchema: z.object({
+      companyId: z.string().describe('The company ID (current account)'),
+    }),
+    execute: async ({ companyId }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+      });
+      if (!company) return { error: 'Company not found' };
+
+      const campaigns = await prisma.segmentCampaign.findMany({
+        where: { companyId },
+        include: {
+          department: {
+            select: {
+              id: true,
+              customName: true,
+              type: true,
+            },
+          },
+          _count: {
+            select: {
+              visits: true,
+              leads: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Get engagement summary for each campaign
+      const campaignsWithEngagement = await Promise.all(
+        campaigns.map(async (campaign) => {
+          const recentVisits = await prisma.campaignVisit.findMany({
+            where: {
+              campaignId: campaign.id,
+              visitedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+            },
+            select: {
+              sessionId: true,
+              chatMessages: true,
+              ctaClicked: true,
+            },
+          });
+
+          const uniqueVisitors = new Set(
+            recentVisits.map((v) => v.sessionId).filter(Boolean)
+          ).size;
+          const chatMessages = recentVisits.reduce((sum, v) => sum + (v.chatMessages || 0), 0);
+          const ctaClicks = recentVisits.filter((v) => v.ctaClicked).length;
+
+          return {
+            id: campaign.id,
+            title: campaign.title,
+            url: campaign.url,
+            slug: campaign.slug,
+            type: campaign.type,
+            departmentName: campaign.department
+              ? campaign.department.customName || campaign.department.type.replace(/_/g, ' ')
+              : 'Account-wide',
+            departmentId: campaign.departmentId,
+            engagementSummary: {
+              totalVisits: campaign._count.visits,
+              totalLeads: campaign._count.leads,
+              recentVisits: recentVisits.length,
+              uniqueVisitors,
+              chatMessages,
+              ctaClicks,
+            },
+          };
+        })
+      );
+
+      return { campaigns: campaignsWithEngagement };
+    },
+  }),
+
+  get_account_changes: tool({
+    description:
+      'Get recent changes and activity for an account. Returns new contacts, email engagements, campaign visits, and research updates. Use when the user asks "What\'s changed at this account?" or "What\'s new at [company]?".',
+    inputSchema: z.object({
+      companyId: z.string().describe('The company ID (current account)'),
+      days: z.number().optional().default(7).describe('Number of days to look back (default: 7)'),
+    }),
+    execute: async ({ companyId, days = 7 }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+      });
+      if (!company) return { error: 'Company not found' };
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      const endDate = new Date();
+
+      // New contacts
+      const newContacts = await prisma.contact.findMany({
+        where: {
+          companyId,
+          createdAt: { gte: startDate, lte: endDate },
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          title: true,
+        },
+      });
+
+      // Email engagements
+      const emailActivities = await prisma.activity.findMany({
+        where: {
+          companyId,
+          type: { in: ['Email', 'EMAIL_SENT', 'EmailOpen', 'EmailClick'] },
+          createdAt: { gte: startDate, lte: endDate },
+        },
+        select: {
+          type: true,
+          summary: true,
+          createdAt: true,
+        },
+      });
+
+      const emailsSent = emailActivities.filter(
+        (a) => a.type === 'Email' || a.type === 'EMAIL_SENT'
+      ).length;
+      const emailsOpened = emailActivities.filter((a) => a.type === 'EmailOpen').length;
+      const emailsClicked = emailActivities.filter((a) => a.type === 'EmailClick').length;
+
+      // Campaign visits
+      const campaignVisits = await prisma.campaignVisit.findMany({
+        where: {
+          campaign: { companyId },
+          visitedAt: { gte: startDate, lte: endDate },
+        },
+        select: {
+          id: true,
+          visitorEmail: true,
+          chatMessages: true,
+          ctaClicked: true,
+          campaign: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
+
+      const uniqueVisitors = new Set(
+        campaignVisits.map((v) => v.visitorEmail).filter(Boolean)
+      ).size;
+      const totalChatMessages = campaignVisits.reduce((sum, v) => sum + (v.chatMessages || 0), 0);
+      const totalCtaClicks = campaignVisits.filter((v) => v.ctaClicked).length;
+
+      // Research updates (check if researchData was updated)
+      const researchUpdated =
+        company.updatedAt && company.updatedAt >= startDate && company.researchData
+          ? true
+          : false;
+
+      const summary = [
+        `${newContacts.length} new contact${newContacts.length !== 1 ? 's' : ''} added`,
+        `${emailsSent} email${emailsSent !== 1 ? 's' : ''} sent, ${emailsOpened} opened, ${emailsClicked} clicked`,
+        `${campaignVisits.length} landing page visit${campaignVisits.length !== 1 ? 's' : ''} (${uniqueVisitors} unique visitors, ${totalChatMessages} chat messages, ${totalCtaClicks} CTA clicks)`,
+        researchUpdated ? 'Account research updated' : null,
+      ]
+        .filter(Boolean)
+        .join('; ');
+
+      return {
+        period: `${days} days`,
+        newContacts: {
+          count: newContacts.length,
+          contacts: newContacts.map((c) => ({
+            id: c.id,
+            name: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown',
+            email: c.email,
+            title: c.title,
+          })),
+        },
+        emailEngagements: {
+          sent: emailsSent,
+          opened: emailsOpened,
+          clicked: emailsClicked,
+        },
+        campaignVisits: {
+          total: campaignVisits.length,
+          uniqueVisitors,
+          chatMessages: totalChatMessages,
+          ctaClicks: totalCtaClicks,
+        },
+        researchUpdates: researchUpdated ? 1 : 0,
+        summary,
+      };
+    },
+  }),
+
+  launch_campaign: tool({
+    description:
+      'Create and launch a new campaign (landing page) for a company. Returns the campaign URL. Use when the user asks to "launch a landing page" or "create a campaign".',
+    inputSchema: z.object({
+      companyId: z.string().describe('The company ID (current account)'),
+      title: z.string().describe('Campaign title'),
+      departmentId: z.string().optional().describe('Optional department ID for segment-specific campaign'),
+      type: z
+        .enum(['landing_page', 'event_invite', 'demo', 'webinar', 'other'])
+        .default('landing_page')
+        .describe('Campaign type'),
+      headline: z.string().optional().describe('Optional headline for the landing page'),
+      body: z.string().optional().describe('Optional body content for the landing page'),
+    }),
+    execute: async ({ companyId, title, departmentId, type = 'landing_page', headline, body }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+      });
+      if (!company) return { error: 'Company not found' };
+
+      // Verify department belongs to company if provided
+      if (departmentId) {
+        const department = await prisma.companyDepartment.findFirst({
+          where: { id: departmentId, companyId },
+        });
+        if (!department) {
+          return { error: 'Department not found or does not belong to this company' };
+        }
+      }
+
+      try {
+        // Generate slug from title
+        const slugBase = title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        let slug = slugBase;
+        let counter = 1;
+        while (
+          await prisma.segmentCampaign.findFirst({
+            where: { userId: session.user.id, slug },
+          })
+        ) {
+          slug = `${slugBase}-${counter}`;
+          counter++;
+        }
+
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+        const url = `${baseUrl}/go/${slug}`;
+
+        const campaign = await prisma.segmentCampaign.create({
+          data: {
+            userId: session.user.id,
+            companyId,
+            departmentId: departmentId || null,
+            slug,
+            title,
+            description: null,
+            type,
+            url,
+            headline: headline || null,
+            body: body || null,
+            ctaLabel: null,
+            ctaUrl: null,
+            isMultiDepartment: false,
+          },
+        });
+
+        return {
+          campaignId: campaign.id,
+          slug: campaign.slug,
+          url: campaign.url,
+          title: campaign.title,
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create campaign';
+        return { error: message };
+      }
+    },
+  }),
 };
