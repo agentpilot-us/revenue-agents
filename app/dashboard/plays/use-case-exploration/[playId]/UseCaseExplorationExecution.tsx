@@ -302,7 +302,7 @@ export function UseCaseExplorationExecution({
               href={`/chat?play=expansion&accountId=${companyId}`}
               className="text-sm px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100"
             >
-              Agent Pilot chat
+              AgentPilot chat
             </Link>
           </div>
           <p className="text-sm text-gray-600">

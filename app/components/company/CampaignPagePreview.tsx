@@ -138,7 +138,7 @@ export function CampaignPagePreview({
         ) : null}
 
         <div className="mt-6 flex items-center justify-center gap-4 text-xs text-zinc-400">
-          <span>Powered by Agent Pilot</span>
+          <span>Powered by AgentPilot</span>
         </div>
       </div>
     </div>

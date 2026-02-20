@@ -27,7 +27,7 @@ export default async function Navigation() {
             <div className="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">AP</span>
             </div>
-            <span className="text-xl font-bold text-slate-900">Agent Pilot</span>
+            <span className="text-xl font-bold text-slate-900">AgentPilot</span>
           </Link>
           <NavigationClient isAuthenticated={isAuthenticated} />
         </div>

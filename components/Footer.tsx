@@ -76,8 +76,8 @@ export default function Footer() {
         </div>
         <div className="border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
           <p>
-            © 2025 Agent Pilot. Built by{' '}
-            <span className="text-blue-400">Agent Pilot</span>.
+            © 2025 AgentPilot. Built by{' '}
+            <span className="text-blue-400">AgentPilot</span>.
           </p>
           <p className="mt-2">
             Salesforce AgentBlazer Legend • Data Cloud Consultant • Agentforce Specialist

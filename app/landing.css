@@ -64,19 +64,11 @@ html {
   text-decoration: none;
 }
 
-.landing-logo-icon {
+.landing-logo-img {
   width: 36px;
   height: 36px;
-  background: var(--gradient-warm);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.landing-logo-icon svg {
-  width: 20px;
-  height: 20px;
+  object-fit: contain;
+  display: block;
 }
 
 .landing-nav-links {
@@ -207,8 +199,18 @@ html {
   color: var(--muted);
   max-width: 660px;
   line-height: 1.7;
-  margin-bottom: 44px;
+  margin-bottom: 16px;
   animation: landingFadeUp 0.8s ease 0.2s both;
+}
+
+.landing-hero-support {
+  font-size: 0.95rem;
+  color: var(--muted);
+  max-width: 660px;
+  line-height: 1.6;
+  margin-bottom: 44px;
+  opacity: 0.9;
+  animation: landingFadeUp 0.8s ease 0.25s both;
 }
 
 .landing-hero-actions {

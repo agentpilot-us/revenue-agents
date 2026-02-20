@@ -211,7 +211,7 @@ export default async function CampaignLandingPage({ params }: Props) {
 
           <div className="mt-6 flex items-center justify-center gap-4 text-xs text-zinc-400">
             <CampaignTrack campaignId={campaign.id} />
-            <span>Powered by Agent Pilot</span>
+            <span>Powered by AgentPilot</span>
           </div>
         </div>
       </div>
@@ -323,7 +323,7 @@ export default async function CampaignLandingPage({ params }: Props) {
 
         <div className="mt-6 flex items-center justify-center gap-4 text-xs text-zinc-400">
           <CampaignTrack campaignId={campaign.id} />
-          <span>Powered by Agent Pilot</span>
+          <span>Powered by AgentPilot</span>
         </div>
       </div>
     </div>

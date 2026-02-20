@@ -102,7 +102,11 @@ export default function HomePage() {
   }, []);
 
   const signInUrl = '/login';
-  const demoUrl = '#cta';
+  // Demo: Calendly (or override via NEXT_PUBLIC_DEMO_BOOKING_URL / NEXT_PUBLIC_CAL_BOOKING_URL)
+  const demoUrl =
+    process.env.NEXT_PUBLIC_DEMO_BOOKING_URL ||
+    process.env.NEXT_PUBLIC_CAL_BOOKING_URL ||
+    'https://calendly.com/agentpilot/agentpilotdemo';
 
   return (
     <div
@@ -117,9 +121,11 @@ export default function HomePage() {
     >
       <nav id="nav" className={`landing-nav ${navScrolled ? 'scrolled' : ''}`}>
         <Link href="/" className="landing-logo">
-          <div className="landing-logo-icon">
-            <LogoIcon />
-          </div>
+          <img
+            src="/agentpilot-logo.png"
+            alt=""
+            className="landing-logo-img"
+          />
           AgentPilot
         </Link>
         <div className="landing-nav-links">
@@ -139,12 +145,13 @@ export default function HomePage() {
       <section className="landing-hero">
         <div className="landing-hero-badge">For Strategic AEs & Revenue Teams</div>
         <h1>
-          AI that researches your accounts, builds personalized pages, and <em>tells you when to follow up</em>
+          The AI workbench for expanding your biggest accounts
         </h1>
         <p className="landing-hero-sub">
-          AgentPilot learns your product, then automatically researches target accounts — mapping buying groups,
-          surfacing initiatives, and generating hyper-personalized landing pages with AI chat. When a high-value
-          prospect engages, you&apos;ll know in real time. Stop spending 10+ hours per account on manual research.
+          AgentPilot keeps a live model of each account by buying group, pulls in website and engagement signals, and recommends concrete moves — the people, message, and page for every opportunity — so reps stop guessing and start expanding.
+        </p>
+        <p className="landing-hero-support">
+          Stop spending 10+ hours per account on manual research, fragmented notes, and generic outreach. Get a live, guided expansion plan in minutes.
         </p>
         <div className="landing-hero-actions">
           <Link href={demoUrl} className="landing-btn-primary">
@@ -157,7 +164,8 @@ export default function HomePage() {
         <div className="landing-hero-visual" />
       </section>
 
-      <div className="landing-trust-bar">
+      {/* Company logos — uncomment when we have customers */}
+      {/* <div className="landing-trust-bar">
         <p className="landing-trust-label">Trusted by GTM teams at</p>
         <div className="landing-trust-logos">
           <span>Company</span>
@@ -166,7 +174,7 @@ export default function HomePage() {
           <span>Company</span>
           <span>Company</span>
         </div>
-      </div>
+      </div> */}
 
       <div className="landing-value-strip">
         <div className="landing-value-strip-inner">
