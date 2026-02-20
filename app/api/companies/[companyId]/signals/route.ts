@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 
 type SignalTier = 1 | 2 | 3;
 
@@ -228,7 +229,7 @@ export async function GET(
     const contentChanges = await prisma.contentLibrary.findMany({
       where: {
         userId: session.user.id,
-        previousContent: { not: null },
+        previousContent: { not: Prisma.JsonNull },
         scrapedAt: { gte: startDate },
       },
       select: {
