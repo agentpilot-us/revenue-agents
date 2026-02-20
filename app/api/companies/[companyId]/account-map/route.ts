@@ -5,20 +5,14 @@ import { prisma } from '@/lib/db';
 type RoleTag = "DECISION_MAKER" | "CHAMPION" | "INFLUENCER" | "OTHER";
 type EngagementType = "PAGE_VIEW" | "REPLY" | "MEETING" | "NONE";
 
-function deriveRoleTag(title: string | null, notes: string | null): RoleTag {
+function deriveRoleTag(title: string | null, enrichedData: any): RoleTag {
   if (!title) return "OTHER";
   const execPattern = /CFO|CIO|CTO|CISO|CEO|VP|Vice President|Head/i;
   const influencerPattern = /Manager|Lead/i;
   
-  // Check for champion flag in notes
-  if (notes) {
-    try {
-      const parsed = JSON.parse(notes);
-      if (parsed.isChampion) return "CHAMPION";
-    } catch {
-      // If notes is not JSON, check if it contains champion keyword
-      if (notes.toLowerCase().includes('champion')) return "CHAMPION";
-    }
+  // Check for champion flag in enrichedData JSON field
+  if (enrichedData && typeof enrichedData === 'object') {
+    if (enrichedData.isChampion === true) return "CHAMPION";
   }
   
   if (execPattern.test(title)) return "DECISION_MAKER";
@@ -132,7 +126,7 @@ export async function GET(
         email: true,
         linkedinUrl: true,
         companyDepartmentId: true,
-        notes: true,
+        enrichedData: true, // Use enrichedData JSON field for storing champion flag if needed
       },
     });
 
@@ -211,7 +205,7 @@ export async function GET(
       
       const engagementScore = computeEngagementScore(contact.id, contactActivities, contactVisits);
       const lastEngagement = getLastEngagement(contact.id, contactActivities, contactVisits);
-      const roleTag = deriveRoleTag(contact.title, contact.notes);
+      const roleTag = deriveRoleTag(contact.title, contact.enrichedData);
 
       return {
         id: contact.id,
