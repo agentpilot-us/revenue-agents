@@ -224,35 +224,34 @@ export async function GET(
       }
     });
 
-    // Fetch content library changes for Tier 2
+    // Fetch content library changes for Tier 2 (ContentLibrary is user-scoped via userId)
     const contentChanges = await prisma.contentLibrary.findMany({
       where: {
-        company: { some: { id: companyId } },
+        userId: session.user.id,
         previousContent: { not: null },
         scrapedAt: { gte: startDate },
       },
       select: {
         id: true,
         title: true,
-        markdown: true,
-        fullText: true,
+        content: true,
         previousContent: true,
         scrapedAt: true,
       },
       orderBy: { scrapedAt: 'desc' },
     });
 
-    contentChanges.forEach(content => {
-      const contentText = content.markdown || content.fullText || '';
+    contentChanges.forEach(item => {
+      const contentText = typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? '');
       if (strategicKeywords.test(contentText)) {
         signals.push({
           tier: 2,
-          date: content.scrapedAt.toISOString(),
-          headline: `Strategic content change detected: ${content.title}`,
+          date: item.scrapedAt.toISOString(),
+          headline: `Strategic content change detected: ${item.title}`,
           description: 'Content update suggests new initiatives or strategic direction',
           cta: {
             label: 'Review changes',
-            action: `content:${content.id}`,
+            action: `content:${item.id}`,
           },
           metadata: {},
         });
