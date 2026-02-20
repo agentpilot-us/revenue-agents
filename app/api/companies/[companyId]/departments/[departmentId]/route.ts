@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
-function toJsonValue(v: unknown): Prisma.InputJsonValue {
+function toJsonValue(v: unknown) {
   return v === null ? Prisma.JsonNull : (v as Prisma.InputJsonValue);
 }
 
