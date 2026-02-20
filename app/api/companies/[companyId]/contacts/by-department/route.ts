@@ -128,9 +128,9 @@ export async function GET(
     if (unassignedContacts.length > 0) {
       result.push({
         department: {
-          id: null,
+          id: null as string | null,
           name: 'Unassigned',
-          type: null,
+          type: null as string | null,
           targetRoles: null,
         },
         contacts: unassignedContacts.map((c) => ({
