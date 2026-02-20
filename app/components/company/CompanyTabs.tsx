@@ -41,6 +41,7 @@ type CompanyTabsProps = {
   companyName: string;
   companyData?: {
     industry: string | null;
+    domain: string | null;
     website: string | null;
     employees: string | null;
     headquarters: string | null;
@@ -108,6 +109,7 @@ const TABS: { id: TabId; label: string }[] = [
 export function CompanyTabs({
   companyId,
   companyName,
+  companyData,
   departments,
   matrixDepartments,
   catalogProducts,

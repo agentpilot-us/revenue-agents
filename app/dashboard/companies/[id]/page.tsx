@@ -225,24 +225,6 @@ export default async function CompanyDetailPage({
       }
     : null;
 
-  const hasMessaging = !!accountMessaging;
-  const hasResearch = !!company.researchData;
-  const hasDepartments = departments.length > 0;
-  const hasContacts = company.contacts.length > 0;
-  const hasContent = contentCount > 0;
-  const hasCampaign = campaigns.length > 0;
-
-  const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
-    where: {
-      userId: session.user.id,
-      type: { in: [ContentType.UseCase, ContentType.SuccessStory] },
-      isActive: true,
-    },
-    select: { id: true, title: true, type: true },
-    orderBy: { title: 'asc' },
-    take: 100,
-  });
-
   const [segmentCampaigns, contentCount] = await Promise.all([
     prisma.segmentCampaign.findMany({
       where: { companyId: id, userId: session.user.id },
@@ -271,6 +253,24 @@ export default async function CompanyDetailPage({
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   }));
+
+  const hasMessaging = !!accountMessaging;
+  const hasResearch = !!company.researchData;
+  const hasDepartments = departments.length > 0;
+  const hasContacts = company.contacts.length > 0;
+  const hasContent = contentCount > 0;
+  const hasCampaign = campaigns.length > 0;
+
+  const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
+    where: {
+      userId: session.user.id,
+      type: { in: [ContentType.UseCase, ContentType.SuccessStory] },
+      isActive: true,
+    },
+    select: { id: true, title: true, type: true },
+    orderBy: { title: 'asc' },
+    take: 100,
+  });
 
   type DeptItem = (typeof departments)[number];
   const deptLabel = (d: { type: string; customName: string | null }) =>
@@ -425,6 +425,7 @@ export default async function CompanyDetailPage({
             companyName={company.name}
             companyData={{
               industry: company.industry,
+              domain: company.domain,
               website: company.website,
               employees: company.employees,
               headquarters: company.headquarters,

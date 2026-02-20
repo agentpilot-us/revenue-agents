@@ -200,7 +200,7 @@ function ContactRow({ contact }: { contact: Contact }) {
                     ? 'default'
                     : contact.enrichmentStatus === 'pending'
                       ? 'secondary'
-                      : 'destructive'
+                      : 'outline'
                 }
                 className="text-xs"
               >

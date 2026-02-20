@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { Prisma } from '@prisma/client';
+import { JSON_NOT_NULL } from '@/lib/prisma-json';
 
 type SignalTier = 1 | 2 | 3;
 
@@ -229,7 +229,7 @@ export async function GET(
     const contentChanges = await prisma.contentLibrary.findMany({
       where: {
         userId: session.user.id,
-        previousContent: { not: Prisma.JsonNull },
+        previousContent: JSON_NOT_NULL,
         scrapedAt: { gte: startDate },
       },
       select: {
@@ -238,6 +238,7 @@ export async function GET(
         content: true,
         previousContent: true,
         scrapedAt: true,
+        updatedAt: true,
       },
       orderBy: { scrapedAt: 'desc' },
     });
@@ -245,9 +246,10 @@ export async function GET(
     contentChanges.forEach(item => {
       const contentText = typeof item.content === 'string' ? item.content : JSON.stringify(item.content ?? '');
       if (strategicKeywords.test(contentText)) {
+        const date = item.scrapedAt ?? item.updatedAt;
         signals.push({
           tier: 2,
-          date: item.scrapedAt.toISOString(),
+          date: date.toISOString(),
           headline: `Strategic content change detected: ${item.title}`,
           description: 'Content update suggests new initiatives or strategic direction',
           cta: {

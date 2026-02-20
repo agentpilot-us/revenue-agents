@@ -42,6 +42,7 @@ type Props = {
   companyName: string;
   initialCampaigns: CampaignItem[];
   departments: DepartmentOption[];
+  companyData?: { name: string; website: string | null; keyInitiatives: string[] | null };
 };
 
 const TYPES = [
@@ -178,6 +179,7 @@ export function CampaignsTab({
           <CreateLandingPageFlow
             companyId={companyId}
             companyName={companyName}
+            companyData={companyData}
             departments={departments}
             scope={landingScope}
             setScope={setLandingScope}
@@ -563,6 +565,7 @@ function AddCampaignForm({
 export function CreateLandingPageFlow({
   companyId,
   companyName,
+  companyData,
   departments,
   scope,
   setScope,
@@ -588,6 +591,7 @@ export function CreateLandingPageFlow({
 }: {
   companyId: string;
   companyName: string;
+  companyData?: { name: string; website: string | null; keyInitiatives: string[] | null };
   departments: DepartmentOption[];
   scope: 'company' | 'segments';
   setScope: (v: 'company' | 'segments') => void;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { toJsonValue } from '@/lib/prisma-json';
 import { fetchSalesforceOpportunityData } from '@/lib/integrations/salesforce-opportunities';
 
 const CACHE_DURATION_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     await prisma.company.update({
       where: { id: companyId },
       data: {
-        salesforceOpportunityData: opportunityData ? (opportunityData as unknown as object) : null,
+        salesforceOpportunityData: toJsonValue(opportunityData ? (opportunityData as unknown as object) : null),
         salesforceLastSyncedAt: now,
       },
     });

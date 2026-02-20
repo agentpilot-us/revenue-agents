@@ -54,6 +54,12 @@ export default async function NewContentLibraryItemPage({
     Framework: 'Framework',
     FeatureRelease: 'Feature Release',
     ResourceLink: 'Resource Link',
+    SuccessStory: 'Success Story',
+    Persona: 'Persona',
+    Battlecard: 'Battlecard',
+    EmailContent: 'Email Content',
+    VideoLink: 'Video Link',
+    UploadedDocument: 'Uploaded Document',
   };
 
   return (

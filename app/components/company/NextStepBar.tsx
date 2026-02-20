@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Copy, BarChart3 } from 'lucide-react';
 
-type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns';
+type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns' | 'map' | 'expansion';
 
 type Props = {
   companyId: string;

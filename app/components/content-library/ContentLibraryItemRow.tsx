@@ -175,7 +175,7 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
         {updatedBadge && (
           <span
             className="shrink-0 px-2 py-0.5 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-            title={`Last updated: ${updatedAt.toLocaleDateString()}`}
+            title={updatedAt ? `Last updated: ${updatedAt.toLocaleDateString()}` : undefined}
           >
             {updatedBadge}
           </span>
