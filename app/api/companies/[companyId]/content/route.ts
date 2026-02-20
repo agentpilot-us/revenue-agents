@@ -89,7 +89,7 @@ export async function PUT(
     const { companyId } = await params;
     const body = await req.json();
     const departmentId = body.departmentId as string;
-    const contentType = body.contentType as 'email' | 'linkedin' | 'talk_track';
+    const contentType = body.contentType as string;
     const content = body.content as string;
 
     if (!departmentId || !contentType || content === undefined) {
