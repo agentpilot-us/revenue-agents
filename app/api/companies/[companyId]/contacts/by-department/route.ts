@@ -103,7 +103,28 @@ export async function GET(
     });
 
     // Format response
-    const result = departments.map((dept) => ({
+    type DepartmentGroup = {
+      department: {
+        id: string | null;
+        name: string;
+        type: string | null;
+        targetRoles: any;
+      };
+      contacts: Array<{
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        title: string | null;
+        email: string | null;
+        linkedinUrl: string | null;
+        personaName: string | null;
+        enrichmentStatus: string | null;
+        isWarm: boolean;
+        buyingRole: string | null;
+      }>;
+    };
+
+    const result: DepartmentGroup[] = departments.map((dept) => ({
       department: {
         id: dept.id,
         name: dept.customName || dept.type.replace(/_/g, ' '),
@@ -128,9 +149,9 @@ export async function GET(
     if (unassignedContacts.length > 0) {
       result.push({
         department: {
-          id: null as string | null,
+          id: null,
           name: 'Unassigned',
-          type: null as string | null,
+          type: null,
           targetRoles: null,
         },
         contacts: unassignedContacts.map((c) => ({
