@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
+
+function toJsonValue(v: unknown): Prisma.InputJsonValue {
+  return v === null ? Prisma.JsonNull : (v as Prisma.InputJsonValue);
+}
 
 const updateDepartmentSchema = z.object({
   valueProp: z.string().optional().nullable(),
@@ -55,9 +60,9 @@ export async function PATCH(
         ...(validated.valueProp !== undefined && { valueProp: validated.valueProp }),
         ...(validated.useCase !== undefined && { useCase: validated.useCase }),
         ...(validated.estimatedOpportunity !== undefined && { estimatedOpportunity: validated.estimatedOpportunity }),
-        ...(validated.objectionHandlers !== undefined && { objectionHandlers: validated.objectionHandlers }),
-        ...(validated.proofPoints !== undefined && { proofPoints: validated.proofPoints }),
-        ...(validated.targetRoles !== undefined && { targetRoles: validated.targetRoles }),
+        ...(validated.objectionHandlers !== undefined && { objectionHandlers: toJsonValue(validated.objectionHandlers) }),
+        ...(validated.proofPoints !== undefined && { proofPoints: toJsonValue(validated.proofPoints) }),
+        ...(validated.targetRoles !== undefined && { targetRoles: toJsonValue(validated.targetRoles) }),
       },
     });
 
