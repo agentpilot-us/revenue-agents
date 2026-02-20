@@ -6,16 +6,6 @@ import { GoogleSignInButton } from './GoogleSignInButton';
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
 
-function LogoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
-    </svg>
-  );
-}
-
 export default async function LoginPage({
   searchParams,
 }: {
@@ -40,9 +30,11 @@ export default async function LoginPage({
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <Link href="/" className="flex items-center gap-3 text-[#0a0a0f] hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#0066FF] via-[#00c2ff] to-[#7c3aed] rounded-lg flex items-center justify-center">
-              <LogoIcon />
-            </div>
+            <img
+              src="/agentpilot-logo.png"
+              alt=""
+              className="w-10 h-10 object-contain"
+            />
             <span className="text-xl font-bold">AgentPilot</span>
           </Link>
         </div>

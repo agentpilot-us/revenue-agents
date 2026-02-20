@@ -67,14 +67,29 @@ export async function runPerplexityResearchOnly(
     orderBy: { name: 'asc' },
   });
 
-  if (catalogProducts.length === 0) {
+  const contentLibraryProductsFirst =
+    catalogProducts.length === 0
+      ? await prisma.product.findMany({
+          where: { userId },
+          select: { name: true, description: true },
+          orderBy: { name: 'asc' },
+        })
+      : [];
+
+  const productNamesForQuery =
+    catalogProducts.length > 0
+      ? catalogProducts.map((p) => p.name).join(', ')
+      : contentLibraryProductsFirst.map((p) => p.name).join(', ');
+
+  if (productNamesForQuery.length === 0) {
     return {
       ok: false,
-      error: 'No catalog products found. Please set up your products first.',
+      error:
+        'No products found. Add products in Your company data (Products) or set up catalog products first.',
     };
   }
 
-  const productNames = catalogProducts.map((p) => p.name).join(', ');
+  const productNames = productNamesForQuery;
   const researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
 
 1. COMPANY BASICS: official name, website, industry, employee count, headquarters, annual revenue
@@ -141,7 +156,7 @@ export async function structureResearchWithClaude(
       };
     }
 
-    const catalogProducts = await prisma.catalogProduct.findMany({
+    const catalogProductsStruct = await prisma.catalogProduct.findMany({
       where: { userId } as { userId: string },
       select: {
         name: true,
@@ -154,25 +169,45 @@ export async function structureResearchWithClaude(
       orderBy: { name: 'asc' },
     });
 
-    if (catalogProducts.length === 0) {
+    const contentLibraryProductsStruct =
+      catalogProductsStruct.length === 0
+        ? await prisma.product.findMany({
+            where: { userId },
+            select: { name: true, description: true },
+            orderBy: { name: 'asc' },
+          })
+        : [];
+
+    const catalogForPrompt =
+      catalogProductsStruct.length > 0
+        ? catalogProductsStruct.map((p) => ({
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            priceMin: p.priceMin != null ? Number(p.priceMin) : null,
+            priceMax: p.priceMax != null ? Number(p.priceMax) : null,
+            targetDepartments: p.targetDepartments as string[] | null,
+          }))
+        : contentLibraryProductsStruct.map((p) => ({
+            name: p.name,
+            slug: p.name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'product',
+            description: p.description,
+            priceMin: null as number | null,
+            priceMax: null as number | null,
+            targetDepartments: [] as string[] | null,
+          }));
+
+    if (catalogForPrompt.length === 0) {
       return {
         ok: false,
-        error: 'No catalog products found. Please set up your products first.',
+        error:
+          'No products found. Add products in Your company data (Products) or set up catalog products first.',
       };
     }
 
-    const catalogForPrompt = catalogProducts.map((p) => ({
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      priceMin: p.priceMin != null ? Number(p.priceMin) : null,
-      priceMax: p.priceMax != null ? Number(p.priceMax) : null,
-      targetDepartments: p.targetDepartments as string[] | null,
-    }));
-
     const sellerDescription = process.env.SELLER_COMPANY_DESCRIPTION ?? null;
 
-    const ragProductNames = catalogProducts.map((p) => p.name).join(' ');
+    const ragProductNames = catalogForPrompt.map((p) => p.name).join(' ');
     const ragQuery = `${companyName} ${ragProductNames} value proposition use cases proof`;
     const [relevantChunks, allChunks] = await Promise.all([
       findRelevantContentLibraryChunks(userId, ragQuery, 24),
@@ -336,7 +371,7 @@ export async function researchCompanyForAccount(
       };
     }
 
-    // Step 2: Load catalog products (only this user's products — not legacy/NVIDIA seed)
+    // Step 2: Load catalog products, or fall back to Content Library Products (Your company data → Products)
     const catalogProducts = await prisma.catalogProduct.findMany({
       where: { userId } as { userId: string },
       select: {
@@ -350,15 +385,44 @@ export async function researchCompanyForAccount(
       orderBy: { name: 'asc' },
     });
 
-    if (catalogProducts.length === 0) {
+    const contentLibraryProducts =
+      catalogProducts.length === 0
+        ? await prisma.product.findMany({
+            where: { userId },
+            select: { name: true, description: true },
+            orderBy: { name: 'asc' },
+          })
+        : [];
+
+    const productsForResearch =
+      catalogProducts.length > 0
+        ? catalogProducts.map((p) => ({
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            priceMin: p.priceMin != null ? Number(p.priceMin) : null,
+            priceMax: p.priceMax != null ? Number(p.priceMax) : null,
+            targetDepartments: p.targetDepartments as string[] | null,
+          }))
+        : contentLibraryProducts.map((p) => ({
+            name: p.name,
+            slug: p.name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'product',
+            description: p.description,
+            priceMin: null as number | null,
+            priceMax: null as number | null,
+            targetDepartments: [] as string[] | null,
+          }));
+
+    if (productsForResearch.length === 0) {
       return {
         ok: false,
-        error: 'No catalog products found. Please set up your products first.',
+        error:
+          'No products found. Add products in Your company data (Products) or set up catalog products first.',
       };
     }
 
     // Step 3: Research target company via Perplexity
-    const productNames = catalogProducts.map((p) => p.name).join(', ');
+    const productNames = productsForResearch.map((p) => p.name).join(', ');
 
     const researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
 
@@ -387,21 +451,14 @@ Focus on finding specific, actionable intelligence that would help a B2B sales r
     }
 
     // Step 4: Synthesize with LLM (new schema: value props, use cases, objection handlers per segment)
-    const catalogForPrompt = catalogProducts.map((p) => ({
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      priceMin: p.priceMin != null ? Number(p.priceMin) : null,
-      priceMax: p.priceMax != null ? Number(p.priceMax) : null,
-      targetDepartments: p.targetDepartments as string[] | null,
-    }));
+    const catalogForPrompt = productsForResearch;
 
     // Company name/website come from company setup only (required above)
     const sellerDescription =
       process.env.SELLER_COMPANY_DESCRIPTION ?? null;
 
     // RAG: relevant chunks + full set so agent has access to all uploaded file data
-    const ragProductNames = catalogProducts.map((p) => p.name).join(' ');
+    const ragProductNames = productsForResearch.map((p) => p.name).join(' ');
     const ragQuery = `${companyName} ${ragProductNames} value proposition use cases proof`;
     const [relevantChunks, allChunks] = await Promise.all([
       findRelevantContentLibraryChunks(userId, ragQuery, 24),

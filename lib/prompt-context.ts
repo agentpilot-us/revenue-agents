@@ -183,6 +183,26 @@ export async function getIndustryPlaybookBlock(
 }
 
 /**
+ * Build a short prompt block from the user's Content Library Products (Product model).
+ * Used so the agent can reference products added via "Your company data" → Products.
+ */
+export async function getContentLibraryProductsBlock(userId: string): Promise<string | null> {
+  const products = await prisma.product.findMany({
+    where: { userId },
+    select: { name: true, description: true, category: true },
+    orderBy: { name: 'asc' },
+  });
+  if (products.length === 0) return null;
+  const lines = ['COMPANY DATA — PRODUCTS (from Your company data):'];
+  for (const p of products) {
+    const desc = p.description?.trim() ? ` — ${p.description}` : '';
+    const cat = p.category?.trim() ? ` [${p.category}]` : '';
+    lines.push(`- ${p.name}${cat}${desc}`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Get structured value props for a department from the user's industry playbook.
  * Returns headline, pitch, bullets, cta for use in campaign prefill and generate-draft.
  */

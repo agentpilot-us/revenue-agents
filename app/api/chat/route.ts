@@ -16,6 +16,7 @@ import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-p
 import {
   getProductKnowledgeBlock,
   getIndustryPlaybookBlock,
+  getContentLibraryProductsBlock,
   getCaseStudiesBlock,
   getRelevantProductIdsForIndustry,
   getCompanyEventsBlock,
@@ -405,14 +406,14 @@ When drafting emails or messages:
     );
     
     // Feature releases and product announcements
-    const featureReleasesBlock = await getFeatureReleasesBlock(
-      session.user.id,
-      company?.industry ?? null,
-      10
-    );
-    
+    const [featureReleasesBlock, contentLibraryProductsBlock] = await Promise.all([
+      getFeatureReleasesBlock(session.user.id, company?.industry ?? null, 10),
+      getContentLibraryProductsBlock(session.user.id),
+    ]);
+
     const productKnowledgeSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
     const industryPlaybookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
+    const contentLibraryProductsSection = contentLibraryProductsBlock ? `\n\n${contentLibraryProductsBlock}` : '';
     const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
     const companyEventsSection = companyEventsBlock ? `\n\n${companyEventsBlock}` : '';
     const featureReleasesSection = featureReleasesBlock ? `\n\n${featureReleasesBlock}` : '';
@@ -554,6 +555,7 @@ ACCOUNT ACTIVITY TRACKING:
 Parse research and save to database: When the user asks "what departments are interested in [product] and why?" (e.g. a product from your catalog): (1) call research_company with a query about that company and product interest, (2) call apply_department_product_research with the Current company ID and the research summary (and optional productFocus). That extracts departments and product interests with value prop and writes them to the account. Then summarize what was added. When the user pastes a block of research text (earnings notes, LinkedIn research, etc.) and wants it ingested: call apply_department_product_research with the Current company ID and the pasted text; then confirm what was created or updated.
 ${productKnowledgeSection}
 ${industryPlaybookSection}
+${contentLibraryProductsSection}
 ${caseStudiesSection}
 ${companyEventsSection}
 ${featureReleasesSection}

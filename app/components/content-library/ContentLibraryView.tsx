@@ -190,6 +190,12 @@ export async function ContentLibraryView({ company }: Props) {
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mt-6">
         <div className="flex justify-between items-center mb-3">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Products</h2>
+          <Link
+            href="/dashboard/content-library/products/new"
+            className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            + Create new
+          </Link>
         </div>
         {products.length > 0 ? (
           <ul className="space-y-2">
@@ -215,7 +221,16 @@ export async function ContentLibraryView({ company }: Props) {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No products yet.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No products yet.{' '}
+            <Link
+              href="/dashboard/content-library/products/new"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Create one
+            </Link>
+            .
+          </p>
         )}
       </div>
 
@@ -223,6 +238,12 @@ export async function ContentLibraryView({ company }: Props) {
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mt-6">
         <div className="flex justify-between items-center mb-3">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Industry Playbooks</h2>
+          <Link
+            href="/dashboard/content-library/industry-playbooks/new"
+            className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            + Create new
+          </Link>
         </div>
         {playbooks.length > 0 ? (
           <ul className="space-y-2">
@@ -243,7 +264,16 @@ export async function ContentLibraryView({ company }: Props) {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No industry playbooks yet.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No industry playbooks yet.{' '}
+            <Link
+              href="/dashboard/content-library/industry-playbooks/new"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Create one
+            </Link>
+            .
+          </p>
         )}
       </div>
     </div>
