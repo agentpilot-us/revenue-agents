@@ -21,7 +21,7 @@ interface Props {
 
 export function WarmContacts({ data }: Props) {
   return (
-    <Card className="p-6 bg-zinc-800/50 border-slate-700">
+    <div className="p-6 bg-zinc-800/50 border border-slate-700 rounded-lg">
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-slate-100 mb-1">Warm Contacts</h2>
         <p className="text-sm text-slate-400">
