@@ -30,7 +30,11 @@ export default async function CompanyDetailPage({
           ? 'contacts'
           : tabParam === 'content'
             ? 'content'
-            : undefined;
+            : tabParam === 'map'
+              ? 'map'
+              : tabParam === 'expansion'
+                ? 'expansion'
+                : undefined;
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     select: {

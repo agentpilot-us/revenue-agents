@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
 import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
@@ -16,8 +16,12 @@ import { ActivityTimeline } from '@/app/components/company/ActivityTimeline';
 import { NextStepBar } from '@/app/components/company/NextStepBar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AccountMap } from '@/components/account/AccountMap';
+import { ExpansionCanvas } from '@/components/account/ExpansionCanvas';
+import { SignalDigest } from '@/app/components/company/SignalDigest';
+import { useRouter } from 'next/navigation';
 
-type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns';
+type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns' | 'map' | 'expansion';
 
 type AccountMessagingData = {
   id: string;
@@ -97,6 +101,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'activity', label: 'Activity' },
   { id: 'messaging', label: 'Messaging' },
   { id: 'campaigns', label: 'Sales Page' },
+  { id: 'map', label: 'Account Map' },
+  { id: 'expansion', label: 'Expansion' },
 ];
 
 export function CompanyTabs({
@@ -124,6 +130,8 @@ export function CompanyTabs({
     if (initialTab === 'campaigns') setActiveTab('campaigns');
     if (initialTab === 'contacts') setActiveTab('contacts');
     if (initialTab === 'content') setActiveTab('content');
+    if (initialTab === 'map') setActiveTab('map');
+    if (initialTab === 'expansion') setActiveTab('expansion');
   }, [initialTab]);
 
   const setTab = (tabId: TabId) => {
@@ -351,18 +359,18 @@ export function CompanyTabs({
             keyInitiatives: companyData.keyInitiatives,
           } : undefined}
         />
+      )}
 
       {activeTab === 'activity' && (
-        <ActivityTimeline
-          companyId={companyId}
-          initialActivities={activities}
-          departments={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
-            id: d.id,
-            customName: d.customName ?? null,
-            type: d.type,
-          }))}
-          contacts={contacts}
-        />
+        <SignalDigestTab companyId={companyId} companyName={companyName} />
+      )}
+
+      {activeTab === 'map' && (
+        <AccountMapTab companyId={companyId} companyName={companyName} domain={companyData?.domain || undefined} />
+      )}
+
+      {activeTab === 'expansion' && (
+        <ExpansionCanvasTab companyId={companyId} companyName={companyName} />
       )}
     </div>
   );
@@ -396,6 +404,114 @@ function ResearchWithAIButton({ companyId }: { companyId: string }) {
       {researching ? 'Researching...' : 'Research with AI'}
     </Button>
   );
+}
+
+function AccountMapTab({ companyId, companyName, domain }: { companyId: string; companyName: string; domain?: string }) {
+  const router = useRouter();
+  const [data, setData] = React.useState<{ account: { name: string; domain?: string }; microsegments: any[]; contacts: any[] } | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch(`/api/companies/${companyId}/account-map`);
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (error) {
+        console.error('Failed to fetch account map data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [companyId]);
+
+  if (loading) {
+    return <div className="p-6 text-center text-gray-500">Loading account map...</div>;
+  }
+
+  if (!data) {
+    return <div className="p-6 text-center text-red-500">Failed to load account map data</div>;
+  }
+
+  return (
+    <AccountMap
+      accountName={data.account.name}
+      domain={data.account.domain || domain}
+      microsegments={data.microsegments}
+      contacts={data.contacts}
+      onOpenContactActivity={(contactId) => {
+        router.push(`/dashboard/companies/${companyId}/contacts/${contactId}`);
+      }}
+      onOpenSegmentPage={(segmentId) => {
+        router.push(`/dashboard/companies/${companyId}/segments/${segmentId}/page`);
+      }}
+      onOpenContactDiscovery={(segmentId) => {
+        router.push(`/dashboard/companies/${companyId}/discover-contacts?departmentId=${segmentId}`);
+      }}
+    />
+  );
+}
+
+function ExpansionCanvasTab({ companyId, companyName }: { companyId: string; companyName: string }) {
+  const router = useRouter();
+  const [data, setData] = React.useState<{ microsegments: any[] } | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch(`/api/companies/${companyId}/expansion-canvas`);
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (error) {
+        console.error('Failed to fetch expansion canvas data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [companyId]);
+
+  if (loading) {
+    return <div className="p-6 text-center text-gray-500">Loading expansion canvas...</div>;
+  }
+
+  if (!data) {
+    return <div className="p-6 text-center text-red-500">Failed to load expansion canvas data</div>;
+  }
+
+  return (
+    <ExpansionCanvas
+      accountName={companyName}
+      microsegments={data.microsegments}
+      onCreateSegmentPage={(segmentId) => {
+        router.push(`/dashboard/companies/${companyId}?tab=campaigns&departmentIds=${segmentId}`);
+      }}
+      onOpenSegmentPage={(segmentId, pageUrl) => {
+        if (pageUrl) {
+          window.open(pageUrl, '_blank');
+        } else {
+          router.push(`/dashboard/companies/${companyId}/segments/${segmentId}/page`);
+        }
+      }}
+      onOpenEngagementPlay={(segmentId) => {
+        router.push(`/dashboard/companies/${companyId}/segments/${segmentId}/engage`);
+      }}
+      onOpenChampionExpansion={(segmentId) => {
+        // TODO: Open champion expansion modal
+        router.push(`/chat?play=expansion&accountId=${companyId}&segmentId=${segmentId}`);
+      }}
+    />
+  );
+}
+
+function SignalDigestTab({ companyId, companyName }: { companyId: string; companyName: string }) {
+  return <SignalDigest companyId={companyId} companyName={companyName} days={7} />;
 }
 
 function ExpansionStrategySection({

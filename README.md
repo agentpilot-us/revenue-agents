@@ -108,6 +108,20 @@ Visit `http://localhost:3000`
 - ✅ GitHub organization invitation automation
 - ✅ Customer portal (basic implementation)
 - ✅ Responsive design with Tailwind CSS
+- ✅ Account Intelligence & Expansion Enhancements (v1.1)
+  - Account Map view for strategic "who's who" per account
+  - Expansion Canvas for visualizing growth opportunities
+  - Signal Tiers & Digest View for prioritized account activity
+  - Champion-led and exec-level expansion plays
+
+## What Lives Where
+
+**AgentPilot is the strategic workbench:**
+- Intelligence: buying groups, contacts, engagement, signals
+- Expansion: microsegments, pages, plays
+
+**CRM is the ledger (optional sync v2+):**
+- Stages, pipeline values, ownership
 
 ## Deployment
 
