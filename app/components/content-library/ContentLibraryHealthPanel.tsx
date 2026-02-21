@@ -113,26 +113,6 @@ export function ContentLibraryHealthPanel() {
         ))}
       </div>
 
-      {(health.readyForDemo || health.readyForOutreach || health.readyForBuyingGroups) && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {health.readyForDemo && (
-            <span className="px-2 py-1 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-              Ready for demo
-            </span>
-          )}
-          {health.readyForOutreach && (
-            <span className="px-2 py-1 text-xs rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-              Ready for outreach
-            </span>
-          )}
-          {health.readyForBuyingGroups && (
-            <span className="px-2 py-1 text-xs rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-              Ready for buying groups
-            </span>
-          )}
-        </div>
-      )}
-
       {health.recommendations.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Top recommendations</h3>
@@ -158,8 +138,23 @@ export function ContentLibraryHealthPanel() {
   );
 }
 
+/** Display total per dimension: "have / total" so the second number is the total. Bars cap at 100%. */
+const DIMENSION_DISPLAY_TOTAL: Record<string, number> = {
+  'Value Propositions': 10,
+  'Product Capabilities': 10,
+  'Customer Proof Points': 10,
+  Differentiators: 10,
+  'Target Personas': 10,
+  'Case Studies': 10,
+  'Use Cases': 10,
+  'Pricing Stance': 1,
+};
+
 function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
   const [expanded, setExpanded] = useState(false);
+  const total = DIMENSION_DISPLAY_TOTAL[dimension.name] ?? 10;
+  const have = dimension.found;
+  const barPct = total > 0 ? Math.min(100, Math.round((have / total) * 100)) : 0;
   const statusColors = {
     complete: 'bg-green-500',
     partial: 'bg-amber-500',
@@ -171,7 +166,7 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
       <div className="flex justify-between mb-0.5">
         <span className="text-gray-700 dark:text-gray-300">{dimension.name}</span>
         <span className="text-gray-500 dark:text-gray-400">
-          {dimension.found}/{dimension.target}
+          {have}/{total}
           {dimension.pendingCount != null && dimension.pendingCount > 0 && (
             <span className="ml-1 text-amber-600 dark:text-amber-400">({dimension.pendingCount} pending)</span>
           )}
@@ -180,7 +175,7 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
       <div className="h-2 rounded-full bg-slate-100 dark:bg-zinc-700 overflow-hidden">
         <div
           className={`h-full rounded-full ${statusColors[dimension.status]}`}
-          style={{ width: `${Math.min(100, dimension.score)}%` }}
+          style={{ width: `${barPct}%` }}
         />
       </div>
       {hasItems && (
