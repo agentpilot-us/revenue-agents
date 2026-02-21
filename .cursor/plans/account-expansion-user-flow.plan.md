@@ -1,6 +1,6 @@
 ---
 name: Account Expansion User Flow
-overview: Guided user flow from company to shareable sales page: Account Intelligence page (research with real status, inline buying-group review, messaging), persistent Next Step bar (forward + complete + backwards), tab deep-linking, Content auto-generate, Sales Page live-on-create with undo, empty state, and error recovery per step.
+overview: "Guided user flow from company to shareable sales page: Account Intelligence page (research with real status, inline buying-group review, messaging), persistent Next Step bar (forward + complete + backwards), tab deep-linking, Content auto-generate, Sales Page live-on-create with undo, empty state, and error recovery per step."
 todos: []
 isProject: false
 ---
@@ -24,6 +24,7 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 **Problem**: Research takes 60–90s with two sequential calls (Perplexity then Claude). A generic spinner for 90s feels broken.
 
 **Change**: Surface two real states from the existing sequential code:
+
 - **"Researching [company name]..."** — when Perplexity is running.
 - **"Analyzing buying groups..."** — when Claude is structuring the output.
 
@@ -38,6 +39,7 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 **Problem**: ResearchReviewModal as the review surface creates a flow break — modal on top of a linear flow feels like an interruption. For one-click path, user doesn’t know if the modal is required or optional.
 
 **Change**:
+
 - **After research completes**: Show an **inline review panel** below the research area on the Intelligence page. List buying groups in place; user can edit inline (names, use cases, etc.) and clicks **"Looks good → Generate messaging"** (no modal).
 - **Keep the modal** only as a "Re-open research" / "Review research again" option for users who want to revisit later (e.g. from Overview or a link on the Intelligence page).
 
@@ -50,6 +52,7 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 **Problem**: Spec only defined forward progression. Users jump around (e.g. Sales Page before finding contacts, or regenerate messaging after a campaign is live). Bar must handle "you’re ahead of this step" and "all done."
 
 **Change**:
+
 - **Forward**: Next incomplete step — "Next: Find contacts" / "Next: Content" / "Next: Sales page" with **Continue →** to the right tab.
 - **Complete**: When all steps are done (research, departments, messaging, at least one contact, content for at least one dept, at least one live campaign), bar becomes **"Your page is live"** with two CTAs: **Copy URL** and **View Analytics** (no forward prompt).
 - **Backwards**: When user is on a tab they’ve already completed (e.g. on Contacts after launching a page), bar shows **current status** (e.g. "Contacts added", "Content ready") rather than pushing them to the next step. Optionally still show a small "Next: …" for the next step if there is one, but primary message is status.
@@ -81,6 +84,7 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 **Problem**: generate-draft → approve-draft is two steps. If copy is already good (grounded in buying group messaging), required approval adds friction. Target: "URL is in my clipboard" at 7:00, not "I see the copy, then I confirm."
 
 **Change**: Make the approval step **opt-out**, not required.
+
 - **Generate draft** → create the campaign **live immediately** (or create in "preview" state that is publicly viewable with a slug).
 - Show the new page with a **30-second "Undo"** window (e.g. "Undo launch" or "Revert to draft") similar to Notion/Linear. URL exists and can be copied right away.
 - User can **edit copy after** launch from the campaign edit UI. No mandatory "approve" click before the URL works.
@@ -94,6 +98,7 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 **Problem**: Spec covered transitions but not what a brand new user sees on the Intelligence page before doing anything — often a blank or near-blank page with only a Research button.
 
 **Change**: Add a short **guided empty state**:
+
 - Under the company name (or at top of the main card), show **two sentences**: what will happen when they click Research (what to expect), how long it typically takes, and what they’ll have at the end (e.g. "We’ll research [company] and suggest buying groups. This usually takes about 2 minutes. You’ll then review segments and generate messaging.").
 - Keeps first impression clear and sets expectations so the Research click feels intentional.
 
@@ -107,13 +112,15 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 
 **Change**: Add explicit **error states and retry** per step:
 
-| Step | Failure case | Recovery |
-|------|----------------|----------|
-| Research | Perplexity fails / timeout | Show message: "Research didn’t complete. [Retry] or try again in a few minutes." Do not leave a broken spinner. |
-| Research | Claude timeout / error | Same: clear message + Retry. Optionally "Save what we have" if Perplexity data is stored and can be re-run through Claude later. |
-| Find Contacts | PhantomBuster returns zero results | Message: "No contacts found for this group. Try a different buying group or add contacts manually." Link to manual add. No dead end. |
-| Content generate | API error | "Couldn’t generate copy. [Retry]." Keep existing content if any. |
-| Sales Page / launch | generate-draft or approve fails | "Couldn’t create page. [Retry]." Preserve draft if created. |
+
+| Step                | Failure case                       | Recovery                                                                                                                             |
+| ------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Research            | Perplexity fails / timeout         | Show message: "Research didn’t complete. [Retry] or try again in a few minutes." Do not leave a broken spinner.                      |
+| Research            | Claude timeout / error             | Same: clear message + Retry. Optionally "Save what we have" if Perplexity data is stored and can be re-run through Claude later.     |
+| Find Contacts       | PhantomBuster returns zero results | Message: "No contacts found for this group. Try a different buying group or add contacts manually." Link to manual add. No dead end. |
+| Content generate    | API error                          | "Couldn’t generate copy. [Retry]." Keep existing content if any.                                                                     |
+| Sales Page / launch | generate-draft or approve fails    | "Couldn’t create page. [Retry]." Preserve draft if created.                                                                          |
+
 
 **Where**: Same files as each step (ResearchButton / AccountIntelligenceClient, FindContactsModal, ContentTab, CampaignsTab). Ensure every async path has catch + user-visible message + Retry or fallback action. No silent failures.
 
@@ -141,13 +148,16 @@ Clear, linear path from **company name** to **shareable sales page URL**. Steps 
 
 ## File summary
 
-| Area | New | Modified |
-|------|-----|----------|
-| Research status | — | Research flow (split or status API), [ResearchButton.tsx](app/components/company/ResearchButton.tsx), [AccountIntelligenceClient.tsx](app/dashboard/companies/[id]/intelligence/AccountIntelligenceClient.tsx) |
-| Inline review | Inline panel in AccountIntelligenceClient | [AccountIntelligenceClient.tsx](app/dashboard/companies/[id]/intelligence/AccountIntelligenceClient.tsx), [ResearchReviewModal.tsx](app/components/company/ResearchReviewModal.tsx) (re-open only) |
-| Next Step bar | NextStepBar.tsx | [companies/[id]/page.tsx](app/dashboard/companies/[id]/page.tsx) |
-| Tab URL | — | [CompanyTabs.tsx](app/components/company/CompanyTabs.tsx), [companies/[id]/page.tsx](app/dashboard/companies/[id]/page.tsx) |
-| Content | — | [ContentTab.tsx](app/components/company/ContentTab.tsx) |
-| Sales Page | — | [CampaignsTab.tsx](app/components/company/CampaignsTab.tsx), campaigns generate-draft/approve-draft or equivalent |
-| Empty state | — | [AccountIntelligenceClient.tsx](app/dashboard/companies/[id]/intelligence/AccountIntelligenceClient.tsx) |
-| Error recovery | — | ResearchButton, AccountIntelligenceClient, FindContactsModal, ContentTab, CampaignsTab |
+
+| Area            | New                                       | Modified                                                                                                                                                                                                       |
+| --------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Research status | —                                         | Research flow (split or status API), [ResearchButton.tsx](app/components/company/ResearchButton.tsx), [AccountIntelligenceClient.tsx](app/dashboard/companies/[id]/intelligence/AccountIntelligenceClient.tsx) |
+| Inline review   | Inline panel in AccountIntelligenceClient | [AccountIntelligenceClient.tsx](app/dashboard/companies/[id]/intelligence/AccountIntelligenceClient.tsx), [ResearchReviewModal.tsx](app/components/company/ResearchReviewModal.tsx) (re-open only)             |
+| Next Step bar   | NextStepBar.tsx                           | [companies/[id]/page.tsx](app/dashboard/companies/[id]/page.tsx)                                                                                                                                               |
+| Tab URL         | —                                         | [CompanyTabs.tsx](app/components/company/CompanyTabs.tsx), [companies/[id]/page.tsx](app/dashboard/companies/[id]/page.tsx)                                                                                    |
+| Content         | —                                         | [ContentTab.tsx](app/components/company/ContentTab.tsx)                                                                                                                                                        |
+| Sales Page      | —                                         | [CampaignsTab.tsx](app/components/company/CampaignsTab.tsx), campaigns generate-draft/approve-draft or equivalent                                                                                              |
+| Empty state     | —                                         | [AccountIntelligenceClient.tsx](app/dashboard/companies/[id]/intelligence/AccountIntelligenceClient.tsx)                                                                                                       |
+| Error recovery  | —                                         | ResearchButton, AccountIntelligenceClient, FindContactsModal, ContentTab, CampaignsTab                                                                                                                         |
+
+

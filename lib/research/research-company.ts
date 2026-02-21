@@ -260,6 +260,8 @@ ${perplexitySummary}
 
 ${contentLibraryNote}
 
+CRITICAL: COMPANY BASICS (employees, headquarters, revenue) must be taken ONLY from the RESEARCH DATA above for ${companyName}. Do not use example numbers, placeholders from the schema, or any other company's data. If the research does not state a value, omit that field or use "Not disclosed".
+
 Now produce the full account intelligence brief per the schema. For each micro-segment:
 - Write a value proposition that references ${companyName}'s specific context and initiatives
 - List 2–3 concrete use cases (useCasesAtThisCompany) showing HOW they would use our products
@@ -510,6 +512,8 @@ RESEARCH DATA (from web search):
 ${perplexityResult.summary}
 
 ${contentLibraryNote}
+
+CRITICAL: COMPANY BASICS (employees, headquarters, revenue) must be taken ONLY from the RESEARCH DATA above for ${companyName}. Do not use example numbers, placeholders from the schema, or any other company's data. If the research does not state a value, omit that field or use "Not disclosed".
 
 Now produce the full account intelligence brief per the schema. For each micro-segment:
 - Write a value proposition that references ${companyName}'s specific context and initiatives

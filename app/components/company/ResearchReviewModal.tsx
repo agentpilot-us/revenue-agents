@@ -69,11 +69,7 @@ export function ResearchReviewModal({
   const [microSegments, setMicroSegments] = useState(data.microSegments ?? []);
   const [newShapePayload, setNewShapePayload] = useState<CompanyResearchData | null>(isNewShape ? (data as CompanyResearchData) : null);
 
-  const productFitList = Array.isArray(data.productFit)
-    ? data.productFit
-    : Array.isArray((data as unknown as { nvidiaProductFit?: unknown }).nvidiaProductFit)
-      ? (data as unknown as { nvidiaProductFit: { product: string; useCase: string; whyRelevant: string }[] }).nvidiaProductFit
-      : [];
+  const productFitList = Array.isArray(data.productFit) ? data.productFit : [];
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -256,7 +252,7 @@ export function ResearchReviewModal({
                 <Input
                   value={companyBasics.employees || ''}
                   onChange={(e) => setCompanyBasics({ ...companyBasics, employees: e.target.value })}
-                  placeholder="e.g., ~167,000"
+                  placeholder="e.g., ~5,000 or 500–1,000"
                   className="bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
                 />
               </div>
@@ -278,7 +274,7 @@ export function ResearchReviewModal({
                 <Input
                   value={companyBasics.revenue || ''}
                   onChange={(e) => setCompanyBasics({ ...companyBasics, revenue: e.target.value })}
-                  placeholder="e.g., $171.8B (2024)"
+                  placeholder="e.g., $500M (2024)"
                   className="bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100"
                 />
               </div>

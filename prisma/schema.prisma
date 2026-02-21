@@ -116,9 +116,9 @@ model Company {
   hubspotId    String? // HubSpot company Id when crmSource = hubspot
 
   // AI Research fields
-  employees             String? // e.g., "~167,000"
+  employees             String? // e.g., "~5,000"
   headquarters          String? // e.g., "Detroit, Michigan"
-  revenue               String? // e.g., "$171.8B (2024)"
+  revenue               String? // e.g., "$500M (2024)"
   businessOverview      String? @db.Text // "What they do" summary
   keyInitiatives        Json? // Array of initiative strings
   researchData          Json? // Store raw AI research response for reference

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import { DepartmentType, Prisma } from '@prisma/client';
 import { ContentType } from '@prisma/client';
 
@@ -76,8 +77,10 @@ YOUR TASK: ACCOUNT INTELLIGENCE SYNTHESIS
 Given the target company research below, produce the following sections:
 
 1. COMPANY BASICS
-   Extract: companyName, website, industry, employees (e.g. "~167,000"),
-   headquarters, revenue (e.g. "$171.8B (2024)").
+   Extract ONLY from the research data provided: companyName, website, industry,
+   employees (e.g. "~5,000" or "500–1,000"), headquarters (e.g. "San Francisco, CA"),
+   revenue (e.g. "$500M (2024)"). If the research does not state a value, omit the field
+   or use "Not disclosed" — never use example numbers from this prompt.
 
 2. BUSINESS OVERVIEW
    businessOverview: 2–3 sentence summary of what they do. keyInitiatives: specific,
@@ -430,6 +433,13 @@ export async function getCompanyResearchPromptBlock(
         lines.push(`  Products: ${productNames}`);
       }
     });
+  }
+
+  // Include account-level why-this-company messaging so chat/drafts use it
+  const accountMessagingBlock = await getAccountMessagingPromptBlock(companyId, userId);
+  if (accountMessagingBlock) {
+    lines.push('\n');
+    lines.push(accountMessagingBlock);
   }
 
   lines.push('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

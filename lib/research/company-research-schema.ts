@@ -127,12 +127,15 @@ export const companyResearchSchema = z.object({
   employees: z
     .string()
     .optional()
-    .describe('Employee count as a string, e.g. "~167,000" or "500–1,000"'),
-  headquarters: z.string().optional().describe('HQ location, e.g. "Santa Clara, CA"'),
+    .describe('Employee count from research only, e.g. "~5,000" or "500–1,000". Omit if not in research.'),
+  headquarters: z
+    .string()
+    .optional()
+    .describe('HQ city/region from research only, e.g. "San Francisco, CA". Omit if not in research.'),
   revenue: z
     .string()
     .optional()
-    .describe('Annual revenue as a string, e.g. "$171.8B (2024)"'),
+    .describe('Annual revenue from research only, e.g. "$500M (2024)". Omit if not in research.'),
 
   businessOverview: z
     .string()

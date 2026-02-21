@@ -82,6 +82,7 @@ export async function POST(
     if (isNewSchema(body)) {
       const researchData = companyResearchSchema.parse(body);
 
+      // Write employees, headquarters, revenue as top-level Company fields (not only researchData)
       await prisma.company.update({
         where: { id: companyId },
         data: {
@@ -172,6 +173,7 @@ export async function POST(
     } else {
       const researchData = legacyResearchSchema.parse(body);
 
+      // Write employees, headquarters, revenue as top-level Company fields (not only researchData)
       await prisma.company.update({
         where: { id: companyId },
         data: {
