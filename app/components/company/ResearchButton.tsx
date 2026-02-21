@@ -11,9 +11,11 @@ type Props = {
   companyName: string;
   /** When set, research result is passed here instead of opening the modal (e.g. for inline review on Intelligence page). */
   onComplete?: (data: unknown) => void;
+  /** Optional button label when not researching (default: "Research with AI"). Use e.g. "Re-run research" for step 2. */
+  label?: string;
 };
 
-export function ResearchButton({ companyId, companyName, onComplete }: Props) {
+export function ResearchButton({ companyId, companyName, onComplete, label = 'Research with AI' }: Props) {
   const [researchStatus, setResearchStatus] = useState<ResearchStatus>(null);
   const [researchData, setResearchData] = useState<unknown>(null);
   const [showModal, setShowModal] = useState(false);
@@ -81,7 +83,7 @@ export function ResearchButton({ companyId, companyName, onComplete }: Props) {
         ) : (
           <>
             <span className="mr-2">🔍</span>
-            Research with AI
+            {label}
           </>
         )}
       </Button>

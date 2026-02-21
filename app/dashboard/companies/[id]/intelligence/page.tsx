@@ -29,7 +29,7 @@ export default async function AccountIntelligencePage({
   if (!company) notFound();
 
   const hasResearch = !!company.researchData;
-  const departmentCount = company._count?.departments ?? 0;
+  const departmentCount = company._count.departments ?? 0;
   const hasDepartments = departmentCount > 0;
   const hasMessaging = !!company.accountMessaging;
 

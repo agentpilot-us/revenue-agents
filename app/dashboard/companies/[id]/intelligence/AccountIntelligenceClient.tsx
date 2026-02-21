@@ -38,11 +38,13 @@ export function AccountIntelligenceClient({
 
   const showBanner = researchDone && hasResearch && !bannerDismissed;
 
+  // Scroll to step 2 when landing with ?researchDone=1; clear URL so banner doesn't reappear on refresh.
+  // bannerDismissed intentionally omitted from deps — we only want to run once when researchDone is true.
   useEffect(() => {
     if (!researchDone || !hasResearch) return;
     step2Ref.current?.scrollIntoView({ behavior: 'smooth' });
-    setBannerDismissed(true);
     router.replace(pathname ?? `/dashboard/companies/${companyId}/intelligence`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on researchDone; banner stays until user dismisses or URL replace hides it
   }, [researchDone, hasResearch, pathname, companyId, router]);
 
   const handleDismissBanner = () => {
@@ -209,6 +211,7 @@ export function AccountIntelligenceClient({
             <ResearchButton
               companyId={companyId}
               companyName={companyName}
+              label={hasResearch ? 'Re-run research' : undefined}
               onComplete={(data) => {
                 const parsed = data as CompanyResearchData;
                 if (parsed && Array.isArray(parsed.microSegments) && parsed.microSegments.length > 0) {
@@ -217,7 +220,7 @@ export function AccountIntelligenceClient({
               }}
             />
             {hasResearch && (
-              <span className="text-sm text-slate-500">Run again to edit segments.</span>
+              <span className="text-sm text-slate-500">Update segments.</span>
             )}
           </div>
           {pendingResearchData && (
