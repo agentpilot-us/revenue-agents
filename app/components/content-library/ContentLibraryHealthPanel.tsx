@@ -8,6 +8,20 @@ import type {
   ContentHealthRecommendation,
 } from '@/lib/content-library/structured-extraction';
 
+/** Event dispatched when content is confirmed/approved so the health panel refetches. */
+export const CONTENT_LIBRARY_HEALTH_INVALIDATE = 'content-library-health-invalidate';
+
+function fetchHealth(): Promise<ContentHealthScore> {
+  return fetch('/api/content-library/health').then((res) => {
+    if (!res.ok) {
+      return res.json().catch(() => ({})).then((data) => {
+        throw new Error(data.error || 'Failed to load health');
+      });
+    }
+    return res.json();
+  });
+}
+
 export function ContentLibraryHealthPanel() {
   const [health, setHealth] = useState<ContentHealthScore | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,12 +31,7 @@ export function ContentLibraryHealthPanel() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/content-library/health');
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to load health');
-        }
-        const data = await res.json();
+        const data = await fetchHealth();
         if (!cancelled) setHealth(data);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
@@ -31,6 +40,19 @@ export function ContentLibraryHealthPanel() {
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      fetchHealth()
+        .then((data) => {
+          setHealth(data);
+          setError(null);
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'));
+    };
+    window.addEventListener(CONTENT_LIBRARY_HEALTH_INVALIDATE, handler);
+    return () => window.removeEventListener(CONTENT_LIBRARY_HEALTH_INVALIDATE, handler);
   }, []);
 
   if (loading) {
@@ -137,11 +159,13 @@ export function ContentLibraryHealthPanel() {
 }
 
 function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
+  const [expanded, setExpanded] = useState(false);
   const statusColors = {
     complete: 'bg-green-500',
     partial: 'bg-amber-500',
     missing: 'bg-slate-300 dark:bg-zinc-600',
   };
+  const hasItems = dimension.items?.length > 0;
   return (
     <div className="text-sm">
       <div className="flex justify-between mb-0.5">
@@ -159,6 +183,24 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
           style={{ width: `${Math.min(100, dimension.score)}%` }}
         />
       </div>
+      {hasItems && (
+        <>
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            {expanded ? 'Hide what we have' : 'View what we have'}
+          </button>
+          {expanded && (
+            <ul className="mt-1.5 pl-4 list-disc text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+              {dimension.items.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
 }

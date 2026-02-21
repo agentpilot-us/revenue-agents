@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { StructuredPageExtraction } from '@/lib/content-library/structured-extraction';
+import { CONTENT_LIBRARY_HEALTH_INVALIDATE } from '@/app/components/content-library/ContentLibraryHealthPanel';
 
 type Props = {
   id: string;
@@ -160,6 +161,7 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
         throw new Error(data.error || 'Confirm failed');
       }
       setShowConfirmCard(false);
+      window.dispatchEvent(new CustomEvent(CONTENT_LIBRARY_HEALTH_INVALIDATE));
       router.refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Confirm failed');

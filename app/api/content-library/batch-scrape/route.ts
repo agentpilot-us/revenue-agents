@@ -251,8 +251,19 @@ async function getHealthScore(userId: string) {
     department: item.department ?? undefined,
   }));
 
-  const firstUrl = items.find((i) => i.sourceUrl)?.sourceUrl;
-  const productUrl = firstUrl ? getOrigin(firstUrl) : undefined;
+  const canonicalOrigin = process.env.CONTENT_LIBRARY_PRODUCT_ORIGIN?.trim();
+  let productUrl: string | undefined;
+  if (canonicalOrigin) {
+    try {
+      productUrl = new URL(canonicalOrigin).origin;
+    } catch {
+      productUrl = undefined;
+    }
+  }
+  if (!productUrl) {
+    const firstUrl = items.find((i) => i.sourceUrl)?.sourceUrl;
+    productUrl = firstUrl ? getOrigin(firstUrl) : undefined;
+  }
 
   return scoreContentLibraryHealth(mapped, productUrl);
 }

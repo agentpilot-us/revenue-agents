@@ -43,13 +43,24 @@ export async function GET() {
       };
     });
 
+    // Prefer canonical product origin so recommendations point at the real site, not staging.
     let productUrl: string | undefined;
-    const firstWithUrl = rows.find((r) => r.sourceUrl);
-    if (firstWithUrl?.sourceUrl) {
+    const canonicalOrigin = process.env.CONTENT_LIBRARY_PRODUCT_ORIGIN?.trim();
+    if (canonicalOrigin) {
       try {
-        productUrl = new URL(firstWithUrl.sourceUrl).origin;
+        productUrl = new URL(canonicalOrigin).origin;
       } catch {
         productUrl = undefined;
+      }
+    }
+    if (!productUrl) {
+      const firstWithUrl = rows.find((r) => r.sourceUrl);
+      if (firstWithUrl?.sourceUrl) {
+        try {
+          productUrl = new URL(firstWithUrl.sourceUrl).origin;
+        } catch {
+          productUrl = undefined;
+        }
       }
     }
 

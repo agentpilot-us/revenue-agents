@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { StructuredPageExtraction } from '@/lib/content-library/structured-extraction';
+import { CONTENT_LIBRARY_HEALTH_INVALIDATE } from '@/app/components/content-library/ContentLibraryHealthPanel';
 
 type Mode = 'url' | 'site' | 'upload';
 
@@ -249,6 +250,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
               setHighValueLinks([]);
               setLowValueLinks([]);
               setSelectedUrls(new Set());
+              window.dispatchEvent(new CustomEvent(CONTENT_LIBRARY_HEALTH_INVALIDATE));
               refresh();
               setSuccess(`Saved ${event.saved} page(s).${event.failed > 0 ? ` ${event.failed} failed or skipped.` : ''}`);
             } else if (event.type === 'error') {
@@ -301,6 +303,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
       setSuccess(`Added ${data.created ?? 0} page(s).`);
       setReviewItems([]);
       setSelectedReviewItems(new Set());
+      window.dispatchEvent(new CustomEvent(CONTENT_LIBRARY_HEALTH_INVALIDATE));
       refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Approve failed');
