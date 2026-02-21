@@ -5,13 +5,16 @@ import { AccountIntelligenceClient } from './AccountIntelligenceClient';
 
 export default async function AccountIntelligencePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ researchDone?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/api/auth/signin');
 
   const { id: companyId } = await params;
+  const { researchDone: researchDoneParam } = await searchParams;
   const company = await prisma.company.findFirst({
     where: { id: companyId, userId: session.user.id },
     select: {
@@ -26,7 +29,8 @@ export default async function AccountIntelligencePage({
   if (!company) notFound();
 
   const hasResearch = !!company.researchData;
-  const hasDepartments = (company._count?.departments ?? 0) > 0;
+  const departmentCount = company._count?.departments ?? 0;
+  const hasDepartments = departmentCount > 0;
   const hasMessaging = !!company.accountMessaging;
 
   return (
@@ -38,6 +42,8 @@ export default async function AccountIntelligencePage({
           hasResearch={hasResearch}
           hasDepartments={hasDepartments}
           hasMessaging={hasMessaging}
+          departmentCount={departmentCount}
+          researchDone={researchDoneParam === '1'}
         />
       </div>
     </div>
