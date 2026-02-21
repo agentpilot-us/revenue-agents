@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 
 export async function PATCH(
   req: NextRequest,
@@ -17,11 +18,29 @@ export async function PATCH(
       return NextResponse.json({ error: 'Missing content id' }, { status: 400 });
     }
 
-    const body = await req.json();
-    const updates: { isPinned?: boolean } = {};
+    const body = await req.json().catch(() => ({}));
+    const updates: Prisma.ContentLibraryUpdateManyMutationInput = {};
 
     if (typeof body.isPinned === 'boolean') {
       updates.isPinned = body.isPinned;
+    }
+    if (typeof body.userConfirmed === 'boolean') {
+      updates.userConfirmed = body.userConfirmed;
+    }
+    if (body.extraction && typeof body.extraction === 'object') {
+      const row = await prisma.contentLibrary.findFirst({
+        where: { id, userId: session.user.id },
+        select: { content: true },
+      });
+      if (row && row.content && typeof row.content === 'object') {
+        const current = row.content as Record<string, unknown>;
+        updates.content = {
+          ...current,
+          extraction: { ...(current.extraction as Record<string, unknown> || {}), ...body.extraction },
+        } as Prisma.InputJsonValue;
+      }
+    } else if (body.content && typeof body.content === 'object') {
+      updates.content = body.content as Prisma.InputJsonValue;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import type { StructuredPageExtraction } from '@/lib/content-library/structured-extraction';
 
 type Props = {
   id: string;
@@ -12,6 +13,8 @@ type Props = {
   isPinned?: boolean;
   version?: string | null;
   hasPreviousContent?: boolean;
+  userConfirmed?: boolean;
+  content?: Record<string, unknown> | null;
 };
 
 function getDaysAgo(date: Date): number {
@@ -30,7 +33,7 @@ function formatUpdatedBadge(updatedAt: Date): string | null {
   return null;
 }
 
-export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinned = false, version, hasPreviousContent = false }: Props) {
+export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinned = false, version, hasPreviousContent = false, userConfirmed = true, content }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,6 +41,10 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
   const [pinned, setPinned] = useState(isPinned);
   const [scheduleFrequency, setScheduleFrequency] = useState<'off' | 'daily' | 'weekly'>('off');
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [showConfirmCard, setShowConfirmCard] = useState(false);
+  const extraction = content?.extraction as StructuredPageExtraction | undefined;
+  const needsConfirmation = !userConfirmed && extraction;
 
   useEffect(() => {
     if (!sourceUrl) return;
@@ -138,11 +145,83 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
     }
   };
 
+  const handleConfirm = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (confirming) return;
+    setConfirming(true);
+    try {
+      const res = await fetch(`/api/content-library/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userConfirmed: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Confirm failed');
+      }
+      setShowConfirmCard(false);
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Confirm failed');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   const updatedBadge = updatedAt ? formatUpdatedBadge(updatedAt) : null;
   const canViewChanges = hasPreviousContent && version && parseFloat(version) > 1.0;
 
   return (
-    <li className="flex items-center gap-2 text-sm group flex-wrap">
+    <li className="space-y-2">
+      {needsConfirmation && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm">
+          {!showConfirmCard ? (
+            <button
+              type="button"
+              onClick={() => setShowConfirmCard(true)}
+              className="text-amber-800 dark:text-amber-200 hover:underline font-medium"
+            >
+              Review extraction and confirm
+            </button>
+          ) : (
+            <>
+              <div className="mb-3 font-medium text-amber-900 dark:text-amber-100">What we found — confirm or edit later</div>
+              {extraction.valuePropositions?.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-gray-600 dark:text-gray-400">Value propositions: </span>
+                  <ul className="list-disc list-inside text-gray-700 dark:text-gray-300">{extraction.valuePropositions.slice(0, 3).map((v, i) => <li key={i}>{v}</li>)}</ul>
+                </div>
+              )}
+              {extraction.capabilities?.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-gray-600 dark:text-gray-400">Capabilities: </span>
+                  <ul className="list-disc list-inside text-gray-700 dark:text-gray-300">{extraction.capabilities.slice(0, 3).map((c, i) => <li key={i}>{c}</li>)}</ul>
+                </div>
+              )}
+              {extraction.proofPoints?.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-gray-600 dark:text-gray-400">Proof points: </span>
+                  <ul className="list-disc list-inside text-gray-700 dark:text-gray-300">{extraction.proofPoints.slice(0, 3).map((p, i) => <li key={i}>{p}</li>)}</ul>
+                </div>
+              )}
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={confirming}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+                >
+                  {confirming ? '…' : 'Looks good'}
+                </button>
+                <button type="button" onClick={() => setShowConfirmCard(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm">
+                  Close
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      <div className="flex items-center gap-2 text-sm group flex-wrap">
       <Link
         href={`/dashboard/content-library/${id}/edit`}
         className="text-blue-600 dark:text-blue-400 hover:underline shrink-0"
@@ -266,6 +345,7 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
           </svg>
         )}
       </button>
+      </div>
     </li>
   );
 }

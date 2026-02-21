@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { ContentType, Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { scrapeUrl, mapUrl } from '@/lib/tools/firecrawl';
 import {
-  categorizePage,
-  suggestedTypeToContentType,
-} from '@/lib/content-library/import-pipeline';
+  enrichScrapedContent,
+  type StructuredPageExtraction,
+} from '@/lib/content-library/structured-extraction';
+import { getChatModel } from '@/lib/llm/get-model';
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
 import { calculateContentHash } from '@/lib/content-library/content-hash';
 
@@ -84,7 +86,8 @@ export async function POST(req: NextRequest) {
     const existingSet = new Set(existing.map((r) => r.sourceUrl));
 
     const reviewMode = body.reviewMode === true;
-    const created: { id: string; title: string; type: string; sourceUrl: string | null }[] = [];
+    const model = getChatModel();
+    const created: { id: string; title: string; type: string; sourceUrl: string | null; extraction?: StructuredPageExtraction }[] = [];
     const reviewItems: {
       url: string;
       title: string;
@@ -94,6 +97,7 @@ export async function POST(req: NextRequest) {
       industry?: string;
       department?: string;
       contentPayload: unknown;
+      extraction: StructuredPageExtraction;
     }[] = [];
     const deadline = Date.now() + SCRAPE_TIMEOUT_MS;
 
@@ -109,34 +113,30 @@ export async function POST(req: NextRequest) {
       if (!scrapeResult.ok || !scrapeResult.markdown) continue;
 
       const markdown = scrapeResult.markdown;
-      let categorized: { title: string; description: string; suggestedType: string; industry?: string; department?: string };
+      let extraction: StructuredPageExtraction;
+      let contentPayload: Record<string, unknown>;
+      let suggestedType: string;
       try {
-        categorized = await categorizePage(pageUrl, markdown);
-      } catch {
-        categorized = {
-          title: pageUrl.replace(/^https?:\/\//, '').slice(0, 300),
-          description: '',
-          suggestedType: 'Other',
-        };
+        const enriched = await enrichScrapedContent(pageUrl, markdown, model);
+        extraction = enriched.extraction;
+        contentPayload = enriched.contentPayload as Record<string, unknown>;
+        suggestedType = enriched.suggestedType;
+      } catch (e) {
+        console.error('Structured extraction failed for', pageUrl, e);
+        continue;
       }
 
-      const contentType = suggestedTypeToContentType(categorized.suggestedType);
-      const contentPayload = {
-        markdown: markdown.slice(0, 100_000),
-        description: categorized.description ?? '',
-        suggestedType: categorized.suggestedType,
-      };
+      const title = extraction.keyMessages[0] ?? pageUrl.replace(/^https?:\/\//, '').slice(0, 500);
 
       if (reviewMode) {
         reviewItems.push({
           url: pageUrl,
-          title: categorized.title.slice(0, 500),
-          description: categorized.description ?? '',
-          suggestedType: categorized.suggestedType,
-          type: contentType,
-          industry: categorized.industry,
-          department: categorized.department,
+          title: title.slice(0, 500),
+          description: extraction.keyMessages[0] ?? '',
+          suggestedType,
+          type: suggestedType,
           contentPayload,
+          extraction,
         });
       } else {
         const contentHash = calculateContentHash(contentPayload);
@@ -145,27 +145,28 @@ export async function POST(req: NextRequest) {
           data: {
             userId: session.user.id,
             productId: null,
-            title: categorized.title.slice(0, 500),
-            type: contentType,
-            content: contentPayload,
+            title: title.slice(0, 500),
+            type: suggestedType as ContentType,
+            content: contentPayload as Prisma.InputJsonValue,
             contentHash,
             version: '1.0',
-            industry: categorized.industry ?? null,
-            department: categorized.department ?? null,
+            industry: null,
+            department: null,
             sourceUrl: pageUrl,
-            userConfirmed: true,
+            userConfirmed: false,
             scrapedAt: new Date(),
           },
           select: { id: true, title: true, type: true, sourceUrl: true },
         });
 
         try {
-          await ingestContentLibraryChunks(row.id, contentPayload.markdown);
+          const md = (contentPayload.markdown as string) ?? '';
+          await ingestContentLibraryChunks(row.id, md);
         } catch (e) {
           console.error('RAG ingest failed for', row.id, e);
         }
 
-        created.push(row);
+        created.push({ ...row, extraction });
       }
       existingSet.add(pageUrl);
     }

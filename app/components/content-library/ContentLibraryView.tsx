@@ -6,6 +6,7 @@ import type { GetCompanySetupStateUser } from '@/app/actions/content-library-set
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
 import { ContentLibraryActions } from '@/app/components/content-library/ContentLibraryActions';
+import { ContentLibraryHealthPanel } from '@/app/components/content-library/ContentLibraryHealthPanel';
 import { ContentLibraryItemRow } from '@/app/components/content-library/ContentLibraryItemRow';
 
 const SECTION_LABELS: Partial<Record<ContentType, string>> = {
@@ -29,7 +30,7 @@ export async function ContentLibraryView({ company }: Props) {
   const [items, products, playbooks] = await Promise.all([
     prisma.contentLibrary.findMany({
       where: { userId: session.user.id, isActive: true, archivedAt: null },
-      select: { id: true, title: true, type: true, sourceUrl: true, updatedAt: true, isPinned: true, version: true, previousContent: true },
+      select: { id: true, title: true, type: true, sourceUrl: true, updatedAt: true, isPinned: true, version: true, previousContent: true, userConfirmed: true, content: true },
       orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
     }),
     prisma.product.findMany({
@@ -78,6 +79,8 @@ export async function ContentLibraryView({ company }: Props) {
       </div>
 
       <ContentLibraryActions />
+
+      <ContentLibraryHealthPanel />
 
       {/* Company info */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6">
@@ -155,6 +158,8 @@ export async function ContentLibraryView({ company }: Props) {
                       isPinned={item.isPinned}
                       version={item.version}
                       hasPreviousContent={!!item.previousContent}
+                      userConfirmed={item.userConfirmed}
+                      content={item.content as Record<string, unknown> | null}
                     />
                   ))}
                 </ul>

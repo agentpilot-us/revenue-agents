@@ -46,7 +46,7 @@ export async function ingestContentLibraryChunks(
 
 /**
  * Retrieve top-k chunks from the user's content library by similarity to the query.
- * Returns chunk content strings for injection into the prompt.
+ * Confirmed content is preferred: fetch 2*topK by distance, then sort by userConfirmed DESC and take topK.
  */
 export async function findRelevantContentLibraryChunks(
   userId: string,
@@ -62,8 +62,8 @@ export async function findRelevantContentLibraryChunks(
   });
   const vectorStr = '[' + (embedding as number[]).join(',') + ']';
 
-  const rows = await prisma.$queryRaw<{ content: string }[]>`
-    SELECT c.content
+  const rows = await prisma.$queryRaw<{ content: string; userConfirmed: boolean }[]>`
+    SELECT c.content, cl."userConfirmed"
     FROM "ContentLibraryChunk" c
     INNER JOIN "ContentLibrary" cl ON cl.id = c."contentLibraryId"
     WHERE cl."userId" = ${userId}
@@ -71,10 +71,13 @@ export async function findRelevantContentLibraryChunks(
       AND cl."archivedAt" IS NULL
       AND c.embedding IS NOT NULL
     ORDER BY c.embedding <=> ${vectorStr}::vector
-    LIMIT ${topK}
+    LIMIT ${topK * 2}
   `;
 
-  return rows.map((r) => r.content);
+  const sorted = [...rows].sort((a, b) =>
+    a.userConfirmed === b.userConfirmed ? 0 : a.userConfirmed ? -1 : 1
+  );
+  return sorted.slice(0, topK).map((r) => r.content);
 }
 
 /**

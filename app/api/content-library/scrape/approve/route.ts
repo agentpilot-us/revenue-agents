@@ -23,15 +23,23 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       if (!item.url || !item.title || !item.type) continue;
 
-      // Check if already exists
       const existing = await prisma.contentLibrary.findFirst({
         where: {
           userId: session.user.id,
           sourceUrl: item.url,
           isActive: true,
         },
+        select: { id: true, title: true, type: true, sourceUrl: true },
       });
-      if (existing) continue;
+
+      if (existing) {
+        await prisma.contentLibrary.update({
+          where: { id: existing.id },
+          data: { userConfirmed: true },
+        });
+        created.push(existing);
+        continue;
+      }
 
       const contentPayload = item.contentPayload || {
         description: item.description || '',
@@ -51,7 +59,7 @@ export async function POST(req: NextRequest) {
           industry: item.industry || null,
           department: item.department || null,
           sourceUrl: item.url,
-          userConfirmed: true,
+          userConfirmed: false,
           scrapedAt: new Date(),
         },
         select: { id: true, title: true, type: true, sourceUrl: true },

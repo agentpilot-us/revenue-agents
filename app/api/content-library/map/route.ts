@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { mapUrl } from '@/lib/tools/firecrawl';
+import { prioritizeMapLinks } from '@/lib/content-library/link-priority';
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +36,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ links: result.links });
+    const { links, highValue, lowValue } = prioritizeMapLinks(result.links);
+    return NextResponse.json({ links, highValue, lowValue });
   } catch (error) {
     console.error('Content library map error:', error);
     return NextResponse.json(
