@@ -11,7 +11,6 @@ import { detectPromptInjection } from '@/lib/security/prompt-injection';
 import { logSecurityEvent, getIPAddress } from '@/lib/security/audit';
 import { expansion } from '@/lib/plays/expansion';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
-import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
 import {
   getProductKnowledgeBlock,
@@ -41,6 +40,14 @@ import {
   getActiveEnrollmentContext,
   advanceEnrollment,
 } from '@/lib/sequences/get-next-touch-context';
+import { detectIntent } from '@/lib/chat/intent-detector';
+import { INTENT_BLOCKS } from '@/lib/chat/context-config';
+import {
+  PERSONA_WORKFLOW_INSTRUCTIONS,
+  EXPANSION_FORMAT_INSTRUCTIONS,
+  FEATURE_RELEASE_OUTREACH_INSTRUCTIONS,
+  EVENT_INVITE_INSTRUCTIONS,
+} from '@/lib/chat/static-instructions';
 
 /** Passed to tools via experimental_context so execute can read account without closure */
 type ChatContext = {
@@ -240,106 +247,96 @@ export async function POST(req: Request) {
       }
     }
 
-    // Content library: fetch content matching account industry and/or target contact's department for department-specific messaging.
-    // When account (company) is set, include and prefer entries where company matches so account-specific guides (e.g. GM) are used.
+    // Intent-based selective context: only load blocks needed for this turn
+    const lastUserContent = messages
+      .filter((m: unknown) => (m as { role?: string }).role === 'user')
+      .pop() as { content?: string } | undefined;
+    const lastUserMessageText =
+      typeof lastUserContent?.content === 'string' ? lastUserContent.content.trim() : '';
+    const intent = detectIntent(lastUserMessageText);
+    const neededBlocks = new Set(INTENT_BLOCKS[intent]);
+
+    // Content library (relevantContent): entire whereClause + findMany inside guard so query never runs when not needed
     type ContentShape = {
       valueProp?: string;
       benefits?: string[];
       proofPoints?: string[];
       successStories?: Array<{ company?: string; results?: string[] }>;
     };
-    const orConditions: Array<{ industry?: string | null; department?: string; company?: string | null }> = [];
-    if (company?.industry) {
-      orConditions.push({ industry: company.industry }, { industry: null }, { industry: '' });
-    }
-    if (targetContactDepartment) {
-      orConditions.push({ department: targetContactDepartment });
-    }
-    const whereClause: {
-      userId: string;
-      userConfirmed: boolean;
-      isActive: boolean;
-      OR?: Array<{ industry?: string | null; department?: string; company?: string | null }>;
-      AND?: Array<Record<string, unknown>>;
-    } = {
-      userId: session.user.id,
-      userConfirmed: true,
-      isActive: true,
-    };
-    // Prioritize: 1) User's company-branded, 2) Account-specific, 3) Industry/department matched
-    if (company?.name) {
-      whereClause.AND = [
-        ...(orConditions.length > 0 ? [{ OR: orConditions }] : []),
-        { OR: [{ company: userCompanyName }, { company: company.name }, { company: null }, { company: '' }] },
-      ];
-    } else if (orConditions.length > 0) {
-      whereClause.OR = [
-        { company: userCompanyName }, // User's company-branded first
-        ...orConditions,
-      ];
-    } else {
-      whereClause.OR = [{ company: userCompanyName }, { company: null }, { company: '' }];
-    }
-    const relevantContent = await prisma.contentLibrary.findMany({
-      where: whereClause,
-      orderBy: [
-        // Prioritize: userCompanyName > account company name > null/empty
-        { company: 'desc' },
-        { department: 'desc' },
-        { persona: 'desc' },
-        { industry: 'desc' },
-      ],
-      take: 8,
-    });
-
-    const contentLibrarySection =
-      relevantContent.length > 0
-        ? `\nPRODUCT MESSAGING (Content Library — use for department-specific value props and use cases):\n${relevantContent
-            .map((c: { type: string; title: string; industry: string | null; department: string | null; persona: string | null; content: unknown }) => {
-              const body = c.content as ContentShape | null;
-              const valueProp = body?.valueProp ?? '';
-              const benefits = body?.benefits?.join(', ') ?? '';
-              const proofPoints = body?.proofPoints?.join(', ') ?? '';
-              const successStories =
-                body?.successStories
-                  ?.map(
-                    (s) =>
-                      `- ${s.company ?? 'Unknown'}: ${s.results?.join(', ') ?? ''}`
-                  )
-                  .join('\n') ?? '';
-              return `[${c.type}] ${c.title}
+    let contentLibrarySection = '';
+    if (neededBlocks.has('content_library')) {
+      const orConditions: Array<{ industry?: string | null; department?: string; company?: string | null }> = [];
+      if (company?.industry) {
+        orConditions.push({ industry: company.industry }, { industry: null }, { industry: '' });
+      }
+      if (targetContactDepartment) {
+        orConditions.push({ department: targetContactDepartment });
+      }
+      const whereClause: {
+        userId: string;
+        userConfirmed: boolean;
+        isActive: boolean;
+        OR?: Array<{ industry?: string | null; department?: string; company?: string | null }>;
+        AND?: Array<Record<string, unknown>>;
+      } = {
+        userId: session.user.id,
+        userConfirmed: true,
+        isActive: true,
+      };
+      if (company?.name) {
+        whereClause.AND = [
+          ...(orConditions.length > 0 ? [{ OR: orConditions }] : []),
+          { OR: [{ company: userCompanyName }, { company: company.name }, { company: null }, { company: '' }] },
+        ];
+      } else if (orConditions.length > 0) {
+        whereClause.OR = [{ company: userCompanyName }, ...orConditions];
+      } else {
+        whereClause.OR = [{ company: userCompanyName }, { company: null }, { company: '' }];
+      }
+      const relevantContent = await prisma.contentLibrary.findMany({
+        where: whereClause,
+        orderBy: [{ company: 'desc' }, { department: 'desc' }, { persona: 'desc' }, { industry: 'desc' }],
+        take: 8,
+      });
+      if (relevantContent.length > 0) {
+        contentLibrarySection = `\nPRODUCT MESSAGING (Content Library — use for department-specific value props and use cases):\n${relevantContent
+          .map((c: { type: string; title: string; industry: string | null; department: string | null; persona: string | null; content: unknown }) => {
+            const body = c.content as ContentShape | null;
+            const valueProp = body?.valueProp ?? '';
+            const benefits = body?.benefits?.join(', ') ?? '';
+            const proofPoints = body?.proofPoints?.join(', ') ?? '';
+            const successStories =
+              body?.successStories
+                ?.map((s) => `- ${s.company ?? 'Unknown'}: ${s.results?.join(', ') ?? ''}`)
+                .join('\n') ?? '';
+            return `[${c.type}] ${c.title}
 Industry: ${c.industry ?? '—'} | Department: ${c.department ?? '—'} | Persona: ${c.persona ?? '—'}
 
 Value Prop: ${valueProp}
 Benefits: ${benefits}
 Proof Points: ${proofPoints}
 ${successStories ? `Success Stories:\n${successStories}` : ''}`;
-            })
-            .join('\n---\n')}
+          })
+          .join('\n---\n')}
 
 When drafting emails or messages:
 1. Use the contact's department to select the right messaging: choose value propositions and use cases that match the recipient's department (e.g. Autonomous Vehicles, IT Infrastructure, Manufacturing).
 2. Reference success stories and proof points relevant to that department and the account's industry.
-3. Personalize by contact: department drives which messaging applies; use their title and department together.`
-        : '';
-
-    // Account-level messaging (additive to content library and department logic)
-    let accountContextBlock = '';
-    if (accountId && session.user.id) {
-      const block = await getAccountMessagingPromptBlock(accountId, session.user.id);
-      if (block) accountContextBlock = `\n\n${block}`;
+3. Personalize by contact: department drives which messaging applies; use their title and department together.`;
+      }
     }
 
-    // Account research data (AI-generated company intelligence)
+    // Account research (only when block needed)
+    let accountContextBlock = '';
     let researchDataBlock = '';
-    if (accountId && session.user.id) {
+    if (neededBlocks.has('account_research') && accountId && session.user.id) {
       const block = await getCompanyResearchPromptBlock(accountId, session.user.id);
       if (block) researchDataBlock = `\n\n${block}`;
     }
 
-    // Agent memory: previous conversation summary and decisions for this account
+    // Agent memory (only when block needed)
     let accountMemoryBlock = '';
-    if (accountId) {
+    if (neededBlocks.has('agent_memory') && accountId) {
       const companyWithMemory = await prisma.company.findFirst({
         where: { id: accountId, userId: session.user.id },
         select: { agentContext: true },
@@ -354,61 +351,48 @@ When drafting emails or messages:
       }
     }
 
-    // RAG: retrieve relevant content library chunks for this conversation
+    // RAG (only when block needed and we have a query)
     let ragContentSection = '';
-    try {
-      const lastUserMessage = [...messages].reverse().find((m: unknown) => (m as { role?: string }).role === 'user');
-      let ragQuery = 'value proposition and outreach';
-      if (lastUserMessage && typeof lastUserMessage === 'object' && lastUserMessage !== null) {
-        const content = (lastUserMessage as { content?: string; parts?: unknown[] }).content ?? (lastUserMessage as { content?: string; parts?: { type: string; text?: string }[] }).parts?.find((p: { type: string }) => p.type === 'text')?.text;
-        if (typeof content === 'string' && content.trim().length > 0) {
-          ragQuery = content.trim().slice(0, 2000);
+    if (neededBlocks.has('rag_chunks') && lastUserMessageText.length > 0) {
+      try {
+        const ragQuery = lastUserMessageText.slice(0, 2000);
+        const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 6);
+        if (ragChunks.length > 0) {
+          ragContentSection = `\n\n${formatRAGChunksForPrompt(ragChunks)}`;
         }
+      } catch (e) {
+        console.error('RAG retrieval failed:', e);
       }
-      const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 8);
-      if (ragChunks.length > 0) {
-        ragContentSection = `\n\n${formatRAGChunksForPrompt(ragChunks)}`;
-      }
-    } catch (e) {
-      console.error('RAG retrieval failed:', e);
     }
 
-    // Product Knowledge Layer: industry playbook -> relevant product IDs -> product knowledge + case studies
-    const industryPlaybookBlock = await getIndustryPlaybookBlock(
-      session.user.id,
-      company?.industry ?? null
-    );
-    const relevantProductIds = await getRelevantProductIdsForIndustry(
-      session.user.id,
-      company?.industry ?? null,
-      targetContactDepartment
-    );
-    const productKnowledgeBlock = await getProductKnowledgeBlock(
-      session.user.id,
-      relevantProductIds.length > 0 ? relevantProductIds : undefined
-    );
-    const caseStudiesBlock = await getCaseStudiesBlock(
-      session.user.id,
-      company?.industry ?? null,
-      targetContactDepartment,
-      relevantProductIds
-    );
-    
-    // Company events (GTC sessions, webinars, etc.) - filter by contact role if available
-    const contactRole = contactId
-      ? company?.contacts.find((c) => c.id === contactId)?.title || null
-      : null;
-    const companyEventsBlock = await getCompanyEventsBlock(
-      session.user.id,
-      company?.industry ?? null,
-      targetContactDepartment,
-      contactRole
-    );
-    
-    // Feature releases and product announcements
-    const [featureReleasesBlock, contentLibraryProductsBlock] = await Promise.all([
-      getFeatureReleasesBlock(session.user.id, company?.industry ?? null, 10),
-      getContentLibraryProductsBlock(session.user.id),
+    // relevantProductIds once when product_knowledge or case_studies needed
+    const needProductOrCaseStudies = neededBlocks.has('product_knowledge') || neededBlocks.has('case_studies');
+    const relevantProductIds = needProductOrCaseStudies
+      ? await getRelevantProductIdsForIndustry(session.user.id, company?.industry ?? null, targetContactDepartment)
+      : [];
+
+    // Conditional block loading (parallel where independent)
+    const [
+      industryPlaybookBlock,
+      productKnowledgeBlock,
+      caseStudiesBlock,
+      companyEventsBlock,
+      featureReleasesBlock,
+      contentLibraryProductsBlock,
+    ] = await Promise.all([
+      neededBlocks.has('industry_playbook') ? getIndustryPlaybookBlock(session.user.id, company?.industry ?? null) : Promise.resolve(null),
+      neededBlocks.has('product_knowledge') ? getProductKnowledgeBlock(session.user.id, relevantProductIds.length > 0 ? relevantProductIds : undefined) : Promise.resolve(null),
+      neededBlocks.has('case_studies') ? getCaseStudiesBlock(session.user.id, company?.industry ?? null, targetContactDepartment, relevantProductIds) : Promise.resolve(null),
+      neededBlocks.has('events')
+        ? getCompanyEventsBlock(
+            session.user.id,
+            company?.industry ?? null,
+            targetContactDepartment,
+            contactId ? company?.contacts.find((c: ContactRow) => c.id === contactId)?.title || null : null
+          )
+        : Promise.resolve(null),
+      neededBlocks.has('feature_releases') ? getFeatureReleasesBlock(session.user.id, company?.industry ?? null, 10) : Promise.resolve(null),
+      neededBlocks.has('content_library') ? getContentLibraryProductsBlock(session.user.id) : Promise.resolve(null),
     ]);
 
     const productKnowledgeSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
@@ -418,9 +402,19 @@ When drafting emails or messages:
     const companyEventsSection = companyEventsBlock ? `\n\n${companyEventsBlock}` : '';
     const featureReleasesSection = featureReleasesBlock ? `\n\n${featureReleasesBlock}` : '';
 
-    // Hyper-personalized campaign links for this company/segment (use in segment emails and drafts)
+    // Event recommendations instruction: only adjacent to events block when present
+    const eventRecommendationsText =
+      companyEventsSection && neededBlocks.has('events')
+        ? `\n\nEVENT RECOMMENDATIONS: When users ask which sessions/events to invite contacts to, use the COMPANY EVENTS & SESSIONS section above. Match by: Primary Topic/Interest, Industry, Department, Role/title.`
+        : '';
+    const featureReleasesInstruction =
+      featureReleasesSection && neededBlocks.has('feature_releases')
+        ? `\n\nFEATURE RELEASES: When sharing product updates, reference the FEATURE RELEASES & PRODUCT ANNOUNCEMENTS section. Use for latest features, recent announcements in outreach, and capabilities relevant to the contact's use case.`
+        : '';
+
+    // Campaigns (only when block needed)
     let campaignBlock = '';
-    if (accountId && session.user.id) {
+    if (neededBlocks.has('campaigns') && accountId && session.user.id) {
       const campaigns = await prisma.segmentCampaign.findMany({
         where: { companyId: accountId, userId: session.user.id },
         include: { department: { select: { customName: true, type: true } } },
@@ -437,18 +431,23 @@ When drafting emails or messages:
       }
     }
 
-    // Messaging framework
-    const lastUserContent = messages
-      .filter((m: unknown) => (m as { role?: string }).role === 'user')
-      .pop() as { content?: string } | undefined;
-    const messagingContext = await getMessagingContextForAgent(
-      session.user.id,
-      typeof lastUserContent?.content === 'string' ? lastUserContent.content : undefined,
-      accountId ?? null
-    );
-    const messagingSection = messagingContext
-      ? `MESSAGING FRAMEWORK:\n${messagingContext.content}\n\nALWAYS use this messaging framework when drafting emails.`
-      : '';
+    // Messaging framework (pass accountId ?? null for account-specific matching)
+    let messagingSection = '';
+    if (neededBlocks.has('messaging_framework')) {
+      const messagingContext = await getMessagingContextForAgent(
+        session.user.id,
+        lastUserMessageText.length > 0 ? lastUserMessageText : undefined,
+        accountId ?? null
+      );
+      if (messagingContext) {
+        messagingSection = `\n\nMESSAGING FRAMEWORK:\n${messagingContext.content}\n\nALWAYS use this messaging framework when drafting emails.`;
+      }
+    }
+
+    const expansionFormatSection = neededBlocks.has('expansion_format') ? `\n\n${EXPANSION_FORMAT_INSTRUCTIONS}` : '';
+    const personaWorkflowSection = neededBlocks.has('persona_workflow') ? `\n\n${PERSONA_WORKFLOW_INSTRUCTIONS}` : '';
+    const featureReleaseOutreachSection = intent === 'feature_release_outreach' ? `\n\n${FEATURE_RELEASE_OUTREACH_INSTRUCTIONS}` : '';
+    const eventInviteSection = intent === 'event_invite' ? `\n\n${EVENT_INVITE_INSTRUCTIONS}` : '';
 
     const contactsList =
       company?.contacts
@@ -479,54 +478,10 @@ You help account managers:
 - Track landing page performance and engagement
 - Monitor account changes and recent activity
 - Launch campaigns and landing pages
-
-PERSONA-AWARE WORKFLOW:
-When drafting emails or outreach:
-1. Identify the contact's persona (Economic Buyer, Technical Buyer, Program Manager, etc.)
-2. Understand what that persona cares about (pain points, success metrics)
-3. Match messaging tone to persona (executive = strategic, technical = detailed, business = practical)
-4. Reference relevant content that matches persona preferences
-5. Use appropriate channel (Economic Buyer = exec dinner, Technical Buyer = sandbox trial)
-
-EXAMPLE CONVERSATION:
-User: "Draft an email to Michael Torres at GM about Jetson"
-
-You:
-1. Look up Michael Torres (VP Manufacturing at GM)
-2. Match persona → "Economic Buyer - Manufacturing"
-3. Get persona details → Cares about: quality defects, cost reduction, ROI
-4. Draft email with persona-aware messaging:
-   - Tone: Business (not too technical, focus on outcomes)
-   - Pain point: Reference quality control / defect reduction
-   - Proof: BMW case study ($40M savings, 60% defect reduction)
-   - CTA: Soft ask (plant tour, ROI calculator)
-   - Length: 100-150 words (exec is busy)
-
-Always explain WHY you chose a certain messaging approach based on persona.
-
-PERSONA TYPES:
-- Economic Buyer: Budget owner, C-suite/VP, cares about ROI and business outcomes
-- Technical Buyer: Evaluates tech fit, Director/Manager, cares about architecture and integration
-- Program Manager: Implements solutions, Manager/Director, cares about deployment and change mgmt
-- Champion: Your internal advocate, any level, cares about their personal success
-- End User: Daily user, IC level, cares about ease of use and productivity
-
-Be proactive—suggest persona-specific next steps based on context.
-
-When presenting product penetration, format the full department-by-product matrix as a markdown table: rows = productList (product names), columns = departmentList (department type or customName), cells = status + amount (e.g. ACTIVE + arr as "$500K", OPPORTUNITY + opportunitySize as "$300K", TRIAL + amount, or "—" when matrix[departmentId][productId] is null). Use the departmentList, productList, and matrix returned by get_product_penetration to build this table.
-
-CROSS-DEPARTMENT EXPANSION STRATEGY:
-When the user asks "What's my best approach to expand at [company] across all departments?" or "strategy across departments" or "expand at [company]":
-1. Call get_expansion_strategy(companyId) to get phase1, phase2, phase3 with department names, top product, opportunity size, and fit score per department.
-2. Optionally call list_departments and get_product_penetration for more detail (contacts, last activity).
-3. Respond with this EXACT structure (use the section headers and formatting below):
-   - PHASE 1 (NOW - Q1): List each department from phase1 with product, $, fit %, status, action plan (bullet points: THIS WEEK, WEEK 2-3), timeline, success probability. Add a short "KEY INSIGHT" if relevant (e.g. "Run Manufacturing + Design plays SIMULTANEOUSLY").
-   - PHASE 2 (Q2): List phase2 departments (upsell / existing customer expansion) with action plan and timeline.
-   - PHASE 3 (Q3-Q4): List phase3 departments (longer cycle or lower priority) with action plan and timeline.
-   - SUMMARY: Total expansion target ($), Phase 1/2/3 breakdown, expected close rate, timeline (e.g. "9-12 months for full account expansion").
-   - FOCUS THIS WEEK: Numbered list of 1-3 concrete actions (e.g. "Follow up with Michael Torres (Manufacturing)", "Email David for Jennifer intro (Design)").
-   - End with: "Want me to draft those emails?" or "Want me to draft the follow-up for [contact]?" so the user has a clear CTA.
-Use clear section dividers (e.g. ━━━) and keep action plans specific (names, products, next step).
+${personaWorkflowSection}
+${expansionFormatSection}
+${featureReleaseOutreachSection}
+${eventInviteSection}
 
 ACCOUNT CONTEXT:
 - Current company ID (use this as companyId in list_departments, find_contacts_in_department, discover_departments): ${accountId || 'none'}
@@ -557,24 +512,9 @@ ${productKnowledgeSection}
 ${industryPlaybookSection}
 ${contentLibraryProductsSection}
 ${caseStudiesSection}
-${companyEventsSection}
-${featureReleasesSection}
+${companyEventsSection}${eventRecommendationsText}
+${featureReleasesSection}${featureReleasesInstruction}
 ${ragContentSection}
-
-DEPARTMENT-BASED MESSAGING: Each contact may have a department (e.g. Autonomous Vehicles, IT Infrastructure). Use the content library entries that match that department to determine value propositions and use cases when drafting to that contact. If department is "Not set", use industry and persona from the content library.
-
-EVENT RECOMMENDATIONS: When users ask about which sessions/events to invite contacts to (e.g. "which sessions should I invite the VP of Autonomous Vehicles to?"), use the COMPANY EVENTS & SESSIONS section above. Sessions are organized by TOPIC/INTEREST (e.g., "Autonomous Vehicles", "AI Factories", "CUDA", "Robotics"), not by product. Match events by:
-- Primary Topic/Interest (most important - e.g. "Autonomous Vehicles" sessions for AV contacts)
-- Industry (e.g. Automotive events for automotive companies)
-- Department (e.g. Autonomous Vehicles sessions for AV department contacts)
-- Role/title (e.g. VP-level sessions for VP contacts)
-- Additional topics (secondary topics covered in the session)
-
-FEATURE RELEASES: When sharing product updates or announcements, reference the FEATURE RELEASES & PRODUCT ANNOUNCEMENTS section. Use these to:
-- Share latest product features with prospects
-- Reference recent announcements in outreach
-- Highlight new capabilities relevant to the contact's use case
-
 ${messagingSection}
 ${contentLibrarySection}
 ${campaignBlock}
