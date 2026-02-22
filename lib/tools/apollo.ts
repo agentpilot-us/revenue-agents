@@ -9,6 +9,8 @@ export type SearchApolloContactsParams = {
   companyName?: string;
   /** Title filters (e.g. from department targetRoles). */
   titles?: string[];
+  /** Keywords for USE_CASE/DIVISIONAL segments (e.g. "autonomous driving ADAS"). */
+  keywords?: string[];
   /** Seniority: vp, director, manager, c_suite, etc. */
   seniorityLevels?: string[];
   maxResults?: number;
@@ -61,6 +63,9 @@ export async function searchApolloContacts(
     };
     if (params.titles?.length) {
       body.person_titles = params.titles;
+    }
+    if (params.keywords?.length) {
+      body.q_keywords = params.keywords.join(' ');
     }
     if (params.seniorityLevels?.length) {
       body.person_seniorities = params.seniorityLevels;

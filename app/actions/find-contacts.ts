@@ -6,11 +6,12 @@ import { prisma } from '@/lib/db';
 import { findContactsForSegment } from '@/lib/tools/contact-finder';
 import { enrichContact } from '@/lib/tools/clay';
 import { generateWhyRelevant } from '@/lib/contacts/why-relevant';
+import { resolveSearchContext, type SeniorityLevel } from '@/lib/contacts/resolve-search-context';
 import { matchPersona } from '@/app/actions/match-persona';
 import { DepartmentType } from '@prisma/client';
 
-export type ContactTypeOption = 'economic' | 'technical' | 'program' | 'influencer';
-export type SearchScopeOption = 'linkedin' | 'clay' | 'zoominfo';
+export type { SeniorityLevel };
+export type SearchScopeOption = 'apollo' | 'linkedin' | 'clay' | 'zoominfo';
 
 export type FoundContact = {
   id: string;
@@ -36,26 +37,29 @@ export type FindContactsResult = {
   error: string;
 };
 
+/** Default seniority when not specified (economic buyer + technical evaluator tier). */
+const DEFAULT_SENIORITY: SeniorityLevel[] = ['vp', 'manager_director'];
+
 export async function findContactsForDepartment(
   companyId: string,
   departmentId: string,
-  _contactTypes: ContactTypeOption[],
-  scope: { linkedin?: boolean; clay?: boolean; zoominfo?: boolean }
+  seniorityLevels: SeniorityLevel[],
+  scope: { apollo?: boolean; linkedin?: boolean; clay?: boolean; zoominfo?: boolean }
 ): Promise<FindContactsResult> {
   const company = await prisma.company.findFirst({
     where: { id: companyId },
-    select: { id: true, name: true, domain: true, website: true },
+    select: { id: true, name: true, domain: true, website: true, segmentationStrategy: true },
   });
   if (!company) return { ok: false, error: 'Company not found' };
 
   const department = await prisma.companyDepartment.findFirst({
     where: { id: departmentId, companyId },
-    select: { id: true, type: true, customName: true, targetRoles: true },
+    select: { id: true, type: true, customName: true, targetRoles: true, useCase: true },
   });
   if (!department) return { ok: false, error: 'Department not found' };
 
   const steps: Array<{ step: string; detail: string }> = [];
-  const useFinder = scope.linkedin !== false;
+  const useFinder = scope.apollo === true || scope.linkedin !== false;
   const useClay = scope.clay === true;
   const useZoomInfo = scope.zoominfo === true;
 
@@ -66,8 +70,21 @@ export async function findContactsForDepartment(
       '';
     const companyDomain =
       rawDomain || `${company.name.toLowerCase().replace(/\s+/g, '')}.com`;
-    const targetRoles = flattenTargetRoles(
-      department.targetRoles as { economicBuyer?: string[]; technicalEvaluator?: string[]; champion?: string[]; influencer?: string[] } | null
+    const seniorityFilter = seniorityLevels.length > 0 ? seniorityLevels : DEFAULT_SENIORITY;
+    const searchContext = resolveSearchContext(
+      {
+        customName: department.customName,
+        type: department.type,
+        targetRoles: department.targetRoles as {
+          economicBuyer?: string[];
+          technicalEvaluator?: string[];
+          champion?: string[];
+          influencer?: string[];
+        } | null,
+        useCase: department.useCase,
+      },
+      company.segmentationStrategy,
+      seniorityFilter
     );
 
     let segmentResults;
@@ -75,7 +92,9 @@ export async function findContactsForDepartment(
       segmentResults = await findContactsForSegment({
         companyDomain,
         companyName: company.name,
-        targetRoles: targetRoles.length > 0 ? targetRoles : undefined,
+        targetRoles: searchContext.titles.length > 0 ? searchContext.titles : undefined,
+        keywords: searchContext.keywords.length > 0 ? searchContext.keywords : undefined,
+        seniorityLevels: searchContext.seniorityLevels.length > 0 ? searchContext.seniorityLevels : undefined,
         maxResults: 15,
       });
     } catch (e) {
@@ -162,18 +181,6 @@ export async function findContactsForDepartment(
   return { ok: false, error: 'At least one search scope is required.' };
 }
 
-function flattenTargetRoles(
-  targetRoles: { economicBuyer?: string[]; technicalEvaluator?: string[]; champion?: string[]; influencer?: string[] } | null
-): string[] {
-  if (!targetRoles || typeof targetRoles !== 'object') return [];
-  const out: string[] = [];
-  for (const key of ['economicBuyer', 'technicalEvaluator', 'champion', 'influencer'] as const) {
-    const arr = targetRoles[key];
-    if (Array.isArray(arr)) out.push(...arr.filter((t): t is string => typeof t === 'string'));
-  }
-  return [...new Set(out)];
-}
-
 export type AddContactsInput = {
   firstName: string;
   lastName: string;
@@ -194,16 +201,18 @@ export type AddContactsResult = {
   error: string;
 };
 
-export async function addContactsToDepartment(
+/**
+ * Internal version — no auth check. Call from findAndEnrichContactsForCompany
+ * after auth is done once to avoid N+1 auth() calls.
+ */
+async function addContactsToDepartmentInternal(
+  userId: string,
   companyId: string,
   departmentId: string,
   contacts: AddContactsInput[]
 ): Promise<AddContactsResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: 'Unauthorized' };
-
   const company = await prisma.company.findFirst({
-    where: { id: companyId, userId: session.user.id },
+    where: { id: companyId, userId },
   });
   if (!company) return { ok: false, error: 'Company not found' };
 
@@ -262,6 +271,16 @@ export async function addContactsToDepartment(
   return { ok: true, added, skipped, contactIds };
 }
 
+export async function addContactsToDepartment(
+  companyId: string,
+  departmentId: string,
+  contacts: AddContactsInput[]
+): Promise<AddContactsResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Unauthorized' };
+  return addContactsToDepartmentInternal(session.user.id, companyId, departmentId, contacts);
+}
+
 const MAX_DEPARTMENT_CONCURRENCY = 3;
 const DEFAULT_MAX_PER_DEPT = 10;
 
@@ -296,7 +315,7 @@ export async function findAndEnrichContactsForCompany(
 
   const company = await prisma.company.findFirst({
     where: { id: companyId, userId: session.user.id },
-    select: { id: true, name: true, domain: true, website: true },
+    select: { id: true, name: true, domain: true, website: true, segmentationStrategy: true },
   });
   if (!company) return { ok: false, error: 'Company not found' };
 
@@ -305,7 +324,7 @@ export async function findAndEnrichContactsForCompany(
       companyId,
       ...(options.departmentIds?.length ? { id: { in: options.departmentIds } } : {}),
     },
-    select: { id: true, type: true, customName: true, targetRoles: true },
+    select: { id: true, type: true, customName: true, targetRoles: true, useCase: true },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -317,6 +336,7 @@ export async function findAndEnrichContactsForCompany(
 
   const limit = pLimit(MAX_DEPARTMENT_CONCURRENCY);
   let totalAdded = 0;
+  const allNewContactIds: string[] = [];
 
   const rawDomain =
     company.domain?.trim() ||
@@ -327,14 +347,28 @@ export async function findAndEnrichContactsForCompany(
 
   for (const dept of departments) {
     try {
-      const targetRoles = flattenTargetRoles(
-        dept.targetRoles as { economicBuyer?: string[]; technicalEvaluator?: string[]; champion?: string[]; influencer?: string[] } | null
+      const searchContext = resolveSearchContext(
+        {
+          customName: dept.customName,
+          type: dept.type,
+          targetRoles: dept.targetRoles as {
+            economicBuyer?: string[];
+            technicalEvaluator?: string[];
+            champion?: string[];
+            influencer?: string[];
+          } | null,
+          useCase: dept.useCase,
+        },
+        company.segmentationStrategy,
+        DEFAULT_SENIORITY
       );
       const segmentResults = await limit(() =>
         findContactsForSegment({
           companyDomain,
           companyName: company.name,
-          targetRoles: targetRoles.length > 0 ? targetRoles : undefined,
+          targetRoles: searchContext.titles.length > 0 ? searchContext.titles : undefined,
+          keywords: searchContext.keywords.length > 0 ? searchContext.keywords : undefined,
+          seniorityLevels: searchContext.seniorityLevels.length > 0 ? searchContext.seniorityLevels : undefined,
           maxResults: maxPerDept,
         })
       );
@@ -347,9 +381,15 @@ export async function findAndEnrichContactsForCompany(
         linkedinUrl: c.linkedinUrl,
       }));
 
-      const addResult = await addContactsToDepartment(companyId, dept.id, toAdd);
+      const addResult = await addContactsToDepartmentInternal(
+        session.user.id,
+        companyId,
+        dept.id,
+        toAdd
+      );
       if (addResult.ok) {
         totalAdded += addResult.added;
+        allNewContactIds.push(...addResult.contactIds);
         send({
           type: 'department',
           departmentId: dept.id,
@@ -367,15 +407,28 @@ export async function findAndEnrichContactsForCompany(
 
   let enriched = 0;
   let failed = 0;
+  const deptCache = new Map<
+    string,
+    { customName: string | null; type: string; valueProp: string | null; useCase: string | null }
+  >();
   const maxEnrichRounds = 20;
   for (let round = 0; round < maxEnrichRounds; round++) {
+    if (allNewContactIds.length === 0) break;
     const pending = await prisma.contact.count({
-      where: { companyId, enrichmentStatus: 'pending' },
+      where: {
+        id: { in: allNewContactIds },
+        companyId,
+        enrichmentStatus: 'pending',
+      },
     });
     if (pending === 0) break;
     const batchSize = 10;
     const toProcess = await prisma.contact.findMany({
-      where: { companyId, enrichmentStatus: 'pending' },
+      where: {
+        id: { in: allNewContactIds },
+        companyId,
+        enrichmentStatus: 'pending',
+      },
       take: batchSize,
       select: {
         id: true,
@@ -402,10 +455,17 @@ export async function findAndEnrichContactsForCompany(
         let whyRelevant: string | undefined;
         if (c.companyDepartmentId) {
           try {
-            const dept = await prisma.companyDepartment.findUnique({
-              where: { id: c.companyDepartmentId },
-              select: { customName: true, type: true, valueProp: true, useCase: true },
-            });
+            let dept = deptCache.get(c.companyDepartmentId);
+            if (!dept) {
+              const row = await prisma.companyDepartment.findUnique({
+                where: { id: c.companyDepartmentId },
+                select: { customName: true, type: true, valueProp: true, useCase: true },
+              });
+              if (row) {
+                dept = row;
+                deptCache.set(c.companyDepartmentId, dept);
+              }
+            }
             if (dept) {
               whyRelevant = await generateWhyRelevant({
                 contactTitle: (result.data.title as string) ?? c.title ?? '',

@@ -6,8 +6,8 @@ import {
   findContactsForDepartment,
   addContactsToDepartment,
   type FoundContact,
-  type ContactTypeOption,
   type SearchScopeOption,
+  type SeniorityLevel,
 } from '@/app/actions/find-contacts';
 import {
   Dialog,
@@ -18,17 +18,18 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-const CONTACT_TYPES: { id: ContactTypeOption; label: string; sub: string }[] = [
-  { id: 'economic', label: 'Economic Buyers (VPs, C-suite)', sub: 'Budget owners, final decision makers' },
-  { id: 'technical', label: 'Technical Buyers (Directors, Managers)', sub: 'Evaluate solutions, manage implementation' },
-  { id: 'program', label: 'Program Managers (Quality, Ops)', sub: 'Run QC programs, deploy technology' },
-  { id: 'influencer', label: 'Influencers (Engineers, Specialists)', sub: 'End users, provide input' },
+const SENIORITY_OPTIONS: { id: SeniorityLevel; label: string; sub: string }[] = [
+  { id: 'c_level', label: 'C-Level', sub: 'CEO, CTO, CCO, President' },
+  { id: 'vp', label: 'VP', sub: 'Vice Presidents, SVPs, EVPs' },
+  { id: 'manager_director', label: 'Manager / Director', sub: 'Directors, Managers, Heads of' },
+  { id: 'specialist', label: 'Specialist / IC', sub: 'Engineers, Analysts, Specialists' },
 ];
 
 const SCOPE_OPTIONS: { id: SearchScopeOption; label: string }[] = [
-  { id: 'linkedin', label: 'LinkedIn (via PhantomBuster)' },
+  { id: 'apollo', label: 'Apollo (search & enrichment)' },
   { id: 'clay', label: 'Clay enrichment (emails, phones)' },
   { id: 'zoominfo', label: 'ZoomInfo (if available)' },
+  { id: 'linkedin', label: 'Apollo (search)' },
 ];
 
 type Step = 'config' | 'searching' | 'results' | 'added';
@@ -61,16 +62,16 @@ export function FindContactsModal({
   onAdded,
 }: Props) {
   const [step, setStep] = useState<Step>('config');
-  const [contactTypes, setContactTypes] = useState<ContactTypeOption[]>(['technical', 'program']);
-  const [scope, setScope] = useState<SearchScopeOption[]>(['linkedin', 'clay']);
+  const [seniority, setSeniority] = useState<SeniorityLevel[]>(['vp', 'manager_director']);
+  const [scope, setScope] = useState<SearchScopeOption[]>(['apollo', 'clay']);
   const [steps, setSteps] = useState<Array<{ step: string; detail: string }>>([]);
   const [results, setResults] = useState<FoundContact[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addedSummary, setAddedSummary] = useState<{ added: number; contacts: AddedContact[]; byPersona: Array<{ role: string; names: string[] }> } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const toggleContactType = (id: ContactTypeOption) => {
-    setContactTypes((prev) =>
+  const toggleSeniority = (id: SeniorityLevel) => {
+    setSeniority((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
@@ -85,8 +86,18 @@ export function FindContactsModal({
     setError(null);
     setStep('searching');
     setSteps([]);
-    const scopeObj = { linkedin: scope.includes('linkedin'), clay: scope.includes('clay'), zoominfo: scope.includes('zoominfo') };
-    const res = await findContactsForDepartment(companyId, departmentId, contactTypes, scopeObj);
+    const scopeObj = {
+      apollo: scope.includes('apollo'),
+      linkedin: scope.includes('linkedin'),
+      clay: scope.includes('clay'),
+      zoominfo: scope.includes('zoominfo'),
+    };
+    const res = await findContactsForDepartment(
+      companyId,
+      departmentId,
+      seniority.length > 0 ? seniority : ['vp', 'manager_director'],
+      scopeObj
+    );
     if (!res.ok) {
       setError(res.error);
       setStep('config');
@@ -193,19 +204,19 @@ export function FindContactsModal({
             <p className="text-sm text-gray-600">
               I'll search for contacts in {companyName}'s {departmentName} department.
             </p>
-            <p className="text-sm font-medium text-gray-700 mt-3">What type of contacts are you looking for?</p>
+            <p className="text-sm font-medium text-gray-700 mt-3">Seniority levels:</p>
             <div className="space-y-2 mt-2 border rounded-lg p-4 bg-gray-50">
-              {CONTACT_TYPES.map((t) => (
-                <label key={t.id} className="flex items-start gap-3 cursor-pointer">
+              {SENIORITY_OPTIONS.map((s) => (
+                <label key={s.id} className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={contactTypes.includes(t.id)}
-                    onChange={() => toggleContactType(t.id)}
+                    checked={seniority.includes(s.id)}
+                    onChange={() => toggleSeniority(s.id)}
                     className="mt-1 rounded border-gray-300"
                   />
                   <div>
-                    <span className="text-sm font-medium">{t.label}</span>
-                    <p className="text-xs text-gray-500">{t.sub}</p>
+                    <span className="text-sm font-medium">{s.label}</span>
+                    <p className="text-xs text-gray-500">{s.sub}</p>
                   </div>
                 </label>
               ))}
@@ -228,7 +239,12 @@ export function FindContactsModal({
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSearch} disabled={contactTypes.length === 0 || !scope.includes('linkedin')}>
+              <Button
+                onClick={handleSearch}
+                disabled={
+                  (seniority.length === 0) || (!scope.includes('apollo') && !scope.includes('linkedin'))
+                }
+              >
                 Search
               </Button>
             </DialogFooter>
@@ -237,7 +253,9 @@ export function FindContactsModal({
 
         {step === 'searching' && (
           <>
-            <p className="text-sm text-gray-600">Searching LinkedIn for contacts...</p>
+            <p className="text-sm text-gray-600">
+              {scope.includes('apollo') ? 'Searching Apollo for contacts…' : 'Searching for contacts…'}
+            </p>
             <div className="mt-4 space-y-2">
               {steps.map((s, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
@@ -369,11 +387,6 @@ export function FindContactsModal({
               <Button asChild>
                 <Link href={`/chat?play=expansion&accountId=${companyId}`}>
                   Launch Multi-Contact Play
-                </Link>
-              </Button>
-              <Button variant="secondary" asChild>
-                <Link href={`/chat?play=expansion&accountId=${companyId}`}>
-                  Draft Emails for All
                 </Link>
               </Button>
             </DialogFooter>

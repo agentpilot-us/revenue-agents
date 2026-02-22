@@ -21,6 +21,10 @@ export type FindContactsForSegmentParams = {
   companyName: string;
   /** Role/title hints from department (e.g. targetRoles). */
   targetRoles?: string[];
+  /** Keywords for USE_CASE/DIVISIONAL segments (e.g. "autonomous driving ADAS"). */
+  keywords?: string[];
+  /** Apollo seniority filter (from resolveSearchContext). */
+  seniorityLevels?: string[];
   maxResults?: number;
   provider?: 'apollo' | 'clay';
 };
@@ -52,12 +56,14 @@ async function findViaApollo(
 ): Promise<ContactFinderResult[]> {
   const domain =
     params.companyDomain.replace(/^www\./, '').split('/')[0] || params.companyDomain;
-  const seniorityLevels = ['vp', 'director', 'manager', 'c_suite', 'senior'];
+  const seniorityLevels =
+    params.seniorityLevels?.length ? params.seniorityLevels : ['vp', 'director', 'manager', 'c_suite', 'senior'];
 
   const result = await searchApolloContacts({
     companyDomain: domain,
     companyName: params.companyName,
     titles: params.targetRoles?.length ? params.targetRoles : undefined,
+    keywords: params.keywords?.length ? params.keywords : undefined,
     seniorityLevels,
     maxResults: params.maxResults ?? 15,
   });

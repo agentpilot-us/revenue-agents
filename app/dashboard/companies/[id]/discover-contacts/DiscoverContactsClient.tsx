@@ -6,10 +6,17 @@ import {
   findContactsForDepartment,
   addContactsToDepartment,
   type FoundContact,
-  type ContactTypeOption,
   type SearchScopeOption,
+  type SeniorityLevel,
 } from '@/app/actions/find-contacts';
 import { Button } from '@/components/ui/button';
+
+const SENIORITY_OPTIONS: { id: SeniorityLevel; label: string }[] = [
+  { id: 'c_level', label: 'C-Level' },
+  { id: 'vp', label: 'VP' },
+  { id: 'manager_director', label: 'Manager / Director' },
+  { id: 'specialist', label: 'Specialist / IC' },
+];
 
 type Department = { id: string; type: string; customName: string | null };
 
@@ -27,13 +34,20 @@ export function DiscoverContactsClient({
   initialDepartmentId,
 }: Props) {
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? '');
-  const [scope, setScope] = useState<SearchScopeOption[]>(['linkedin', 'clay']);
+  const [seniority, setSeniority] = useState<SeniorityLevel[]>(['vp', 'manager_director']);
+  const [scope, setScope] = useState<SearchScopeOption[]>(['apollo', 'clay']);
   const [step, setStep] = useState<'config' | 'running' | 'results' | 'error'>('config');
   const [steps, setSteps] = useState<Array<{ step: string; detail: string }>>([]);
   const [results, setResults] = useState<FoundContact[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+
+  const toggleSeniority = (id: SeniorityLevel) => {
+    setSeniority((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const toggleScope = (id: SearchScopeOption) => {
     setScope((prev) =>
@@ -50,6 +64,7 @@ export function DiscoverContactsClient({
     setErrorMessage(null);
     setResults([]);
     const scopeObj = {
+      apollo: scope.includes('apollo'),
       linkedin: scope.includes('linkedin'),
       clay: scope.includes('clay'),
       zoominfo: scope.includes('zoominfo'),
@@ -58,7 +73,7 @@ export function DiscoverContactsClient({
       const res = await findContactsForDepartment(
         companyId,
         departmentId,
-        ['technical', 'program'],
+        seniority.length > 0 ? seniority : ['vp', 'manager_director'],
         scopeObj
       );
       if (!res.ok) {
@@ -159,10 +174,28 @@ export function DiscoverContactsClient({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Seniority levels
+            </label>
+            <div className="flex flex-wrap gap-4">
+              {SENIORITY_OPTIONS.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+                  <input
+                    type="checkbox"
+                    checked={seniority.includes(s.id)}
+                    onChange={() => toggleSeniority(s.id)}
+                    className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
+                  />
+                  <span className="text-sm">{s.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Data sources
             </label>
             <div className="flex flex-wrap gap-4">
-              {(['linkedin', 'clay', 'zoominfo'] as const).map((id) => (
+              {(['apollo', 'clay', 'zoominfo', 'linkedin'] as const).map((id) => (
                 <label key={id} className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
                   <input
                     type="checkbox"
@@ -171,9 +204,10 @@ export function DiscoverContactsClient({
                     className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
                   />
                   <span className="text-sm">
-                    {id === 'linkedin' && 'LinkedIn'}
+                    {id === 'apollo' && 'Apollo (search & enrichment)'}
                     {id === 'clay' && 'Clay (enrich email/phone)'}
                     {id === 'zoominfo' && 'ZoomInfo'}
+                    {id === 'linkedin' && 'Apollo (search)'}
                   </span>
                 </label>
               ))}
@@ -182,7 +216,14 @@ export function DiscoverContactsClient({
           {errorMessage && (
             <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
           )}
-          <Button onClick={runDiscovery} disabled={!departmentId}>
+          <Button
+            onClick={runDiscovery}
+            disabled={
+              !departmentId ||
+              seniority.length === 0 ||
+              (!scope.includes('apollo') && !scope.includes('linkedin'))
+            }
+          >
             Run contact discovery
           </Button>
         </div>
