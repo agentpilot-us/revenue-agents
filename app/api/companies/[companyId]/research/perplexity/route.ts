@@ -6,7 +6,7 @@ import { runPerplexityResearchOnly } from '@/lib/research/research-company';
 export const maxDuration = 60;
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
@@ -26,10 +26,14 @@ export async function POST(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
+    const body = await req.json().catch(() => ({}));
+    const userGoal = typeof body.userGoal === 'string' ? body.userGoal.trim() || undefined : undefined;
+
     const result = await runPerplexityResearchOnly(
       company.name,
       company.domain ?? undefined,
-      session.user.id
+      session.user.id,
+      userGoal
     );
 
     if (!result.ok) {

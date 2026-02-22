@@ -31,6 +31,8 @@ type PromptOptions = {
   contentLibrary?: ContentLibraryContext;
   /** RAG chunk contents from uploaded Content Library files (for value props and proof points). */
   ragChunks?: string[];
+  /** Rep's targeting intent — prioritize these buying groups, then suggest 2–3 additional. */
+  userGoal?: string;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -73,6 +75,14 @@ ${departmentTypes}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YOUR TASK: ACCOUNT INTELLIGENCE SYNTHESIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${options?.userGoal?.trim() ? `
+SALES REP TARGETING GOAL:
+${options.userGoal.trim()}
+
+Use this goal to prioritize which buying groups to identify.
+Return the groups the rep specified first, then suggest 2–3 additional
+groups that fit their product based on the account's structure.
+` : ''}
 
 Given the target company research below, produce the following sections:
 

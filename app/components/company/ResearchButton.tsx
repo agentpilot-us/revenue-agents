@@ -13,9 +13,11 @@ type Props = {
   onComplete?: (data: unknown) => void;
   /** Optional button label when not researching (default: "Research with AI"). Use e.g. "Re-run research" for step 2. */
   label?: string;
+  /** Optional targeting goal — shapes Perplexity query and structuring so output matches rep intent. */
+  userGoal?: string;
 };
 
-export function ResearchButton({ companyId, companyName, onComplete, label = 'Research with AI' }: Props) {
+export function ResearchButton({ companyId, companyName, onComplete, label = 'Research with AI', userGoal }: Props) {
   const [researchStatus, setResearchStatus] = useState<ResearchStatus>(null);
   const [researchData, setResearchData] = useState<unknown>(null);
   const [showModal, setShowModal] = useState(false);
@@ -27,8 +29,11 @@ export function ResearchButton({ companyId, companyName, onComplete, label = 'Re
     setResearchStatus('perplexity');
     setError(null);
     try {
+      const goalPayload = userGoal?.trim() ? { userGoal: userGoal.trim() } : {};
       const res = await fetch(`/api/companies/${companyId}/research/perplexity`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(goalPayload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -42,7 +47,10 @@ export function ResearchButton({ companyId, companyName, onComplete, label = 'Re
       const structureRes = await fetch(`/api/companies/${companyId}/research/structure`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ summary: data.summary }),
+        body: JSON.stringify({
+          summary: data.summary,
+          ...(userGoal?.trim() ? { userGoal: userGoal.trim() } : {}),
+        }),
       });
       const structureData = await structureRes.json();
       if (!structureRes.ok) {

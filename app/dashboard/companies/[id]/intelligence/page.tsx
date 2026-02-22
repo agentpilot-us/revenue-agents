@@ -21,6 +21,7 @@ export default async function AccountIntelligencePage({
       id: true,
       name: true,
       researchData: true,
+      researchGoal: true,
       accountMessaging: { select: { id: true } },
       _count: { select: { departments: true } },
     },
@@ -44,6 +45,7 @@ export default async function AccountIntelligencePage({
           hasMessaging={hasMessaging}
           departmentCount={departmentCount}
           researchDone={researchDoneParam === '1'}
+          researchGoal={company.researchGoal ?? undefined}
         />
       </div>
     </div>

@@ -19,6 +19,8 @@ type Props = {
   companyName: string;
   researchData: CompanyResearchData;
   onSaved: () => void;
+  /** Goal used for this research run; persisted to company when user saves. */
+  researchGoal?: string | null;
 };
 
 export function InlineResearchReviewPanel({
@@ -26,6 +28,7 @@ export function InlineResearchReviewPanel({
   companyName,
   researchData,
   onSaved,
+  researchGoal,
 }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -67,9 +70,10 @@ export function InlineResearchReviewPanel({
         };
       });
 
-      const payload: CompanyResearchData = {
+      const payload: CompanyResearchData & { researchGoal?: string | null } = {
         ...researchData,
         microSegments,
+        ...(researchGoal != null && researchGoal !== '' ? { researchGoal: researchGoal.trim() } : {}),
       };
 
       const res = await fetch(`/api/companies/${companyId}/apply-research`, {

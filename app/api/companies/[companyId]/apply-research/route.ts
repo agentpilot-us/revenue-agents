@@ -79,6 +79,9 @@ export async function POST(
       productsLinked: 0,
     };
 
+    const researchGoal =
+      typeof body.researchGoal === 'string' ? body.researchGoal.trim() || null : null;
+
     if (isNewSchema(body)) {
       const researchData = companyResearchSchema.parse(body);
 
@@ -96,6 +99,7 @@ export async function POST(
           keyInitiatives: researchData.keyInitiatives,
           segmentationStrategy: researchData.segmentationStrategy ?? undefined,
           segmentationRationale: researchData.segmentationRationale ?? undefined,
+          researchGoal: researchGoal ?? undefined,
           researchData: body,
         },
       });
@@ -185,6 +189,7 @@ export async function POST(
           revenue: researchData.companyBasics.revenue ?? company.revenue,
           businessOverview: researchData.whatTheyDo.summary,
           keyInitiatives: researchData.whatTheyDo.keyInitiatives,
+          researchGoal: researchGoal ?? undefined,
           researchData: body,
         },
       });

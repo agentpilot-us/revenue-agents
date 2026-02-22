@@ -122,6 +122,7 @@ model Company {
   businessOverview      String? @db.Text // "What they do" summary
   keyInitiatives        Json? // Array of initiative strings
   researchData          Json? // Store raw AI research response for reference
+  researchGoal          String? @db.Text // Rep's targeting intent (e.g. "Target enterprise AEs across Financial Services, Healthcare")
   segmentationStrategy  String? // FUNCTIONAL | USE_CASE | DIVISIONAL | HYBRID
   segmentationRationale String? @db.Text
 

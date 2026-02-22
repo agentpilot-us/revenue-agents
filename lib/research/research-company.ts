@@ -27,7 +27,8 @@ export type PerplexityOnlyResult =
 export async function runPerplexityResearchOnly(
   companyName: string,
   companyDomain: string | undefined,
-  userId: string
+  userId: string,
+  userGoal?: string
 ): Promise<PerplexityOnlyResult> {
   if (!userId) {
     return {
@@ -90,7 +91,9 @@ export async function runPerplexityResearchOnly(
   }
 
   const productNames = productNamesForQuery;
-  const researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
+  const researchQuery = userGoal?.trim()
+    ? `${companyName} organization structure, departments relevant to: ${userGoal.trim()}. Include headcount, key initiatives, and leadership for those teams. Also include company basics: website, industry, employee count, headquarters, revenue.`
+    : `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
 
 1. COMPANY BASICS: official name, website, industry, employee count, headquarters, annual revenue
 
@@ -126,7 +129,8 @@ export async function structureResearchWithClaude(
   companyName: string,
   companyDomain: string | undefined,
   perplexitySummary: string,
-  userId: string
+  userId: string,
+  userGoal?: string
 ): Promise<ResearchCompanyResult> {
   try {
     if (!userId) {
@@ -229,6 +233,7 @@ export async function structureResearchWithClaude(
       sellerDescription: sellerDescription ?? undefined,
       contentLibrary: contentLibrary ?? undefined,
       ragChunks: ragChunks.length > 0 ? ragChunks : undefined,
+      userGoal: userGoal?.trim() || undefined,
     });
 
     if (
@@ -252,9 +257,14 @@ export async function structureResearchWithClaude(
       ? `\nIMPORTANT: Use the Content Library entries above to ground your value propositions and proof points. Reference specific use cases, case studies, or industry playbooks by name where they are relevant to this account.`
       : `\nNOTE: No Content Library entries are available yet. Generate value propositions based on the product catalog and what you know about the target company's priorities.`;
 
+    const userGoalBlock =
+      userGoal?.trim() ?
+        `\nSALES REP TARGETING GOAL (prioritize these groups, then suggest 2–3 more):\n${userGoal.trim()}\n\n`
+      : '';
+
     const userPrompt = `TARGET COMPANY: ${companyName}
 ${companyDomain ? `Domain: ${companyDomain}` : ''}
-
+${userGoalBlock}
 RESEARCH DATA (from web search):
 ${perplexitySummary}
 

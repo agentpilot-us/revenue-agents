@@ -34,12 +34,14 @@ export async function POST(
         { status: 400 }
       );
     }
+    const userGoal = typeof body.userGoal === 'string' ? body.userGoal.trim() || undefined : undefined;
 
     const result = await structureResearchWithClaude(
       company.name,
       company.domain ?? undefined,
       summary,
-      session.user.id
+      session.user.id,
+      userGoal
     );
 
     if (!result.ok) {
