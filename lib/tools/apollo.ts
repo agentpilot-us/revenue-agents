@@ -56,7 +56,6 @@ export async function searchApolloContacts(
 
   try {
     const body: Record<string, unknown> = {
-      api_key: apiKey,
       q_organization_domains: [params.companyDomain],
       per_page: maxResults,
       page: 1,
@@ -73,7 +72,10 @@ export async function searchApolloContacts(
 
     const res = await fetch('https://api.apollo.io/api/v1/mixed_people/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+      },
       body: JSON.stringify(body),
     });
 
