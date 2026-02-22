@@ -137,7 +137,7 @@ export function AccountIntelligenceClient({
               researchData={pendingResearchData}
               researchGoal={userGoal.trim() || undefined}
               onSaved={() =>
-                router.push(`/dashboard/companies/${companyId}/intelligence?researchDone=1`)
+                router.push(`/dashboard/companies/${companyId}/contacts?onboarding=1`)
               }
             />
           )}

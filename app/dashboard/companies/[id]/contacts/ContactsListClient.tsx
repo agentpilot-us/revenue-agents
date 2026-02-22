@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { CrmImportPushCard } from '@/app/components/company/CrmImportPushCard';
 import { Spinner } from '@/components/ui/spinner';
@@ -20,7 +20,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Users, CheckCircle2, Info, Columns2, Linkedin, Upload, UserPlus, Circle } from 'lucide-react';
+import { Users, CheckCircle2, Info, Columns2, Linkedin, Upload, UserPlus, Circle, X } from 'lucide-react';
 
 type ContactRow = {
   id: string;
@@ -129,12 +129,14 @@ export function ContactsListClient({
   companyCrm,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'responsive' | 'dormant'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [enriching, setEnriching] = useState(false);
   const [enrichmentBannerDismissed, setEnrichmentBannerDismissed] = useState(false);
+  const [onboardingBannerDismissed, setOnboardingBannerDismissed] = useState(false);
   const [findAndEnrichRunning, setFindAndEnrichRunning] = useState(false);
   const [findAndEnrichStatus, setFindAndEnrichStatus] = useState<string | null>(null);
   const [findAndEnrichResult, setFindAndEnrichResult] = useState<{
@@ -146,6 +148,27 @@ export function ContactsListClient({
   const pendingCount = initialContacts.filter((c) => c.enrichmentStatus === 'pending').length;
   const showEnrichmentBanner =
     (pendingCount > 0 || enriching) && !enrichmentBannerDismissed;
+
+  const isOnboarding = searchParams.get('onboarding') === '1';
+  const showOnboardingBanner =
+    isOnboarding &&
+    departments.length > 0 &&
+    !onboardingBannerDismissed;
+
+  const handleDismissOnboardingBanner = useCallback(() => {
+    setOnboardingBannerDismissed(true);
+    router.replace(`/dashboard/companies/${companyId}/contacts`);
+  }, [companyId, router]);
+
+  // Scroll to buying groups when landing from research with segments ready
+  useEffect(() => {
+    if (!showOnboardingBanner || departments.length === 0) return;
+    const el = document.getElementById('buying-groups');
+    if (el) {
+      const t = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+      return () => clearTimeout(t);
+    }
+  }, [showOnboardingBanner, departments.length]);
 
   const columnsHasData = useMemo(
     () => ({
@@ -327,6 +350,27 @@ export function ContactsListClient({
 
   return (
     <div className="space-y-4">
+      {/* Just arrived from research: segments ready — find the people */}
+      {showOnboardingBanner && (
+        <div
+          id="onboarding-banner"
+          className="flex items-center justify-between gap-4 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-slate-200"
+          role="status"
+        >
+          <span>
+            Your {departments.length} buying segment{departments.length === 1 ? '' : 's'} are ready — find the people below.
+          </span>
+          <button
+            type="button"
+            onClick={handleDismissOnboardingBanner}
+            className="shrink-0 p-1 rounded hover:bg-green-500/20 text-slate-400 hover:text-white"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Step 3 sub-progress */}
       <div className="rounded-lg border border-zinc-600 bg-zinc-800/50 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -377,7 +421,7 @@ export function ContactsListClient({
       </div>
 
       {/* Buying groups from Account Intelligence — Find contacts per group */}
-      <div className="rounded-lg border border-zinc-600 p-4 bg-zinc-800/80">
+      <div id="buying-groups" className="rounded-lg border border-zinc-600 p-4 bg-zinc-800/80">
         <h3 className="font-medium text-slate-100 text-sm mb-1">Buying groups</h3>
         <p className="text-xs text-slate-400 mb-4">
           Departments from Account Intelligence. Find contacts for each group.
