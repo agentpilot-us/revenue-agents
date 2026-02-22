@@ -465,15 +465,6 @@ export default async function CompanyDetailPage({
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}
             engagementByDept={engagementByDept}
-            nextStepBar={{
-              hasResearch,
-              hasDepartments,
-              hasMessaging,
-              hasContacts,
-              hasContent,
-              hasCampaign,
-              campaignUrl: campaigns[0]?.url ?? null,
-            }}
           />
         </div>
       </div>

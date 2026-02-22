@@ -95,15 +95,15 @@ type CompanyTabsProps = {
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'departments', label: 'Buying Groups' },
-  { id: 'overview', label: 'Overview' },
   { id: 'contacts', label: 'Contacts' },
+  { id: 'messaging', label: 'Messaging' },
   { id: 'content', label: 'Content' },
+  { id: 'campaigns', label: 'Sales Page' },
   { id: 'engagement', label: 'Engagement' },
   { id: 'activity', label: 'Activity' },
-  { id: 'messaging', label: 'Messaging' },
-  { id: 'campaigns', label: 'Sales Page' },
-  { id: 'map', label: 'Account Map' },
+  { id: 'overview', label: 'Overview' },
   { id: 'expansion', label: 'Expansion' },
+  { id: 'map', label: 'Account Map' },
 ];
 
 export function CompanyTabs({
@@ -528,28 +528,28 @@ function ExpansionStrategySection({
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">Expansion Strategy Recommendation</h2>
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Where to focus first</h2>
       <div className="space-y-3 text-sm">
         {strategy.phase1.length > 0 && (
           <p>
-            <span className="font-medium text-gray-700">Phase 1:</span> Focus on{' '}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Phase 1:</span> Focus on{' '}
             {strategy.phase1.join(', ')} (highest fit scores, budget signals detected).
           </p>
         )}
         {strategy.phase2.length > 0 && (
           <p>
-            <span className="font-medium text-gray-700">Phase 2:</span> Upsell in {strategy.phase2.join(', ')}{' '}
+            <span className="font-medium text-gray-700 dark:text-gray-300">Phase 2:</span> Upsell in {strategy.phase2.join(', ')}{' '}
             (leverage existing relationship).
           </p>
         )}
         {strategy.phase3.length > 0 && (
           <p>
-            <span className="font-medium text-gray-700">Phase 3:</span> {strategy.phase3.join(', ')} (longer cycle or lower priority).
+            <span className="font-medium text-gray-700 dark:text-gray-300">Phase 3:</span> {strategy.phase3.join(', ')} (longer cycle or lower priority).
           </p>
         )}
       </div>
-      <Link href={`/chat?play=expansion&accountId=${companyId}`} className="inline-block mt-4">
-        <Button variant="outline">Chat with AI about strategy</Button>
+      <Link href={`/dashboard/companies/${companyId}/contacts`} className="inline-block mt-4">
+        <Button>Find contacts for Phase 1 segments</Button>
       </Link>
     </div>
   );

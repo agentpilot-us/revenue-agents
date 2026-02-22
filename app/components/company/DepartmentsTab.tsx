@@ -151,20 +151,29 @@ export function DepartmentsTab({
         </div>
       )}
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold">Departments</h2>
           <p className="text-gray-600">
             Track expansion opportunities by department
           </p>
         </div>
-        <Button
-          onClick={handleDiscover}
-          disabled={discovering}
-          variant="outline"
-        >
-          {discovering ? 'Discovering…' : 'Discover More'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {departments.length > 0 && (
+            <Button asChild>
+              <Link href={`/dashboard/companies/${companyId}/contacts`}>
+                Find & enrich all segments
+              </Link>
+            </Button>
+          )}
+          <Button
+            onClick={handleDiscover}
+            disabled={discovering}
+            variant="outline"
+          >
+            {discovering ? 'Discovering…' : 'Discover More'}
+          </Button>
+        </div>
       </div>
 
       {discovered.length > 0 && (
@@ -304,9 +313,15 @@ function BuyingGroupCard({
           <h3 className="text-xl font-semibold">
             {dept.customName || dept.type.replace(/_/g, ' ')}
           </h3>
-          <Badge className={statusColors[dept.status]}>
-            {statusIcons[dept.status]} {dept.status.replace(/_/g, ' ')}
-          </Badge>
+          {dept.status === DepartmentStatus.RESEARCH_PHASE ? (
+            <Badge className="bg-gray-100 text-gray-700 border-gray-200 dark:bg-zinc-700 dark:text-zinc-300 dark:border-zinc-600">
+              {dept._count.contacts} contact{dept._count.contacts !== 1 ? 's' : ''}
+            </Badge>
+          ) : (
+            <Badge className={statusColors[dept.status]}>
+              {statusIcons[dept.status]} {dept.status.replace(/_/g, ' ')}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -529,11 +544,13 @@ function BuyingGroupCard({
             View Contacts
           </Link>
         </Button>
-        <Button size="sm" asChild>
-          <Link href={`/chat?play=expansion&accountId=${companyId}&departmentId=${dept.id}`}>
-            Start Expansion Play
-          </Link>
-        </Button>
+        {dept._count.contacts > 0 && (
+          <Button size="sm" asChild>
+            <Link href={`/chat?play=expansion&accountId=${companyId}&departmentId=${dept.id}`}>
+              Start Expansion Play
+            </Link>
+          </Button>
+        )}
         {dept.contacts.length > 0 && (
           <Button size="sm" variant="secondary" asChild>
             <Link
