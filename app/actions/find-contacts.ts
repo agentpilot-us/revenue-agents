@@ -6,11 +6,11 @@ import { prisma } from '@/lib/db';
 import { findContactsForSegment } from '@/lib/tools/contact-finder';
 import { enrichContact } from '@/lib/tools/clay';
 import { generateWhyRelevant } from '@/lib/contacts/why-relevant';
-import { resolveSearchContext, type SeniorityLevel } from '@/lib/contacts/resolve-search-context';
+import type { SeniorityLevel } from '@/lib/contacts/resolve-search-context';
+import { resolveSearchContext } from '@/lib/contacts/resolve-search-context';
 import { matchPersona } from '@/app/actions/match-persona';
 import { DepartmentType } from '@prisma/client';
 
-export type { SeniorityLevel };
 export type SearchScopeOption = 'apollo' | 'linkedin' | 'clay' | 'zoominfo';
 
 export type FoundContact = {

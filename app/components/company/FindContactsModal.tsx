@@ -7,8 +7,8 @@ import {
   addContactsToDepartment,
   type FoundContact,
   type SearchScopeOption,
-  type SeniorityLevel,
 } from '@/app/actions/find-contacts';
+import type { SeniorityLevel } from '@/lib/contacts/resolve-search-context';
 import {
   Dialog,
   DialogContent,
