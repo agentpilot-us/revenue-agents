@@ -17,6 +17,8 @@ type Props = {
   hasMessaging: boolean;
   departmentCount: number;
   researchDone?: boolean;
+  /** Stored goal from last research run; shown in step 1 done state. */
+  researchGoal?: string | null;
 };
 
 export function AccountIntelligenceClient({
@@ -27,6 +29,7 @@ export function AccountIntelligenceClient({
   hasMessaging,
   departmentCount,
   researchDone = false,
+  researchGoal,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -35,6 +38,7 @@ export function AccountIntelligenceClient({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [pendingResearchData, setPendingResearchData] = useState<CompanyResearchData | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [userGoal, setUserGoal] = useState('');
 
   const showBanner = researchDone && hasResearch && !bannerDismissed;
 
@@ -102,10 +106,22 @@ export function AccountIntelligenceClient({
             <li>• Product fit analysis</li>
             <li>• Ready-to-use copy for outreach</li>
           </ul>
-          <div className="mt-6">
+          <div className="mt-6 space-y-3">
+            <label className="text-sm text-slate-300 font-medium">
+              What are you trying to accomplish?{' '}
+              <span className="text-slate-500 font-normal">(optional)</span>
+            </label>
+            <textarea
+              value={userGoal}
+              onChange={(e) => setUserGoal(e.target.value)}
+              placeholder="e.g. Target enterprise AEs at Salesforce across Financial Services, Healthcare, and Tech verticals"
+              rows={3}
+              className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-600 text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
             <ResearchButton
               companyId={companyId}
               companyName={companyName}
+              userGoal={userGoal.trim() || undefined}
               onComplete={(data) => {
                 const parsed = data as CompanyResearchData;
                 if (parsed && Array.isArray(parsed.microSegments) && parsed.microSegments.length > 0) {
@@ -119,6 +135,7 @@ export function AccountIntelligenceClient({
               companyId={companyId}
               companyName={companyName}
               researchData={pendingResearchData}
+              researchGoal={userGoal.trim() || undefined}
               onSaved={() =>
                 router.push(`/dashboard/companies/${companyId}/intelligence?researchDone=1`)
               }
@@ -164,6 +181,11 @@ export function AccountIntelligenceClient({
               </span>
             </div>
             <p className="text-sm text-slate-400 mt-1">{step1Summary}</p>
+            {researchGoal?.trim() && (
+              <p className="text-sm text-slate-500 mt-1.5">
+                Goal: {researchGoal.trim()}
+              </p>
+            )}
           </div>
         </section>
 
@@ -212,6 +234,7 @@ export function AccountIntelligenceClient({
               companyId={companyId}
               companyName={companyName}
               label={hasResearch ? 'Re-run research' : undefined}
+              userGoal={researchGoal?.trim() || undefined}
               onComplete={(data) => {
                 const parsed = data as CompanyResearchData;
                 if (parsed && Array.isArray(parsed.microSegments) && parsed.microSegments.length > 0) {
@@ -228,6 +251,7 @@ export function AccountIntelligenceClient({
               companyId={companyId}
               companyName={companyName}
               researchData={pendingResearchData}
+              researchGoal={researchGoal?.trim() || undefined}
               onSaved={() => {
                 setPendingResearchData(null);
                 router.refresh();
