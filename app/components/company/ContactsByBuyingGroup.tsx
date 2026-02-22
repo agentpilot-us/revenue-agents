@@ -18,6 +18,7 @@ type Contact = {
   enrichmentStatus: string | null;
   isWarm: boolean;
   buyingRole: string | null;
+  whyRelevant: string | null;
 };
 
 type DepartmentGroup = {
@@ -212,6 +213,11 @@ function ContactRow({ contact }: { contact: Contact }) {
               </Badge>
             )}
           </div>
+          {contact.whyRelevant && (
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 italic">
+              {contact.whyRelevant}
+            </p>
+          )}
           <div className="text-sm text-gray-600 dark:text-gray-400 space-x-3 mt-1">
             {contact.title && <span>{contact.title}</span>}
             {contact.email && (

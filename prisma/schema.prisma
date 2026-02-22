@@ -211,7 +211,7 @@ model Contact {
   photoUrl            String?
   bio                 String?            @db.Text
   enrichedData        Json?
-  enrichmentStatus    String? // pending | enriching | complete | failed
+  enrichmentStatus    String? // pending | enriching | complete | failed | not_needed
   enrichedAt          DateTime?
 
   city    String?

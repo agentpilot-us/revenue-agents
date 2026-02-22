@@ -135,6 +135,14 @@ export function ContactsListClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [enriching, setEnriching] = useState(false);
   const [enrichmentBannerDismissed, setEnrichmentBannerDismissed] = useState(false);
+  const [findAndEnrichRunning, setFindAndEnrichRunning] = useState(false);
+  const [findAndEnrichStatus, setFindAndEnrichStatus] = useState<string | null>(null);
+  const [findAndEnrichResult, setFindAndEnrichResult] = useState<{
+    departmentsProcessed: number;
+    contactsAdded: number;
+    enriched: number;
+    failed: number;
+  } | null>(null);
   const pendingCount = initialContacts.filter((c) => c.enrichmentStatus === 'pending').length;
   const showEnrichmentBanner =
     (pendingCount > 0 || enriching) && !enrichmentBannerDismissed;
@@ -236,6 +244,83 @@ export function ContactsListClient({
     }, 100);
   };
 
+  const handleFindAndEnrichAll = useCallback(async () => {
+    setFindAndEnrichRunning(true);
+    setFindAndEnrichStatus('Finding contacts for all segments…');
+    setFindAndEnrichResult(null);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contacts/find-and-enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Find and enrich failed');
+      }
+      if (!res.body) {
+        throw new Error('No response stream');
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as {
+              type: string;
+              departmentCount?: number;
+              departmentName?: string;
+              contactsAdded?: number;
+              departmentsProcessed?: number;
+              enriched?: number;
+              failed?: number;
+              message?: string;
+            };
+            if (event.type === 'started') {
+              setFindAndEnrichStatus(`Finding contacts for ${event.departmentCount ?? 0} departments…`);
+            } else if (event.type === 'department') {
+              setFindAndEnrichStatus(
+                `Added ${event.contactsAdded ?? 0} to ${event.departmentName ?? 'segment'}. Finding more…`
+              );
+            } else if (event.type === 'enriching') {
+              setFindAndEnrichStatus('Enriching contacts…');
+            } else if (event.type === 'complete') {
+              setFindAndEnrichResult({
+                departmentsProcessed: event.departmentsProcessed ?? 0,
+                contactsAdded: event.contactsAdded ?? 0,
+                enriched: event.enriched ?? 0,
+                failed: event.failed ?? 0,
+              });
+              setFindAndEnrichStatus(null);
+              toast.success(
+                `Added ${event.contactsAdded ?? 0} contacts, enriched ${event.enriched ?? 0}.`
+              );
+              router.refresh();
+              scrollToContactsTable();
+            } else if (event.type === 'error') {
+              setFindAndEnrichStatus(null);
+              toast.error(event.message ?? 'Find and enrich failed');
+            }
+          } catch {
+            // skip malformed SSE line
+          }
+        }
+      }
+    } catch (e) {
+      setFindAndEnrichStatus(null);
+      toast.error(e instanceof Error ? e.message : 'Find and enrich failed');
+    } finally {
+      setFindAndEnrichRunning(false);
+    }
+  }, [companyId, router]);
+
   const deptsWithContacts = departments.filter((d) => (d.contactCount ?? 0) > 0).length;
   const allEnriched = initialContacts.length > 0 && initialContacts.every((c) => c.enrichmentStatus === 'complete');
   const canProceedToOutreach = initialContacts.length > 0;
@@ -298,7 +383,29 @@ export function ContactsListClient({
           Departments from Account Intelligence. Find contacts for each group.
         </p>
         {departments.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <>
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <Button
+                onClick={handleFindAndEnrichAll}
+                disabled={findAndEnrichRunning}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {findAndEnrichRunning ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" />
+                    {findAndEnrichStatus ?? 'Running…'}
+                  </>
+                ) : (
+                  'Find & enrich all segments'
+                )}
+              </Button>
+              {findAndEnrichResult && !findAndEnrichRunning && (
+                <span className="text-sm text-slate-400">
+                  {findAndEnrichResult.contactsAdded} added, {findAndEnrichResult.enriched} enriched
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {departments.map((dept) => (
               <div
                 key={dept.id}
@@ -335,7 +442,8 @@ export function ContactsListClient({
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         ) : (
           <div className="flex items-center justify-between gap-4 rounded-lg border border-zinc-600 bg-zinc-800/50 px-4 py-3">
             <p className="text-sm text-slate-400">

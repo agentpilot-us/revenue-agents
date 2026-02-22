@@ -34,6 +34,7 @@ export async function GET(
         companyDepartmentId: true,
         personaId: true,
         enrichmentStatus: true,
+        enrichedData: true,
         persona: {
           select: {
             name: true,
@@ -121,6 +122,7 @@ export async function GET(
         enrichmentStatus: string | null;
         isWarm: boolean;
         buyingRole: string | null;
+        whyRelevant: string | null;
       }>;
     };
 
@@ -131,18 +133,22 @@ export async function GET(
         type: dept.type,
         targetRoles: dept.targetRoles,
       },
-      contacts: (contactsByDept[dept.id] || []).map((c) => ({
-        id: c.id,
-        firstName: c.firstName,
-        lastName: c.lastName,
-        title: c.title,
-        email: c.email,
-        linkedinUrl: c.linkedinUrl,
-        personaName: c.persona?.name ?? null,
-        enrichmentStatus: c.enrichmentStatus,
-        isWarm: c.email ? warmEmails.has(c.email) : false,
-        buyingRole: c.persona?.name ?? null, // Could be enhanced to match persona to department targetRoles
-      })),
+      contacts: (contactsByDept[dept.id] || []).map((c) => {
+        const enriched = c.enrichedData as { whyRelevant?: string } | null;
+        return {
+          id: c.id,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          title: c.title,
+          email: c.email,
+          linkedinUrl: c.linkedinUrl,
+          personaName: c.persona?.name ?? null,
+          enrichmentStatus: c.enrichmentStatus,
+          isWarm: c.email ? warmEmails.has(c.email) : false,
+          buyingRole: c.persona?.name ?? null,
+          whyRelevant: enriched?.whyRelevant ?? null,
+        };
+      }),
     }));
 
     // Add unassigned contacts
@@ -154,18 +160,22 @@ export async function GET(
           type: null,
           targetRoles: null,
         },
-        contacts: unassignedContacts.map((c) => ({
-          id: c.id,
-          firstName: c.firstName,
-          lastName: c.lastName,
-          title: c.title,
-          email: c.email,
-          linkedinUrl: c.linkedinUrl,
-          personaName: c.persona?.name ?? null,
-          enrichmentStatus: c.enrichmentStatus,
-          isWarm: c.email ? warmEmails.has(c.email) : false,
-          buyingRole: c.persona?.name ?? null,
-        })),
+        contacts: unassignedContacts.map((c) => {
+          const enriched = c.enrichedData as { whyRelevant?: string } | null;
+          return {
+            id: c.id,
+            firstName: c.firstName,
+            lastName: c.lastName,
+            title: c.title,
+            email: c.email,
+            linkedinUrl: c.linkedinUrl,
+            personaName: c.persona?.name ?? null,
+            enrichmentStatus: c.enrichmentStatus,
+            isWarm: c.email ? warmEmails.has(c.email) : false,
+            buyingRole: c.persona?.name ?? null,
+            whyRelevant: enriched?.whyRelevant ?? null,
+          };
+        }),
       });
     }
 
