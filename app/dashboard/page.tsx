@@ -15,7 +15,8 @@ export default async function DashboardPage({
     redirect('/api/auth/signin');
   }
 
-  const firstName = session.user.name?.split(' ')[0] ?? 'User';
+  const firstName =
+    typeof session.user.name === 'string' ? session.user.name.split(' ')[0] ?? 'User' : 'User';
 
   // Content Library counts: if user has no content, send to Company setup or Content Library
   const [contentLibraryCounts, catalogProductCount, industryPlaybookCount] = await Promise.all([
