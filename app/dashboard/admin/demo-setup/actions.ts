@@ -25,7 +25,7 @@ export async function lockAsDemo(
     where: { id: companyId, userId: session.user.id },
     select: { id: true },
   });
-  if (!company) return { ok: false, error: 'Company not found' });
+  if (!company) return { ok: false, error: 'Company not found' };
 
   await prisma.company.update({
     where: { id: companyId },
