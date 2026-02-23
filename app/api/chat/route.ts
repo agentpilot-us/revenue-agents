@@ -229,7 +229,6 @@ export async function POST(req: Request) {
           name: true,
           domain: true,
           industry: true,
-          // @ts-expect-error isDemoAccount added in schema; run npx prisma generate after migration
           isDemoAccount: true,
           contacts: {
             take: 10,
