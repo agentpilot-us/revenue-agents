@@ -271,8 +271,8 @@ export default async function SettingsPage() {
           <h2 className="text-xl font-semibold mb-4 text-gray-900">Profile</h2>
           <UserProfileSettings 
             userId={user?.id ?? session.user.id}
-            initialName={user?.name ?? session.user?.name ?? ''}
-            initialEmail={user?.email ?? session.user?.email ?? ''}
+            initialName={user?.name ?? (typeof session.user?.name === 'string' ? session.user.name : '')}
+            initialEmail={user?.email ?? (typeof session.user?.email === 'string' ? session.user.email : '')}
             initialCompanyName={user?.companyName ?? ''}
             initialCompanyWebsite={user?.companyWebsite ?? ''}
             initialCompanyLogoUrl={user?.companyLogoUrl ?? undefined}
