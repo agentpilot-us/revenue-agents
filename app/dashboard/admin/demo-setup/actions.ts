@@ -60,7 +60,7 @@ export async function getCompaniesForDemo(userId: string) {
   });
 }
 
-export function getVerticals(): readonly string[] {
+export async function getVerticals(): Promise<readonly string[]> {
   return VERTICALS;
 }
 
