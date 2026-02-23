@@ -32,7 +32,7 @@ export default async function CompanySetupPage() {
     contentRefreshFrequency: user.contentRefreshFrequency ?? undefined,
     contentRefreshNextAt:
       user.contentRefreshNextAt != null ? user.contentRefreshNextAt.toISOString() : undefined,
-    email: session.user.email ?? undefined,
+    email: typeof session.user.email === 'string' ? session.user.email : undefined,
   };
 
   return (
