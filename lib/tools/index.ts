@@ -1,14 +1,22 @@
 export { sendEmail } from './resend';
 export type { SendEmailParams, SendEmailResult } from './resend';
 
-export { enrichContact } from './clay';
-export type { EnrichContactParams, EnrichContactResult } from './clay';
-
-export { searchLinkedInContacts } from './phantombuster';
+export { searchApolloContacts, enrichPersonApollo } from './apollo';
 export type {
-  SearchLinkedInContactsParams,
-  SearchLinkedInContactsResult,
-} from './phantombuster';
+  SearchApolloContactsParams,
+  SearchApolloContactsResult,
+  ApolloPerson,
+  EnrichPersonApolloParams,
+} from './apollo';
+
+export { enrichContact } from './enrich-contact';
+export type { EnrichContactParams, EnrichContactResult } from './enrich-contact';
+
+export { findContactsForSegment } from './contact-finder';
+export type {
+  FindContactsForSegmentParams,
+  ContactFinderResult,
+} from './contact-finder';
 
 export { createCalendarEvent, getCalendarRsvps, getCalendarRSVPs } from './cal';
 export type {

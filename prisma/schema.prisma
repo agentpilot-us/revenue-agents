@@ -160,6 +160,12 @@ model Company {
   nextCrawlAt         DateTime? // Next scheduled crawl
   lastContentChangeAt DateTime? // Last time content change was detected
 
+  // Demo mode: frozen account for demos (no API/LLM calls)
+  isDemoAccount Boolean   @default(false)
+  demoVertical  String? // 'saas' | 'pharma' | 'semiconductor' | 'fintech'
+  demoLockedAt  DateTime?
+  demoNote      String?  @db.Text // e.g. "NVIDIA/GM semiconductor demo — built 2026-02-23 — contacts: 12, segments: 4"
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

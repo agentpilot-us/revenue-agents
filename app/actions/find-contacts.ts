@@ -4,7 +4,7 @@ import pLimit from 'p-limit';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { findContactsForSegment } from '@/lib/tools/contact-finder';
-import { enrichContact } from '@/lib/tools/clay';
+import { enrichContact } from '@/lib/tools/enrich-contact';
 import { generateWhyRelevant } from '@/lib/contacts/why-relevant';
 import type { SeniorityLevel } from '@/lib/contacts/resolve-search-context';
 import { resolveSearchContext } from '@/lib/contacts/resolve-search-context';
@@ -120,6 +120,9 @@ export async function findContactsForDepartment(
         const enrichResult = await enrichContact({
           linkedinUrl: c.linkedinUrl,
           domain: company.domain ?? undefined,
+          firstName: c.firstName ?? undefined,
+          lastName: c.lastName ?? undefined,
+          organizationName: company.name,
         });
         if (enrichResult.ok && enrichResult.data) {
           enriched++;
@@ -449,6 +452,9 @@ export async function findAndEnrichContactsForCompany(
         email: c.email ?? undefined,
         linkedinUrl: c.linkedinUrl ?? undefined,
         domain: company.domain ?? undefined,
+        firstName: c.firstName ?? undefined,
+        lastName: c.lastName ?? undefined,
+        organizationName: company.name,
       });
       if (result.ok && result.data) {
         const enrichedData = result.data as Record<string, unknown>;

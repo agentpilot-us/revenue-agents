@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { enrichContact } from '@/lib/tools/clay';
+import { enrichContact } from '@/lib/tools/enrich-contact';
 import { generateWhyRelevant } from '@/lib/contacts/why-relevant';
 
 const MAX_PER_REQUEST = 10;
+
+// Processes up to MAX_PER_REQUEST pending contacts company-wide.
+// This is intentionally a global sweep — it cleans up contacts
+// left in 'pending' state from any source (find-contacts batch,
+// manual add, import). The find-contacts batch flow has its own
+// scoped enrichment loop and doesn't rely on this route.
 
 export async function POST(
   _req: NextRequest,
@@ -52,6 +58,9 @@ export async function POST(
         email: c.email ?? undefined,
         linkedinUrl: c.linkedinUrl ?? undefined,
         domain: company.domain ?? undefined,
+        firstName: c.firstName ?? undefined,
+        lastName: c.lastName ?? undefined,
+        organizationName: company.name,
       });
 
       if (result.ok) {

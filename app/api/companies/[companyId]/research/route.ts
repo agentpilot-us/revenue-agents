@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { researchCompanyForAccount } from '@/lib/research/research-company';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
+import type { CompanyResearchData } from '@/lib/research/company-research-schema';
 
 export const maxDuration = 60;
 
@@ -24,6 +26,32 @@ export async function POST(
 
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+    }
+
+    if (await isDemoAccount(companyId)) {
+      const existing = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+        select: {
+          researchData: true,
+          businessOverview: true,
+          keyInitiatives: true,
+          segmentationStrategy: true,
+          segmentationRationale: true,
+          employees: true,
+          headquarters: true,
+          revenue: true,
+          website: true,
+          industry: true,
+        },
+      });
+      if (!existing?.researchData || typeof existing.researchData !== 'object') {
+        return NextResponse.json(
+          { error: 'Demo account has no research data.' },
+          { status: 400 }
+        );
+      }
+      const data = existing.researchData as unknown as CompanyResearchData;
+      return NextResponse.json({ data });
     }
 
     const result = await researchCompanyForAccount(

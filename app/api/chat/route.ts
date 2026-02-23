@@ -26,7 +26,7 @@ import {
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
 import {
-  searchLinkedInContacts,
+  findContactsForSegment,
   enrichContact,
   researchCompany,
   getCalendarRsvps,
@@ -57,6 +57,7 @@ type ChatContext = {
   industry: string | null;
   userId: string;
   contactId?: string | null;
+  isDemoMode?: boolean;
   activeEnrollment?: {
     enrollmentId: string;
     sequenceName: string;
@@ -175,7 +176,7 @@ export async function POST(req: Request) {
 
         // Detect PII (less strict for authenticated users - they own the data)
         const piiCheck = detectPII(sanitized);
-        if (piiCheck.hasPII && piiCheck.types.includes('credit_card') || piiCheck.types.includes('ssn')) {
+        if (piiCheck.hasPII && (piiCheck.types.includes('credit_card') || piiCheck.types.includes('ssn'))) {
           // Only redact sensitive PII like credit cards and SSNs
           logSecurityEvent({
             eventType: 'pii_detected',
@@ -217,13 +218,19 @@ export async function POST(req: Request) {
 
     // Resolve company (account) context and contacts with department
     type ContactRow = { id: string; firstName: string | null; lastName: string | null; title: string | null; department: string | null };
-    let company: { id: string; name: string; domain: string | null; industry: string | null; contacts: ContactRow[] } | null = null;
+    let company: { id: string; name: string; domain: string | null; industry: string | null; isDemoAccount: boolean; contacts: ContactRow[] } | null = null;
     let targetContactDepartment: string | null = null;
 
     if (accountId) {
       const row = await prisma.company.findFirst({
         where: { id: accountId, userId: session.user.id },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          industry: true,
+          // @ts-expect-error isDemoAccount added in schema; run npx prisma generate after migration
+          isDemoAccount: true,
           contacts: {
             take: 10,
             orderBy: { lastContactedAt: 'desc' },
@@ -234,19 +241,65 @@ export async function POST(req: Request) {
       if (!row) {
         return new Response('Account not found', { status: 404 });
       }
+      const rowWithContacts = row as unknown as {
+        id: string;
+        name: string;
+        domain: string | null;
+        industry: string | null;
+        isDemoAccount?: boolean;
+        contacts: ContactRow[];
+      };
       company = {
-        id: row.id,
-        name: row.name,
-        domain: row.domain,
-        industry: row.industry,
-        contacts: row.contacts,
+        id: rowWithContacts.id,
+        name: rowWithContacts.name,
+        domain: rowWithContacts.domain,
+        industry: rowWithContacts.industry,
+        isDemoAccount: rowWithContacts.isDemoAccount ?? false,
+        contacts: rowWithContacts.contacts,
       };
       if (contactId) {
-        const contact = row.contacts.find((c: ContactRow) => c.id === contactId);
+        const contact = rowWithContacts.contacts.find((c: ContactRow) => c.id === contactId);
         if (contact?.department) targetContactDepartment = contact.department;
       }
     }
 
+    const isDemoMode = company?.isDemoAccount ?? false;
+
+    let systemPrompt = '';
+    if (isDemoMode && company) {
+      const demoDepartments = await prisma.companyDepartment.findMany({
+        where: { companyId: company.id },
+        select: { customName: true, type: true, valueProp: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      const contactsList =
+        company.contacts
+          ?.map(
+            (c: ContactRow) =>
+              `  - ${[c.firstName, c.lastName].filter(Boolean).join(' ').trim() || 'Unknown'} (${c.title ?? '—'}) — Department: ${c.department ?? 'Not set'}`
+          )
+          .join('\n') ?? '  None';
+      const departmentsList =
+        demoDepartments
+          .map(
+            (d) =>
+              `  - ${d.customName ?? d.type.replace(/_/g, ' ')}: ${d.valueProp ?? '—'}`
+          )
+          .join('\n') || '  None';
+      systemPrompt = `You are an AI assistant for a demo account. Use only the account data below. Do not call external tools or research.
+
+Company: ${company.name}
+Domain: ${company.domain ?? 'N/A'}
+Industry: ${company.industry ?? 'N/A'}
+
+Departments (buying groups):
+${departmentsList}
+
+Contacts:
+${contactsList}
+
+This is a demo account. Answer using only the account data above; do not call external tools or research.`;
+    } else {
     // Intent-based selective context: only load blocks needed for this turn
     const lastUserContent = messages
       .filter((m: unknown) => (m as { role?: string }).role === 'user')
@@ -327,7 +380,6 @@ When drafting emails or messages:
     }
 
     // Account research (only when block needed)
-    let accountContextBlock = '';
     let researchDataBlock = '';
     if (neededBlocks.has('account_research') && accountId && session.user.id) {
       const block = await getCompanyResearchPromptBlock(accountId, session.user.id);
@@ -518,11 +570,12 @@ ${ragContentSection}
 ${messagingSection}
 ${contentLibrarySection}
 ${campaignBlock}
-${accountContextBlock}
 ${researchDataBlock}
 ${accountMemoryBlock}
 
 Work step-by-step and explain what you're doing.`;
+
+    }
 
     let activeEnrollment: ChatContext['activeEnrollment'] = null;
     if (contactId && session.user.id) {
@@ -537,6 +590,7 @@ Work step-by-step and explain what you're doing.`;
       industry: company?.industry ?? null,
       userId: session.user.id,
       contactId: contactId ?? null,
+      isDemoMode,
       activeEnrollment,
     };
 
@@ -555,16 +609,28 @@ Work step-by-step and explain what you're doing.`;
           maxResults: z.number().default(50).optional().describe('Max number of results'),
         }),
         execute: async (
-          params: { companyName?: string; companyDomain?: string; maxResults?: number },
+          params: { companyName?: string; companyDomain?: string; jobTitles?: string[]; keywords?: string[]; maxResults?: number },
           opts?: { experimental_context?: ChatContext }
         ) => {
-          const res = await searchLinkedInContacts({
-            companyName: params.companyName,
-            companyDomain: params.companyDomain,
-            limit: params.maxResults,
+          if (opts?.experimental_context?.isDemoMode) {
+            return { found: 0, profiles: [], message: 'Demo account — using existing data.' };
+          }
+          const domain = params.companyDomain ?? '';
+          const name = params.companyName ?? '';
+          if (!domain && !name) throw new Error('companyDomain or companyName required');
+          const contacts = await findContactsForSegment({
+            companyDomain: domain || 'unknown.com',
+            companyName: name || 'Unknown',
+            targetRoles: params.jobTitles?.length ? params.jobTitles : undefined,
+            keywords: params.keywords?.length ? params.keywords : undefined,
+            maxResults: params.maxResults ?? 10,
           });
-          if (!res.ok) throw new Error(res.error);
-          return { found: res.contacts.length, profiles: res.contacts };
+          const profiles = contacts.map((c) => ({
+            name: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown',
+            url: c.linkedinUrl,
+            title: c.title,
+          }));
+          return { found: profiles.length, profiles };
         },
       }),
       enrich_contact: toolWithSchema({
@@ -578,11 +644,16 @@ Work step-by-step and explain what you're doing.`;
           domain: z.string().optional().describe('Company domain for lookup'),
         }),
         execute: async (params: Record<string, unknown>, opts?: { experimental_context?: ChatContext }) => {
+          if (opts?.experimental_context?.isDemoMode) {
+            return { message: 'Demo account — using existing data.', email: undefined };
+          }
           const accountIdForTools = opts?.experimental_context?.accountId ?? '';
           const res = await enrichContact({
             email: params.email as string | undefined,
             linkedinUrl: params.linkedinUrl as string | undefined,
             domain: params.domain as string | undefined,
+            firstName: (params.firstName as string | undefined) ?? undefined,
+            lastName: (params.lastName as string | undefined) ?? undefined,
           });
           if (!res.ok) throw new Error(res.error);
           const data = res.data as Record<string, unknown> & { email?: string };
@@ -602,8 +673,8 @@ Work step-by-step and explain what you're doing.`;
                   seniority: (data.seniority as string) ?? undefined,
                 },
                 create: {
-                  firstName: (params.firstName as string) ?? '',
-                  lastName: (params.lastName as string) ?? '',
+                  firstName: (params.firstName as string | undefined) ?? '',
+                  lastName: (params.lastName as string | undefined) ?? '',
                   email: data.email,
                   companyId: accountIdForTools,
                   phone: (data.phone as string) ?? undefined,
@@ -615,7 +686,6 @@ Work step-by-step and explain what you're doing.`;
                   seniority: (data.seniority as string) ?? undefined,
                 },
               });
-              const uid = opts?.experimental_context?.userId;
               return { contactId: contact.id, ...data };
             } catch (e) {
               throw new Error(e instanceof Error ? e.message : 'Failed to save contact');
@@ -635,6 +705,9 @@ Work step-by-step and explain what you're doing.`;
         }),
         execute: async (params: { companyName?: string; companyDomain?: string; query: string }, opts?: { experimental_context?: ChatContext }) => {
           const ctx = opts?.experimental_context;
+          if (ctx?.isDemoMode) {
+            return { summary: 'Demo account — using existing research data.' };
+          }
           const accountIdForTools = ctx?.accountId ?? '';
           const res = await researchCompany({
             query: params.query,
@@ -1324,6 +1397,7 @@ SECURITY INSTRUCTIONS:
       experimental_context,
       abortSignal: req.signal,
       stopWhen: stepCountIs(20),
+      maxOutputTokens: isDemoMode ? 300 : undefined,
       onStepFinish: async (stepResult) => {
         stepIndex++;
         const idx = stepIndex;

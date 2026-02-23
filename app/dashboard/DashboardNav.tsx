@@ -11,6 +11,7 @@ import {
   Bolt,
   FileText,
   BarChart3,
+  Presentation,
 } from 'lucide-react';
 
 const navigation: Array<{
@@ -29,12 +30,19 @@ const navigation: Array<{
   { name: 'Billing', href: '/billing', icon: CreditCard },
 ];
 
-export function DashboardNav() {
+export function DashboardNav({ allowDemoSetup = false }: { allowDemoSetup?: boolean }) {
   const pathname = usePathname();
+  const links = allowDemoSetup
+    ? [
+        ...navigation.slice(0, 2),
+        { name: 'Demo setup', href: '/dashboard/admin/demo-setup', icon: Presentation },
+        ...navigation.slice(2),
+      ]
+    : navigation;
 
   return (
     <nav className="space-y-1">
-      {navigation.map((item) => {
+      {links.map((item) => {
         const Icon = item.icon;
         const isActive =
           item.href === '/dashboard'

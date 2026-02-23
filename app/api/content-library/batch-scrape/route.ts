@@ -26,6 +26,7 @@ import {
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
 import { getChatModel } from '@/lib/llm/get-model';
 import { calculateContentHash } from '@/lib/content-library/content-hash';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
 const MAX_CONCURRENCY = 5;
 const MAX_URLS = 30;
@@ -34,6 +35,7 @@ const SCRAPE_TIMEOUT_MS = 30000;
 type BatchScrapeRequest = {
   urls: string[];
   productId?: string;
+  companyId?: string;
 };
 
 type BatchScrapeEvent =
@@ -56,9 +58,27 @@ export async function POST(req: NextRequest) {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const { urls: rawUrls, productId } = body;
+  const { urls: rawUrls, productId, companyId } = body;
   if (!Array.isArray(rawUrls) || rawUrls.length === 0) {
     return new Response('urls must be a non-empty array', { status: 400 });
+  }
+
+  if (companyId && (await isDemoAccount(companyId))) {
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+    const encoder = new TextEncoder();
+    writer.write(encoder.encode(`data: ${JSON.stringify({ type: 'started', total: 0 })}\n\n`));
+    writer.write(
+      encoder.encode(`data: ${JSON.stringify({ type: 'complete', saved: 0, failed: 0, health: null })}\n\n`)
+    );
+    writer.close();
+    return new Response(stream.readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
   }
 
   const urls = [...new Set(rawUrls.filter(isValidUrl))].slice(0, MAX_URLS);

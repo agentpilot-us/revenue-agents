@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { DepartmentType, DepartmentStatus } from '@prisma/client';
 import { companyResearchSchema } from '@/lib/research/company-research-schema';
 import { autoGenerateAccountMessaging } from '@/lib/account-messaging/auto-generate';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
 /** Legacy research payload (companyBasics, whatTheyDo, microSegments with roles + products as slug[]) */
 const legacyResearchSchema = z.object({
@@ -62,6 +63,13 @@ export async function POST(
 
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+    }
+
+    if (await isDemoAccount(companyId)) {
+      return NextResponse.json(
+        { error: 'Demo account is locked.' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();

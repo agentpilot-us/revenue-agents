@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { autoGenerateAccountMessaging } from '@/lib/account-messaging/auto-generate';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
 export async function POST(
   _req: NextRequest,
@@ -21,6 +22,29 @@ export async function POST(
     });
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+    }
+
+    if (await isDemoAccount(companyId)) {
+      const existing = await prisma.accountMessaging.findUnique({
+        where: { companyId },
+      });
+      if (!existing) {
+        return NextResponse.json(
+          { error: 'No existing messaging for demo account.' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({
+        id: existing.id,
+        companyId: existing.companyId,
+        whyThisCompany: existing.whyThisCompany,
+        useCases: existing.useCases,
+        successStories: existing.successStories,
+        objectionHandlers: existing.objectionHandlers,
+        doNotMention: existing.doNotMention,
+        aiGenerated: existing.aiGenerated,
+        updatedAt: existing.updatedAt,
+      });
     }
 
     // Use auto-generation logic (prioritizes company-branded Content Library, includes ALL)

@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { DepartmentType, DepartmentStatus } from '@prisma/client';
 import { discoverDepartments } from '@/app/actions/discover-departments';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
 /**
  * Chat tools for department discovery and lookup.
@@ -801,6 +802,25 @@ export const chatTools = {
         where: { id: companyId, userId: session.user.id },
       });
       if (!company) return { error: 'Company not found' };
+
+      if (await isDemoAccount(companyId)) {
+        const existing = await prisma.segmentCampaign.findFirst({
+          where: { companyId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (existing) {
+          return {
+            campaignId: existing.id,
+            slug: existing.slug,
+            url: existing.url,
+            title: existing.title,
+            message: 'Demo account — using existing campaign.',
+          };
+        }
+        return {
+          message: 'Demo account has no campaign yet. Use the existing link from the account if one was created during setup.',
+        };
+      }
 
       // Verify department belongs to company if provided
       if (departmentId) {

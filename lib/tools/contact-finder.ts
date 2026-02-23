@@ -74,7 +74,7 @@ async function findViaApollo(
 
   return result.people.map((p) => {
     const firstName = p.first_name ?? p.name?.split(/\s+/)[0] ?? '';
-    const lastName = p.last_name ?? p.name?.split(/\s+/).slice(1).join(' ') ?? '';
+    const lastName = p.last_name ?? p.last_name_obfuscated ?? p.name?.split(/\s+/).slice(1).join(' ') ?? '';
     return {
       firstName,
       lastName,

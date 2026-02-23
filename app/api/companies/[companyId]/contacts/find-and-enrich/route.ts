@@ -6,7 +6,9 @@
 
 import { NextRequest } from 'next/server';
 import { auth } from '@/auth';
+import { prisma } from '@/lib/db';
 import { findAndEnrichContactsForCompany, type FindAndEnrichProgress } from '@/app/actions/find-contacts';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
 export const maxDuration = 120;
 
@@ -40,6 +42,20 @@ export async function POST(
 
   (async () => {
     try {
+      if (await isDemoAccount(companyId)) {
+        const contactCount = await prisma.contact.count({ where: { companyId } });
+        send({ type: 'started', departmentCount: 0 });
+        send({
+          type: 'complete',
+          departmentsProcessed: 0,
+          contactsAdded: 0,
+          enriched: contactCount,
+          failed: 0,
+        });
+        writer.close();
+        return;
+      }
+
       const result = await findAndEnrichContactsForCompany(companyId, {
         departmentIds: body.departmentIds,
         maxPerDept: body.maxPerDept,

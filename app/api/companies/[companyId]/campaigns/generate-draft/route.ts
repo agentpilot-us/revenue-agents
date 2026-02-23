@@ -16,6 +16,7 @@ import {
   findRelevantContentLibraryChunks,
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
+import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
 
 const bodySchema = z.object({
@@ -74,6 +75,32 @@ export async function POST(
     });
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
+    }
+
+    if (await isDemoAccount(companyId)) {
+      const campaigns = await prisma.segmentCampaign.findMany({
+        where: { companyId },
+        select: { id: true, departmentId: true, title: true, headline: true, body: true, pageSections: true, department: { select: { customName: true, type: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (campaigns.length === 0) {
+        return NextResponse.json(
+          { error: 'Demo account has no campaigns. Create a campaign during demo setup first.' },
+          { status: 400 }
+        );
+      }
+      const drafts = campaigns.map((c) => ({
+        departmentId: c.departmentId ?? null,
+        segmentName: c.department?.customName ?? c.department?.type?.replace(/_/g, ' ') ?? c.title,
+        headline: c.headline ?? '',
+        body: c.body ?? '',
+        pageSections: c.pageSections ?? null,
+      }));
+      return NextResponse.json({
+        companyId,
+        companyName: company.name,
+        drafts,
+      });
     }
 
     let body: unknown;

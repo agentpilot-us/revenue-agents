@@ -13,6 +13,8 @@ export default async function DashboardLayout({
     redirect('/login?callbackUrl=/dashboard');
   }
 
+  const allowDemoSetup = process.env.ALLOW_DEMO_SETUP === 'true';
+
   return (
     <div className="min-h-screen bg-zinc-900">
       <aside className="fixed left-0 top-0 z-40 h-full w-56 border-r border-slate-700 bg-zinc-900">
@@ -20,7 +22,7 @@ export default async function DashboardLayout({
           <h2 className="mb-6 px-2 text-sm font-semibold text-slate-400 uppercase tracking-wider">
             Dashboard
           </h2>
-          <DashboardNav />
+          <DashboardNav allowDemoSetup={allowDemoSetup} />
         </div>
       </aside>
       <main className="pl-56">{children}</main>
