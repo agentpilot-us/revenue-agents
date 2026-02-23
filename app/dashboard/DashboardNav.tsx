@@ -12,6 +12,7 @@ import {
   FileText,
   BarChart3,
   Presentation,
+  Users,
 } from 'lucide-react';
 
 const navigation: Array<{
@@ -36,6 +37,7 @@ export function DashboardNav({ allowDemoSetup = false }: { allowDemoSetup?: bool
     ? [
         ...navigation.slice(0, 2),
         { name: 'Demo setup', href: '/dashboard/admin/demo-setup', icon: Presentation },
+        { name: 'Waitlist', href: '/dashboard/admin/users', icon: Users },
         ...navigation.slice(2),
       ]
     : navigation;

@@ -13,6 +13,17 @@ export default async function DashboardLayout({
     redirect('/login?callbackUrl=/dashboard');
   }
 
+  const status = (session.user as { accountStatus?: string }).accountStatus ?? 'waitlist';
+  if (status === 'waitlist') {
+    redirect('/waitlist-pending');
+  }
+  if (status === 'invited') {
+    redirect('/onboarding');
+  }
+  if (status === 'suspended') {
+    redirect('/suspended');
+  }
+
   const allowDemoSetup = process.env.ALLOW_DEMO_SETUP === 'true';
 
   return (

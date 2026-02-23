@@ -3,8 +3,11 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { DM_Sans } from 'next/font/google';
 import { GoogleSignInButton } from './GoogleSignInButton';
+import { EmailSignInForm } from './EmailSignInForm';
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans' });
+
+const hasResend = Boolean(process.env.RESEND_API_KEY);
 
 export default async function LoginPage({
   searchParams,
@@ -14,8 +17,11 @@ export default async function LoginPage({
   const session = await auth();
   const params = await searchParams;
 
-  // If already authenticated, redirect to dashboard or callbackUrl
   if (session) {
+    const status = (session.user as { accountStatus?: string }).accountStatus;
+    if (status === 'waitlist') redirect('/waitlist-pending');
+    if (status === 'invited') redirect('/onboarding');
+    if (status === 'suspended') redirect('/suspended');
     redirect(params.callbackUrl || '/dashboard');
   }
 
@@ -27,26 +33,22 @@ export default async function LoginPage({
       style={{ fontFamily: 'var(--font-dm-sans), -apple-system, sans-serif' } as React.CSSProperties}
     >
       <div className="w-full max-w-md px-6">
-        {/* Logo */}
         <div className="flex justify-center mb-8">
           <Link href="/" className="flex items-center gap-3 text-[#0a0a0f] hover:opacity-80 transition-opacity">
-            <img
-              src="/agentpilot-logo.png"
-              alt=""
-              className="w-10 h-10 object-contain"
-            />
+            <img src="/agentpilot-logo.png" alt="" className="w-10 h-10 object-contain" />
             <span className="text-xl font-bold">AgentPilot</span>
           </Link>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-[#e2e1df] p-8">
           <h1 className="text-2xl font-semibold text-[#0a0a0f] mb-2 text-center">Sign in to AgentPilot</h1>
+          <p className="text-sm text-[#6b6b7b] text-center mb-6">
+            New to AgentPilot? <Link href="/request-access" className="text-[#0066FF] hover:underline font-medium">Request access</Link>
+          </p>
           <p className="text-sm text-[#6b6b7b] text-center mb-8">
-            Continue with your Google account to access your dashboard
+            Already have an invite? Sign in below.
           </p>
 
-          {/* Error Message */}
           {params.error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-800">
@@ -69,26 +71,28 @@ export default async function LoginPage({
             </div>
           )}
 
-          {/* Google Sign In - POST required by Auth.js for OAuth (GET with provider throws Unsupported action) */}
           <GoogleSignInButton callbackUrl={callbackUrl} />
 
-          {/* Footer Links */}
+          {hasResend && (
+            <>
+              <div className="my-6 flex items-center gap-3">
+                <span className="flex-1 h-px bg-[#e2e1df]" />
+                <span className="text-xs text-[#6b6b7b]">or</span>
+                <span className="flex-1 h-px bg-[#e2e1df]" />
+              </div>
+              <EmailSignInForm callbackUrl={callbackUrl} />
+            </>
+          )}
+
           <div className="mt-8 pt-6 border-t border-[#e2e1df]">
             <div className="flex flex-col items-center gap-4 text-sm">
               <Link href="/" className="text-[#6b6b7b] hover:text-[#0a0a0f] transition-colors">
                 ← Back to Home
               </Link>
-              <p className="text-[#6b6b7b] text-center">
-                New to AgentPilot?{' '}
-                <Link href="/#cta" className="text-[#0066FF] hover:underline font-medium">
-                  Book a demo
-                </Link>
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Additional Info */}
         <p className="mt-6 text-xs text-center text-[#6b6b7b]">
           By continuing, you agree to AgentPilot&apos;s Terms of Service and Privacy Policy
         </p>
