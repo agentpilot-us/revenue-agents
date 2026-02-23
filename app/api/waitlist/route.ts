@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.flatten().message || 'Invalid input' },
+        { error: parsed.error.message || 'Invalid input' },
         { status: 400 }
       );
     }
