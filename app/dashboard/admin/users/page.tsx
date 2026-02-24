@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { getAllowUserAdmin, getWaitlistEntries } from './actions';
+import { getAllowUserAdmin, getWaitlistEntries, getWaitlistUsers } from './actions';
 import { UsersListClient } from './UsersListClient';
 
 export default async function AdminUsersPage() {
@@ -16,15 +16,18 @@ export default async function AdminUsersPage() {
     );
   }
 
-  const entries = await getWaitlistEntries();
+  const [entries, waitlistUsers] = await Promise.all([
+    getWaitlistEntries(),
+    getWaitlistUsers(),
+  ]);
 
   return (
     <div className="p-8 max-w-2xl">
       <h1 className="text-xl font-semibold text-white mb-2">Waitlist</h1>
       <p className="text-slate-400 text-sm mb-6">
-        Approve requests to send an invite email. They sign in with Google or email to activate their account.
+        Approve form submissions to send an invite email, or activate accounts that already signed in.
       </p>
-      <UsersListClient entries={entries} />
+      <UsersListClient entries={entries} waitlistUsers={waitlistUsers} />
     </div>
   );
 }

@@ -780,9 +780,9 @@ export default function HomePage() {
       <footer className="landing-footer">
         <p>© 2026 AgentPilot. All rights reserved.</p>
         <div className="landing-footer-links">
-          <Link href="#">Privacy</Link>
+          <Link href="/privacy">Privacy</Link>
           <Link href="#">Terms</Link>
-          <Link href="#">Contact</Link>
+          <Link href="mailto:info@agentpilot.us">Contact</Link>
         </div>
       </footer>
     </div>

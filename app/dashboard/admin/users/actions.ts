@@ -24,6 +24,45 @@ export async function getWaitlistEntries(): Promise<
   return entries;
 }
 
+/** Users who signed in but are still waitlist (no Request access form submission). */
+export async function getWaitlistUsers(): Promise<
+  Array<{ id: string; email: string; name: string | null; createdAt: Date }>
+> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+  if (process.env.ALLOW_DEMO_SETUP !== 'true') return [];
+
+  const users = await prisma.user.findMany({
+    where: { accountStatus: 'waitlist' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, email: true, name: true, createdAt: true },
+  });
+  return users;
+}
+
+/** Activate a user (set accountStatus to active). Use for accounts that already signed in. */
+export async function activateUser(
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Unauthorized' };
+  if (process.env.ALLOW_DEMO_SETUP !== 'true') return { ok: false, error: 'Not enabled' };
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, accountStatus: 'waitlist' },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: 'User not found or already active' };
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus: 'active', activatedAt: new Date() },
+  });
+
+  revalidatePath('/dashboard/admin/users');
+  return { ok: true };
+}
+
 export async function approveWaitlistEntry(
   waitlistEntryId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
