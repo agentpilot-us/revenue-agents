@@ -82,6 +82,7 @@ ${options.userGoal.trim()}
 Use this goal to prioritize which buying groups to identify.
 Return the groups the rep specified first, then suggest 2–3 additional
 groups that fit their product based on the account's structure.
+Keep each segment concise: at most 2 use cases and 2 objection handlers per segment.
 ` : ''}
 
 Given the target company research below, produce the following sections:

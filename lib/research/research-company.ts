@@ -214,8 +214,8 @@ export async function structureResearchWithClaude(
     const ragProductNames = catalogForPrompt.map((p) => p.name).join(' ');
     const ragQuery = `${companyName} ${ragProductNames} value proposition use cases proof`;
     const [relevantChunks, allChunks] = await Promise.all([
-      findRelevantContentLibraryChunks(userId, ragQuery, 24),
-      getAllContentLibraryChunkContents(userId, 50),
+      findRelevantContentLibraryChunks(userId, ragQuery, 6),
+      getAllContentLibraryChunkContents(userId, 5),
     ]);
     const seen = new Set<string>();
     const ragChunks: string[] = [];
@@ -290,7 +290,7 @@ You MUST output at least one micro-segment. Do not return an empty microSegments
             model: getChatModel(),
             schema: companyResearchSchema,
             system: systemPrompt,
-            maxOutputTokens: 6000,
+            maxOutputTokens: 8000,
             prompt: userPrompt,
           });
         } catch (err) {
@@ -501,8 +501,8 @@ Focus on finding specific, actionable intelligence that would help a B2B sales r
     const ragProductNames = productsForResearch.map((p) => p.name).join(' ');
     const ragQuery = `${companyName} ${ragProductNames} value proposition use cases proof`;
     const [relevantChunks, allChunks] = await Promise.all([
-      findRelevantContentLibraryChunks(userId, ragQuery, 24),
-      getAllContentLibraryChunkContents(userId, 50),
+      findRelevantContentLibraryChunks(userId, ragQuery, 6),
+      getAllContentLibraryChunkContents(userId, 5),
     ]);
     const seen = new Set<string>();
     const ragChunks: string[] = [];
@@ -568,7 +568,7 @@ You MUST output at least one micro-segment. Do not return an empty microSegments
         model: getChatModel(),
         schema: companyResearchSchema,
         system: systemPrompt,
-        maxOutputTokens: 6000,
+        maxOutputTokens: 8000,
         prompt: userPrompt,
       });
 
