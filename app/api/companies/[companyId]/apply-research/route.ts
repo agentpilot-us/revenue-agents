@@ -260,9 +260,7 @@ export async function POST(
             ? segment.useCasesAtThisCompany.join('\n\n')
             : segment.useCase ?? null;
         const estimatedOpp =
-          segment.estimatedOpportunity ??
-          segment.products?.[0]?.estimatedOpportunity ??
-          null;
+          segment.estimatedOpportunity ?? null;
 
         const deptData = {
           companyId,
