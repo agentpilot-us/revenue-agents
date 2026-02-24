@@ -511,8 +511,10 @@ export async function getCompanyResearchPromptBlock(
           type: true,
           customName: true,
           useCase: true,
+          valueProp: true,
           targetRoles: true,
           estimatedOpportunity: true,
+          objectionHandlers: true,
           companyProducts: {
             include: {
               product: { select: { name: true, slug: true } },

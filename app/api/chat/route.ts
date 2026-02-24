@@ -307,6 +307,15 @@ This is a demo account. Answer using only the account data above; do not call ex
       typeof lastUserContent?.content === 'string' ? lastUserContent.content.trim() : '';
     const intent = detectIntent(lastUserMessageText);
     const neededBlocks = new Set(INTENT_BLOCKS[intent]);
+    // Always load account research and memory when an account is selected so the agent has company/target context
+    if (accountId) {
+      neededBlocks.add('account_research');
+      neededBlocks.add('agent_memory');
+    }
+    // Always load "your company" (seller) context: products, messaging, and events so the agent can reference them (e.g. "what event should I send to Revenue Vessel sales?")
+    neededBlocks.add('product_knowledge');
+    neededBlocks.add('messaging_framework');
+    neededBlocks.add('events');
 
     // Content library (relevantContent): entire whereClause + findMany inside guard so query never runs when not needed
     type ContentShape = {
@@ -534,14 +543,18 @@ ${expansionFormatSection}
 ${featureReleaseOutreachSection}
 ${eventInviteSection}
 
-ACCOUNT CONTEXT:
+YOUR COMPANY (the seller — always look here first when the user asks what to send or recommend):
+- Name: ${userCompanyName}${userCompanyWebsite ? `\n- Website: ${userCompanyWebsite}` : ''}
+The sections below describe your company's offerings: product knowledge, messaging framework, company events/sessions/webinars, and content library. When the user asks what event to send to an account (e.g. "what event should I send to Revenue Vessel sales?"), use YOUR COMPANY's events/sessions from the COMPANY EVENTS section below to recommend the best match for that account or segment. Do not ask for your events—they are in the prompt. Use them when drafting outreach or answering questions about your products, messaging, and events.
+
+ACCOUNT CONTEXT (target company):
 - Current company ID (use this as companyId in list_departments, find_contacts_in_department, discover_departments): ${accountId || 'none'}
 - Company: ${company?.name ?? 'N/A'}
 - Domain: ${company?.domain ?? 'Unknown'}
 - Industry: ${company?.industry ?? 'Unknown'}
 - Contacts (use each contact's department to pick the right messaging):
 ${contactsList}
-${!accountId ? '\nNo account is selected. If the user asks about departments or contacts, ask them to open a company (e.g. from the dashboard) and start the chat from that company\'s page.' : ''}
+${accountId ? '\nYou are in the context of this target company. Use the ACCOUNT INTELLIGENCE section below (company basics, buying groups, use cases, target roles) when finding contacts, recommending who to contact, drafting outreach, or answering questions about this account. Do not ask for the company ID or which company—you already have it.' : '\nNo account is selected. If the user asks about departments or contacts, ask them to open a company (e.g. from the dashboard) and start the chat from that company\'s page.'}
 
 When the user asks "what departments does [company] have?" or similar: first call list_departments with the Current company ID above. That returns the departments already mapped for this account. Only use discover_departments if it is available and the user wants to find additional departments via AI research.
 
