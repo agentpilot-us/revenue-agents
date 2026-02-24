@@ -167,7 +167,7 @@ export async function POST(
           where: { companyId_type: { companyId, type: departmentType } },
         });
         const useCaseText =
-          segment.useCasesAtThisCompany?.length > 0
+          segment.useCasesAtThisCompany && segment.useCasesAtThisCompany.length > 0
             ? segment.useCasesAtThisCompany.join('\n\n')
             : null;
         const deptData = {
