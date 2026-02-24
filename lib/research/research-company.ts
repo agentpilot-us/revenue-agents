@@ -3,9 +3,22 @@ import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 import { researchCompany } from '@/lib/tools/perplexity';
 import { prisma } from '@/lib/db';
-import { companyResearchSchema, type CompanyResearchData } from './company-research-schema';
+import {
+  buyingGroupDetailSchema,
+  companyResearchSchema,
+  discoverGroupsResultSchema,
+  productFitListSchema,
+  type BuyingGroupDetail,
+  type BuyingGroupSeed,
+  type CompanyResearchData,
+  type DiscoverGroupsResult,
+  type ProductFit,
+} from './company-research-schema';
 import {
   buildCompanyResearchPrompt,
+  buildDiscoverGroupsPrompt,
+  buildEnrichGroupPrompt,
+  buildProductFitPrompt,
   loadContentLibraryContext,
 } from './company-research-prompt';
 import {
@@ -120,6 +133,311 @@ Focus on finding specific, actionable intelligence that would help a B2B sales r
   }
 
   return { ok: true, summary: perplexityResult.summary };
+}
+
+export type DiscoverBuyingGroupsResult =
+  | { ok: true; data: DiscoverGroupsResult }
+  | { ok: false; error: string };
+
+/**
+ * Step 1 of 4-step account intel: Perplexity + small LLM output (company basics + 4–6 buying group seeds).
+ * Fast, low token count, rarely fails.
+ */
+export async function discoverBuyingGroupsForAccount(
+  companyName: string,
+  companyDomain: string | undefined,
+  userId: string,
+  userGoal?: string
+): Promise<DiscoverBuyingGroupsResult> {
+  const perplexityResult = await runPerplexityResearchOnly(
+    companyName,
+    companyDomain,
+    userId,
+    userGoal
+  );
+  if (!perplexityResult.ok) return { ok: false, error: perplexityResult.error };
+
+  const catalogProducts = await prisma.catalogProduct.findMany({
+    where: { userId } as { userId: string },
+    select: { name: true },
+    orderBy: { name: 'asc' },
+  });
+  const contentLibraryProducts =
+    catalogProducts.length === 0
+      ? await prisma.product.findMany({
+          where: { userId },
+          select: { name: true },
+          orderBy: { name: 'asc' },
+        })
+      : [];
+  const productNames =
+    catalogProducts.length > 0
+      ? catalogProducts.map((p) => p.name).join(', ')
+      : contentLibraryProducts.map((p) => p.name).join(', ');
+  if (!productNames) {
+    return {
+      ok: false,
+      error:
+        'No products found. Add products in Your company data or set up catalog products first.',
+    };
+  }
+
+  if (
+    process.env.USE_MOCK_LLM !== 'true' &&
+    !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+    !process.env.ANTHROPIC_API_KEY
+  ) {
+    return {
+      ok: false,
+      error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required for discovery.',
+    };
+  }
+
+  const { system, user: userTemplate } = buildDiscoverGroupsPrompt({
+    companyName,
+    companyDomain,
+    productNames,
+    userGoal: userGoal?.trim() || undefined,
+  });
+  const userPrompt = userTemplate.replace(
+    '{{PERPLEXITY_SUMMARY}}',
+    perplexityResult.summary
+  );
+
+  try {
+    const result = await generateObject({
+      model: getChatModel(),
+      schema: discoverGroupsResultSchema,
+      system,
+      prompt: userPrompt,
+      maxOutputTokens: 2500,
+    });
+    const parsed = discoverGroupsResultSchema.safeParse(result.object);
+    if (!parsed.success) {
+      const first = parsed.error.errors[0];
+      const path = first?.path?.join('.') ?? 'field';
+      console.error('Discover groups schema validation failed:', parsed.error.flatten());
+      return {
+        ok: false,
+        error: `Invalid structure (${path}): ${first?.message ?? 'check format'}. Try again.`,
+      };
+    }
+    return { ok: true, data: parsed.data };
+  } catch (err) {
+    console.error('discoverBuyingGroupsForAccount error:', err);
+    if (err instanceof Error) {
+      if (err.message.includes('429') || err.message.includes('rate limit')) {
+        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
+      }
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: 'Discovery failed unexpectedly.' };
+  }
+}
+
+export type EnrichGroupResult =
+  | { ok: true; data: BuyingGroupDetail }
+  | { ok: false; error: string };
+
+/**
+ * Step 2 of 4-step account intel: Enrich one buying group (value prop, roles, searchKeywords, seniorityByRole).
+ * Caller supplies the Perplexity summary so the group-enrich API can run Perplexity once and then N enrichments in parallel.
+ */
+export async function enrichBuyingGroup(
+  companyName: string,
+  companyDomain: string | undefined,
+  seed: BuyingGroupSeed,
+  userId: string,
+  perplexitySummary: string,
+  userGoal?: string
+): Promise<EnrichGroupResult> {
+  const catalogProductsStruct = await prisma.catalogProduct.findMany({
+    where: { userId } as { userId: string },
+    select: {
+      name: true,
+      slug: true,
+      description: true,
+      priceMin: true,
+      priceMax: true,
+      targetDepartments: true,
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const contentLibraryProductsStruct =
+    catalogProductsStruct.length === 0
+      ? await prisma.product.findMany({
+          where: { userId },
+          select: { name: true, description: true },
+          orderBy: { name: 'asc' },
+        })
+      : [];
+
+  const catalogForPrompt =
+    catalogProductsStruct.length > 0
+      ? catalogProductsStruct.map((p) => ({
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          priceMin: p.priceMin != null ? Number(p.priceMin) : null,
+          priceMax: p.priceMax != null ? Number(p.priceMax) : null,
+          targetDepartments: (p.targetDepartments as string[] | null) ?? null,
+        }))
+      : contentLibraryProductsStruct.map((p) => ({
+          name: p.name,
+          slug: p.name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'product',
+          description: p.description,
+          priceMin: null as number | null,
+          priceMax: null as number | null,
+          targetDepartments: [] as string[] | null,
+        }));
+
+  if (catalogForPrompt.length === 0) {
+    return {
+      ok: false,
+      error: 'No products found. Add products or catalog products first.',
+    };
+  }
+
+  const contentLibrary = await loadContentLibraryContext(userId).catch(() => null);
+  const ragProductNames = catalogForPrompt.map((p) => p.name).join(' ');
+  const ragQuery = `${companyName} ${seed.name} ${ragProductNames} value prop use cases`;
+  const [relevantChunks, allChunks] = await Promise.all([
+    findRelevantContentLibraryChunks(userId, ragQuery, 4),
+    getAllContentLibraryChunkContents(userId, 3),
+  ]);
+  const seen = new Set<string>();
+  const ragChunks: string[] = [];
+  for (const c of [...relevantChunks, ...allChunks]) {
+    const key = c.slice(0, 200);
+    if (!seen.has(key)) {
+      seen.add(key);
+      ragChunks.push(c);
+    }
+  }
+
+  const { system, user: userTemplate } = buildEnrichGroupPrompt({
+    companyName,
+    companyDomain,
+    groupName: seed.name,
+    rationale: seed.rationale,
+    segmentType: seed.segmentType,
+    orgFunction: seed.orgFunction,
+    divisionOrProduct: seed.divisionOrProduct ?? null,
+    catalogProducts: catalogForPrompt,
+    contentLibrary: contentLibrary ?? undefined,
+    ragChunks: ragChunks.length > 0 ? ragChunks : undefined,
+    userGoal: userGoal?.trim() || undefined,
+  });
+  const userPrompt = userTemplate.replace(
+    '{{PERPLEXITY_SUMMARY}}',
+    perplexitySummary
+  );
+
+  if (
+    process.env.USE_MOCK_LLM !== 'true' &&
+    !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+    !process.env.ANTHROPIC_API_KEY
+  ) {
+    return {
+      ok: false,
+      error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required for enrichment.',
+    };
+  }
+
+  try {
+    const result = await generateObject({
+      model: getChatModel(),
+      schema: buyingGroupDetailSchema,
+      system,
+      prompt: userPrompt,
+      maxOutputTokens: 2500,
+    });
+    const parsed = buyingGroupDetailSchema.safeParse(result.object);
+    if (!parsed.success) {
+      const first = parsed.error.errors[0];
+      const path = first?.path?.join('.') ?? 'field';
+      console.error('Enrich group schema validation failed:', parsed.error.flatten());
+      return {
+        ok: false,
+        error: `Invalid structure (${path}): ${first?.message ?? 'check format'}. Try again.`,
+      };
+    }
+    return { ok: true, data: parsed.data };
+  } catch (err) {
+    console.error('enrichBuyingGroup error:', err);
+    if (err instanceof Error) {
+      if (err.message.includes('429') || err.message.includes('rate limit')) {
+        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
+      }
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: 'Enrichment failed unexpectedly.' };
+  }
+}
+
+export type ProductFitForGroupResult =
+  | { ok: true; products: ProductFit[] }
+  | { ok: false; error: string };
+
+/**
+ * Step 3 of 4-step account intel: Score each catalog product for one buying group (relevance 0–100 + talkingPoint).
+ */
+export async function scoreProductFitForGroup(
+  group: BuyingGroupDetail,
+  productNames: string[]
+): Promise<ProductFitForGroupResult> {
+  if (productNames.length === 0) {
+    return { ok: true, products: [] };
+  }
+  if (
+    process.env.USE_MOCK_LLM !== 'true' &&
+    !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+    !process.env.ANTHROPIC_API_KEY
+  ) {
+    return {
+      ok: false,
+      error: 'GOOGLE_GENERATIVE_AI_API_KEY or ANTHROPIC_API_KEY required for product fit.',
+    };
+  }
+
+  const { system, user } = buildProductFitPrompt({
+    groupName: group.name,
+    valueProp: group.valueProp,
+    useCasesAtThisCompany: group.useCasesAtThisCompany,
+    whyThisGroupBuys: group.whyThisGroupBuys,
+    productNames,
+  });
+
+  try {
+    const result = await generateObject({
+      model: getChatModel(),
+      schema: productFitListSchema,
+      system,
+      prompt: user,
+      maxOutputTokens: 1500,
+    });
+    const parsed = productFitListSchema.safeParse(result.object);
+    if (!parsed.success) {
+      const first = parsed.error.errors[0];
+      const path = first?.path?.join('.') ?? 'field';
+      console.error('Product fit schema validation failed:', parsed.error.flatten());
+      return {
+        ok: false,
+        error: `Invalid structure (${path}): ${first?.message ?? 'check format'}. Try again.`,
+      };
+    }
+    return { ok: true, products: parsed.data.products };
+  } catch (err) {
+    console.error('scoreProductFitForGroup error:', err);
+    if (err instanceof Error) {
+      if (err.message.includes('429') || err.message.includes('rate limit')) {
+        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
+      }
+      return { ok: false, error: err.message };
+    }
+    return { ok: false, error: 'Product fit scoring failed unexpectedly.' };
+  }
 }
 
 /**

@@ -42,6 +42,38 @@ function isNewSchema(body: unknown): body is { companyName: string } {
   return typeof body === 'object' && body !== null && 'companyName' in body && typeof (body as { companyName: unknown }).companyName === 'string';
 }
 
+/** DepartmentType enum values in fixed order for 4-step flow (one segment per type to satisfy unique). */
+const DEPARTMENT_TYPES_ORDER: DepartmentType[] = [
+  DepartmentType.SALES,
+  DepartmentType.MARKETING,
+  DepartmentType.REVENUE_OPERATIONS,
+  DepartmentType.PRODUCT,
+  DepartmentType.ENGINEERING,
+  DepartmentType.AUTONOMOUS_VEHICLES,
+  DepartmentType.MANUFACTURING_OPERATIONS,
+  DepartmentType.CUSTOMER_SUCCESS,
+  DepartmentType.INDUSTRIAL_DESIGN,
+  DepartmentType.IT_DATA_CENTER,
+  DepartmentType.SUPPLY_CHAIN,
+  DepartmentType.CONNECTED_SERVICES,
+  DepartmentType.EXECUTIVE_LEADERSHIP,
+  DepartmentType.FINANCE,
+  DepartmentType.LEGAL,
+  DepartmentType.HR,
+  DepartmentType.OTHER,
+];
+
+function is4StepSchema(body: unknown): body is { companyBasics: unknown; enrichedGroups: unknown[] } {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    'enrichedGroups' in body &&
+    Array.isArray((body as { enrichedGroups: unknown }).enrichedGroups) &&
+    'companyBasics' in body &&
+    typeof (body as { companyBasics: unknown }).companyBasics === 'object'
+  );
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -90,7 +122,108 @@ export async function POST(
     const researchGoal =
       typeof body.researchGoal === 'string' ? body.researchGoal.trim() || null : null;
 
-    if (isNewSchema(body)) {
+    if (is4StepSchema(body)) {
+      const companyBasics = body.companyBasics as {
+        name: string;
+        website?: string;
+        industry?: string;
+        employees?: string;
+        headquarters?: string;
+        revenue?: string;
+      };
+      const enrichedGroups = body.enrichedGroups as Array<{
+        name: string;
+        segmentType?: string;
+        orgDepartment?: string;
+        valueProp?: string;
+        useCasesAtThisCompany?: string[];
+        whyThisGroupBuys?: string;
+        objectionHandlers?: Array<{ objection: string; response: string }>;
+        roles?: { economicBuyer: string[]; technicalEvaluator: string[]; champion: string[]; influencer: string[] };
+        searchKeywords?: string[];
+        seniorityByRole?: Record<string, string[]>;
+        products?: Array<{ productName?: string; productSlug?: string }>;
+        estimatedOpportunity?: string;
+      }>;
+
+      await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          name: companyBasics.name,
+          website: companyBasics.website ?? company.website,
+          industry: companyBasics.industry ?? company.industry,
+          employees: companyBasics.employees ?? company.employees,
+          headquarters: companyBasics.headquarters ?? company.headquarters,
+          revenue: companyBasics.revenue ?? company.revenue,
+          researchGoal: researchGoal ?? undefined,
+          researchData: body,
+        },
+      });
+
+      for (let i = 0; i < enrichedGroups.length; i++) {
+        const segment = enrichedGroups[i];
+        const departmentType = DEPARTMENT_TYPES_ORDER[i % DEPARTMENT_TYPES_ORDER.length];
+        const existingDept = await prisma.companyDepartment.findUnique({
+          where: { companyId_type: { companyId, type: departmentType } },
+        });
+        const useCaseText =
+          segment.useCasesAtThisCompany?.length > 0
+            ? segment.useCasesAtThisCompany.join('\n\n')
+            : null;
+        const deptData = {
+          companyId,
+          type: departmentType,
+          customName: segment.name,
+          status: DepartmentStatus.RESEARCH_PHASE as DepartmentStatus,
+          useCase: useCaseText,
+          targetRoles: segment.roles ?? undefined,
+          estimatedOpportunity: segment.estimatedOpportunity ?? undefined,
+          valueProp: segment.valueProp ?? undefined,
+          objectionHandlers: segment.objectionHandlers ?? undefined,
+          notes: `AI-generated (4-step): ${segment.name}. ${segment.whyThisGroupBuys ?? ''}`.trim(),
+          segmentType: segment.segmentType ?? undefined,
+          searchKeywords: segment.searchKeywords ?? undefined,
+          orgDepartment: segment.orgDepartment ?? undefined,
+          seniorityByRole: segment.seniorityByRole ?? undefined,
+          whyThisGroupBuys: segment.whyThisGroupBuys ?? undefined,
+        };
+        let dept;
+        if (existingDept) {
+          dept = await prisma.companyDepartment.update({
+            where: { id: existingDept.id },
+            data: deptData,
+          });
+          summary.departmentsUpdated++;
+        } else {
+          dept = await prisma.companyDepartment.create({ data: deptData });
+          summary.departmentsCreated++;
+        }
+        for (const pf of segment.products ?? []) {
+          const productId =
+            productNameToId.get((pf.productName ?? pf.productSlug ?? '').trim().toLowerCase()) ??
+            productSlugToId.get(pf.productSlug ?? '');
+          if (productId) {
+            await prisma.companyProduct.upsert({
+              where: {
+                companyId_companyDepartmentId_productId: {
+                  companyId,
+                  companyDepartmentId: dept.id,
+                  productId,
+                },
+              },
+              create: {
+                companyId,
+                companyDepartmentId: dept.id,
+                productId,
+                status: 'OPPORTUNITY',
+              },
+              update: {},
+            });
+            summary.productsLinked++;
+          }
+        }
+      }
+    } else if (isNewSchema(body)) {
       const researchData = companyResearchSchema.parse(body);
 
       // Write employees, headquarters, revenue as top-level Company fields (not only researchData)

@@ -225,6 +225,180 @@ ${chunks.map((c) => `- ${c}`).join('\n')}`;
 }
 
 // ─────────────────────────────────────────────────────────────
+// Step 1: Discover buying groups (lightweight, small output)
+// ─────────────────────────────────────────────────────────────
+
+export type DiscoverGroupsPromptInput = {
+  companyName: string;
+  companyDomain?: string;
+  productNames: string;
+  userGoal?: string;
+};
+
+/**
+ * Build system + user prompt for Step 1: discover 4–6 buying group names + company basics only.
+ * Output is small (DiscoverGroupsResult) so it rarely hits token limits.
+ */
+export function buildDiscoverGroupsPrompt(input: DiscoverGroupsPromptInput): { system: string; user: string } {
+  const { companyName, companyDomain, productNames, userGoal } = input;
+  const system = `You are an account intelligence AI. Your task is to analyze research about a target company and output ONLY:
+1. COMPANY BASICS: name, website, industry, employees, headquarters, revenue (from the research only; use "Not disclosed" if missing).
+2. BUYING GROUPS: 4–6 groups that would buy products like: ${productNames}.
+
+For each buying group provide:
+- id: short stable slug (e.g. "av_software", "manufacturing", "it_enterprise"). No spaces.
+- name: display name (e.g. "Autonomous Vehicle Software Team", "Manufacturing & Factory Operations").
+- rationale: one sentence on why this group matters for buying at this company.
+- segmentType: one of FUNCTIONAL (by department), USE_CASE (by use case), DIVISIONAL (by business unit).
+- orgFunction: org-chart function (e.g. "Software Engineering", "Manufacturing", "IT").
+- divisionOrProduct: if DIVISIONAL or USE_CASE, the division/product line name (e.g. "Autonomous Driving"); otherwise null.
+
+Return exactly the JSON shape requested. No value props, no titles, no products yet.`;
+
+  const userGoalBlock = userGoal?.trim()
+    ? `\nSALES REP TARGETING GOAL (prioritize these, then add 2–3 more):\n${userGoal.trim()}\n\n`
+    : '';
+
+  const user = `TARGET COMPANY: ${companyName}
+${companyDomain ? `Domain: ${companyDomain}` : ''}
+${userGoalBlock}RESEARCH DATA (from web search):
+
+{{PERPLEXITY_SUMMARY}}
+
+Extract company basics and 4–6 buying groups. Use segmentType to reflect how this company is organized (functional departments vs use-case teams vs divisions).`;
+
+  return { system, user };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Step 2: Enrich one buying group (value prop, roles, keywords, seniority)
+// ─────────────────────────────────────────────────────────────
+
+export type EnrichGroupPromptInput = {
+  companyName: string;
+  companyDomain?: string;
+  groupName: string;
+  rationale: string;
+  segmentType: string;
+  orgFunction: string;
+  divisionOrProduct: string | null;
+  catalogProducts: CatalogProduct[];
+  contentLibrary?: ContentLibraryContext;
+  ragChunks?: string[];
+  userGoal?: string;
+};
+
+/**
+ * Build system + user prompt for enriching a single buying group.
+ * Output: BuyingGroupDetail (roles, searchKeywords, seniorityByRole, valueProp, use cases, objections).
+ */
+export function buildEnrichGroupPrompt(input: EnrichGroupPromptInput): {
+  system: string;
+  user: string;
+} {
+  const {
+    companyName,
+    companyDomain,
+    groupName,
+    rationale,
+    segmentType,
+    orgFunction,
+    divisionOrProduct,
+    catalogProducts,
+    contentLibrary,
+    ragChunks,
+    userGoal,
+  } = input;
+
+  const productBlock = buildProductBlock(catalogProducts);
+  const contentBlock = contentLibrary ? buildContentLibraryBlock(contentLibrary) : '';
+  const ragBlock = ragChunks?.length ? buildRAGBlock(ragChunks) : '';
+
+  const keywordInstruction =
+    segmentType === 'USE_CASE' || segmentType === 'DIVISIONAL'
+      ? `
+For searchKeywords: provide 4–6 terms that would appear in LinkedIn titles or profiles for people in this group (e.g. for Autonomous Vehicles: "autonomous driving", "self-driving", "ADAS", "AV software"). These bridge the gap between the group name and how people actually list their roles.`
+      : `
+For searchKeywords: leave empty or minimal — titles are sufficient for FUNCTIONAL segments.`;
+
+  const system = `You are an account intelligence AI. Enrich ONE buying group for ${companyName}.
+
+${productBlock}
+${contentBlock}
+${ragBlock ? `\n${ragBlock}\n` : ''}
+
+OUTPUT SHAPE: One buying group detail with:
+- name, segmentType, orgDepartment (Apollo-friendly department label, e.g. "Engineering")
+- valueProp: 2–3 sentences for this group at this company. Use our content library when relevant.
+- useCasesAtThisCompany: 2–3 concrete use cases (max 2 if rep goal is narrow).
+- whyThisGroupBuys: one sentence for contact cards.
+- objectionHandlers: 2–3 { objection, response } pairs.
+- roles: economicBuyer, technicalEvaluator, champion, influencer — each array at least one searchable LinkedIn title.
+- searchKeywords: array of strings for Apollo/LinkedIn search.${keywordInstruction}
+- seniorityByRole: for each role type, list Apollo seniority levels used (e.g. ["c_suite", "vp", "director"] for economicBuyer; ["manager", "director"] for technicalEvaluator; ["individual_contributor", "manager"] for champion and influencer).
+- products: leave empty (populated in a later step).
+- estimatedOpportunity: optional, e.g. "$500K – $2M".
+
+Keep output concise so the response stays within token limits.`;
+
+  const userGoalLine = userGoal?.trim() ? `\nRep goal: ${userGoal.trim()}\n` : '';
+  const user = `TARGET COMPANY: ${companyName}
+${companyDomain ? `Domain: ${companyDomain}` : ''}
+${userGoalLine}
+BUYING GROUP TO ENRICH:
+- name: ${groupName}
+- rationale: ${rationale}
+- segmentType: ${segmentType}
+- orgFunction: ${orgFunction}
+${divisionOrProduct ? `- divisionOrProduct: ${divisionOrProduct}` : ''}
+
+{{PERPLEXITY_SUMMARY}}
+
+Produce the full detail for this one group. Use the research above and our product/content context.`;
+
+  return { system, user };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Step 3: Product fit scoring (relevance + talkingPoint per product)
+// ─────────────────────────────────────────────────────────────
+
+export type ProductFitPromptInput = {
+  groupName: string;
+  valueProp: string;
+  useCasesAtThisCompany: string[];
+  whyThisGroupBuys: string;
+  productNames: string[];
+};
+
+/**
+ * Build a short prompt for scoring product fit for one buying group.
+ * Output: { products: [{ productName, relevance (0–100), talkingPoint }] }.
+ */
+export function buildProductFitPrompt(input: ProductFitPromptInput): {
+  system: string;
+  user: string;
+} {
+  const { groupName, valueProp, useCasesAtThisCompany, whyThisGroupBuys, productNames } = input;
+  const useCasesBlock = useCasesAtThisCompany.map((u) => `- ${u}`).join('\n');
+  const productsList = productNames.join(', ');
+
+  const system = `You are an account intelligence AI. Score how relevant each of our products is to ONE buying group. Output a JSON object with a "products" array. Each item: productName (exact from our list), relevance (0–100), talkingPoint (one sentence for contact cards: why this product matters to this group). Include every product from our list; use relevance 0 if not relevant and give a brief talkingPoint anyway.`;
+
+  const user = `BUYING GROUP: ${groupName}
+Value prop: ${valueProp}
+Why they buy: ${whyThisGroupBuys}
+Use cases at this company:
+${useCasesBlock}
+
+OUR PRODUCTS (score each): ${productsList}
+
+Return { "products": [ { "productName": "...", "relevance": 0-100, "talkingPoint": "..." }, ... ] }.`;
+
+  return { system, user };
+}
+
+// ─────────────────────────────────────────────────────────────
 // Content Library loader — fetches from DB for a given userId
 // ─────────────────────────────────────────────────────────────
 

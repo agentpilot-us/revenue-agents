@@ -27,23 +27,92 @@ export const targetRolesSchema = z.object({
 export type TargetRoles = z.infer<typeof targetRolesSchema>;
 
 // ─────────────────────────────────────────────────────────────
-// Product fit per segment
+// New account-intel primitives (segment types, seeds, details)
 // ─────────────────────────────────────────────────────────────
 
-const productFitSchema = z.object({
+export const segmentTypeSchema = z.enum(['FUNCTIONAL', 'USE_CASE', 'DIVISIONAL']);
+export type SegmentType = z.infer<typeof segmentTypeSchema>;
+
+export const buyingGroupSeedSchema = z.object({
+  id: z.string().describe('Stable client-generated id used to track this seed through the flow'),
+  name: z
+    .string()
+    .describe('Buying group name, e.g. "Autonomous Vehicle Software Team" or "Manufacturing Operations"'),
+  rationale: z
+    .string()
+    .describe('One sentence on why this group matters for buying our products at this company.'),
+  segmentType: segmentTypeSchema.describe(
+    'FUNCTIONAL (by department), USE_CASE (by what they do), or DIVISIONAL (by business unit/product line).'
+  ),
+  orgFunction: z
+    .string()
+    .describe('Org-chart function this group rolls up to, e.g. "Software Engineering", "Manufacturing".'),
+  divisionOrProduct: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Division, business unit, or product line name, e.g. "Autonomous Driving", "GM Defense".'),
+});
+export type BuyingGroupSeed = z.infer<typeof buyingGroupSeedSchema>;
+
+const seniorityByRoleSchema = z.object({
+  economicBuyer: z
+    .array(z.string())
+    .default([])
+    .describe('Apollo seniority levels for economic buyers, e.g. ["c_suite", "vp", "director"].'),
+  technicalEvaluator: z
+    .array(z.string())
+    .default([])
+    .describe('Apollo seniority levels for technical evaluators.'),
+  champion: z
+    .array(z.string())
+    .default([])
+    .describe('Apollo seniority levels for champions.'),
+  influencer: z
+    .array(z.string())
+    .default([])
+    .describe('Apollo seniority levels for influencers / day-to-day users.'),
+});
+export type SeniorityByRole = z.infer<typeof seniorityByRoleSchema>;
+
+// ─────────────────────────────────────────────────────────────
+// Product fit per segment (new lightweight type)
+// ─────────────────────────────────────────────────────────────
+
+export const productFitSchema = z.object({
   productSlug: z.string().optional().describe('Deprecated: use productName'),
   productName: z.string().describe('Exact product name from our catalog'),
   relevance: z
+    .number()
+    .min(0)
+    .max(100)
+    .describe('0–100 numeric relevance score for this product → this buying group.'),
+  talkingPoint: z
     .string()
-    .describe('Why this product is relevant to this specific segment at this specific company'),
+    .describe('One-sentence talking point tying this product to the buying group, for contact cards.'),
   estimatedOpportunity: z
     .string()
     .optional()
     .describe('Estimated deal size, e.g. "$500K – $2M"'),
 });
 
-// ─────────────────────────────────────────────────────────────
-// Micro-segment (buying group) schema — core output unit
+export type ProductFit = z.infer<typeof productFitSchema>;
+
+/** Step 3: one group's product fit scores (productName, relevance, talkingPoint per product). */
+export const productFitListSchema = z.object({
+  products: z
+    .array(productFitSchema)
+    .describe('Score and talking point for each catalog product relevant to this buying group.'),
+});
+
+// Legacy product fit (monolithic flow): relevance string, no talkingPoint
+const legacyProductFitSchema = z.object({
+  productSlug: z.string().optional(),
+  productName: z.string(),
+  relevance: z.string().describe('Relevance description or score'),
+});
+
+// Legacy micro-segment schema (monolithic flow) — kept for compatibility
 // ─────────────────────────────────────────────────────────────
 
 export const microSegmentSchema = z.object({
@@ -100,7 +169,7 @@ export const microSegmentSchema = z.object({
   targetRoles: targetRolesSchema,
 
   products: z
-    .array(productFitSchema)
+    .array(legacyProductFitSchema)
     .min(1)
     .describe('Products from our catalog relevant to this segment'),
 
@@ -115,6 +184,88 @@ export const microSegmentSchema = z.object({
 });
 
 export type MicroSegment = z.infer<typeof microSegmentSchema>;
+
+// ─────────────────────────────────────────────────────────────
+// New BuyingGroupDetail & ProductFitScore for 4-step flow
+// ─────────────────────────────────────────────────────────────
+
+export const buyingGroupDetailSchema = z.object({
+  // Identity
+  name: z
+    .string()
+    .describe('Buying group name, e.g. "Autonomous Vehicle Software Team" or "Manufacturing Operations".'),
+  segmentType: segmentTypeSchema.describe('Segmentation type for this group.'),
+  orgDepartment: z
+    .string()
+    .describe('Org-chart department label used for Apollo department filters, e.g. "Engineering".'),
+
+  // Messaging
+  valueProp: z
+    .string()
+    .describe('2–3 sentence value proposition specific to this group at this company.'),
+  useCasesAtThisCompany: z
+    .array(z.string())
+    .min(1)
+    .max(4)
+    .describe('2–3 concrete use cases at this company for this group.'),
+  whyThisGroupBuys: z
+    .string()
+    .describe('One-sentence summary: why this group cares / what outcome they want.'),
+  objectionHandlers: z
+    .array(
+      z.object({
+        objection: z.string(),
+        response: z.string(),
+      })
+    )
+    .min(1)
+    .max(4)
+    .describe('Top objections for this group and how to respond.'),
+
+  // Contact finding — direct inputs for resolveSearchContext / Apollo
+  roles: targetRolesSchema,
+  searchKeywords: z
+    .array(z.string())
+    .default([])
+    .describe(
+      'Search keywords for LinkedIn/Apollo, especially important for USE_CASE or DIVISIONAL segments (e.g. "autonomous driving", "ADAS").'
+    ),
+  seniorityByRole: seniorityByRoleSchema,
+
+  // Product fit (populated in Step 3)
+  products: z
+    .array(productFitSchema)
+    .default([])
+    .describe('Per-product fit scores and talking points for this group.'),
+  estimatedOpportunity: z
+    .string()
+    .optional()
+    .describe('Optional total opportunity for this group, e.g. "$500K – $2M".'),
+});
+
+export type BuyingGroupDetail = z.infer<typeof buyingGroupDetailSchema>;
+
+const companyBasicsSchema = z.object({
+  name: z.string().describe('Official company name.'),
+  website: z.string().optional().describe('Company website URL.'),
+  industry: z.string().optional().describe('Primary industry.'),
+  employees: z.string().optional().describe('Employee count, e.g. "~5,000" or "500–1,000".'),
+  headquarters: z.string().optional().describe('HQ, e.g. "Detroit, Michigan".'),
+  revenue: z.string().optional().describe('Annual revenue, e.g. "$500M (2024)".'),
+});
+
+export const discoverGroupsResultSchema = z.object({
+  basics: companyBasicsSchema,
+  groups: z.array(buyingGroupSeedSchema).min(1),
+});
+
+export type DiscoverGroupsResult = z.infer<typeof discoverGroupsResultSchema>;
+
+export const productFitScoreSchema = productFitSchema.extend({
+  groupName: z.string().describe('Name of the buying group this score applies to.'),
+});
+
+export type ProductFitScore = z.infer<typeof productFitScoreSchema>;
 
 // ─────────────────────────────────────────────────────────────
 // Full company research schema (new flat + segmentation shape)

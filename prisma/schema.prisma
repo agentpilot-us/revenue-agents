@@ -582,6 +582,13 @@ model CompanyDepartment {
   proofPoints          Json? // Relevant case studies / proof points (array of strings or refs)
   objectionHandlers    Json? // [{ objection: string, response: string }]
 
+  // 4-step account intel: contact-finding and Apollo
+  segmentType     String? // FUNCTIONAL | USE_CASE | DIVISIONAL
+  searchKeywords  Json? // string[] — for USE_CASE/DIVISIONAL keyword bridging
+  orgDepartment   String? // Apollo department filter (e.g. "Engineering")
+  seniorityByRole Json? // { economicBuyer, technicalEvaluator, champion, influencer } — Apollo seniority levels
+  whyThisGroupBuys String? @db.Text // One sentence for contact "why relevant" card
+
   contacts                Contact[]
   companyProducts         CompanyProduct[]
   activities              Activity[]
