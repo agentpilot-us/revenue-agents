@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { ChatUI } from '@/app/chat/ChatUI';
-import { MessageSquare, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageSquare, X, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AccountChatWidgetProps {
@@ -60,6 +61,13 @@ export function AccountChatWidget({ accountId, companyName }: AccountChatWidgetP
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <Link
+            href={`/chat?play=expansion&accountId=${accountId}`}
+            title="Open chat in full page"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-600 dark:text-gray-400"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden />
+          </Link>
           <Button
             variant="ghost"
             size="icon"
@@ -85,9 +93,9 @@ export function AccountChatWidget({ accountId, companyName }: AccountChatWidgetP
         </div>
       </div>
 
-      {/* Chat Content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <ChatUI playId="expansion" accountId={accountId} />
+      {/* Chat Content: flex column so input stays visible at bottom */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <ChatUI playId="expansion" accountId={accountId} compact />
       </div>
     </div>
   );

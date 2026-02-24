@@ -27,9 +27,11 @@ type ChatUIProps = {
   playId: string;
   accountId?: string;
   contactId?: string;
+  /** When true, use less space for research block so the message input stays visible (e.g. in widget). */
+  compact?: boolean;
 };
 
-export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
+export function ChatUI({ playId, accountId, contactId, compact = false }: ChatUIProps) {
   const body = useMemo(
     () => ({
       playId,
@@ -65,9 +67,17 @@ export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
   }
 
   return (
-    <div className="flex flex-col min-h-[400px] rounded-xl border border-gray-200 bg-gray-50/50 dark:bg-zinc-900">
+    <div
+      className={`flex flex-col rounded-xl border border-gray-200 bg-gray-50/50 dark:bg-zinc-900 overflow-hidden ${
+        compact ? 'min-h-0 flex-1' : 'min-h-[400px]'
+      }`}
+    >
       {accountId ? (
-        <div className="p-3 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-t-xl max-h-[300px] overflow-y-auto">
+        <div
+          className={`p-3 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-t-xl overflow-y-auto shrink-0 ${
+            compact ? 'max-h-[140px]' : 'max-h-[300px]'
+          }`}
+        >
           <CompanyResearchDisplay companyId={accountId} />
         </div>
       ) : (
@@ -128,7 +138,7 @@ export function ChatUI({ playId, accountId, contactId }: ChatUIProps) {
           )}
         </ConversationContent>
       </Conversation>
-      <div className="p-4 border-t border-gray-200 bg-white rounded-b-xl">
+      <div className="p-4 border-t border-gray-200 bg-white dark:bg-zinc-800 rounded-b-xl shrink-0">
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputBody>
             <PromptInputTextarea placeholder="Message the agent…" />
