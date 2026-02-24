@@ -1,12 +1,12 @@
 /**
  * Central chat model for the app. Use getChatModel() everywhere so we can switch
- * provider via env. Default: Gemini when GOOGLE_GENERATIVE_AI_API_KEY is set;
- * otherwise Anthropic. Mock available for tests.
+ * provider via env.
  *
- * Env:
+ * Env (priority order):
  * - USE_MOCK_LLM=true → mock model (no API calls)
- * - GOOGLE_GENERATIVE_AI_API_KEY → Gemini (default for chat; recommended for low cost / token limits)
- * - else ANTHROPIC_API_KEY → Anthropic (fallback for teams that prefer it)
+ * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude (use to avoid Gemini free-tier quota)
+ * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
+ * - else ANTHROPIC_API_KEY → Claude
  */
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
@@ -61,11 +61,17 @@ function getAnthropicModel() {
 
 /**
  * Returns the chat model for generateText / streamText / generateObject.
- * Uses Gemini when GOOGLE_GENERATIVE_AI_API_KEY (or LLM_PROVIDER=gemini) is set; otherwise Anthropic.
+ * - USE_MOCK_LLM=true → mock
+ * - LLM_PROVIDER=anthropic (and ANTHROPIC_API_KEY set) → Claude (use this to avoid Gemini quota)
+ * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
+ * - else ANTHROPIC_API_KEY → Claude
  */
 export function getChatModel() {
   if (process.env.USE_MOCK_LLM === 'true') {
     return getMockChatModel();
+  }
+  if (process.env.LLM_PROVIDER === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+    return getAnthropicModel();
   }
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini') {
     return getGeminiChatModel();
