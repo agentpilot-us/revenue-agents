@@ -45,6 +45,8 @@ export function NightlyCrawlSettings({
     }
   };
 
+  const NOT_SET_VALUE = '__none__';
+
   const hourOptions = Array.from({ length: 24 }, (_, i) => ({
     value: i.toString(),
     label: `${i.toString().padStart(2, '0')}:00 UTC`,
@@ -68,14 +70,16 @@ export function NightlyCrawlSettings({
             Preferred Time (UTC)
           </label>
           <Select
-            value={preferredHour !== null ? preferredHour.toString() : ''}
-            onValueChange={(value) => setPreferredHour(value === '' ? null : parseInt(value, 10))}
+            value={preferredHour !== null ? preferredHour.toString() : NOT_SET_VALUE}
+            onValueChange={(value) =>
+              setPreferredHour(value === NOT_SET_VALUE ? null : parseInt(value, 10))
+            }
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select hour" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Not set (use default)</SelectItem>
+              <SelectItem value={NOT_SET_VALUE}>Not set (use default)</SelectItem>
               {hourOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}

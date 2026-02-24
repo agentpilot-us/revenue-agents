@@ -282,13 +282,41 @@ Now produce the full account intelligence brief per the schema. For each micro-s
 
 You MUST output at least one micro-segment. Do not return an empty microSegments array.`;
 
-    const result = await generateObject({
-      model: getChatModel(),
-      schema: companyResearchSchema,
-      system: systemPrompt,
-      maxOutputTokens: 6000,
-      prompt: userPrompt,
-    });
+    const runGenerateObjectWithRetry = async () => {
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          return await generateObject({
+            model: getChatModel(),
+            schema: companyResearchSchema,
+            system: systemPrompt,
+            maxOutputTokens: 6000,
+            prompt: userPrompt,
+          });
+        } catch (err) {
+          lastError = err;
+          const message = err instanceof Error ? err.message : '';
+          const isParseError =
+            typeof message === 'string' &&
+            (message.includes('No object generated') ||
+              message.includes('could not parse the response'));
+          if (attempt === 1 && isParseError) {
+            console.warn(
+              'generateObject parse error (structure research), retrying once…',
+              err
+            );
+            continue;
+          }
+          break;
+        }
+      }
+      if (lastError instanceof Error) {
+        throw lastError;
+      }
+      throw new Error('Research failed while structuring account intelligence.');
+    };
+
+    const result = await runGenerateObjectWithRetry();
 
     const object = result.object;
     const parsed = companyResearchSchema.safeParse(object);
