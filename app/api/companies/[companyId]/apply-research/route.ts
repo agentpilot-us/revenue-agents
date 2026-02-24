@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { DepartmentType, DepartmentStatus } from '@prisma/client';
+import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
 import { companyResearchSchema } from '@/lib/research/company-research-schema';
 import { autoGenerateAccountMessaging } from '@/lib/account-messaging/auto-generate';
 import { isDemoAccount } from '@/lib/demo/is-demo-account';
@@ -156,7 +156,7 @@ export async function POST(
           headquarters: companyBasics.headquarters ?? company.headquarters,
           revenue: companyBasics.revenue ?? company.revenue,
           researchGoal: researchGoal ?? undefined,
-          researchData: body,
+          researchData: body as Prisma.InputJsonValue,
         },
       });
 
