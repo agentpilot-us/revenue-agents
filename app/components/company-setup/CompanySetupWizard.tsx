@@ -50,6 +50,23 @@ function parseUrl(url: string): string {
   }
 }
 
+const MAX_SPECIFIC_URLS = 30;
+
+function parseValidUrls(text: string): string[] {
+  const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const urls: string[] = [];
+  for (const line of lines) {
+    try {
+      const u = new URL(line.startsWith('http') ? line : `https://${line}`);
+      if (u.protocol === 'http:' || u.protocol === 'https:') urls.push(u.toString());
+    } catch {
+      // skip invalid
+    }
+    if (urls.length >= MAX_SPECIFIC_URLS) break;
+  }
+  return urls;
+}
+
 export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfileProp }: Props) {
   const router = useRouter();
   const onSaveProfile = useCallback(
@@ -81,6 +98,10 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
     [onSaveProfileProp]
   );
   const [step, setStep] = useState<Step>('form');
+  const [importMode, setImportMode] = useState<'full_website' | 'specific_urls' | null>(null);
+  const [specificUrlsText, setSpecificUrlsText] = useState('');
+  const [batchProgress, setBatchProgress] = useState<{ total: number; done: number } | null>(null);
+  const [importSource, setImportSource] = useState<'full_website' | 'specific_urls'>('full_website');
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -123,6 +144,7 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
     setMessage(null);
     try {
       await onSaveProfile(data);
+      setImportSource('full_website');
       setStep('import-progress');
       setImporting(true);
       setImportProgress([{ step: 1, message: 'Starting crawl...' }]);
@@ -165,6 +187,94 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
     }
   };
 
+  const handleNavigateToContentLibrary = async () => {
+    if (!isValid) {
+      router.push('/dashboard/content-library');
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      await onSaveProfile(data);
+      router.push('/dashboard/content-library');
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save company info' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImportSpecificUrls = async () => {
+    const validUrls = parseValidUrls(specificUrlsText);
+    if (!isValid || validUrls.length === 0) {
+      setMessage({ type: 'error', text: 'Fill company basics and add at least one valid URL (one per line).' });
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      await onSaveProfile(data);
+      setImportSource('specific_urls');
+      setStep('import-progress');
+      setBatchProgress({ total: validUrls.length, done: 0 });
+      const res = await fetch('/api/content-library/batch-scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls: validUrls }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error((json as { error?: string }).error ?? 'Batch import failed');
+      }
+      if (!res.body) {
+        throw new Error('No response stream');
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as {
+              type: string;
+              total?: number;
+              index?: number;
+              saved?: number;
+              failed?: number;
+              message?: string;
+            };
+            if (event.type === 'started' && typeof event.total === 'number') {
+              setBatchProgress({ total: event.total, done: 0 });
+            } else if (event.type === 'page' && typeof event.index === 'number') {
+              setBatchProgress((prev) => (prev ? { ...prev, done: event.index! } : null));
+            } else if (event.type === 'complete') {
+              setBatchProgress(null);
+              setSuccessStats({ created: event.saved ?? 0 });
+              setStep('success');
+            } else if (event.type === 'error') {
+              throw new Error(event.message ?? 'Import error');
+            }
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message === 'Import error') throw parseErr;
+          }
+        }
+      }
+      setBatchProgress(null);
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Import failed' });
+      setStep('form');
+      setBatchProgress(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleApprove = async () => {
     const toApprove = selectedReviewIndices.map((i) => importResults[i]).filter(Boolean);
     if (toApprove.length === 0) return;
@@ -188,13 +298,32 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
   };
 
   if (step === 'import-progress') {
+    const isSpecificUrls = importSource === 'specific_urls';
+    const progressTotal = isSpecificUrls ? batchProgress?.total ?? 0 : 0;
+    const progressDone = isSpecificUrls ? batchProgress?.done ?? 0 : 0;
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Importing Content from {domain}
+          {isSpecificUrls
+            ? `Importing URLs (${progressDone} of ${progressTotal})`
+            : `Importing Content from ${domain}`}
         </h1>
         <div className="rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-          {importing ? (
+          {isSpecificUrls ? (
+            <>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                Scraping and extracting content from your URLs…
+              </p>
+              <div className="h-2 bg-gray-200 dark:bg-zinc-700 rounded overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 transition-all duration-300"
+                  style={{
+                    width: progressTotal > 0 ? `${Math.round((progressDone / progressTotal) * 100)}%` : '50%',
+                  }}
+                />
+              </div>
+            </>
+          ) : importing ? (
             <>
               <p className="text-gray-600 dark:text-gray-400 mb-4">Analyzing {domain}...</p>
               <div className="h-2 bg-gray-200 dark:bg-zinc-700 rounded overflow-hidden">
@@ -410,6 +539,36 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Step 2 of 3: Import your content
         </h2>
+        {importMode === 'specific_urls' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Paste URLs below, one per line. We&apos;ll scrape and add them to your library (max {MAX_SPECIFIC_URLS}).
+            </p>
+            <textarea
+              value={specificUrlsText}
+              onChange={(e) => setSpecificUrlsText(e.target.value)}
+              placeholder="https://example.com/page1
+https://example.com/page2"
+              rows={6}
+              className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 px-3 py-2 text-gray-900 dark:text-gray-100 font-mono text-sm"
+            />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {parseValidUrls(specificUrlsText).length} valid URL{parseValidUrls(specificUrlsText).length !== 1 ? 's' : ''} (max {MAX_SPECIFIC_URLS})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setImportMode(null)}>
+                Back
+              </Button>
+              <Button
+                onClick={handleImportSpecificUrls}
+                disabled={!isValid || saving || parseValidUrls(specificUrlsText).length === 0}
+              >
+                {saving ? 'Importing…' : 'Import these URLs'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-6 space-y-4">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">
             Quick Start: Smart Website Import (Recommended)
@@ -431,15 +590,15 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
         </div>
         <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">————— OR —————</p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/dashboard/content-library">
-            <Button variant="outline">Upload Files</Button>
-          </Link>
-          <Link href="/dashboard/content-library">
-            <Button variant="outline">Add Specific URLs</Button>
-          </Link>
-          <Link href="/dashboard/content-library">
-            <Button variant="outline">Enter Text</Button>
-          </Link>
+          <Button variant="outline" onClick={handleNavigateToContentLibrary}>
+            Upload Files
+          </Button>
+          <Button variant="outline" onClick={() => setImportMode('specific_urls')}>
+            Add Specific URLs
+          </Button>
+          <Button variant="outline" onClick={handleNavigateToContentLibrary}>
+            Enter Text
+          </Button>
         </div>
         <details className="mt-6">
           <summary className="cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
@@ -473,6 +632,8 @@ export function CompanySetupWizard({ initialData, onSaveProfile: onSaveProfilePr
             </p>
           </div>
         </details>
+          </>
+        )}
       </section>
 
       {/* Step 3 of 3: Keep Content Fresh */}
