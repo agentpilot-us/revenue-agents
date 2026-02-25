@@ -98,8 +98,10 @@ export async function POST(
       userGoal,
     };
 
+    const toolWithSchema = (config: any) => tool(config);
+
     const researchTools: Record<string, Tool> = {
-      discover_buying_groups: tool({
+      discover_buying_groups: toolWithSchema({
         description:
           'Research the target company and identify 4–6 buying groups (seeds). Returns company basics, group seeds, and perplexitySummary. Call this first; then pass perplexitySummary to each enrich_buying_group call.',
         inputSchema: z.object({
@@ -126,7 +128,7 @@ export async function POST(
         },
       }),
 
-      enrich_buying_group: tool({
+      enrich_buying_group: toolWithSchema({
         description:
           'Enrich a single buying group (value prop, roles, search keywords, seniority). Pass the group from discover_buying_groups and the perplexitySummary from that same discover result.',
         inputSchema: z.object({
@@ -152,7 +154,7 @@ export async function POST(
         },
       }),
 
-      score_product_fit: tool({
+      score_product_fit: toolWithSchema({
         description:
           'Score how relevant each catalog product is to one buying group (0–100 + talking point). Pass an enriched group from enrich_buying_group. Returns the same group with products array filled.',
         inputSchema: z.object({
@@ -190,7 +192,7 @@ export async function POST(
         },
       }),
 
-      save_research_results: tool({
+      save_research_results: toolWithSchema({
         description:
           'Save company basics and enriched buying groups to the database. Call after all groups are enriched (and optionally product-scored). Pass basics from discover_buying_groups and the list of enriched groups.',
         inputSchema: z.object({
@@ -256,7 +258,7 @@ export async function POST(
       abortSignal: req.signal,
     });
 
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
   } catch (error) {
     console.error('POST /api/companies/[companyId]/research/run error:', error);
     const message = error instanceof Error ? error.message : 'Research run failed';
