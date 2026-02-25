@@ -209,12 +209,13 @@ export async function POST(req: Request) {
     const accountId = typeof body.accountId === 'string' ? body.accountId : (body.companyId as string | undefined);
     const contactId = typeof body.contactId === 'string' ? body.contactId : undefined;
 
-    // Get user's company name for Content Library matching
+    // Get user's company name and website for Content Library matching and system prompt
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { companyName: true },
+      select: { companyName: true, companyWebsite: true },
     });
     const userCompanyName = user?.companyName || 'Your company';
+    const userCompanyWebsite = user?.companyWebsite?.trim() || null;
 
     // Resolve company (account) context and contacts with department
     type ContactRow = { id: string; firstName: string | null; lastName: string | null; title: string | null; department: string | null };
