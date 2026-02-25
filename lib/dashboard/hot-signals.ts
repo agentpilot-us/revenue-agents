@@ -1,6 +1,6 @@
 import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { getPlayDisplayName } from '@/lib/plays/plays-config';
+import { getPlayDisplayName, type PlayId } from '@/lib/plays/plays-config';
 import { RELEVANCE_HOT_SIGNALS_MIN, RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
 
 const execPattern =
@@ -223,7 +223,7 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
         : s.relevanceScore >= RELEVANCE_TIER_2_MIN
           ? 'amber'
           : 'green';
-    const playLabel = getPlayDisplayName(s.suggestedPlay ?? undefined);
+    const playLabel = getPlayDisplayName((s.suggestedPlay ?? undefined) as PlayId | undefined);
     signals.push({
       companyId: s.companyId,
       companyName: s.company.name,
