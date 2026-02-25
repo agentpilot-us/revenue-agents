@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { z } from 'zod';
-import { DepartmentType, Prisma } from '@prisma/client';
+import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
 import { companyResearchSchema } from '@/lib/research/company-research-schema';
 import { save4StepResearch, DEPARTMENT_TYPES_ORDER } from '@/lib/research/save-4-step-research';
 import { autoGenerateAccountMessaging } from '@/lib/account-messaging/auto-generate';
