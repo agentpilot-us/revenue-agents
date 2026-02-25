@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { getPlayDisplayName } from '@/lib/plays/plays-config';
+import { getPlayDisplayName, type PlayId } from '@/lib/plays/plays-config';
 import { JSON_NOT_NULL } from '@/lib/prisma-json';
 import { RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
 
@@ -293,7 +293,7 @@ export async function GET(
           : s.relevanceScore >= RELEVANCE_TIER_2_MIN
             ? 2
             : 3;
-      const playLabel = getPlayDisplayName(s.suggestedPlay ?? undefined);
+      const playLabel = getPlayDisplayName((s.suggestedPlay ?? undefined) as PlayId | undefined);
       const typeLabel = s.type.replace(/_/g, ' ');
       signals.push({
         tier,
