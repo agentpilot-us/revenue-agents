@@ -3,6 +3,20 @@
  * Handles matching email domains to company domains with subdomain support
  */
 
+/** Platform domains that can access any landing page (e.g. internal / AgentPilot team) */
+export const ALLOWED_PLATFORM_DOMAINS = ['agentpilot.us'] as const;
+
+/**
+ * Returns true if the email domain is an allowed platform domain (e.g. @agentpilot.us).
+ * Used so platform users can access any customer landing page.
+ */
+export function isAllowedPlatformDomain(emailDomain: string): boolean {
+  const normalized = emailDomain.toLowerCase().trim().replace(/^www\./, '');
+  return (ALLOWED_PLATFORM_DOMAINS as readonly string[]).some(
+    (d) => normalized === d || normalized.endsWith('.' + d)
+  );
+}
+
 /**
  * Extract and normalize domain from email address
  */

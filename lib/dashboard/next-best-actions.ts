@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { getSuggestedPlays } from '@/lib/plays/engine';
+import { buildSignalPlayHref } from '@/lib/dashboard/signal-play-href';
 
 export type NextBestActionItem = {
   companyId: string;
@@ -56,7 +57,13 @@ export async function getNextBestActions(
         departmentName: suggestion.segment.name,
         label: `${company.name} — ${suggestion.triggerText}`,
         ctaLabel: `Run "${suggestion.play.name}"`,
-        ctaHref: `/chat?play=expansion&accountId=${company.id}&segmentId=${suggestion.segment.id}`,
+        ctaHref: buildSignalPlayHref({
+          companyId: company.id,
+          playId: suggestion.play.id,
+          segmentId: suggestion.segment.id,
+          segmentName: suggestion.segment.name,
+          signalTitle: suggestion.triggerText,
+        }),
         playId: suggestion.play.id,
         priority,
       });
@@ -77,14 +84,21 @@ export async function getNextBestActions(
             a.playId === 'new_buying_group'
         );
         if (!already) {
+          const triggerText = `${deptName} has ${contactCount} contact${contactCount !== 1 ? 's' : ''} but no sales page`;
           actions.push({
             companyId: company.id,
             companyName: company.name,
             departmentId: dept.id,
             departmentName: deptName,
-            label: `${company.name} — ${deptName} has ${contactCount} contact${contactCount !== 1 ? 's' : ''} but no sales page`,
+            label: `${company.name} — ${triggerText}`,
             ctaLabel: 'Run "Open New Buying Group"',
-            ctaHref: `/chat?play=expansion&accountId=${company.id}&segmentId=${dept.id}`,
+            ctaHref: buildSignalPlayHref({
+              companyId: company.id,
+              playId: 'new_buying_group',
+              segmentId: dept.id,
+              segmentName: deptName,
+              signalTitle: triggerText,
+            }),
             playId: 'new_buying_group',
             priority: 0,
           });

@@ -45,7 +45,7 @@ export default async function LandingPageAuthPage({ params, searchParams }: Prop
               {companyDomain && (
                 <>
                   <br />
-                  <span className="font-medium">@{companyDomain}</span>
+                  <span className="font-medium">@{companyDomain}</span> or <span className="font-medium">@agentpilot.us</span>
                 </>
               )}
             </p>

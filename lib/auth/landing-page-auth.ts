@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { extractEmailDomain, matchDomains, isValidEmail } from './domain-matcher';
+import { extractEmailDomain, matchDomains, isValidEmail, isAllowedPlatformDomain } from './domain-matcher';
 import { randomBytes } from 'crypto';
 
 /**
@@ -221,9 +221,10 @@ export async function validateDomainMatch(
     return { valid: true, companyDomain: null };
   }
 
-  // Extract and match domains
+  // Extract and match domains: allow company domain or allowed platform domains (e.g. @agentpilot.us)
   const emailDomain = extractEmailDomain(email);
-  const matches = matchDomains(emailDomain, companyDomain);
+  const matches =
+    matchDomains(emailDomain, companyDomain) || isAllowedPlatformDomain(emailDomain);
 
   return { valid: matches, companyDomain };
 }

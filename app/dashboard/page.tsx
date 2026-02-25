@@ -333,7 +333,9 @@ export default async function DashboardPage({
   }
 
   const launchPlays = nextBestActions.filter(
-    (a) => a.playId && a.ctaHref.startsWith('/chat')
+    (a) =>
+      a.playId &&
+      (a.ctaHref.startsWith('/chat') || a.ctaHref.includes('/create-content'))
   );
 
   return (

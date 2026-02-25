@@ -67,16 +67,22 @@ export function LandingPageAuthForm({ campaignId, companyName, companyDomain }: 
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder={companyDomain ? `your.name@${companyDomain}` : 'your.email@company.com'}
+          placeholder={companyDomain ? `your.name@${companyDomain}` : 'your.name@agentpilot.us'}
           required
           disabled={loading}
           className="w-full px-4 py-2.5 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        {companyDomain && (
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Your email domain must match <span className="font-medium">@{companyDomain}</span>
-          </p>
-        )}
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Your email domain must match{' '}
+          {companyDomain ? (
+            <>
+              <span className="font-medium">@{companyDomain}</span> or{' '}
+              <span className="font-medium">@agentpilot.us</span>
+            </>
+          ) : (
+            <span className="font-medium">@agentpilot.us</span>
+          )}
+        </p>
       </div>
 
       {message && (

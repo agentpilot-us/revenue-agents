@@ -17,8 +17,8 @@ import {
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
 
-
-const contentTypeSchema = ['email', 'linkedin', 'custom_url'] as const;
+// RESTORED: talking_points added back
+const contentTypeSchema = ['email', 'linkedin', 'custom_url', 'talking_points'] as const;
 type ContentType = (typeof contentTypeSchema)[number];
 
 function isContentType(s: string): s is ContentType {
@@ -50,7 +50,8 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
-    const contentType = isContentType(body.contentType ?? '') ? body.contentType : 'email';
+    const rawContentType = body.contentType ?? '';
+    const contentType: ContentType = isContentType(rawContentType) ? rawContentType : 'email';
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     if (!prompt) {
       return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
@@ -82,14 +83,9 @@ export async function POST(
     const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 8);
     const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
 
-    const contentTypeInstruction =
-      contentType === 'email'
-        ? 'Generate an email: include a "Subject:" line first, then a blank line, then the email body (plain text, 2-4 short paragraphs). Use the context below for the target account and your company\'s messaging and value props.'
-        : contentType === 'linkedin'
-          ? 'Generate a LinkedIn post or message: professional tone, concise. Use the context below for the target account and your company\'s messaging. Output plain text only.'
-          : 'Generate copy for a custom URL or landing page: include a short headline, a body paragraph or two, and a CTA button label. Use the context below. Output plain text with clear line breaks (e.g. "Headline: ...", "Body: ...", "CTA: ...").';
+    const contentTypeInstruction = getContentTypeInstruction(contentType, company.name);
 
-    const systemPrompt = `You are a B2B content writer. The user is creating ${(contentType ?? 'email').replace(/_/g, ' ')} content for the target account "${company.name}".
+    const systemPrompt = `You are a B2B content writer. The user is creating ${contentType.replace(/_/g, ' ')} content for the target account "${company.name}".
 
 ${contentTypeInstruction}
 
@@ -115,14 +111,16 @@ ${messagingSection}${accountSection}${researchSection}`;
 
     const isQuotaError =
       (error as { statusCode?: number })?.statusCode === 429 ||
-      (error as { data?: { error?: { code?: string } } })?.data?.error?.code === 'insufficient_quota' ||
+      (error as { data?: { error?: { code?: string } } })?.data?.error?.code ===
+        'insufficient_quota' ||
       (error instanceof Error && /quota|rate limit|429/i.test(error.message));
 
     if (isQuotaError) {
       return NextResponse.json(
         {
           error: 'Embedding quota exceeded',
-          details: 'Your OpenAI (or embedding provider) quota or billing limit was exceeded. Check your plan and billing at https://platform.openai.com/account/billing.',
+          details:
+            'Your OpenAI (or embedding provider) quota or billing limit was exceeded. Check your plan and billing at https://platform.openai.com/account/billing.',
         },
         { status: 503 }
       );
@@ -135,5 +133,41 @@ ${messagingSection}${accountSection}${researchSection}`;
       },
       { status: 500 }
     );
+  }
+}
+
+function getContentTypeInstruction(contentType: ContentType, companyName: string): string {
+  switch (contentType) {
+    case 'email':
+      return `Generate an email: include a "Subject:" line first, then a blank line, then the email body (plain text, 2-4 short paragraphs). Use the context below for the target account and your company's messaging and value props.`;
+
+    case 'linkedin':
+      return `Generate a LinkedIn message: connection request or InMail tone. Professional but not stiff. Under 300 characters for a connection request, under 200 words for an InMail. Reference something specific about ${companyName}. End with a clear but low-pressure ask (15-minute call, not "let's schedule a demo"). Output plain text only.`;
+
+    case 'custom_url':
+      return `Generate copy for a custom URL or landing page: include a short headline, a body paragraph or two, and a CTA button label. Use the context below. Output plain text with clear line breaks (e.g. "Headline: ...", "Body: ...", "CTA: ...").`;
+
+    case 'talking_points':
+      return `Generate a pre-meeting talking points sheet for a sales rep preparing to meet with someone at ${companyName}. Structure the output as follows:
+
+OPENING (2-3 options):
+- Conversation starters tied to what's happening at the account right now (use any signal context in the prompt)
+
+KEY PAIN TO PROBE:
+- The one question to ask that surfaces the problem your product solves for this specific buyer
+
+VALUE PROPS FOR THIS MEETING (3 max):
+- Specific to this buyer's role and what they care about — not generic company messaging
+
+LIKELY OBJECTIONS:
+- 2-3 objections this buyer is likely to raise, with a one-sentence response to each
+
+PROOF POINT TO DROP:
+- One case study or customer reference most relevant to this company/industry
+
+SUGGESTED NEXT STEP:
+- How to close the meeting and advance the deal
+
+Keep each section tight — this is a quick-reference sheet, not a script. Output plain text with the section headers above.`;
   }
 }
