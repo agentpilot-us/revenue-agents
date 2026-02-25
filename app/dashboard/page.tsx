@@ -27,6 +27,38 @@ function startOfWeek(d: Date): Date {
   return x;
 }
 
+/** Parse estimatedOpportunity (e.g. "$50K-$150K") to { min, max } in dollars. */
+function parseOpportunityRange(s: string | null): { min: number; max: number } | null {
+  if (!s || !s.trim()) return null;
+  const parts = s
+    .replace(/\$/g, '')
+    .split(/[\s–\-–—]+/)
+    .map((p) => p.trim().toUpperCase().replace(/,/g, ''));
+  const numbers: number[] = [];
+  for (const p of parts) {
+    const match = p.match(/^([\d.]+)\s*(K|M)?$/);
+    if (match) {
+      let n = Number(match[1]);
+      if (match[2] === 'K') n *= 1000;
+      else if (match[2] === 'M') n *= 1_000_000;
+      numbers.push(n);
+    }
+  }
+  if (numbers.length === 0) return null;
+  return { min: Math.min(...numbers), max: Math.max(...numbers) };
+}
+
+/** Short label for department to avoid truncation. */
+function deptShortName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('customer success')) return 'CS Team';
+  if (n.includes('revenue operation') || n.includes('revops')) return 'RevOps';
+  if (n.includes('sales')) return 'Sales';
+  if (n.includes('delivery') || n.includes('implementation')) return 'Delivery';
+  if (n.length <= 12) return name;
+  return name;
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -119,6 +151,7 @@ export default async function DashboardPage({
     getHotSignals(session.user.id),
     getNextBestActions(session.user.id),
     getMomentumWeekComparison(session.user.id),
+    // ExpansionPlay = tracked expansion by dept+product (status, nextActionDue). Not tactical plays (lib/plays).
     prisma.expansionPlay.findMany({
       where: {
         company: { userId: session.user.id },
@@ -216,12 +249,17 @@ export default async function DashboardPage({
       lastActivity,
       coveragePct,
       borderColor,
-      departments: c.departments.map((d) => ({
-        id: d.id,
-        name: d.customName ?? d.type.replace(/_/g, ' '),
-        contactCount: d._count.contacts,
-        hasCampaign: d.segmentCampaigns.length > 0,
-      })),
+      departments: c.departments.map((d) => {
+        const fullName = d.customName ?? d.type.replace(/_/g, ' ');
+        return {
+          id: d.id,
+          name: fullName,
+          shortName: deptShortName(fullName),
+          contactCount: d._count.contacts,
+          hasCampaign: d.segmentCampaigns.length > 0,
+          estimatedOpportunity: (d as { estimatedOpportunity?: string | null }).estimatedOpportunity ?? null,
+        };
+      }),
     };
   });
 
@@ -232,7 +270,7 @@ export default async function DashboardPage({
     0
   );
 
-  const todaysTasks = [
+  const playTasks = [
     ...playsNeedingAction.map((p) => ({
       id: p.id,
       label: `${p.company.name} — ${p.companyDepartment?.customName ?? p.companyDepartment?.type?.replace(/_/g, ' ') ?? 'Dept'}`,
@@ -247,12 +285,52 @@ export default async function DashboardPage({
       })),
   ];
 
+  const autoTasks: { id: string; label: string; href: string }[] = [];
+  for (const c of companies) {
+    for (const d of c.departments) {
+      if (d.contactCount > 0 && !d.hasCampaign) {
+        autoTasks.push({
+          id: `page-${c.id}-${d.id}`,
+          label: `Create sales page for ${c.name} → ${d.shortName}`,
+          href: `/dashboard/companies/${c.id}/departments/${d.id}`,
+        });
+      }
+      if (d.contactCount === 0) {
+        autoTasks.push({
+          id: `contacts-${c.id}-${d.id}`,
+          label: `Find contacts for ${c.name} → ${d.shortName}`,
+          href: `/dashboard/companies/${c.id}/departments/${d.id}`,
+        });
+      }
+    }
+    autoTasks.push({
+      id: `research-${c.id}`,
+      label: `Research ${c.name} buying groups`,
+      href: `/dashboard/companies/${c.id}`,
+    });
+  }
+  const todaysTasks = [...playTasks, ...autoTasks];
+
   const pipelineMap = new Map(
     pipelineByCompany.map((p) => [
       p.companyId,
       Number(p._sum.opportunitySize ?? 0),
     ])
   );
+
+  const potentialByCompany = new Map<string, { min: number; max: number }>();
+  for (const c of companies) {
+    let minSum = 0;
+    let maxSum = 0;
+    for (const d of c.departments) {
+      const range = parseOpportunityRange(d.estimatedOpportunity);
+      if (range) {
+        minSum += range.min;
+        maxSum += range.max;
+      }
+    }
+    if (minSum > 0 || maxSum > 0) potentialByCompany.set(c.id, { min: minSum, max: maxSum });
+  }
 
   const launchPlays = nextBestActions.filter(
     (a) => a.playId && a.ctaHref.startsWith('/chat')
@@ -271,16 +349,29 @@ export default async function DashboardPage({
       }
       activityFeed={
         <ActivityFeed
-          activities={recentActivities.map((a) => ({
-            id: a.id,
-            type: a.type,
-            summary: a.summary,
-            createdAt: a.createdAt,
-            companyId: a.companyId,
-            companyName: a.company?.name ?? null,
-            companyDepartmentId: a.companyDepartmentId,
-            contactId: a.contactId,
-          }))}
+          activities={
+            recentActivities.length > 0
+              ? recentActivities.map((a) => ({
+                  id: a.id,
+                  type: a.type,
+                  summary: a.summary,
+                  createdAt: a.createdAt,
+                  companyId: a.companyId,
+                  companyName: a.company?.name ?? null,
+                  companyDepartmentId: a.companyDepartmentId,
+                  contactId: a.contactId,
+                }))
+              : companies.slice(0, 8).map((c) => ({
+                  id: `syn-${c.id}`,
+                  type: 'Account Added',
+                  summary: `Account added: ${c.name}`,
+                  createdAt: typeof c.lastActivity === 'string' ? new Date(c.lastActivity) : c.lastActivity,
+                  companyId: c.id,
+                  companyName: c.name,
+                  companyDepartmentId: null,
+                  contactId: null,
+                }))
+          }
         />
       }
     >
@@ -292,7 +383,19 @@ export default async function DashboardPage({
             <TodaysTasks tasks={todaysTasks} />
           </>
         }
-        center={<AccountRadarGrid accounts={companies} />}
+        center={
+              <AccountRadarGrid
+                accounts={companies.map((c) => ({
+                  ...c,
+                  departments: c.departments.map((d) => ({
+                    id: d.id,
+                    name: d.shortName,
+                    contactCount: d.contactCount,
+                    hasCampaign: d.hasCampaign,
+                  })),
+                }))}
+              />
+            }
         right={
           <>
             <MomentumThisWeek momentum={momentum} />
@@ -301,6 +404,7 @@ export default async function DashboardPage({
                 id: c.id,
                 name: c.name,
                 pipeline: pipelineMap.get(c.id) ?? 0,
+                potential: potentialByCompany.get(c.id) ?? null,
               }))}
             />
             <LaunchPlays actions={launchPlays} />

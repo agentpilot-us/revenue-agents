@@ -45,15 +45,11 @@ export function AccountRadarCard({
   departments,
 }: AccountRadarCardProps) {
   return (
-    <div
-      className={`rounded-lg border bg-zinc-800/80 p-4 ${borderClasses[borderColor]}`}
+    <Link
+      href={`/dashboard/companies/${id}`}
+      className={`block rounded-lg border bg-zinc-800/80 p-4 transition-colors hover:bg-zinc-800 ${borderClasses[borderColor]}`}
     >
-      <Link
-        href={`/dashboard/companies/${id}`}
-        className="font-semibold text-slate-100 hover:text-amber-400 transition-colors"
-      >
-        {name}
-      </Link>
+      <span className="font-semibold text-slate-100">{name}</span>
       <div className="mt-2 h-1.5 w-full rounded-full bg-slate-700 overflow-hidden">
         <div
           className="h-full rounded-full bg-amber-500/80"
@@ -95,12 +91,9 @@ export function AccountRadarCard({
         {pagesLive === 0 ? '0 pages' : `${pagesLive} page${pagesLive !== 1 ? 's' : ''} live`}
       </p>
       <p className="text-xs text-slate-500">Last signal: {formatLastSignal(lastActivity)}</p>
-      <Link
-        href={`/dashboard/companies/${id}`}
-        className="mt-3 inline-block text-xs font-medium text-amber-400 hover:text-amber-300"
-      >
+      <span className="mt-3 inline-block text-xs font-medium text-amber-400">
         Open account →
-      </Link>
-    </div>
+      </span>
+    </Link>
   );
 }

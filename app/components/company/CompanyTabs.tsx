@@ -375,31 +375,64 @@ export function CompanyTabs({
 
 function ResearchWithAIButton({ companyId }: { companyId: string }) {
   const [researching, setResearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleResearch = async () => {
     setResearching(true);
+    setError(null);
     try {
       const res = await fetch(`/api/companies/${companyId}/research`, {
         method: 'POST',
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        // Refresh the page to show updated research data
         window.location.reload();
-      } else {
-        alert('Failed to run research. Please try again.');
+        return;
       }
-    } catch (error) {
-      console.error('Research error:', error);
-      alert('Failed to run research. Please try again.');
+      const message = typeof data?.error === 'string' ? data.error : 'Failed to run research. Please try again.';
+      setError(message);
+    } catch (err) {
+      console.error('Research error:', err);
+      setError('Failed to run research. Please try again.');
     } finally {
       setResearching(false);
     }
   };
 
+  const isSetupError =
+    error &&
+    (error.includes('company setup') ||
+      error.includes('Content Library') ||
+      error.includes('No products found') ||
+      error.includes('Your company data'));
+
   return (
-    <Button onClick={handleResearch} disabled={researching} size="sm">
-      {researching ? 'Researching...' : 'Research with AI'}
-    </Button>
+    <div className="flex flex-col items-end gap-2 min-w-[280px]">
+      <Button onClick={handleResearch} disabled={researching} size="sm">
+        {researching ? 'Researching...' : 'Research with AI'}
+      </Button>
+      {error && (
+        <div className="w-full min-w-[280px] max-w-md rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+          <p className="font-medium">Research couldn’t run</p>
+          <p className="mt-1">{error}</p>
+          {isSetupError && (
+            <Link
+              href="/dashboard/content-library"
+              className="mt-2 inline-block text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Complete setup in Your company data →
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="mt-2 text-xs text-amber-600 dark:text-amber-300 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

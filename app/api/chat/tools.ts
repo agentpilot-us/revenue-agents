@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
 import { discoverDepartments } from '@/app/actions/discover-departments';
 import { isDemoAccount } from '@/lib/demo/is-demo-account';
+import { fetchAccountSignals } from '@/lib/signals/fetch-account-signals';
 
 /**
  * Chat tools for department discovery and lookup.
@@ -32,6 +33,45 @@ export const chatTools = {
         return {
           error: `Department discovery failed: ${message}. Use list_departments to see departments already mapped for this account.`,
         };
+      }
+    },
+  }),
+
+  get_account_signals: tool({
+    description:
+      "Fetch realtime account signals (news, earnings, executive changes) for a company from the last 48 hours. Use when the user asks 'What happened at [company] today?' or 'Any news at [company]?' or similar. Returns earnings, product announcements, executive hires/departures, and suggested plays.",
+    inputSchema: z.object({
+      companyId: z.string().describe('The company ID (current account)'),
+    }),
+    execute: async ({ companyId }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+        select: { id: true, name: true, domain: true, industry: true },
+      });
+      if (!company) return { error: 'Company not found' };
+      try {
+        const signals = await fetchAccountSignals(
+          company.name,
+          company.domain ?? '',
+          company.industry,
+          48
+        );
+        return {
+          companyName: company.name,
+          signals: signals.map((s) => ({
+            type: s.type,
+            title: s.title,
+            summary: s.summary,
+            url: s.url,
+            relevanceScore: s.relevanceScore,
+            suggestedPlay: s.suggestedPlay ?? undefined,
+          })),
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Signal fetch failed';
+        return { error: message };
       }
     },
   }),

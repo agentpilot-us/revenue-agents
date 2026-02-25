@@ -271,7 +271,20 @@ export function AccountIntelligenceClient({
                 {step1Loading ? 'Discovering…' : 'Discover buying groups'}
               </Button>
               {step1Error && (
-                <p className="text-sm text-red-400">{step1Error}</p>
+                <div className="text-sm text-red-400 space-y-1">
+                  <p>{step1Error}</p>
+                  {(step1Error.includes('company setup') ||
+                    step1Error.includes('Content Library') ||
+                    step1Error.includes('No products found') ||
+                    step1Error.includes('Your company data')) && (
+                    <Link
+                      href="/dashboard/content-library"
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      Complete setup in Your company data →
+                    </Link>
+                  )}
+                </div>
               )}
             </>
           ) : (

@@ -172,6 +172,7 @@ model Company {
   accountMessaging AccountMessaging?
   agentContext     Json? // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
   segmentCampaigns SegmentCampaign[]
+  accountSignals   AccountSignal[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
   workflowStep                   Int? // 1, 2, or 3
@@ -200,6 +201,30 @@ model Company {
   @@index([industry])
   @@index([salesforceId])
   @@index([userId, workflowStep])
+}
+
+// Realtime account signals from Exa + Perplexity (news, earnings, executive changes)
+model AccountSignal {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId         String
+
+  type           String   // earnings_call | product_announcement | executive_hire | executive_departure | funding_round | acquisition | industry_news | job_posting_signal
+  title          String
+  summary        String   @db.Text
+  url            String
+  publishedAt    DateTime
+  relevanceScore Int      // 1-10
+  suggestedPlay  String?  // new_buying_group | event_invite | feature_release | re_engagement | champion_enablement | null
+  status         String   @default("new") // new | seen | acted
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, publishedAt])
+  @@index([userId, status, relevanceScore])
+  @@index([companyId, url])
+  @@index([companyId, publishedAt, type])
 }
 
 // Account-level messaging: why this company, use cases, success stories, objection handlers, do-not-mention

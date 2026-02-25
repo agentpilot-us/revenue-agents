@@ -68,13 +68,20 @@ export function CompanyResearchDisplay({ companyId }: Props) {
 
   if (!researchData) {
     return (
-      <div className="p-2">
+      <div className="p-2 space-y-2">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          No research data yet.{' '}
+          No research data yet. Use &quot;Research with AI&quot; above, or{' '}
           <Link href={`/dashboard/companies/${companyId}/intelligence`} className="text-blue-600 dark:text-blue-400 hover:underline">
-            Research target company
+            set up Account Intelligence
           </Link>{' '}
-          to generate account intelligence.
+          for the guided flow.
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          You need your company name and at least one product in{' '}
+          <Link href="/dashboard/content-library" className="text-blue-600 dark:text-blue-400 hover:underline">
+            Your company data
+          </Link>{' '}
+          before research can run.
         </p>
       </div>
     );
@@ -91,9 +98,16 @@ export function CompanyResearchDisplay({ companyId }: Props) {
 
   if (!hasData) {
     return (
-      <div className="p-2">
+      <div className="p-2 space-y-2">
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Research data exists but is empty. Use &quot;Research with AI&quot; to populate account intelligence.
+          Research data exists but is empty. Use &quot;Research with AI&quot; above to populate account intelligence.
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Research requires your company name and at least one product in{' '}
+          <Link href="/dashboard/content-library" className="text-blue-600 dark:text-blue-400 hover:underline">
+            Your company data
+          </Link>
+          . If the button fails, complete that setup first.
         </p>
       </div>
     );

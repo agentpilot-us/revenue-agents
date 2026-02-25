@@ -16,6 +16,8 @@ type Props = {
   hasPreviousContent?: boolean;
   userConfirmed?: boolean;
   content?: Record<string, unknown> | null;
+  /** Optional id for the row element (e.g. "pending-review") so the health panel can link to it. */
+  scrollId?: string;
 };
 
 function getDaysAgo(date: Date): number {
@@ -34,7 +36,7 @@ function formatUpdatedBadge(updatedAt: Date): string | null {
   return null;
 }
 
-export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinned = false, version, hasPreviousContent = false, userConfirmed = true, content }: Props) {
+export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinned = false, version, hasPreviousContent = false, userConfirmed = true, content, scrollId }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -174,7 +176,7 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
   const canViewChanges = hasPreviousContent && version && parseFloat(version) > 1.0;
 
   return (
-    <li className="space-y-2">
+    <li className="space-y-2" id={scrollId}>
       {needsConfirmation && (
         <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm">
           {!showConfirmCard ? (

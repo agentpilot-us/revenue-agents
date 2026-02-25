@@ -1,5 +1,7 @@
 import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { getPlayDisplayName } from '@/lib/plays/plays-config';
+import { RELEVANCE_HOT_SIGNALS_MIN, RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
 
 const execPattern =
   /CFO|CIO|CTO|CISO|CEO|VP|Vice President|Head|President|Director/i;
@@ -16,6 +18,10 @@ export type HotSignal = {
   contactId?: string;
   departmentId?: string;
   campaignId?: string;
+  /** When set, this signal is from AccountSignal and can be dismissed via PATCH /api/signals/[id]/dismiss */
+  signalId?: string;
+  /** When set, CTA is POST to run-play (use RunPlayButton), not navigation */
+  runPlaySignalId?: string;
 };
 
 function classifyTier1(
@@ -198,6 +204,42 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
     });
   }
 
+  // Account signals from Exa (realtime news, earnings, executive) — status new, score >= 7, last 48h
+  const accountSignals = await prisma.accountSignal.findMany({
+    where: {
+      userId,
+      status: 'new',
+      relevanceScore: { gte: RELEVANCE_HOT_SIGNALS_MIN },
+      publishedAt: { gte: fortyEightHoursAgo },
+    },
+    include: { company: { select: { name: true } } },
+    orderBy: [{ relevanceScore: 'desc' }, { publishedAt: 'desc' }],
+    take: 10,
+  });
+  for (const s of accountSignals) {
+    const color: 'red' | 'amber' | 'green' =
+      s.relevanceScore >= RELEVANCE_TIER_1_MIN
+        ? 'red'
+        : s.relevanceScore >= RELEVANCE_TIER_2_MIN
+          ? 'amber'
+          : 'green';
+    const playLabel = getPlayDisplayName(s.suggestedPlay ?? undefined);
+    signals.push({
+      companyId: s.companyId,
+      companyName: s.company.name,
+      headline: s.title,
+      description: s.summary,
+      ctaLabel: playLabel ? `Run ${playLabel} play` : 'View account',
+      ctaHref: playLabel
+        ? `/api/signals/${s.id}/run-play`
+        : `/dashboard/companies/${s.companyId}`,
+      color,
+      date: s.publishedAt.toISOString(),
+      signalId: s.id,
+      runPlaySignalId: playLabel ? s.id : undefined,
+    });
+  }
+
   // New feature release ready (green) - user-level content
   const featureRelease = await prisma.contentLibrary.findFirst({
     where: {
@@ -211,11 +253,15 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
     orderBy: { createdAt: 'desc' },
   });
   if (featureRelease) {
+    const dateLabel = featureRelease.createdAt.toLocaleDateString('en-US', {
+      month: 'short',
+      year: 'numeric',
+    });
     signals.push({
       companyId: '',
       companyName: '',
       headline: 'New feature release ready to share',
-      description: `"${featureRelease.title}" — share with accounts`,
+      description: `"${featureRelease.title}" — ${dateLabel}`,
       ctaLabel: 'Run Feature Release play',
       ctaHref: '/chat?play=expansion',
       color: 'green',

@@ -58,6 +58,7 @@ export async function ContentLibraryView({ company }: Props) {
   );
 
   const firecrawlConfigured = isServiceConfigured('firecrawl');
+  const firstPendingId = items.find((i) => !i.userConfirmed)?.id ?? null;
 
   return (
     <div className="p-8 bg-gray-50 dark:bg-zinc-900 min-h-screen">
@@ -82,7 +83,7 @@ export async function ContentLibraryView({ company }: Props) {
 
       <ContentLibraryActions />
 
-      <ContentLibraryHealthPanel />
+      <ContentLibraryHealthPanel firstPendingId={firstPendingId} />
 
       {/* Company info */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6">
@@ -162,6 +163,7 @@ export async function ContentLibraryView({ company }: Props) {
                       hasPreviousContent={!!item.previousContent}
                       userConfirmed={item.userConfirmed}
                       content={item.content as Record<string, unknown> | null}
+                      scrollId={item.id === firstPendingId ? 'pending-review' : undefined}
                     />
                   ))}
                 </ul>

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { getPlayDisplayName } from '@/lib/plays/plays-config';
 import { JSON_NOT_NULL } from '@/lib/prisma-json';
+import { RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
 
 type SignalTier = 1 | 2 | 3;
 
@@ -271,6 +273,36 @@ export async function GET(
         cta: {
           label: 'View research',
           action: `research:${companyId}`,
+        },
+        metadata: {},
+      });
+    }
+
+    // Account signals from Exa (no status filter — Activity tab shows all)
+    const accountSignals = await prisma.accountSignal.findMany({
+      where: {
+        companyId,
+        publishedAt: { gte: startDate },
+      },
+      orderBy: { publishedAt: 'desc' },
+    });
+    for (const s of accountSignals) {
+      const tier: SignalTier =
+        s.relevanceScore >= RELEVANCE_TIER_1_MIN
+          ? 1
+          : s.relevanceScore >= RELEVANCE_TIER_2_MIN
+            ? 2
+            : 3;
+      const playLabel = getPlayDisplayName(s.suggestedPlay ?? undefined);
+      const typeLabel = s.type.replace(/_/g, ' ');
+      signals.push({
+        tier,
+        date: s.publishedAt.toISOString(),
+        headline: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} (Score: ${s.relevanceScore})`,
+        description: s.summary,
+        cta: {
+          label: playLabel ? `Run ${playLabel} play` : 'View signal',
+          action: `activity:${companyId}`,
         },
         metadata: {},
       });

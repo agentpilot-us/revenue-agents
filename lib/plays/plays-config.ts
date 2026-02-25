@@ -43,6 +43,13 @@ export type PlayContext = {
   featureRelease?: { title: string; date: string; description: string };
   caseStudy?: { title: string; outcome: string };
   championName?: string;
+  /** When a play is triggered by an external signal, carry it here */
+  triggerSignal?: {
+    type: string;
+    title: string;
+    summary: string;
+    publishedAt: string;
+  };
 };
 
 export type Play = {
@@ -72,6 +79,12 @@ Create a sales page and intro email for the ${ctx.segment.name} buying group at 
 Account: ${ctx.accountName} (${ctx.accountIndustry ?? 'Unknown industry'})
 Segment: ${ctx.segment.name}
 Value proposition for this segment: ${ctx.segment.valueProp ?? 'Not set'}
+${ctx.triggerSignal ? `
+TRIGGER: ${ctx.triggerSignal.title}
+Context: ${ctx.triggerSignal.summary}
+This signal suggests a new budget owner or stakeholder shift — the page should 
+acknowledge the current moment at ${ctx.accountName}, not be evergreen.
+` : ''}
 
 Build:
 1. A sales page with headline, 2-paragraph intro, 3 value props specific to this segment, 
@@ -156,23 +169,31 @@ ${ctx.segment.name} pain points.
     buildPrompt: (ctx) =>
       `
 Create a re-engagement sales page and email for the ${ctx.segment.name} segment 
-at ${ctx.accountName}. This account has gone quiet.
+at ${ctx.accountName}.
+
+${ctx.triggerSignal ? `
+REASON TO REACH OUT NOW — this is the primary hook, reference it directly:
+What happened: ${ctx.triggerSignal.title}
+Details: ${ctx.triggerSignal.summary}
+Type: ${ctx.triggerSignal.type.replace(/_/g, ' ')}
+Published: ${ctx.triggerSignal.publishedAt}
+
+The email subject line and opening sentence MUST reference this specific event.
+Do NOT write a generic "checking in" or "just following up" email.
+` : `Days since last activity: ${ctx.segment.lastActivityDays ?? 'Unknown'} days.
+Give them a reason to re-engage — not a reminder that time has passed.`}
 
 Account: ${ctx.accountName}
 Segment: ${ctx.segment.name}
-Days since last activity: ${ctx.segment.lastActivityDays ?? 'Unknown'}
-${ctx.featureRelease ? `New since last contact: ${ctx.featureRelease.title}` : ''}
-${ctx.caseStudy ? `Relevant new case study: ${ctx.caseStudy.title} — ${ctx.caseStudy.outcome}` : ''}
-${ctx.events?.[0] ? `Upcoming event: ${ctx.events[0].name} on ${ctx.events[0].date}` : ''}
+${ctx.featureRelease ? `Supporting evidence (use if relevant): ${ctx.featureRelease.title} — ${ctx.featureRelease.description}` : ''}
+${ctx.caseStudy ? `Supporting case study: ${ctx.caseStudy.title} — ${ctx.caseStudy.outcome}` : ''}
+${ctx.events?.[0] ? `Upcoming event to mention: ${ctx.events[0].name} on ${ctx.events[0].date}` : ''}
 
 Build:
-1. A "what's changed" sales page: new feature OR new case study OR upcoming event — 
-   whichever is most relevant. Frame as "here's what's new since we last spoke."
-   CTA: "Let's reconnect"
-2. A re-engagement email (< 80 words): NOT "just checking in." Must have a specific, 
-   new reason to reach out. Reference what's changed.
-
-Tone: confident, not apologetic. Give them a reason — not a reminder.
+1. A sales page framed around what changed — the signal event is the news hook, 
+   your product is the solution. CTA: "Let's reconnect"
+2. An email under 80 words. Subject line should reference the signal event directly.
+   Tone: confident, not apologetic. One specific reason to talk now.
     `.trim(),
   },
 
@@ -196,6 +217,12 @@ Account: ${ctx.accountName}
 Segment: ${ctx.segment.name}
 Champion: ${ctx.championName ?? 'Unknown'}
 ${ctx.caseStudy ? `Proof point: ${ctx.caseStudy.title} — ${ctx.caseStudy.outcome}` : ''}
+${ctx.triggerSignal ? `
+CURRENT CONTEXT AT ACCOUNT:
+${ctx.triggerSignal.title} — ${ctx.triggerSignal.summary}
+The executive reading this page is likely aware of this. The page should feel 
+timely, not like a generic vendor pitch.
+` : ''}
 
 Build:
 1. An executive-facing page:
@@ -211,3 +238,12 @@ No jargon. No feature lists. Executives buy outcomes.
     `.trim(),
   },
 ];
+
+/** Display name for a PlayId (e.g. "Open New Buying Group"). Use for signals and UI labels. */
+export function getPlayDisplayName(
+  playId: PlayId | null | undefined
+): string | null {
+  if (!playId) return null;
+  const play = PLAYS.find((p) => p.id === playId);
+  return play?.name ?? null;
+}

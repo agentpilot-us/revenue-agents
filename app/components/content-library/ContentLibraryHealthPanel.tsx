@@ -22,7 +22,12 @@ function fetchHealth(): Promise<ContentHealthScore> {
   });
 }
 
-export function ContentLibraryHealthPanel() {
+type ContentLibraryHealthPanelProps = {
+  /** When set, "pending review" message becomes a link that scrolls to the first pending item. */
+  firstPendingId?: string | null;
+};
+
+export function ContentLibraryHealthPanel({ firstPendingId }: ContentLibraryHealthPanelProps = {}) {
   const [health, setHealth] = useState<ContentHealthScore | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +102,15 @@ export function ContentLibraryHealthPanel() {
         </div>
         {health.pendingReviewCount > 0 && (
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            {health.pendingReviewCount} item{health.pendingReviewCount !== 1 ? 's' : ''} pending your review
+            {firstPendingId ? (
+              <a href="#pending-review" className="hover:underline font-medium">
+                {health.pendingReviewCount} item{health.pendingReviewCount !== 1 ? 's' : ''} pending your review — scroll to review
+              </a>
+            ) : (
+              <>
+                {health.pendingReviewCount} item{health.pendingReviewCount !== 1 ? 's' : ''} pending your review. Review each item below and click &quot;Review extraction and confirm&quot; → &quot;Looks good&quot;.
+              </>
+            )}
           </p>
         )}
         {health.lowConfidenceCount > 0 && (
@@ -138,7 +151,7 @@ export function ContentLibraryHealthPanel() {
   );
 }
 
-/** Display total per dimension: "have / total" so the second number is the total. Bars cap at 100%. */
+/** Display total per dimension: "have / target" — target is the goal; found can exceed it. We cap the displayed numerator at target so we never show e.g. 41/10. */
 const DIMENSION_DISPLAY_TOTAL: Record<string, number> = {
   'Value Propositions': 10,
   'Product Capabilities': 10,
@@ -154,6 +167,8 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
   const [expanded, setExpanded] = useState(false);
   const total = DIMENSION_DISPLAY_TOTAL[dimension.name] ?? 10;
   const have = dimension.found;
+  // Display as "X/target" with X capped at target so we never show e.g. 41/10; when over target show "10/10 (41 found)"
+  const displayHave = Math.min(have, total);
   const barPct = total > 0 ? Math.min(100, Math.round((have / total) * 100)) : 0;
   const statusColors = {
     complete: 'bg-green-500',
@@ -166,7 +181,8 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
       <div className="flex justify-between mb-0.5">
         <span className="text-gray-700 dark:text-gray-300">{dimension.name}</span>
         <span className="text-gray-500 dark:text-gray-400">
-          {have}/{total}
+          {displayHave}/{total}
+          {have > total && <span className="ml-0.5 text-gray-400 dark:text-gray-500">({have} found)</span>}
           {dimension.pendingCount != null && dimension.pendingCount > 0 && (
             <span className="ml-1 text-amber-600 dark:text-amber-400">({dimension.pendingCount} pending)</span>
           )}

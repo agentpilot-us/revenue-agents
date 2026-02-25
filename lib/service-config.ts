@@ -10,6 +10,7 @@ const SERVICE_ENV_KEYS: Record<string, string[]> = {
   phantombuster: ['PHANTOMBUSTER_API_KEY'],
   perplexity: ['PERPLEXITY_API_KEY'],
   firecrawl: ['FIRECRAWL_API_KEY'],
+  exa: ['EXA_API_KEY'],
 } as const;
 
 export type ServiceId = keyof typeof SERVICE_ENV_KEYS;
