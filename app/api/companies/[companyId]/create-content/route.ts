@@ -110,8 +110,24 @@ ${messagingSection}${accountSection}${researchSection}`;
     });
 
     return NextResponse.json({ content: text.trim() });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Create content API error:', error);
+
+    const isQuotaError =
+      (error as { statusCode?: number })?.statusCode === 429 ||
+      (error as { data?: { error?: { code?: string } } })?.data?.error?.code === 'insufficient_quota' ||
+      (error instanceof Error && /quota|rate limit|429/i.test(error.message));
+
+    if (isQuotaError) {
+      return NextResponse.json(
+        {
+          error: 'Embedding quota exceeded',
+          details: 'Your OpenAI (or embedding provider) quota or billing limit was exceeded. Check your plan and billing at https://platform.openai.com/account/billing.',
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: 'Failed to generate content',

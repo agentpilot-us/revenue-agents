@@ -72,7 +72,8 @@ export function CreateContentClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? 'Failed to generate content');
+        const msg = data.details ? `${data.error ?? 'Error'}: ${data.details}` : (data.error ?? 'Failed to generate content');
+        setError(msg);
         return;
       }
       setContent(data.content ?? '');
