@@ -8,6 +8,8 @@ import { isServiceConfigured } from '@/lib/service-config';
 import { ContentLibraryActions } from '@/app/components/content-library/ContentLibraryActions';
 import { ContentLibraryHealthPanel } from '@/app/components/content-library/ContentLibraryHealthPanel';
 import { ContentLibraryItemRow } from '@/app/components/content-library/ContentLibraryItemRow';
+import { ProductRowActions } from '@/app/components/content-library/ProductRowActions';
+import { IndustryPlaybookRowActions } from '@/app/components/content-library/IndustryPlaybookRowActions';
 
 const SECTION_LABELS: Partial<Record<ContentType, string>> = {
   SuccessStory: 'Case studies',
@@ -129,7 +131,7 @@ export async function ContentLibraryView({ company }: Props) {
         ).map((type) => {
           const list = byType[type] ?? [];
           const label = SECTION_LABELS[type] ?? type;
-          const canCreateManually = ['UseCase', 'CompanyEvent', 'Framework', 'FeatureRelease', 'ResourceLink'].includes(type);
+          const canCreateManually = ['SuccessStory', 'UseCase', 'CompanyEvent', 'Framework', 'FeatureRelease', 'ResourceLink'].includes(type);
           return (
             <div
               key={type}
@@ -207,9 +209,9 @@ export async function ContentLibraryView({ company }: Props) {
             {products.map((product) => (
               <li
                 key={product.id}
-                className="flex items-center justify-between text-sm p-2 rounded hover:bg-slate-50 dark:hover:bg-zinc-700/50"
+                className="flex items-center justify-between gap-2 text-sm p-2 rounded hover:bg-slate-50 dark:hover:bg-zinc-700/50"
               >
-                <div>
+                <div className="min-w-0 flex-1">
                   <span className="font-medium text-gray-900 dark:text-gray-100">{product.name}</span>
                   {product.category && (
                     <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
@@ -222,6 +224,7 @@ export async function ContentLibraryView({ company }: Props) {
                     </p>
                   )}
                 </div>
+                <ProductRowActions productId={product.id} productName={product.name} />
               </li>
             ))}
           </ul>
@@ -255,7 +258,7 @@ export async function ContentLibraryView({ company }: Props) {
             {playbooks.map((playbook) => (
               <li
                 key={playbook.id}
-                className="flex items-center justify-between text-sm p-2 rounded hover:bg-slate-50 dark:hover:bg-zinc-700/50"
+                className="flex items-center justify-between gap-2 text-sm p-2 rounded hover:bg-slate-50 dark:hover:bg-zinc-700/50"
               >
                 <div className="flex-1 min-w-0">
                   <span className="font-medium text-gray-900 dark:text-gray-100">{playbook.name}</span>
@@ -265,6 +268,7 @@ export async function ContentLibraryView({ company }: Props) {
                     </p>
                   )}
                 </div>
+                <IndustryPlaybookRowActions playbookId={playbook.id} playbookName={playbook.name} />
               </li>
             ))}
           </ul>

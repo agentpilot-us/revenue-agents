@@ -5,10 +5,12 @@ import { CompanyEventForm } from '@/app/components/content-library/CompanyEventF
 import { FrameworkForm } from '@/app/components/content-library/FrameworkForm';
 import { FeatureReleaseForm } from '@/app/components/content-library/FeatureReleaseForm';
 import { ResourceLinkForm } from '@/app/components/content-library/ResourceLinkForm';
+import { SuccessStoryForm } from '@/app/dashboard/content-library/SuccessStoryForm';
 import Link from 'next/link';
 import type { ContentType } from '@prisma/client';
 
 const VALID_TYPES: ContentType[] = [
+  'SuccessStory',
   'UseCase',
   'CompanyEvent',
   'Framework',
@@ -74,6 +76,7 @@ export default async function NewContentLibraryItemPage({
         <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
           Create new {typeLabels[type]}
         </h1>
+        {type === 'SuccessStory' && <SuccessStoryForm />}
         {type === 'UseCase' && <UseCaseForm />}
         {type === 'CompanyEvent' && <CompanyEventForm />}
         {type === 'Framework' && <FrameworkForm />}

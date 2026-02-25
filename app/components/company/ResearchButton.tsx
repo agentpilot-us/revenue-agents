@@ -17,6 +17,16 @@ type Props = {
   userGoal?: string;
 };
 
+async function parseJsonOrTextError(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    // Surface the server's text message if JSON parsing fails
+    throw new Error(text || 'Response was not valid JSON');
+  }
+}
+
 export function ResearchButton({ companyId, companyName, onComplete, label = 'Research with AI', userGoal }: Props) {
   const [researchStatus, setResearchStatus] = useState<ResearchStatus>(null);
   const [researchData, setResearchData] = useState<unknown>(null);
@@ -35,7 +45,7 @@ export function ResearchButton({ companyId, companyName, onComplete, label = 'Re
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(goalPayload),
       });
-      const data = await res.json();
+      const data = await parseJsonOrTextError(res);
       if (!res.ok) {
         throw new Error(data.error || 'Research failed');
       }
@@ -52,7 +62,7 @@ export function ResearchButton({ companyId, companyName, onComplete, label = 'Re
           ...(userGoal?.trim() ? { userGoal: userGoal.trim() } : {}),
         }),
       });
-      const structureData = await structureRes.json();
+      const structureData = await parseJsonOrTextError(structureRes);
       if (!structureRes.ok) {
         throw new Error(structureData.error || 'Structuring failed');
       }

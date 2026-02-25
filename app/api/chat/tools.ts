@@ -2,7 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { DepartmentType, DepartmentStatus } from '@prisma/client';
+import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
 import { discoverDepartments } from '@/app/actions/discover-departments';
 import { isDemoAccount } from '@/lib/demo/is-demo-account';
 
@@ -783,23 +783,34 @@ export const chatTools = {
 
   launch_campaign: tool({
     description:
-      'Create and launch a new campaign (landing page) for a company. Returns the campaign URL. Use when the user asks to "launch a landing page" or "create a campaign".',
+      'Create a sales page for a segment. Choose page type: feature_announcement, event_invite, account_intro, or case_study. Generates sections from the content library and returns the page URL. Use when the user asks to "create a sales page", "launch an event invite", or "create a landing page for [segment]".',
     inputSchema: z.object({
-      companyId: z.string().describe('The company ID (current account)'),
-      title: z.string().describe('Campaign title'),
-      departmentId: z.string().optional().describe('Optional department ID for segment-specific campaign'),
-      type: z
-        .enum(['landing_page', 'event_invite', 'demo', 'webinar', 'other'])
-        .default('landing_page')
-        .describe('Campaign type'),
-      headline: z.string().optional().describe('Optional headline for the landing page'),
-      body: z.string().optional().describe('Optional body content for the landing page'),
+      companyId: z.string().optional().describe('Company ID (current account from context if omitted)'),
+      segmentName: z.string().optional().describe('Segment/department name, e.g. "Autonomous Vehicles", "Sales"'),
+      departmentId: z.string().optional().describe('Department ID if known (from list_departments)'),
+      pageType: z
+        .enum(['feature_announcement', 'event_invite', 'account_intro', 'case_study'])
+        .describe('Type of sales page'),
+      ctaLabel: z.string().optional().describe('Button label, e.g. "Register Now", "Book a Demo"'),
+      ctaUrl: z.string().optional().describe('Where the CTA button goes'),
+      userGoal: z.string().optional().describe('What the rep wants to accomplish with this page'),
     }),
-    execute: async ({ companyId, title, departmentId, type = 'landing_page', headline, body }) => {
+    execute: async ({
+      companyId: inputCompanyId,
+      segmentName,
+      departmentId,
+      pageType,
+      ctaLabel,
+      ctaUrl,
+      userGoal,
+    }) => {
       const session = await auth();
       if (!session?.user?.id) return { error: 'Unauthorized' };
+      const companyId = inputCompanyId;
+      if (!companyId) return { error: 'Company context required. Open an account first.' };
       const company = await prisma.company.findFirst({
         where: { id: companyId, userId: session.user.id },
+        select: { id: true, name: true },
       });
       if (!company) return { error: 'Company not found' };
 
@@ -822,50 +833,77 @@ export const chatTools = {
         };
       }
 
-      // Verify department belongs to company if provided
-      if (departmentId) {
-        const department = await prisma.companyDepartment.findFirst({
-          where: { id: departmentId, companyId },
+      let resolvedDepartmentId: string | null = departmentId ?? null;
+      if (segmentName && !resolvedDepartmentId) {
+        const depts = await prisma.companyDepartment.findMany({
+          where: { companyId },
+          select: { id: true, customName: true, type: true },
         });
-        if (!department) {
-          return { error: 'Department not found or does not belong to this company' };
-        }
+        const q = segmentName.trim().toLowerCase();
+        const match = depts.find(
+          (d) =>
+            (d.customName ?? d.type.replace(/_/g, ' ')).toLowerCase().includes(q) ||
+            q.includes((d.customName ?? d.type.replace(/_/g, ' ')).toLowerCase())
+        );
+        if (match) resolvedDepartmentId = match.id;
       }
 
+      const { generateSalesPageSections } = await import('@/lib/campaigns/generate-sales-page');
+      const generated = await generateSalesPageSections({
+        companyId,
+        userId: session.user.id,
+        pageType,
+        departmentId: resolvedDepartmentId ?? undefined,
+        userGoal: userGoal ?? undefined,
+      });
+
+      if (!generated.ok) return { error: generated.error };
+
+      const { headline, subheadline, sections, ctaLabel: genCta, ctaUrl: genUrl } = generated.data;
+      const title =
+        resolvedDepartmentId && segmentName
+          ? `${segmentName} – ${pageType.replace(/_/g, ' ')}`
+          : `${company.name} – ${pageType.replace(/_/g, ' ')}`;
+
+      const slugBase = title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 50) || 'sales-page';
+      let slug = slugBase;
+      let counter = 1;
+      while (
+        await prisma.segmentCampaign.findFirst({
+          where: { userId: session.user.id, slug },
+        })
+      ) {
+        slug = `${slugBase}-${counter}`;
+        counter++;
+      }
+
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      const url = `${baseUrl}/go/${slug}`;
+
       try {
-        // Generate slug from title
-        const slugBase = title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        let slug = slugBase;
-        let counter = 1;
-        while (
-          await prisma.segmentCampaign.findFirst({
-            where: { userId: session.user.id, slug },
-          })
-        ) {
-          slug = `${slugBase}-${counter}`;
-          counter++;
-        }
-
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
-        const url = `${baseUrl}/go/${slug}`;
-
         const campaign = await prisma.segmentCampaign.create({
           data: {
             userId: session.user.id,
             companyId,
-            departmentId: departmentId || null,
+            departmentId: resolvedDepartmentId,
             slug,
             title,
             description: null,
-            type,
+            type: 'landing_page',
             url,
-            headline: headline || null,
-            body: body || null,
-            ctaLabel: null,
-            ctaUrl: null,
+            pageType,
+            headline: headline ?? null,
+            subheadline: subheadline ?? null,
+            sections: sections as unknown as Prisma.InputJsonValue,
+            ctaLabel: ctaLabel ?? genCta ?? null,
+            ctaUrl: ctaUrl ?? genUrl ?? null,
+            body: null,
             isMultiDepartment: false,
           },
         });
@@ -875,6 +913,7 @@ export const chatTools = {
           slug: campaign.slug,
           url: campaign.url,
           title: campaign.title,
+          message: `Sales page created. Share this URL: ${campaign.url}`,
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create campaign';

@@ -332,7 +332,7 @@ export function ContentLibraryItemRow({ id, title, sourceUrl, updatedAt, isPinne
         onClick={handleDelete}
         disabled={deleting}
         className="shrink-0 text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded disabled:opacity-50"
-        title="Remove"
+        title="Remove from company data"
         aria-label={`Remove ${title}`}
       >
         {deleting ? (

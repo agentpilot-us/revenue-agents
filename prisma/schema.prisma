@@ -635,11 +635,16 @@ model SegmentCampaign {
   url         String // full URL (e.g. https://app.example.com/go/{slug} or external)
   type        String // landing_page | event_invite | demo | webinar | other
 
+  // Sales page (static, no chatbot): rep-built sections
+  pageType    String  @default("sales_page") // sales_page | feature_announcement | event_invite | account_intro | case_study
+  subheadline String? @db.Text
+  sections    Json?   // ordered array of SalesPageSection (hero, value_props, feature, event, case_study, social_proof, cta)
+
   headline     String? @db.Text
   body         String? @db.Text
   ctaLabel     String?
   ctaUrl       String?
-  pageSections Json? // { events?: [], caseStudy?: {}, successStory?: {} } for structured blocks
+  pageSections Json?   // legacy: { events?: [], caseStudy?: {}, successStory?: {} }
 
   isMultiDepartment Boolean @default(false)
   departmentConfig  Json? // { departments: [{ id, name, slug, headline?, body?, pageSections? }] } when isMultiDepartment

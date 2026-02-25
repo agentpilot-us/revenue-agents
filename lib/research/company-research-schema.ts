@@ -245,7 +245,7 @@ export const buyingGroupDetailSchema = z.object({
 
 export type BuyingGroupDetail = z.infer<typeof buyingGroupDetailSchema>;
 
-const companyBasicsSchema = z.object({
+export const companyBasicsSchema = z.object({
   name: z.string().describe('Official company name.'),
   website: z.string().optional().describe('Company website URL.'),
   industry: z.string().optional().describe('Primary industry.'),

@@ -136,7 +136,7 @@ Focus on finding specific, actionable intelligence that would help a B2B sales r
 }
 
 export type DiscoverBuyingGroupsResult =
-  | { ok: true; data: DiscoverGroupsResult }
+  | { ok: true; data: DiscoverGroupsResult; perplexitySummary: string }
   | { ok: false; error: string };
 
 /**
@@ -222,7 +222,7 @@ export async function discoverBuyingGroupsForAccount(
         error: `Invalid structure (${path}): ${first?.message ?? 'check format'}. Try again.`,
       };
     }
-    return { ok: true, data: parsed.data };
+    return { ok: true, data: parsed.data, perplexitySummary: perplexityResult.summary };
   } catch (err) {
     console.error('discoverBuyingGroupsForAccount error:', err);
     if (err instanceof Error) {

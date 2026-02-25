@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { CampaignChat } from '@/app/go/CampaignChat';
+import { GoPageContent } from '@/app/go/GoPageContent';
 import { CampaignTrack } from '@/app/go/CampaignTrack';
 import { requireLandingPageAuth } from '@/lib/auth/landing-page-middleware';
 
@@ -51,7 +51,9 @@ async function getCampaign(slugOrId: string) {
   return {
     ...campaign,
     company: {
-      ...campaign.company,
+      name: campaign.company.name,
+      domain: campaign.company.domain,
+      userId: campaign.company.userId,
       logoUrl: user?.companyLogoUrl ?? undefined,
     },
   };
@@ -202,13 +204,6 @@ export default async function CampaignLandingPage({ params }: Props) {
             )}
           </div>
 
-          <div className="mt-8">
-            <CampaignChat
-              campaignId={campaign.id}
-              departmentId={selectedDept?.id ?? null}
-            />
-          </div>
-
           <div className="mt-6 flex items-center justify-center gap-4 text-xs text-zinc-400">
             <CampaignTrack campaignId={campaign.id} />
             <span>Powered by AgentPilot</span>
@@ -218,114 +213,22 @@ export default async function CampaignLandingPage({ params }: Props) {
     );
   }
 
-  const segmentName =
-    campaign.department?.customName ??
-    campaign.department?.type?.replace(/_/g, ' ') ??
-    null;
-
-  const sections = (campaign.pageSections ?? null) as PageSections | null;
-  const hasEvents = sections?.events && sections.events.length > 0;
-  const hasCaseStudy = sections?.caseStudy && (sections.caseStudy.title || sections.caseStudy.summary);
-  const hasSuccessStory = sections?.successStory && (sections.successStory.title || sections.successStory.summary);
+  const campaignPayload = {
+    id: campaign.id,
+    headline: campaign.headline,
+    subheadline: (campaign as { subheadline?: string | null }).subheadline ?? null,
+    body: campaign.body,
+    description: campaign.description,
+    sections: (campaign as { sections?: unknown }).sections ?? null,
+    pageSections: (campaign.pageSections ?? null) as PageSections | null,
+    ctaLabel: campaign.ctaLabel,
+    ctaUrl: campaign.ctaUrl,
+    url: campaign.url,
+    company: { name: campaign.company.name, logoUrl: campaign.company.logoUrl },
+    department: campaign.department,
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-8">
-          {(campaign.company.logoUrl || segmentName) && (
-            <div className="mb-4 flex items-center gap-3">
-              {campaign.company.logoUrl && (
-                <img
-                  src={campaign.company.logoUrl}
-                  alt={campaign.company.name}
-                  className="h-8 w-auto object-contain"
-                />
-              )}
-              {segmentName && (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {campaign.company.name}
-                  {segmentName ? ` · ${segmentName}` : ''}
-                </p>
-              )}
-            </div>
-          )}
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-            {campaign.headline || campaign.title}
-          </h1>
-          {campaign.body && (
-            <div
-              className="prose prose-zinc dark:prose-invert prose-sm max-w-none mb-6"
-              dangerouslySetInnerHTML={{ __html: campaign.body }}
-            />
-          )}
-          {!campaign.body && campaign.description && (
-            <p className="text-zinc-600 dark:text-zinc-300 mb-6 whitespace-pre-wrap">
-              {campaign.description}
-            </p>
-          )}
-          {hasEvents && (
-            <section className="mb-6">
-              <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-3">Upcoming events</h2>
-              <ul className="space-y-2">
-                {sections!.events!.map((e, i) => (
-                  <li key={i} className="text-sm text-zinc-600 dark:text-zinc-300">
-                    {e.url ? (
-                      <a href={e.url} target="_blank" rel="noopener noreferrer" className="text-amber-600 dark:text-amber-400 hover:underline">
-                        {e.title || 'Event'}
-                      </a>
-                    ) : (
-                      <span className="font-medium">{e.title || 'Event'}</span>
-                    )}
-                    {e.date && <span className="text-zinc-500 dark:text-zinc-400 ml-2">{e.date}</span>}
-                    {e.description && <p className="mt-1 text-zinc-500 dark:text-zinc-400">{e.description}</p>}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {hasCaseStudy && (
-            <section className="mb-6 p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800">
-              <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">Case study</h2>
-              <p className="font-medium text-zinc-800 dark:text-zinc-200">{sections!.caseStudy!.title}</p>
-              {sections!.caseStudy!.summary && <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1">{sections!.caseStudy!.summary}</p>}
-              {sections!.caseStudy!.link && (
-                <a href={sections!.caseStudy!.link} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-600 dark:text-amber-400 hover:underline mt-2 inline-block">Read more</a>
-              )}
-            </section>
-          )}
-          {hasSuccessStory && (
-            <section className="mb-6 p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800">
-              <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">Success story</h2>
-              <p className="font-medium text-zinc-800 dark:text-zinc-200">{sections!.successStory!.title}</p>
-              {sections!.successStory!.summary && <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1">{sections!.successStory!.summary}</p>}
-              {sections!.successStory!.link && (
-                <a href={sections!.successStory!.link} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-600 dark:text-amber-400 hover:underline mt-2 inline-block">Read more</a>
-              )}
-            </section>
-          )}
-          {(campaign.ctaLabel || campaign.ctaUrl) && (
-            <div className="pt-4">
-              <a
-                href={campaign.ctaUrl || campaign.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-900 font-medium px-5 py-2.5 transition-colors"
-              >
-                {campaign.ctaLabel || 'Learn more'}
-              </a>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-8">
-          <CampaignChat campaignId={campaign.id} departmentId={campaign.department?.id ?? null} />
-        </div>
-
-        <div className="mt-6 flex items-center justify-center gap-4 text-xs text-zinc-400">
-          <CampaignTrack campaignId={campaign.id} />
-          <span>Powered by AgentPilot</span>
-        </div>
-      </div>
-    </div>
+    <GoPageContent campaign={campaignPayload} />
   );
 }
