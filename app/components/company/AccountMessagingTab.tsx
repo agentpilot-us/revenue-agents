@@ -271,7 +271,9 @@ export function AccountMessagingTab({
 
           <section>
             <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Relevant use cases</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">From your company data (Use Cases).</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              Select use cases that apply to this account. They&apos;re used for messaging and content generation. From your company data (Use Cases).
+            </p>
             <div className="space-y-2">
               {useCases.length === 0 ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400">No use cases in your company data. Add some in Your company data first.</p>

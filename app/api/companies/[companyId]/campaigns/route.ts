@@ -191,6 +191,14 @@ export async function POST(
           department: { select: { id: true, customName: true, type: true } },
         },
       });
+      await prisma.activity.create({
+        data: {
+          companyId,
+          userId: session.user.id,
+          type: 'Campaign',
+          summary: `Sales page created: ${campaign.title}`,
+        },
+      });
       return NextResponse.json({
         id: campaign.id,
         slug: campaign.slug,
@@ -281,6 +289,16 @@ export async function POST(
       },
       include: {
         department: { select: { id: true, customName: true, type: true } },
+      },
+    });
+
+    await prisma.activity.create({
+      data: {
+        companyId,
+        userId: session.user.id,
+        companyDepartmentId: campaign.departmentId,
+        type: 'Campaign',
+        summary: `Sales page created: ${campaign.title}`,
       },
     });
 

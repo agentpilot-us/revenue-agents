@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { WarmIndicator } from './WarmIndicator';
 import { FindContactsModal } from './FindContactsModal';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 type Contact = {
   id: string;
@@ -19,6 +27,7 @@ type Contact = {
   isWarm: boolean;
   buyingRole: string | null;
   whyRelevant: string | null;
+  engagementStatus?: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged';
 };
 
 type DepartmentGroup = {
@@ -41,27 +50,87 @@ type Props = {
   companyName: string;
 };
 
+type Suggestion = {
+  contactId: string;
+  contactName: string;
+  title: string | null;
+  suggestedDepartmentId: string;
+  suggestedDepartmentName: string;
+};
+type DeptOption = { id: string; name: string };
+
 export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
   const [groups, setGroups] = useState<DepartmentGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFindContacts, setShowFindContacts] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<DeptOption[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [selectedDeptByContact, setSelectedDeptByContact] = useState<Record<string, string>>({});
+
+  const fetchGroups = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contacts/by-department`);
+      if (res.ok) {
+        const data = await res.json();
+        setGroups(data.groups);
+      }
+    } catch (error) {
+      console.error('Failed to fetch contacts:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId]);
 
   useEffect(() => {
-    async function fetchContacts() {
-      try {
-        const res = await fetch(`/api/companies/${companyId}/contacts/by-department`);
-        if (res.ok) {
-          const data = await res.json();
-          setGroups(data.groups);
+    fetchGroups();
+  }, [fetchGroups]);
+
+  async function handleSuggestGroups() {
+    setSuggestLoading(true);
+    setSuggestions([]);
+    setDepartmentOptions([]);
+    setSelectedDeptByContact({});
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contacts/suggest-assignments`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Failed to load suggestions');
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+      setDepartmentOptions(data.departmentOptions || []);
+      if ((data.suggestions || []).length > 0) {
+        const initial: Record<string, string> = {};
+        for (const s of data.suggestions) {
+          initial[s.contactId] = s.suggestedDepartmentId;
         }
-      } catch (error) {
-        console.error('Failed to fetch contacts:', error);
-      } finally {
-        setLoading(false);
+        setSelectedDeptByContact(initial);
       }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSuggestLoading(false);
     }
-    fetchContacts();
-  }, [companyId]);
+  }
+
+  async function assignContact(contactId: string, departmentId: string) {
+    setAssigningId(contactId);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyDepartmentId: departmentId }),
+      });
+      if (!res.ok) throw new Error('Failed to assign');
+      setSuggestions((prev) => prev.filter((s) => s.contactId !== contactId));
+      await fetchGroups();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAssigningId(null);
+    }
+  }
 
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Loading contacts...</div>;
@@ -123,16 +192,72 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
                   </div>
                 )}
               </div>
-              {group.department.id && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowFindContacts(group.department.id!)}
-                >
-                  Find Contacts
-                </Button>
-              )}
+              <div className="flex gap-2">
+                {!group.department.id && group.contacts.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={handleSuggestGroups}
+                    disabled={suggestLoading}
+                  >
+                    {suggestLoading ? 'Loading…' : 'Suggest groups'}
+                  </Button>
+                )}
+                {group.department.id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowFindContacts(group.department.id!)}
+                  >
+                    Find Contacts
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {!group.department.id && suggestions.length > 0 && (
+              <div className="mb-4 p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-zinc-800/50 space-y-3">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Suggested assignments</p>
+                {suggestions.map((s) => (
+                  <div
+                    key={s.contactId}
+                    className="flex flex-wrap items-center gap-2 text-sm"
+                  >
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{s.contactName}</span>
+                    {s.title && <span className="text-gray-500 dark:text-gray-400">({s.title})</span>}
+                    <Select
+                      value={selectedDeptByContact[s.contactId] ?? s.suggestedDepartmentId}
+                      onValueChange={(val) =>
+                        setSelectedDeptByContact((prev) => ({ ...prev, [s.contactId]: val }))
+                      }
+                    >
+                      <SelectTrigger className="w-[200px] h-8">
+                        <SelectValue placeholder="Buying group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departmentOptions.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        assignContact(
+                          s.contactId,
+                          selectedDeptByContact[s.contactId] ?? s.suggestedDepartmentId
+                        )
+                      }
+                      disabled={assigningId === s.contactId}
+                    >
+                      {assigningId === s.contactId ? 'Assigning…' : 'Confirm'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {group.contacts.length === 0 ? (
               <div className="text-sm text-gray-500 dark:text-gray-400 py-4">
@@ -151,7 +276,21 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
             ) : (
               <div className="space-y-2">
                 {group.contacts.map((contact) => (
-                  <ContactRow key={contact.id} contact={contact} />
+                  <div key={contact.id} className="flex flex-col gap-2">
+                    <ContactRow contact={contact} />
+                    {!group.department.id && (
+                      <AssignToGroupRow
+                        companyId={companyId}
+                        contactId={contact.id}
+                        departments={groups
+                          .filter((g) => g.department.id != null)
+                          .map((g) => ({ id: g.department.id!, name: g.department.name }))}
+                        onAssigned={fetchGroups}
+                        assigningId={assigningId}
+                        setAssigningId={setAssigningId}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -179,6 +318,61 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
   );
 }
 
+function AssignToGroupRow({
+  companyId,
+  contactId,
+  departments,
+  onAssigned,
+  assigningId,
+  setAssigningId,
+}: {
+  companyId: string;
+  contactId: string;
+  departments: { id: string; name: string }[];
+  onAssigned: () => void;
+  assigningId: string | null;
+  setAssigningId: (id: string | null) => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string>(departments[0]?.id ?? '');
+
+  async function handleAssign() {
+    if (!selectedId) return;
+    setAssigningId(contactId);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contacts/${contactId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyDepartmentId: selectedId }),
+      });
+      if (res.ok) await onAssigned();
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
+  if (departments.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 pl-8 text-sm">
+      <Select value={selectedId} onValueChange={setSelectedId}>
+        <SelectTrigger className="w-[220px] h-8">
+          <SelectValue placeholder="Assign to buying group" />
+        </SelectTrigger>
+        <SelectContent>
+          {departments.map((d) => (
+            <SelectItem key={d.id} value={d.id}>
+              {d.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button size="sm" variant="outline" onClick={handleAssign} disabled={assigningId === contactId}>
+        {assigningId === contactId ? 'Assigning…' : 'Assign'}
+      </Button>
+    </div>
+  );
+}
+
 function ContactRow({ contact }: { contact: Contact }) {
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
 
@@ -194,24 +388,30 @@ function ContactRow({ contact }: { contact: Contact }) {
                 {contact.buyingRole}
               </Badge>
             )}
-            {contact.enrichmentStatus && (
-              <Badge
-                variant={
-                  contact.enrichmentStatus === 'complete'
-                    ? 'default'
-                    : contact.enrichmentStatus === 'pending'
-                      ? 'secondary'
-                      : 'outline'
-                }
-                className="text-xs"
-              >
-                {contact.enrichmentStatus === 'complete'
-                  ? 'Enriched'
-                  : contact.enrichmentStatus === 'pending'
-                    ? 'Pending'
-                    : 'Not Found'}
-              </Badge>
-            )}
+            {(() => {
+              const status = contact.engagementStatus ?? (contact.enrichmentStatus === 'complete' ? 'Enriched' : 'Not enriched');
+              return (
+                <>
+                  <span
+                    className={cn(
+                      'h-2 w-2 rounded-full shrink-0',
+                      status === 'Engaged' && 'bg-green-500',
+                      status === 'Contacted' && 'bg-blue-500',
+                      status === 'Enriched' && 'bg-gray-400 dark:bg-gray-500',
+                      status === 'Not enriched' && 'bg-amber-400'
+                    )}
+                    title={status}
+                    aria-hidden
+                  />
+                  <Badge
+                    variant={status === 'Engaged' ? 'default' : status === 'Contacted' ? 'secondary' : 'outline'}
+                    className="text-xs"
+                  >
+                    {status}
+                  </Badge>
+                </>
+              );
+            })()}
           </div>
           {contact.whyRelevant && (
             <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 italic">

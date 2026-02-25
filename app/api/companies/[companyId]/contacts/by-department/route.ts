@@ -75,6 +75,19 @@ export async function GET(
 
     const warmEmails = new Set(warmVisits.map((v) => v.visitorEmail).filter(Boolean));
 
+    // Contacts who have email/meeting/reply activity (contacted or engaged)
+    const contactIds = contacts.map((c) => c.id);
+    const activitiesByContact = await prisma.activity.findMany({
+      where: {
+        companyId,
+        contactId: { in: contactIds },
+        type: { in: ['EMAIL_SENT', 'Email', 'MEETING_SCHEDULED', 'Meeting', 'REPLY', 'Reply'] },
+      },
+      select: { contactId: true },
+      distinct: ['contactId'],
+    });
+    const contactedContactIds = new Set(activitiesByContact.map((a) => a.contactId).filter(Boolean));
+
     // Group contacts by department
     const contactsByDept: Record<string, typeof contacts> = {};
     const unassignedContacts: typeof contacts = [];
@@ -123,6 +136,7 @@ export async function GET(
         isWarm: boolean;
         buyingRole: string | null;
         whyRelevant: string | null;
+        engagementStatus: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged';
       }>;
     };
 
@@ -135,6 +149,16 @@ export async function GET(
       },
       contacts: (contactsByDept[dept.id] || []).map((c) => {
         const enriched = c.enrichedData as { whyRelevant?: string } | null;
+        const isWarm = c.email ? warmEmails.has(c.email) : false;
+        const contacted = contactedContactIds.has(c.id);
+        const engagementStatus: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged' =
+          isWarm || (contacted && (c.enrichmentStatus === 'complete' || !!c.email))
+            ? 'Engaged'
+            : contacted
+              ? 'Contacted'
+              : c.enrichmentStatus === 'complete'
+                ? 'Enriched'
+                : 'Not enriched';
         return {
           id: c.id,
           firstName: c.firstName,
@@ -144,9 +168,10 @@ export async function GET(
           linkedinUrl: c.linkedinUrl,
           personaName: c.persona?.name ?? null,
           enrichmentStatus: c.enrichmentStatus,
-          isWarm: c.email ? warmEmails.has(c.email) : false,
+          isWarm,
           buyingRole: c.persona?.name ?? null,
           whyRelevant: enriched?.whyRelevant ?? null,
+          engagementStatus,
         };
       }),
     }));
@@ -162,6 +187,16 @@ export async function GET(
         },
         contacts: unassignedContacts.map((c) => {
           const enriched = c.enrichedData as { whyRelevant?: string } | null;
+          const isWarm = c.email ? warmEmails.has(c.email) : false;
+          const contacted = contactedContactIds.has(c.id);
+          const engagementStatus: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged' =
+            isWarm || (contacted && (c.enrichmentStatus === 'complete' || !!c.email))
+              ? 'Engaged'
+              : contacted
+                ? 'Contacted'
+                : c.enrichmentStatus === 'complete'
+                  ? 'Enriched'
+                  : 'Not enriched';
           return {
             id: c.id,
             firstName: c.firstName,
@@ -171,9 +206,10 @@ export async function GET(
             linkedinUrl: c.linkedinUrl,
             personaName: c.persona?.name ?? null,
             enrichmentStatus: c.enrichmentStatus,
-            isWarm: c.email ? warmEmails.has(c.email) : false,
+            isWarm,
             buyingRole: c.persona?.name ?? null,
             whyRelevant: enriched?.whyRelevant ?? null,
+            engagementStatus,
           };
         }),
       });

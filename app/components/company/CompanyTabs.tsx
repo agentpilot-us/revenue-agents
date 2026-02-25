@@ -94,14 +94,14 @@ type CompanyTabsProps = {
 };
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
   { id: 'departments', label: 'Buying Groups' },
   { id: 'contacts', label: 'Contacts' },
-  { id: 'messaging', label: 'Messaging' },
-  { id: 'content', label: 'Content' },
   { id: 'campaigns', label: 'Sales Page' },
   { id: 'engagement', label: 'Engagement' },
   { id: 'activity', label: 'Activity' },
-  { id: 'overview', label: 'Overview' },
+  { id: 'messaging', label: 'Messaging' },
+  { id: 'content', label: 'Content' },
   { id: 'expansion', label: 'Expansion' },
   { id: 'map', label: 'Account Map' },
 ];
@@ -125,15 +125,10 @@ export function CompanyTabs({
   onTabChange,
   nextStepBar,
 }: CompanyTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'departments');
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'expansion');
 
   useEffect(() => {
-    if (initialTab === 'messaging') setActiveTab('messaging');
-    if (initialTab === 'campaigns') setActiveTab('campaigns');
-    if (initialTab === 'contacts') setActiveTab('contacts');
-    if (initialTab === 'content') setActiveTab('content');
-    if (initialTab === 'map') setActiveTab('map');
-    if (initialTab === 'expansion') setActiveTab('expansion');
+    if (initialTab != null) setActiveTab(initialTab);
   }, [initialTab]);
 
   const setTab = (tabId: TabId) => {

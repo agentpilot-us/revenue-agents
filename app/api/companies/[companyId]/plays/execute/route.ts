@@ -91,6 +91,16 @@ export async function POST(
       context: parsed.data.context,
       ctaUrl: parsed.data.ctaUrl,
     });
+    const segmentName = parsed.data.context.segment?.name ?? 'account';
+    await prisma.activity.create({
+      data: {
+        companyId,
+        userId: session.user.id,
+        companyDepartmentId: parsed.data.context.segment?.id ?? null,
+        type: 'Play',
+        summary: `Play run for ${segmentName}`,
+      },
+    });
     return NextResponse.json(result);
   } catch (err) {
     console.error('POST plays/execute error:', err);

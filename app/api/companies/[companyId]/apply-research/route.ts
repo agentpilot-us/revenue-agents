@@ -345,6 +345,18 @@ export async function POST(
       console.error('Auto-generate Account Messaging failed:', error);
     }
 
+    await prisma.activity.create({
+      data: {
+        companyId,
+        userId: session.user.id,
+        type: 'Research',
+        summary:
+          summary.departmentsCreated + summary.departmentsUpdated > 0
+            ? `Account research completed. ${summary.departmentsCreated + summary.departmentsUpdated} buying group(s) identified.`
+            : 'Account research completed.',
+      },
+    });
+
     return NextResponse.json({
       success: true,
       summary,

@@ -67,6 +67,7 @@ export function CampaignsTab({
   const [campaigns, setCampaigns] = useState<CampaignItem[]>(initialCampaigns);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showCreateChoice, setShowCreateChoice] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Create landing page (AI-generated) flow
@@ -135,31 +136,28 @@ export function CampaignsTab({
       <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            AI Powered Custom Sales Pages + Chat
+            AI-Powered Custom Sales Pages
           </h2>
           <div className="flex items-center gap-2">
             <Button
               onClick={() => {
-                setShowCreateLanding((v) => !v);
-                if (showAdd) setShowAdd(false);
+                const isOpen = showCreateLanding || showAdd || showCreateChoice;
+                if (isOpen) {
+                  setShowCreateLanding(false);
+                  setShowAdd(false);
+                  setShowCreateChoice(false);
+                } else {
+                  setShowCreateChoice(true);
+                }
               }}
-              variant={showCreateLanding ? 'outline' : 'default'}
+              variant={showCreateLanding || showAdd || showCreateChoice ? 'outline' : 'default'}
             >
-              {showCreateLanding ? 'Cancel' : 'Create landing page'}
-            </Button>
-            <Button
-              onClick={() => {
-                setShowAdd((v) => !v);
-                if (showCreateLanding) setShowCreateLanding(false);
-              }}
-              variant={showAdd ? 'outline' : 'default'}
-            >
-              {showAdd ? 'Cancel' : 'Add sales page'}
+              {showCreateLanding || showAdd || showCreateChoice ? 'Cancel' : 'Create sales page'}
             </Button>
           </div>
         </div>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Create a custom sales page with chat. Configure headline, body, and CTA, then launch to get a shareable URL. New leads are tracked and pushed to your CRM nightly.
+          Create a custom sales page. Configure headline, body, and CTA, then launch to get a shareable URL. Track visits and CTA clicks.
         </p>
 
         {message && (
@@ -292,6 +290,33 @@ export function CampaignsTab({
           </div>
         )}
 
+        {showCreateChoice && (
+          <div className="mb-4 p-4 rounded-lg border border-gray-200 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-900/50">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">How do you want to create your sales page?</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  setShowCreateChoice(false);
+                  setShowCreateLanding(true);
+                  setShowAdd(false);
+                }}
+              >
+                Create with AI
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateChoice(false);
+                  setShowAdd(true);
+                  setShowCreateLanding(false);
+                }}
+              >
+                Add existing URL
+              </Button>
+            </div>
+          </div>
+        )}
+
         {showAdd && (
           <AddCampaignForm
             companyId={companyId}
@@ -309,7 +334,7 @@ export function CampaignsTab({
           <p className="text-gray-500 dark:text-gray-400">Loading…</p>
         ) : campaigns.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">
-            No sales pages yet. Add one to get a shareable URL with landing page and chat. Leads are captured and pushed to your CRM nightly.
+            No sales pages yet. Create one to get a shareable URL. Track visits and CTA clicks.
           </p>
         ) : (
           <ul className="divide-y divide-gray-200 dark:divide-zinc-600">

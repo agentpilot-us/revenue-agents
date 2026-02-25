@@ -10,6 +10,30 @@ import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
 import { PlaySuggestions } from '@/app/components/plays/PlaySuggestions';
 import { DepartmentStatus, ContentType } from '@prisma/client';
 
+/** Parse estimatedOpportunity string (e.g. "$50K-$150K", "$500K – $2M") to a number. Uses midpoint for ranges. */
+function parseEstimatedOpportunity(s: string | null): number | null {
+  if (!s || !s.trim()) return null;
+  const parts = s
+    .replace(/\$/g, '')
+    .split(/[\s–\-–—]+/)
+    .map((p) => p.trim().toUpperCase().replace(/,/g, ''));
+  const numbers: number[] = [];
+  for (const p of parts) {
+    const match = p.match(/^([\d.]+)\s*(K|M)?$/);
+    if (match) {
+      let n = Number(match[1]);
+      if (match[2] === 'K') n *= 1000;
+      else if (match[2] === 'M') n *= 1_000_000;
+      numbers.push(n);
+    }
+  }
+  if (numbers.length === 0) return null;
+  if (numbers.length === 1) return numbers[0];
+  const min = Math.min(...numbers);
+  const max = Math.max(...numbers);
+  return Math.round((min + max) / 2);
+}
+
 export default async function CompanyDetailPage({
   params,
   searchParams,
@@ -22,20 +46,10 @@ export default async function CompanyDetailPage({
 
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
-  const initialTab =
-    tabParam === 'messaging'
-      ? 'messaging'
-      : tabParam === 'campaigns'
-        ? 'campaigns'
-        : tabParam === 'contacts'
-          ? 'contacts'
-          : tabParam === 'content'
-            ? 'content'
-            : tabParam === 'map'
-              ? 'map'
-              : tabParam === 'expansion'
-                ? 'expansion'
-                : undefined;
+  const validTabs = ['overview', 'departments', 'contacts', 'campaigns', 'engagement', 'activity', 'messaging', 'content', 'expansion', 'map'] as const;
+  const initialTab = tabParam && validTabs.includes(tabParam as (typeof validTabs)[number])
+    ? (tabParam as (typeof validTabs)[number])
+    : 'expansion';
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     select: {
@@ -85,10 +99,9 @@ export default async function CompanyDetailPage({
   const currentARR = companyProductsForTotals
     .filter((cp) => cp.status === 'ACTIVE')
     .reduce((sum, cp) => sum + Number(cp.arr ?? 0), 0);
-  const expansionOpportunity = companyProductsForTotals
+  let expansionOpportunity = companyProductsForTotals
     .filter((cp) => cp.status === 'OPPORTUNITY')
     .reduce((sum, cp) => sum + Number(cp.opportunitySize ?? 0), 0);
-  const targetARR = currentARR + expansionOpportunity;
 
   const departmentsRaw = await prisma.companyDepartment.findMany({
     where: { companyId: id },
@@ -131,6 +144,18 @@ export default async function CompanyDetailPage({
       };
     }
   }
+
+  // When no CompanyProduct opportunity data, derive expansion from department estimatedOpportunity (e.g. "$50K-$150K")
+  if (expansionOpportunity === 0 && departmentsRaw.length > 0) {
+    const parsed = departmentsRaw
+      .map((d) => parseEstimatedOpportunity(d.estimatedOpportunity))
+      .filter((n): n is number => n != null);
+    if (parsed.length > 0) {
+      expansionOpportunity = parsed.reduce((a, b) => a + b, 0);
+    }
+  }
+
+  const targetARR = currentARR + expansionOpportunity;
 
   const departments = departmentsRaw.map(
     (d: (typeof departmentsRaw)[number]) => ({

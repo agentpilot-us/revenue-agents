@@ -271,6 +271,18 @@ async function addContactsToDepartmentInternal(
     added++;
   }
 
+  if (added > 0) {
+    await prisma.activity.create({
+      data: {
+        companyId,
+        userId,
+        companyDepartmentId: departmentId,
+        type: 'Contact Added',
+        summary: `${added} contact(s) added to buying group`,
+      },
+    });
+  }
+
   return { ok: true, added, skipped, contactIds };
 }
 
