@@ -646,6 +646,11 @@ model SegmentCampaign {
   ctaUrl       String?
   pageSections Json?   // legacy: { events?: [], caseStudy?: {}, successStory?: {} }
 
+  // Tactical plays: which play created this; draft email for rep to send
+  playId            String?
+  draftEmailSubject String?
+  draftEmailBody    String?   @db.Text
+
   isMultiDepartment Boolean @default(false)
   departmentConfig  Json? // { departments: [{ id, name, slug, headline?, body?, pageSections? }] } when isMultiDepartment
 

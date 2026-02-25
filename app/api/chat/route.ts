@@ -10,6 +10,8 @@ import { detectPII } from '@/lib/security/pii-detection';
 import { detectPromptInjection } from '@/lib/security/prompt-injection';
 import { logSecurityEvent, getIPAddress } from '@/lib/security/audit';
 import { expansion } from '@/lib/plays/expansion';
+import { getSuggestedPlays } from '@/lib/plays/engine';
+import { executePlay } from '@/lib/plays/execute-play';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
 import {
@@ -1377,6 +1379,84 @@ Work step-by-step and explain what you're doing.`;
             imported,
             total: attendees.length,
             ...(errors.length > 0 ? { errors } : {}),
+          };
+        },
+      }),
+
+      run_play: toolWithSchema({
+        description:
+          'Run a play for a specific buying group. Use when the rep says "run the event invite play for AV Engineering" or "create a re-engagement page for the IT segment".',
+        inputSchema: z.object({
+          playId: z.enum([
+            'new_buying_group',
+            'event_invite',
+            'feature_release',
+            're_engagement',
+            'champion_enablement',
+          ]),
+          segmentName: z.string().describe('Which buying group to run the play for'),
+          ctaUrl: z.string().url().optional(),
+        }),
+        execute: async (
+          params: { playId: string; segmentName: string; ctaUrl?: string },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
+          const ctx = opts?.experimental_context;
+          if (!ctx?.accountId || !ctx?.userId) {
+            throw new Error('Account context required. Open a company and start the chat from that company page.');
+          }
+          const dept = await prisma.companyDepartment.findFirst({
+            where: {
+              companyId: ctx.accountId,
+              customName: { contains: params.segmentName, mode: 'insensitive' },
+            },
+            include: {
+              contacts: { select: { id: true } },
+              activities: {
+                select: { createdAt: true },
+                take: 1,
+                orderBy: { createdAt: 'desc' },
+              },
+            },
+          });
+          if (!dept) {
+            throw new Error(
+              `Segment "${params.segmentName}" not found. Call list_departments to see available segments.`
+            );
+          }
+          const suggestions = await getSuggestedPlays(ctx.accountId, ctx.userId);
+          const match = suggestions.find(
+            (s) => s.play.id === params.playId && s.segment.id === dept.id
+          );
+          const segmentName = dept.customName ?? dept.type.replace(/_/g, ' ');
+          const lastActivity = dept.activities[0]?.createdAt;
+          const daysSinceActivity = lastActivity
+            ? Math.floor(
+                (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
+              )
+            : null;
+          const context = match?.context ?? {
+            accountName: ctx.companyName ?? '',
+            accountDomain: ctx.companyDomain ?? '',
+            accountIndustry: ctx.industry ?? null,
+            segment: {
+              id: dept.id,
+              name: segmentName,
+              valueProp: dept.valueProp,
+              contactCount: dept.contacts.length,
+              lastActivityDays: daysSinceActivity,
+            },
+          };
+          const result = await executePlay({
+            playId: params.playId as Parameters<typeof executePlay>[0]['playId'],
+            companyId: ctx.accountId,
+            userId: ctx.userId,
+            context,
+            ctaUrl: params.ctaUrl,
+          });
+          return {
+            ...result,
+            message: `Play executed. Sales page ready at ${result.previewUrl}. Draft email subject: "${result.email.subject}"`,
           };
         },
       }),

@@ -7,6 +7,7 @@ import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { CompanyARRActions } from '@/app/components/company/CompanyARRActions';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
+import { PlaySuggestions } from '@/app/components/plays/PlaySuggestions';
 import { DepartmentStatus, ContentType } from '@prisma/client';
 
 export default async function CompanyDetailPage({
@@ -407,6 +408,8 @@ export default async function CompanyDetailPage({
             </div>
           </div>
         </div>
+
+        <PlaySuggestions companyId={company.id} />
 
         {initialTab === 'campaigns' && (
           <div className="mb-6">
