@@ -276,7 +276,7 @@ export async function POST(
         ctaLabel: parsed.data.ctaLabel ?? null,
         ctaUrl: parsed.data.ctaUrl ?? null,
         pageType: parsed.data.pageType ?? 'sales_page',
-        sections: parsed.data.sections ? (parsed.data.sections as Prisma.InputJsonValue) : null,
+        sections: parsed.data.sections ? (parsed.data.sections as Prisma.InputJsonValue) : Prisma.JsonNull,
         isMultiDepartment: false,
       },
       include: {
