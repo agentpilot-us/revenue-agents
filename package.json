@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "seed:demo": "dotenv -e .env.local -- tsx prisma/seed-demo-agentpilot.ts",
+    "seed:demo:celigo": "dotenv -e .env.local -- tsx prisma/seed-demo-celigo.ts",
     "cleanup:demo": "dotenv -e .env.local -- tsx prisma/cleanup-demo.ts"
   },
   "dependencies": {

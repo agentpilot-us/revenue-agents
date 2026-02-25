@@ -7,6 +7,7 @@ import { UserProfileSettings } from '@/app/components/settings/UserProfileSettin
 import { SalesforceSettingsBlock } from '@/app/components/settings/SalesforceSettingsBlock';
 import { TestConnectionButton } from '@/app/components/settings/TestConnectionButton';
 import { NightlyCrawlSettings } from '@/app/components/settings/NightlyCrawlSettings';
+import { DeleteYourCompanyDataButton } from '@/app/components/settings/DeleteYourCompanyDataButton';
 
 function serviceStatus(id: ServiceId, optional = false) {
   const connected = isServiceConfigured(id);
@@ -138,6 +139,12 @@ export default async function SettingsPage() {
               Messaging frameworks
             </Link>
             <Link
+              href="/dashboard/settings#your-company-data"
+              className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
+            >
+              Your company data
+            </Link>
+            <Link
               href="/dashboard/settings#profile"
               className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
             >
@@ -264,6 +271,20 @@ export default async function SettingsPage() {
             initialPreferredHour={user?.nightlyCrawlPreferredHour ?? null}
             initialCrawlPaused={user?.crawlPaused ?? false}
           />
+        </div>
+
+        {/* Your company data (content library) */}
+        <div id="your-company-data" className="mt-12 pt-8 border-t border-gray-200">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900">Your company data</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Content library, products, catalog, industry playbooks, and messaging frameworks. Stored under Your company data / Content Library.
+          </p>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 dark:bg-zinc-800 dark:border-zinc-700">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Permanently remove all your company data to start fresh. Your profile and target companies are not affected.
+            </p>
+            <DeleteYourCompanyDataButton />
+          </div>
         </div>
 
         {/* Profile section */}

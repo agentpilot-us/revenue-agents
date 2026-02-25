@@ -95,6 +95,9 @@ Only needed if no demo account exists yet. **Demo setup** is only available when
 6. Click **Lock as demo**.
 7. After lock, the account is read-only for AI/external calls: all views use pre-built data. You can now use this company for demos by following **Steps 1–6** above.
 
+**Alternative: Celigo/Lattice demo seed**  
+To prepopulate a Celigo → Lattice HQ demo for a specific account (e.g. `demo-saas@agentpilot.us`), sign in as that user once, then run: `npm run seed:demo:celigo`. This creates products, content library, Lattice HQ company, buying groups, contacts, and two sales pages. Optional: set `DEMO_USER_EMAIL` in `.env.local` to target a different user.
+
 ---
 
 ## Quick reference
