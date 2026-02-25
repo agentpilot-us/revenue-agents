@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { CompanyTabs } from '@/app/components/company/CompanyTabs';
 import { ProgressSteps } from '@/app/components/company/ProgressSteps';
-import { CompanyARRActions } from '@/app/components/company/CompanyARRActions';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
 import { PlaySuggestions } from '@/app/components/plays/PlaySuggestions';
@@ -47,9 +46,6 @@ export default async function CompanyDetailPage({
   const { id } = await params;
   const { tab: tabParam } = await searchParams;
   const validTabs = ['overview', 'departments', 'contacts', 'campaigns', 'engagement', 'activity', 'messaging', 'content', 'expansion', 'map'] as const;
-  const initialTab = tabParam && validTabs.includes(tabParam as (typeof validTabs)[number])
-    ? (tabParam as (typeof validTabs)[number])
-    : 'expansion';
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     select: {
@@ -71,6 +67,7 @@ export default async function CompanyDetailPage({
       lastCrawlAt: true,
       nextCrawlAt: true,
       lastContentChangeAt: true,
+      accountIntelligenceCompletedAt: true,
       updatedAt: true,
       user: {
         select: {
@@ -287,6 +284,14 @@ export default async function CompanyDetailPage({
   const hasContent = contentCount > 0;
   const hasCampaign = campaigns.length > 0;
 
+  const setupIncomplete = !hasResearch || departments.length === 0 || company.contacts.length === 0;
+  const initialTab =
+    setupIncomplete
+      ? 'overview'
+      : (tabParam && validTabs.includes(tabParam as (typeof validTabs)[number])
+        ? (tabParam as (typeof validTabs)[number])
+        : 'overview');
+
   const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
     where: {
       userId: session.user.id,
@@ -418,7 +423,6 @@ export default async function CompanyDetailPage({
               <div className="text-xl font-semibold text-green-600 dark:text-green-400">
                 ${expansionOpportunity.toLocaleString()}
               </div>
-              <CompanyARRActions companyId={id} />
             </div>
             <div>
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Target ARR</div>
@@ -475,6 +479,7 @@ export default async function CompanyDetailPage({
               lastCrawlAt: company.lastCrawlAt,
               nextCrawlAt: company.nextCrawlAt,
               lastContentChangeAt: company.lastContentChangeAt,
+              accountIntelligenceCompletedAt: company.accountIntelligenceCompletedAt,
             }}
             departments={departments}
             matrixDepartments={matrixDepartments}
@@ -493,6 +498,10 @@ export default async function CompanyDetailPage({
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}
             engagementByDept={engagementByDept}
+            setupIncomplete={setupIncomplete}
+            hasResearch={hasResearch}
+            hasDepartments={hasDepartments}
+            hasContacts={hasContacts}
           />
         </div>
       </div>

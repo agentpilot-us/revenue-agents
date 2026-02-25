@@ -36,22 +36,28 @@ export async function getNextBestActions(
 
   const actions: NextBestActionItem[] = [];
 
-  // 1. Suggested plays (one per company, then flatten and sort)
+  // 1. Suggested plays — take ALL suggestions per company (up to 3), not just the first
   for (const company of companies) {
     const suggestions = await getSuggestedPlays(company.id, userId);
-    const first = suggestions[0];
-    if (first) {
+
+    for (const suggestion of suggestions) {
       const priority =
-        first.play.id === 'new_buying_group' ? 0 : first.play.id === 'event_invite' ? 1 : 2;
+        suggestion.play.id === 'new_buying_group' ? 0
+        : suggestion.play.id === 'feature_release' ? 1
+        : suggestion.play.id === 'event_invite' ? 1
+        : suggestion.play.id === 're_engagement' ? 2
+        : suggestion.play.id === 'champion_enablement' ? 2
+        : 3;
+
       actions.push({
         companyId: company.id,
         companyName: company.name,
-        departmentId: first.segment.id,
-        departmentName: first.segment.name,
-        label: `${company.name} — ${first.triggerText}`,
-        ctaLabel: `Run "${first.play.name}"`,
-        ctaHref: `/chat?play=expansion&accountId=${company.id}&segmentId=${first.segment.id}`,
-        playId: first.play.id,
+        departmentId: suggestion.segment.id,
+        departmentName: suggestion.segment.name,
+        label: `${company.name} — ${suggestion.triggerText}`,
+        ctaLabel: `Run "${suggestion.play.name}"`,
+        ctaHref: `/chat?play=expansion&accountId=${company.id}&segmentId=${suggestion.segment.id}`,
+        playId: suggestion.play.id,
         priority,
       });
     }
@@ -107,7 +113,7 @@ export async function getNextBestActions(
     }
   }
 
-  // Dedupe by company+department+action type (keep first)
+  // Dedupe by company+department+play (keep first)
   const seen = new Set<string>();
   const deduped = actions.filter((a) => {
     const key = `${a.companyId}:${a.departmentId ?? ''}:${a.ctaLabel}`;
@@ -116,7 +122,6 @@ export async function getNextBestActions(
     return true;
   });
 
-  // Sort by priority then by company
   deduped.sort((a, b) => a.priority - b.priority);
 
   if (deduped.length === 0 && companies.length === 0) {
@@ -150,7 +155,7 @@ export async function getNextBestActions(
     ];
   }
 
-  return deduped.slice(0, 5);
+  return deduped.slice(0, 8); // show full play variety
 }
 
 /**

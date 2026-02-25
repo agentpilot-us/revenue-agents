@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { discoverBuyingGroupsForAccount } from '@/lib/research/research-company';
+import { parseDealContext } from '@/lib/types/deal-context';
 
 export const maxDuration = 60;
 
@@ -27,14 +28,36 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}));
-    const userGoal =
-      typeof body.userGoal === 'string' ? body.userGoal.trim() || undefined : undefined;
+    const dealGoal =
+      typeof body.dealGoal === 'string' ? body.dealGoal.trim() || undefined : undefined;
+    const userGoal = dealGoal ?? (typeof body.userGoal === 'string' ? body.userGoal.trim() || undefined : undefined);
+    const rawDealContext = body.dealContext;
+    const dealContext =
+      rawDealContext != null && typeof rawDealContext === 'object'
+        ? parseDealContext(rawDealContext)
+        : undefined;
+
+    if (dealContext) {
+      await prisma.company.update({
+        where: { id: companyId, userId: session.user.id },
+        data: {
+          dealContext: rawDealContext as object,
+          ...(userGoal != null && { researchGoal: userGoal }),
+        },
+      });
+    } else if (userGoal != null) {
+      await prisma.company.update({
+        where: { id: companyId, userId: session.user.id },
+        data: { researchGoal: userGoal },
+      });
+    }
 
     const result = await discoverBuyingGroupsForAccount(
       company.name,
       company.domain ?? undefined,
       session.user.id,
-      userGoal
+      userGoal,
+      dealContext
     );
 
     if (!result.ok) {

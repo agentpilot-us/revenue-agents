@@ -7,9 +7,7 @@ import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBu
 import type { EngagementRow } from '@/app/components/company/EngagementByBuyingGroup';
 import { AccountMessagingTab } from '@/app/components/company/AccountMessagingTab';
 import { CampaignsTab, type CampaignItem } from '@/app/components/company/CampaignsTab';
-import { CompanyResearchDisplay } from '@/app/components/company/CompanyResearchDisplay';
 import { SalesforceBlock } from '@/app/components/company/SalesforceBlock';
-import { CrawlStatus } from '@/app/components/company/CrawlStatus';
 import { ContactsByBuyingGroup } from '@/app/components/company/ContactsByBuyingGroup';
 import { ContentTab } from '@/app/components/company/ContentTab';
 import { ActivityTimeline } from '@/app/components/company/ActivityTimeline';
@@ -63,6 +61,7 @@ type CompanyTabsProps = {
     lastCrawlAt: Date | null;
     nextCrawlAt: Date | null;
     lastContentChangeAt: Date | null;
+    accountIntelligenceCompletedAt: Date | null;
   };
   departments: unknown[];
   matrixDepartments: unknown[];
@@ -91,6 +90,11 @@ type CompanyTabsProps = {
     hasCampaign: boolean;
     campaignUrl?: string | null;
   };
+  /** When true, show only Get started card in Overview and filter to Overview tab only */
+  setupIncomplete?: boolean;
+  hasResearch?: boolean;
+  hasDepartments?: boolean;
+  hasContacts?: boolean;
 };
 
 const TABS: { id: TabId; label: string }[] = [
@@ -124,8 +128,12 @@ export function CompanyTabs({
   engagementByDept = [],
   onTabChange,
   nextStepBar,
+  setupIncomplete = false,
+  hasResearch = false,
+  hasDepartments = false,
+  hasContacts = false,
 }: CompanyTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'expansion');
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'overview');
 
   useEffect(() => {
     if (initialTab != null) setActiveTab(initialTab);
@@ -154,7 +162,7 @@ export function CompanyTabs({
       )}
       <div className="border-b border-gray-200">
         <nav className="flex gap-1" aria-label="Tabs">
-          {TABS.map((tab) => (
+          {(setupIncomplete ? TABS.filter((t) => t.id === 'overview') : TABS).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -186,121 +194,99 @@ export function CompanyTabs({
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Company Snapshot */}
-          {companyData && (
-            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Company Snapshot</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {companyData.industry && (
-                  <div>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Industry:</span>{' '}
-                    <span className="text-gray-600 dark:text-gray-400">{companyData.industry}</span>
+          {setupIncomplete ? (
+            <GetStartedCard companyId={companyId} companyName={companyName} hasResearch={hasResearch} hasDepartments={hasDepartments} hasContacts={hasContacts} />
+          ) : (
+            <>
+              {/* State 2: Company Snapshot */}
+              {companyData && (
+                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Company Snapshot</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {companyData.industry && (
+                      <div>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">Industry:</span>{' '}
+                        <span className="text-gray-600 dark:text-gray-400">{companyData.industry}</span>
+                      </div>
+                    )}
+                    {companyData.revenue && (
+                      <div>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">Revenue:</span>{' '}
+                        <span className="text-gray-600 dark:text-gray-400">{companyData.revenue}</span>
+                      </div>
+                    )}
+                    {companyData.employees && (
+                      <div>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">Employees:</span>{' '}
+                        <span className="text-gray-600 dark:text-gray-400">{companyData.employees}</span>
+                      </div>
+                    )}
+                    {companyData.headquarters && (
+                      <div>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">HQ:</span>{' '}
+                        <span className="text-gray-600 dark:text-gray-400">{companyData.headquarters}</span>
+                      </div>
+                    )}
+                    {companyData.website && (
+                      <div className="md:col-span-2">
+                        <span className="font-medium text-gray-700 dark:text-gray-300">Website:</span>{' '}
+                        <a
+                          href={companyData.website.startsWith('http') ? companyData.website : `https://${companyData.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {companyData.website}
+                        </a>
+                      </div>
+                    )}
                   </div>
-                )}
-                {companyData.revenue && (
-                  <div>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Revenue:</span>{' '}
-                    <span className="text-gray-600 dark:text-gray-400">{companyData.revenue}</span>
-                  </div>
-                )}
-                {companyData.employees && (
-                  <div>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Employees:</span>{' '}
-                    <span className="text-gray-600 dark:text-gray-400">{companyData.employees}</span>
-                  </div>
-                )}
-                {companyData.headquarters && (
-                  <div>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">HQ:</span>{' '}
-                    <span className="text-gray-600 dark:text-gray-400">{companyData.headquarters}</span>
-                  </div>
-                )}
-                {companyData.website && (
-                  <div className="md:col-span-2">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Website:</span>{' '}
-                    <a
-                      href={companyData.website.startsWith('http') ? companyData.website : `https://${companyData.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      {companyData.website}
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Business Overview and Key Initiatives */}
-          {companyData && (companyData.businessOverview || (companyData.keyInitiatives && companyData.keyInitiatives.length > 0)) && (
-            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Business Overview & Key Initiatives</h2>
-              {companyData.businessOverview && (
-                <div className="mb-4">
-                  <p className="text-gray-600 dark:text-gray-300">{companyData.businessOverview}</p>
                 </div>
               )}
-              {companyData.keyInitiatives && companyData.keyInitiatives.length > 0 && (
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Key Initiatives</h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
-                    {companyData.keyInitiatives.map((initiative, i) => (
-                      <li key={i}>{initiative}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Salesforce Block */}
-          {companyData && (
-            <SalesforceBlock
-              companyId={companyId}
-              salesforceLastSyncedAt={companyData.salesforceLastSyncedAt}
-              salesforceOpportunityData={companyData.salesforceOpportunityData}
-              hasSalesforceAccess={companyData.hasSalesforceAccess}
-            />
-          )}
-
-          {/* Crawl Status */}
-          {companyData && (
-            <CrawlStatus
-              lastCrawlAt={companyData.lastCrawlAt}
-              nextCrawlAt={companyData.nextCrawlAt}
-              lastContentChangeAt={companyData.lastContentChangeAt}
-            />
-          )}
-
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Account research</h2>
-              <ResearchWithAIButton companyId={companyId} />
-            </div>
-            <CompanyResearchDisplay key={researchDataKey} companyId={companyId} />
-          </div>
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
-            <div className="space-y-4">
-              <div className="p-4 border border-gray-200 dark:border-zinc-600 rounded-lg">
-                <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Work with expansion agent</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Chat with AI to find contacts, research the account, draft outreach (added to Approval queue), and track engagement.
+              {/* Research updated */}
+              {companyData?.accountIntelligenceCompletedAt && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Research updated {new Date(companyData.accountIntelligenceCompletedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
                 </p>
-                <Link href={`/dashboard/companies/${companyId}?tab=messaging`}>
-                  <Button>Open Messaging</Button>
-                </Link>
-              </div>
-              <Link
-                href={`/dashboard/companies/${companyId}/contacts`}
-                className="block p-4 border border-gray-200 dark:border-zinc-600 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700/50"
-              >
-                <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Build contact list</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Find, add, and enrich contacts</p>
-              </Link>
-            </div>
-          </div>
+              )}
+
+              {/* Buying group coverage */}
+              <BuyingGroupCoverageCard departments={departments} campaigns={campaigns} />
+
+              {/* Business Overview and Key Initiatives */}
+              {companyData && (companyData.businessOverview || (companyData.keyInitiatives && companyData.keyInitiatives.length > 0)) && (
+                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Business Overview & Key Initiatives</h2>
+                  {companyData.businessOverview && (
+                    <div className="mb-4">
+                      <p className="text-gray-600 dark:text-gray-300">{companyData.businessOverview}</p>
+                    </div>
+                  )}
+                  {companyData.keyInitiatives && companyData.keyInitiatives.length > 0 && (
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Key Initiatives</h3>
+                      <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
+                        {companyData.keyInitiatives.map((initiative, i) => (
+                          <li key={i}>{initiative}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Salesforce Block */}
+              {companyData && (
+                <SalesforceBlock
+                  companyId={companyId}
+                  salesforceLastSyncedAt={companyData.salesforceLastSyncedAt}
+                  salesforceOpportunityData={companyData.salesforceOpportunityData}
+                  hasSalesforceAccess={companyData.hasSalesforceAccess}
+                />
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -373,65 +359,77 @@ export function CompanyTabs({
   );
 }
 
-function ResearchWithAIButton({ companyId }: { companyId: string }) {
-  const [researching, setResearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleResearch = async () => {
-    setResearching(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/companies/${companyId}/research`, {
-        method: 'POST',
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        window.location.reload();
-        return;
-      }
-      const message = typeof data?.error === 'string' ? data.error : 'Failed to run research. Please try again.';
-      setError(message);
-    } catch (err) {
-      console.error('Research error:', err);
-      setError('Failed to run research. Please try again.');
-    } finally {
-      setResearching(false);
-    }
-  };
-
-  const isSetupError =
-    error &&
-    (error.includes('company setup') ||
-      error.includes('Content Library') ||
-      error.includes('No products found') ||
-      error.includes('Your company data'));
-
+function GetStartedCard({
+  companyId,
+  companyName,
+  hasResearch,
+  hasDepartments,
+  hasContacts,
+}: {
+  companyId: string;
+  companyName: string;
+  hasResearch: boolean;
+  hasDepartments: boolean;
+  hasContacts: boolean;
+}) {
+  const intelligenceHref = `/dashboard/companies/${companyId}/intelligence`;
   return (
-    <div className="flex flex-col items-end gap-2 min-w-[280px]">
-      <Button onClick={handleResearch} disabled={researching} size="sm">
-        {researching ? 'Researching...' : 'Research with AI'}
-      </Button>
-      {error && (
-        <div className="w-full min-w-[280px] max-w-md rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-          <p className="font-medium">Research couldn’t run</p>
-          <p className="mt-1">{error}</p>
-          {isSetupError && (
-            <Link
-              href="/dashboard/content-library"
-              className="mt-2 inline-block text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              Complete setup in Your company data →
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Get started with {companyName}</h2>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        To use AgentPilot on this account you need:
+      </p>
+      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300 mb-6">
+        <li className="flex items-center gap-2">
+          {hasResearch ? <span className="text-green-600 dark:text-green-400" aria-hidden>✓</span> : <span className="text-gray-400" aria-hidden>○</span>}
+          <span>Account research</span>
+          {!hasResearch && (
+            <Link href={intelligenceHref} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+              Research with AI →
             </Link>
           )}
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            className="mt-2 text-xs text-amber-600 dark:text-amber-300 hover:underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+        </li>
+        <li className="flex items-center gap-2">
+          {hasDepartments ? <span className="text-green-600 dark:text-green-400" aria-hidden>✓</span> : <span className="text-gray-400" aria-hidden>○</span>}
+          At least one buying group
+        </li>
+        <li className="flex items-center gap-2">
+          {hasContacts ? <span className="text-green-600 dark:text-green-400" aria-hidden>✓</span> : <span className="text-gray-400" aria-hidden>○</span>}
+          Contacts in each group
+        </li>
+      </ul>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href={intelligenceHref}
+          className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+        >
+          Complete account setup →
+        </Link>
+        <span className="text-xs text-gray-500 dark:text-gray-400">~5 minutes</span>
+      </div>
+    </div>
+  );
+}
+
+function BuyingGroupCoverageCard({
+  departments,
+  campaigns,
+}: {
+  departments: unknown[];
+  campaigns: Array<{ departmentId?: string | null }>;
+}) {
+  const depts = departments as Array<{ id: string; _count?: { contacts: number }; contacts?: unknown[] }>;
+  const total = depts.length;
+  const withContacts = total === 0 ? 0 : depts.filter((d) => ((d._count as { contacts?: number } | undefined)?.contacts ?? (Array.isArray(d.contacts) ? d.contacts.length : 0)) > 0).length;
+  const deptIdsWithCampaigns = new Set(campaigns.map((c) => c.departmentId).filter(Boolean) as string[]);
+  const withLivePages = deptIdsWithCampaigns.size;
+  if (total === 0) return null;
+  return (
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Buying group coverage</h2>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        {withContacts} of {total} groups have contacts; {withLivePages} have live pages.
+      </p>
     </div>
   );
 }

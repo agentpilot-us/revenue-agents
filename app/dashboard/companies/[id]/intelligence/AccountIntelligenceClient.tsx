@@ -13,6 +13,9 @@ import type {
   CompanyResearchData,
   DiscoverGroupsResult,
 } from '@/lib/research/company-research-schema';
+import type { DealContext } from '@/lib/types/deal-context';
+
+type CatalogProductOption = { id: string; name: string; slug: string };
 
 type Props = {
   companyId: string;
@@ -22,14 +25,32 @@ type Props = {
   hasMessaging: boolean;
   departmentCount: number;
   researchDone?: boolean;
-  /** Stored goal from last research run; shown in step 1 done state. */
   researchGoal?: string | null;
+  dealContext?: DealContext;
+  catalogProducts: CatalogProductOption[];
+  /** When catalog is empty, products from Content Library (Product model) to show as checkboxes. */
+  fallbackProducts?: CatalogProductOption[];
 };
 
 type Step1State = {
   data: DiscoverGroupsResult;
   seeds: BuyingGroupSeed[];
 };
+
+const INITIAL_DEAL_FORM = (dc?: DealContext) => ({
+  productIds: dc?.productIds?.length ? [...dc.productIds] : [] as string[],
+  productNames: dc?.productNames?.length ? [...dc.productNames] : [] as string[],
+  accountStatus: (dc?.accountStatus ?? 'new') as DealContext['accountStatus'],
+  deployedLocation: dc?.deployedLocation ?? '',
+  deployedUseCase: dc?.deployedUseCase ?? '',
+  hasProvenOutcomes: dc?.hasProvenOutcomes,
+  relationshipLocation: dc?.relationshipLocation ?? '',
+  dealShape: (dc?.dealShape ?? 'unknown') as DealContext['dealShape'],
+  targetDivisions: dc?.targetDivisions?.length ? dc.targetDivisions.slice(0, 6) : [] as string[],
+  buyingMotion: (dc?.buyingMotion ?? 'unknown') as DealContext['buyingMotion'],
+  committeeName: dc?.committeeName ?? '',
+  dealGoal: dc?.dealGoal ?? '',
+});
 
 export function AccountIntelligenceClient({
   companyId,
@@ -40,6 +61,9 @@ export function AccountIntelligenceClient({
   departmentCount,
   researchDone = false,
   researchGoal,
+  dealContext: initialDealContext,
+  catalogProducts = [],
+  fallbackProducts = [],
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,7 +72,8 @@ export function AccountIntelligenceClient({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [pendingResearchData, setPendingResearchData] = useState<CompanyResearchData | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [userGoal, setUserGoal] = useState('');
+
+  const [dealForm, setDealForm] = useState(() => INITIAL_DEAL_FORM(initialDealContext));
 
   // 4-step flow state (when !hasResearch)
   const [step1, setStep1] = useState<Step1State | null>(null);
@@ -62,6 +87,17 @@ export function AccountIntelligenceClient({
   const [groupsWithProductFit, setGroupsWithProductFit] = useState<BuyingGroupDetail[] | null>(null);
 
   const showBanner = researchDone && hasResearch && !bannerDismissed;
+
+  const dealGoal = dealForm.dealGoal.trim() || undefined;
+  const usingCatalog = catalogProducts.length > 0;
+  const usingFallback = !usingCatalog && fallbackProducts.length > 0;
+  const hasProductSelection = usingCatalog ? dealForm.productIds.length > 0 : dealForm.productNames.length > 0;
+  const canDiscover =
+    hasProductSelection &&
+    !!dealForm.accountStatus &&
+    !!dealForm.dealShape &&
+    !!dealForm.buyingMotion &&
+    (usingCatalog || usingFallback);
 
   // Scroll to step 2 when landing with ?researchDone=1; clear URL so banner doesn't reappear on refresh.
   // bannerDismissed intentionally omitted from deps — we only want to run once when researchDone is true.
@@ -98,14 +134,37 @@ export function AccountIntelligenceClient({
 
   // 4-step flow: no research yet
   if (!hasResearch) {
+    const buildDealContextPayload = (): DealContext => ({
+      productIds: usingCatalog && dealForm.productIds.length ? dealForm.productIds : undefined,
+      productNames: usingFallback && dealForm.productNames.length ? dealForm.productNames.filter(Boolean) : undefined,
+      accountStatus: dealForm.accountStatus,
+      deployedLocation: dealForm.deployedLocation.trim() || undefined,
+      deployedUseCase: dealForm.deployedUseCase.trim() || undefined,
+      hasProvenOutcomes: dealForm.hasProvenOutcomes,
+      relationshipLocation: dealForm.relationshipLocation.trim() || undefined,
+      dealShape: dealForm.dealShape,
+      targetDivisions:
+        dealForm.dealShape === 'multi_division' && dealForm.targetDivisions.length
+          ? dealForm.targetDivisions.filter(Boolean).slice(0, 6)
+          : undefined,
+      buyingMotion: dealForm.buyingMotion,
+      committeeName: dealForm.committeeName.trim() || undefined,
+      dealGoal: dealGoal || undefined,
+    });
+
     const handleDiscover = async () => {
+      if (!canDiscover) return;
       setStep1Loading(true);
       setStep1Error(null);
       try {
+        const dealContextPayload = buildDealContextPayload();
         const res = await fetch(`/api/companies/${companyId}/research/buying-groups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userGoal: userGoal.trim() || undefined }),
+          body: JSON.stringify({
+            dealContext: dealContextPayload,
+            dealGoal: dealGoal || undefined,
+          }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Discovery failed');
@@ -160,7 +219,7 @@ export function AccountIntelligenceClient({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             groups: step1.seeds,
-            userGoal: userGoal.trim() || undefined,
+            userGoal: dealGoal,
           }),
         });
         const json = await res.json();
@@ -212,7 +271,7 @@ export function AccountIntelligenceClient({
           body: JSON.stringify({
             companyBasics: step1.data.basics,
             enrichedGroups: groupsWithProductFit,
-            researchGoal: userGoal.trim() || undefined,
+            researchGoal: dealGoal,
           }),
         });
         const json = await res.json();
@@ -244,48 +303,281 @@ export function AccountIntelligenceClient({
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-700 bg-zinc-800/50 p-8 space-y-6">
-          <label className="text-sm text-slate-300 font-medium">
-            What are you trying to accomplish?{' '}
-            <span className="text-slate-500 font-normal">(optional)</span>
-          </label>
-          <textarea
-            value={userGoal}
-            onChange={(e) => setUserGoal(e.target.value)}
-            placeholder="e.g. Target enterprise AEs at Salesforce across Financial Services, Healthcare, and Tech verticals"
-            rows={2}
-            className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-600 text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-
+        <div className="rounded-lg border border-slate-700 bg-zinc-800/50 p-8 space-y-8">
           {!step1 ? (
             <>
-              <p className="text-slate-300">
-                Step 1: Discover 4–6 buying groups from web research. You can add, remove, or rename
-                groups before enriching.
-              </p>
-              <Button
-                onClick={handleDiscover}
-                disabled={step1Loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {step1Loading ? 'Discovering…' : 'Discover buying groups'}
-              </Button>
-              {step1Error && (
-                <div className="text-sm text-red-400 space-y-1">
-                  <p>{step1Error}</p>
-                  {(step1Error.includes('company setup') ||
-                    step1Error.includes('Content Library') ||
-                    step1Error.includes('No products found') ||
-                    step1Error.includes('Your company data')) && (
-                    <Link
-                      href="/dashboard/content-library"
-                      className="text-blue-400 hover:text-blue-300 underline"
-                    >
-                      Complete setup in Your company data →
-                    </Link>
+              {/* Section 1 — What are you selling? */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-slate-200">1. What are you selling?</h3>
+                {usingCatalog ? (
+                  <>
+                    <p className="text-slate-500 text-xs">Select one or more products to include in this deal.</p>
+                    <div className="flex flex-wrap gap-3">
+                      {catalogProducts.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={dealForm.productIds.includes(p.id)}
+                            onChange={() => {
+                              setDealForm((prev) => ({
+                                ...prev,
+                                productIds: prev.productIds.includes(p.id)
+                                  ? prev.productIds.filter((id) => id !== p.id)
+                                  : [...prev.productIds, p.id],
+                              }));
+                            }}
+                            className="rounded border-slate-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-300">{p.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : usingFallback ? (
+                  <>
+                    <p className="text-slate-500 text-xs">Select one or more products from your Content Library.</p>
+                    <div className="flex flex-wrap gap-3">
+                      {fallbackProducts.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={dealForm.productNames.includes(p.name)}
+                            onChange={() => {
+                              setDealForm((prev) => ({
+                                ...prev,
+                                productNames: prev.productNames.includes(p.name)
+                                  ? prev.productNames.filter((n) => n !== p.name)
+                                  : [...prev.productNames, p.name],
+                              }));
+                            }}
+                            className="rounded border-slate-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-slate-300">{p.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-slate-400 text-sm">
+                    Add products in{' '}
+                    <Link href="/dashboard/content-library" className="text-blue-400 hover:text-blue-300 underline">
+                      Content Library
+                    </Link>{' '}
+                    — they&apos;ll appear here as checkboxes so you can select which to include in this deal.
+                  </p>
+                )}
+              </div>
+
+              {/* Section 2 — Are you already in this account? */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-slate-200">2. Are you already in this account?</h3>
+                <div className="flex flex-wrap gap-4">
+                  {(['new', 'existing_deployed', 'existing_relationship', 'stalled', 'champion_in'] as const).map(
+                    (v) => (
+                      <label key={v} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="accountStatus"
+                          checked={dealForm.accountStatus === v}
+                          onChange={() => setDealForm((prev) => ({ ...prev, accountStatus: v }))}
+                          className="border-slate-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-300 capitalize">
+                          {v.replace(/_/g, ' ')}
+                        </span>
+                      </label>
+                    )
                   )}
                 </div>
-              )}
+                {dealForm.accountStatus === 'existing_deployed' && (
+                  <div className="ml-4 mt-3 space-y-2 border-l-2 border-slate-600 pl-4">
+                    <input
+                      type="text"
+                      placeholder="Deployed location (e.g. AV Software team)"
+                      value={dealForm.deployedLocation}
+                      onChange={(e) => setDealForm((prev) => ({ ...prev, deployedLocation: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-500 text-sm px-3 py-2"
+                    />
+                    <textarea
+                      placeholder="Use case at this team"
+                      value={dealForm.deployedUseCase}
+                      onChange={(e) => setDealForm((prev) => ({ ...prev, deployedUseCase: e.target.value }))}
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-500 text-sm px-3 py-2 resize-none"
+                    />
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="hasProvenOutcomes"
+                          checked={dealForm.hasProvenOutcomes === true}
+                          onChange={() => setDealForm((prev) => ({ ...prev, hasProvenOutcomes: true }))}
+                          className="border-slate-600 bg-zinc-900 text-blue-600"
+                        />
+                        <span className="text-sm text-slate-300">Yes, proven outcomes</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="hasProvenOutcomes"
+                          checked={dealForm.hasProvenOutcomes === false}
+                          onChange={() => setDealForm((prev) => ({ ...prev, hasProvenOutcomes: false }))}
+                          className="border-slate-600 bg-zinc-900 text-blue-600"
+                        />
+                        <span className="text-sm text-slate-300">No</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+                {dealForm.accountStatus === 'existing_relationship' && (
+                  <div className="ml-4 mt-3">
+                    <input
+                      type="text"
+                      placeholder="Where is the relationship (e.g. Product, Engineering)"
+                      value={dealForm.relationshipLocation}
+                      onChange={(e) => setDealForm((prev) => ({ ...prev, relationshipLocation: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-500 text-sm px-3 py-2"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3 — How does your product land here? */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-slate-200">3. How does your product land here?</h3>
+                <div className="flex flex-wrap gap-4">
+                  {(['single_team', 'multi_department', 'multi_division', 'unknown'] as const).map((v) => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="dealShape"
+                        checked={dealForm.dealShape === v}
+                        onChange={() => setDealForm((prev) => ({ ...prev, dealShape: v }))}
+                        className="border-slate-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-slate-300 capitalize">{v.replace(/_/g, ' ')}</span>
+                    </label>
+                  ))}
+                </div>
+                {dealForm.dealShape === 'multi_division' && (
+                  <div className="ml-4 mt-3 space-y-2 border-l-2 border-slate-600 pl-4">
+                    <p className="text-xs text-slate-500">Add divisions (optional, max 6). Leave empty to discover from research.</p>
+                    {dealForm.targetDivisions.map((val, i) => (
+                      <div key={i} className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Division name"
+                          value={val}
+                          onChange={(e) => {
+                            const next = [...dealForm.targetDivisions];
+                            next[i] = e.target.value;
+                            setDealForm((prev) => ({ ...prev, targetDivisions: next }));
+                          }}
+                          className="flex-1 rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-500 text-sm px-3 py-2"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDealForm((prev) => ({
+                              ...prev,
+                              targetDivisions: prev.targetDivisions.filter((_, j) => j !== i),
+                            }))
+                          }
+                          className="p-2 rounded hover:bg-slate-600 text-slate-400"
+                          aria-label="Remove"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {dealForm.targetDivisions.length < 6 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDealForm((prev) => ({
+                            ...prev,
+                            targetDivisions: [...prev.targetDivisions, ''],
+                          }))
+                        }
+                        className="text-sm text-slate-400 hover:text-white flex items-center gap-1"
+                      >
+                        <Plus className="h-4 w-4" /> Add another
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 4 — How does buying work here? */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-slate-200">4. How does buying work here?</h3>
+                <div className="flex flex-wrap gap-4">
+                  {(['standard', 'committee', 'regulated', 'unknown'] as const).map((v) => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="buyingMotion"
+                        checked={dealForm.buyingMotion === v}
+                        onChange={() => setDealForm((prev) => ({ ...prev, buyingMotion: v }))}
+                        className="border-slate-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-slate-300 capitalize">{v}</span>
+                    </label>
+                  ))}
+                </div>
+                {dealForm.buyingMotion === 'committee' && (
+                  <div className="ml-4 mt-3">
+                    <input
+                      type="text"
+                      placeholder="Committee name (optional)"
+                      value={dealForm.committeeName}
+                      onChange={(e) => setDealForm((prev) => ({ ...prev, committeeName: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-500 text-sm px-3 py-2"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Section 5 — Goal (optional) */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-slate-200">
+                  5. Goal <span className="text-slate-500 font-normal">(optional)</span>
+                </h3>
+                <textarea
+                  value={dealForm.dealGoal}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, dealGoal: e.target.value }))}
+                  placeholder="e.g. Target enterprise AEs across Financial Services, Healthcare"
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-600 bg-zinc-900 text-slate-200 placeholder:text-slate-600 text-sm px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <p className="text-slate-400 text-sm mb-2">~30 seconds. You&apos;ll review before anything saves.</p>
+                <Button
+                  onClick={handleDiscover}
+                  disabled={step1Loading || !canDiscover}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {step1Loading ? 'Mapping account…' : 'Map this account →'}
+                </Button>
+                {step1Error && (
+                  <div className="text-sm text-red-400 space-y-1 mt-2">
+                    <p>{step1Error}</p>
+                    {(step1Error.includes('company setup') ||
+                      step1Error.includes('Content Library') ||
+                      step1Error.includes('No products found') ||
+                      step1Error.includes('Your company data')) && (
+                      <Link
+                        href="/dashboard/content-library"
+                        className="text-blue-400 hover:text-blue-300 underline"
+                      >
+                        Complete setup in Your company data →
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>

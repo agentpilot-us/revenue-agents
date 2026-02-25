@@ -25,6 +25,7 @@ import {
   findRelevantContentLibraryChunks,
   getAllContentLibraryChunkContents,
 } from '@/lib/content-library-rag';
+import type { DealContext } from '@/lib/types/deal-context';
 
 export type ResearchCompanyResult =
   | { ok: true; data: CompanyResearchData }
@@ -36,12 +37,14 @@ export type PerplexityOnlyResult =
 
 /**
  * Run only the Perplexity (web search) step. Use with structureResearchWithClaude for two-phase research with UI status.
+ * When dealContext is provided, research query is adjusted for stalled/champion_in/existing_deployed.
  */
 export async function runPerplexityResearchOnly(
   companyName: string,
   companyDomain: string | undefined,
   userId: string,
-  userGoal?: string
+  userGoal?: string,
+  dealContext?: DealContext
 ): Promise<PerplexityOnlyResult> {
   if (!userId) {
     return {
@@ -68,9 +71,10 @@ export async function runPerplexityResearchOnly(
     };
   }
 
-  const catalogProducts = await prisma.catalogProduct.findMany({
+  let catalogProducts = await prisma.catalogProduct.findMany({
     where: { userId } as { userId: string },
     select: {
+      id: true,
       name: true,
       slug: true,
       description: true,
@@ -81,14 +85,22 @@ export async function runPerplexityResearchOnly(
     orderBy: { name: 'asc' },
   });
 
-  const contentLibraryProductsFirst =
-    catalogProducts.length === 0
-      ? await prisma.product.findMany({
-          where: { userId },
-          select: { name: true, description: true },
-          orderBy: { name: 'asc' },
-        })
-      : [];
+  if (dealContext?.productIds?.length) {
+    catalogProducts = catalogProducts.filter((p) => dealContext!.productIds!.includes(p.id));
+  }
+
+  let contentLibraryProductsFirst: { name: string; description: string | null }[] = [];
+  if (catalogProducts.length === 0) {
+    contentLibraryProductsFirst = await prisma.product.findMany({
+      where: { userId },
+      select: { name: true, description: true },
+      orderBy: { name: 'asc' },
+    });
+    if (dealContext?.productNames?.length) {
+      const namesSet = new Set(dealContext.productNames.map((n) => n.trim()).filter(Boolean));
+      contentLibraryProductsFirst = contentLibraryProductsFirst.filter((p) => namesSet.has(p.name));
+    }
+  }
 
   const productNamesForQuery =
     catalogProducts.length > 0
@@ -104,9 +116,20 @@ export async function runPerplexityResearchOnly(
   }
 
   const productNames = productNamesForQuery;
-  const researchQuery = userGoal?.trim()
-    ? `${companyName} organization structure, departments relevant to: ${userGoal.trim()}. Include headcount, key initiatives, and leadership for those teams. Also include company basics: website, industry, employee count, headquarters, revenue.`
-    : `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
+  let researchQuery: string;
+
+  const status = dealContext?.accountStatus;
+  if (status === 'stalled') {
+    researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''}: focus on what changed in the last 90 days — executive changes, new initiatives, funding, product launches, reorgs. Identify re-entry points and new stakeholders. Also include company basics: website, industry, employee count, headquarters, revenue. Relevant buying areas: ${productNames}.`;
+  } else if (status === 'champion_in') {
+    researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''}: focus on approval chain, committee structure, and decision-makers above the champion. Who is the economic buyer? Who sits on buying committees? Also include company basics and organizational structure. Relevant products: ${productNames}.`;
+  } else if (status === 'existing_deployed') {
+    const loc = dealContext?.deployedLocation?.trim() || 'one team';
+    researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''}: we are already deployed at ${loc}. Focus on OTHER divisions, departments, or business units that could expand the footprint — adjacent use cases, other geographies, other product lines. Do not re-research the already-deployed area. Include company basics and full organizational structure. Relevant products: ${productNames}.`;
+  } else if (userGoal?.trim()) {
+    researchQuery = `${companyName} organization structure, departments relevant to: ${userGoal.trim()}. Include headcount, key initiatives, and leadership for those teams. Also include company basics: website, industry, employee count, headquarters, revenue.`;
+  } else {
+    researchQuery = `Research ${companyName}${companyDomain ? ` (${companyDomain})` : ''} and provide:
 
 1. COMPANY BASICS: official name, website, industry, employee count, headquarters, annual revenue
 
@@ -121,6 +144,7 @@ export async function runPerplexityResearchOnly(
 6. BUYING GROUPS: which departments or teams at ${companyName} make decisions about B2B software purchases in areas like: ${productNames}? What are their priorities and what titles do the decision-makers hold?
 
 Focus on finding specific, actionable intelligence that would help a B2B sales rep engage the right people at ${companyName} with relevant messaging.`;
+  }
 
   const perplexityResult = await researchCompany({
     query: researchQuery,
@@ -141,35 +165,44 @@ export type DiscoverBuyingGroupsResult =
 
 /**
  * Step 1 of 4-step account intel: Perplexity + small LLM output (company basics + 4–6 buying group seeds).
- * Fast, low token count, rarely fails.
+ * When dealContext is provided, products are filtered by dealContext.productIds and prompt includes deal-context blocks.
  */
 export async function discoverBuyingGroupsForAccount(
   companyName: string,
   companyDomain: string | undefined,
   userId: string,
-  userGoal?: string
+  userGoal?: string,
+  dealContext?: DealContext
 ): Promise<DiscoverBuyingGroupsResult> {
   const perplexityResult = await runPerplexityResearchOnly(
     companyName,
     companyDomain,
     userId,
-    userGoal
+    userGoal,
+    dealContext
   );
   if (!perplexityResult.ok) return { ok: false, error: perplexityResult.error };
 
-  const catalogProducts = await prisma.catalogProduct.findMany({
+  let catalogProducts = await prisma.catalogProduct.findMany({
     where: { userId } as { userId: string },
-    select: { name: true },
+    select: { id: true, name: true },
     orderBy: { name: 'asc' },
   });
-  const contentLibraryProducts =
-    catalogProducts.length === 0
-      ? await prisma.product.findMany({
-          where: { userId },
-          select: { name: true },
-          orderBy: { name: 'asc' },
-        })
-      : [];
+  if (dealContext?.productIds?.length) {
+    catalogProducts = catalogProducts.filter((p) => dealContext!.productIds!.includes(p.id));
+  }
+  let contentLibraryProducts: { name: string }[] = [];
+  if (catalogProducts.length === 0) {
+    contentLibraryProducts = await prisma.product.findMany({
+      where: { userId },
+      select: { name: true },
+      orderBy: { name: 'asc' },
+    });
+    if (dealContext?.productNames?.length) {
+      const namesSet = new Set(dealContext.productNames.map((n) => n.trim()).filter(Boolean));
+      contentLibraryProducts = contentLibraryProducts.filter((p) => namesSet.has(p.name));
+    }
+  }
   const productNames =
     catalogProducts.length > 0
       ? catalogProducts.map((p) => p.name).join(', ')
@@ -198,6 +231,7 @@ export async function discoverBuyingGroupsForAccount(
     companyDomain,
     productNames,
     userGoal: userGoal?.trim() || undefined,
+    dealContext,
   });
   const userPrompt = userTemplate.replace(
     '{{PERPLEXITY_SUMMARY}}',

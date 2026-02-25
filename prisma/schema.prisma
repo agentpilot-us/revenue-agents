@@ -178,6 +178,7 @@ model Company {
   workflowStep                   Int? // 1, 2, or 3
   accountIntelligenceCompletedAt DateTime?
   draftData                      Json? // Auto-save / wizard draft payload
+  dealContext                    Json? // Deal context form: productIds, accountStatus, dealShape, targetDivisions, buyingMotion, dealGoal, etc.
 
   // Salesforce sync cache
   salesforceLastSyncedAt    DateTime? // Last time Salesforce data was synced

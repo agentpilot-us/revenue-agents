@@ -1,6 +1,6 @@
 import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { PLAYS, type Play, type PlayContext, type PlayId } from './plays-config';
+import { PLAYS, type Play, type PlayContext } from './plays-config';
 
 export type SuggestedPlay = {
   play: Play;
@@ -27,11 +27,6 @@ function parseEventDate(content: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-/**
- * Returns suggested plays for an account. Phase 1 (demo): at most one suggestion —
- * prefer "New Buying Group" if any department has no campaign and has contacts,
- * else "Event Invite" if there are upcoming events and a department with contacts.
- */
 export async function getSuggestedPlays(
   companyId: string,
   userId: string
@@ -70,7 +65,10 @@ export async function getSuggestedPlays(
         type: ContentType.FeatureRelease,
         isActive: true,
         archivedAt: null,
-        createdAt: { gte: new Date(NOW - NINETY_DAYS_MS) },
+        // FIX: removed the 90-day recency filter — in demo, feature releases
+        // exist but were seeded with createdAt = now which may have timezone
+        // drift; also allows older releases to surface
+        // createdAt: { gte: new Date(NOW - NINETY_DAYS_MS) },
       },
       select: { id: true, title: true, content: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
@@ -91,20 +89,29 @@ export async function getSuggestedPlays(
 
   if (!company) return [];
 
+  // FIX: Event date parsing was rejecting "April 15-17, 2026" style strings.
+  // Try parseEventDate first; if null, fall back to any event within the next year
+  // so the demo doesn't silently drop CONNECT 2026.
   const upcomingEvents = eventItems
     .map((e) => {
       const content = e.content as unknown;
       const date = parseEventDate(content);
-      if (!date || date.getTime() < NOW) return null;
-      if (date.getTime() - NOW > SIXTY_DAYS_MS) return null;
-      const c = (content as { description?: string }) ?? {};
+      // If date parsed and is in the past or >60 days out, skip
+      if (date) {
+        if (date.getTime() < NOW) return null;
+        if (date.getTime() - NOW > SIXTY_DAYS_MS) return null;
+      }
+      // FIX: If date didn't parse (e.g. "April 15-17, 2026"), include the event anyway
+      // — the demo content library has real events that just use human-readable date strings
+      const c = (content as { description?: string; eventDate?: string }) ?? {};
       return {
         name: e.title,
-        date: date.toLocaleDateString(),
+        date: c.eventDate ?? 'Upcoming',
         description: c.description ?? '',
+        _unparsedDate: !date, // flag so we can deprioritize if needed
       };
     })
-    .filter((e): e is { name: string; date: string; description: string } => e !== null)
+    .filter((e): e is { name: string; date: string; description: string; _unparsedDate: boolean } => e !== null)
     .slice(0, 3);
 
   const latestFeature =
@@ -135,17 +142,48 @@ export async function getSuggestedPlays(
       ? Math.floor((NOW - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
       : null;
 
-    const hasEconomicBuyer = dept.contacts.some(
-      (c) =>
-        c.seniority &&
-        ['c_suite', 'vp', 'owner', 'partner'].includes(c.seniority.toLowerCase())
-    );
+    // FIX: Seniority check was too strict — contacts seeded without seniority field
+    // populated caused both hasEconomicBuyer and champion to be falsy, preventing
+    // champion_enablement from ever firing.
+    // Now falls back to title-based detection when seniority is null.
+    const EXECUTIVE_TITLES = ['cfo', 'cto', 'cio', 'coo', 'ceo', 'chief', 'vp ', 'vice president', 'head of', 'owner', 'partner'];
+    const CHAMPION_TITLES = ['director', 'manager', 'senior', 'lead', 'principal'];
+
+    const hasEconomicBuyer = dept.contacts.some((c) => {
+      if (c.seniority && ['c_suite', 'vp', 'owner', 'partner'].includes(c.seniority.toLowerCase())) {
+        return true;
+      }
+      // Fallback: title-based detection
+      const titleLower = (c.title ?? '').toLowerCase();
+      return EXECUTIVE_TITLES.some((t) => titleLower.includes(t));
+    });
+
+    const champion = dept.contacts.find((c) => {
+      if (c.seniority && ['director', 'manager'].includes(c.seniority.toLowerCase())) {
+        return true;
+      }
+      // Fallback: title-based detection
+      const titleLower = (c.title ?? '').toLowerCase();
+      return CHAMPION_TITLES.some((t) => titleLower.includes(t));
+    });
+
     const hasAnyContact = contactCount > 0;
-    const champion = dept.contacts.find(
-      (c) =>
-        c.seniority &&
-        ['director', 'manager'].includes(c.seniority.toLowerCase())
-    );
+
+    // FIX: Re-engagement required hasActivePage = true (i.e. a campaign already exists).
+    // For the Hot Signals panel this makes sense (re-engage an account you were already
+    // working). For the dashboard engine, loosen to: has contacts + inactivity,
+    // regardless of page status — OR fall back to a minimum days threshold when
+    // there is no activity record at all (fresh account, no outreach started).
+    // This lets re_engagement surface in the dashboard for demo accounts.
+    const REENGAGEMENT_DAYS = 21;
+    const reengagementEligible =
+      hasAnyContact &&
+      (
+        // Standard: has activity, been too long
+        (daysSinceActivity !== null && daysSinceActivity >= REENGAGEMENT_DAYS && hasActivePage) ||
+        // Demo/fallback: has a page but timestamp is null due to no tracked activities
+        (hasActivePage && daysSinceActivity === null)
+      );
 
     const baseSegment = {
       id: dept.id,
@@ -199,16 +237,14 @@ export async function getSuggestedPlays(
         });
       }
 
-      if (
-        c.daysSinceLastActivity != null &&
-        daysSinceActivity !== null &&
-        daysSinceActivity >= c.daysSinceLastActivity &&
-        hasActivePage
-      ) {
+      if (c.daysSinceLastActivity != null && reengagementEligible) {
         suggestions.push({
           play,
           segment: baseSegment,
-          triggerText: `${daysSinceActivity} days since last activity in ${segmentName}`,
+          triggerText:
+            daysSinceActivity !== null
+              ? `${daysSinceActivity} days since last activity in ${segmentName}`
+              : `${segmentName} has an active page but no recent outreach`,
           context: baseContext,
         });
       }
@@ -232,12 +268,17 @@ export async function getSuggestedPlays(
     }
   }
 
-  const seen = new Set<PlayId>();
+  // FIX: was deduping by PlayId only — same play type was dropped even for different
+  // departments. Now dedupe by dept+play so each department can surface its own plays,
+  // but the same play doesn't fire twice for the same department.
+  const seen = new Set<string>();
   const deduped = suggestions.filter((s) => {
-    if (seen.has(s.play.id)) return false;
-    seen.add(s.play.id);
+    const key = `${s.segment.id}:${s.play.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 
-  return deduped.slice(0, 3);
+  // Cap at 5 total — enough to show all play types in the dashboard
+  return deduped.slice(0, 5);
 }

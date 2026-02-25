@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import type { DealContext } from '@/lib/types/deal-context';
 import { DepartmentType, Prisma } from '@prisma/client';
 import { ContentType } from '@prisma/client';
 
@@ -233,15 +234,81 @@ export type DiscoverGroupsPromptInput = {
   companyDomain?: string;
   productNames: string;
   userGoal?: string;
+  dealContext?: DealContext;
 };
 
 /**
+ * Append deal-context blocks in fixed order: (1) account status, (2) deal shape, (3) buying motion, (4) product context.
+ * Order matters: account status sets research objective first (e.g. "do not surface already-deployed team").
+ */
+function buildDealContextBlocks(dealContext: DealContext, companyName: string): string {
+  const blocks: string[] = [];
+  const dc = dealContext;
+
+  // 1. Account status block first (primary research objective)
+  if (dc.accountStatus === 'existing_deployed') {
+    const location = dc.deployedLocation?.trim() || 'a known team';
+    const useCase = dc.deployedUseCase?.trim() || 'current use case';
+    const outcomes = dc.hasProvenOutcomes === true ? ' with proven outcomes' : '';
+    blocks.push(`
+EXISTING DEPLOYMENT CONTEXT: ${companyName} already has our solution deployed at ${location} (${useCase}${outcomes}).
+Primary research objective: identify OTHER buying groups at ${companyName} that could expand the footprint — adjacent divisions, departments, or use cases.
+Do NOT surface the already-deployed team as a buying group. Focus on net-new expansion opportunities.`);
+  } else if (dc.accountStatus === 'stalled') {
+    blocks.push(`
+Previously active, now stalled: this account had momentum but has gone quiet. Research focus: what changed in the last 90 days (exec changes, initiatives, funding, product launches)? Identify re-entry points and new stakeholders who might reignite the deal.`);
+  } else if (dc.accountStatus === 'champion_in') {
+    blocks.push(`
+Champion exists; need economic buyer: there is an internal champion but the deal requires executive approval. Research focus: approval chain, committee structure, and decision-makers above the champion. Prioritize economic buyer and committee members as distinct buying groups.`);
+  }
+
+  // 2. Deal shape block second (output structure)
+  if (dc.dealShape === 'multi_division') {
+    const divisions = dc.targetDivisions?.filter(Boolean).length
+      ? dc.targetDivisions!.filter(Boolean).join(', ')
+      : null;
+    if (divisions) {
+      blocks.push(`
+DEAL SHAPE — Multi-division: output one buying-group set per division. Target divisions: ${divisions}. Structure your buying groups so each division is clearly separated.`);
+    } else {
+      blocks.push(`
+DEAL SHAPE — Multi-division: this account is organized by divisions/business units. Discover the relevant divisions from the research and output one buying-group set per division. Structure your buying groups so each division is clearly separated.`);
+    }
+  } else if (dc.dealShape === 'single_team') {
+    blocks.push(`
+DEAL SHAPE — Single team: map to a functional stakeholder map within one team. Output 4–5 buying groups (e.g. by function or role type within that team).`);
+  } else if (dc.dealShape === 'multi_department') {
+    blocks.push(`
+DEAL SHAPE — Multi-department: 3–5 distinct departments, each with distinct use cases. Output one or more buying groups per department; keep use cases clearly scoped per department.`);
+  }
+
+  // 3. Buying motion block third (stakeholder types)
+  if (dc.buyingMotion === 'committee') {
+    const name = dc.committeeName?.trim() ? ` (${dc.committeeName})` : '';
+    blocks.push(`
+BUYING MOTION — Committee: buying decision involves a committee${name}. Include committee members as a distinct buying group where relevant.`);
+  } else if (dc.buyingMotion === 'regulated') {
+    blocks.push(`
+BUYING MOTION — Regulated: compliance and legal are first-class stakeholders. Include compliance/legal as a distinct buying group where relevant.`);
+  }
+
+  // 4. Product context last (filtered product names already in productNames; optional extra emphasis)
+  if (dc.productIds?.length) {
+    blocks.push(`
+PRODUCT CONTEXT: Focus buying groups on products selected for this deal (already listed above).`);
+  }
+
+  if (blocks.length === 0) return '';
+  return `\n\nDEAL CONTEXT (apply these instructions in order):${blocks.join('')}`;
+}
+
+/**
  * Build system + user prompt for Step 1: discover 4–6 buying group names + company basics only.
- * Output is small (DiscoverGroupsResult) so it rarely hits token limits.
+ * When dealContext is provided, appends conditional blocks in order: account status → deal shape → buying motion → product context.
  */
 export function buildDiscoverGroupsPrompt(input: DiscoverGroupsPromptInput): { system: string; user: string } {
-  const { companyName, companyDomain, productNames, userGoal } = input;
-  const system = `You are an account intelligence AI. Your task is to analyze research about a target company and output ONLY:
+  const { companyName, companyDomain, productNames, userGoal, dealContext } = input;
+  let system = `You are an account intelligence AI. Your task is to analyze research about a target company and output ONLY:
 1. COMPANY BASICS: name, website, industry, employees, headquarters, revenue (from the research only; use "Not disclosed" if missing).
 2. BUYING GROUPS: 4–6 groups that would buy products like: ${productNames}.
 
@@ -254,6 +321,10 @@ For each buying group provide:
 - divisionOrProduct: if DIVISIONAL or USE_CASE, the division/product line name (e.g. "Autonomous Driving"); otherwise null.
 
 Return exactly the JSON shape requested. No value props, no titles, no products yet.`;
+
+  if (dealContext) {
+    system += buildDealContextBlocks(dealContext, companyName);
+  }
 
   const userGoalBlock = userGoal?.trim()
     ? `\nSALES REP TARGETING GOAL (prioritize these, then add 2–3 more):\n${userGoal.trim()}\n\n`
