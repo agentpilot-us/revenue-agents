@@ -212,7 +212,7 @@ export default async function DashboardPage({
         slug: 'celigo-connect-2026',
         company: { userId: session.user.id },
       },
-      select: { id: true },
+      select: { id: true, companyId: true },
     }),
   ]);
 
