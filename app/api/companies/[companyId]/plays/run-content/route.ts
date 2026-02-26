@@ -91,13 +91,26 @@ export async function POST(
           { error: 'playId and signalTitle are required when not using signalId' },
           { status: 400 }
         );
+      let segmentId: string | null = typeof body.segmentId === 'string' ? body.segmentId : null;
+      let segmentName: string | null = typeof body.segmentName === 'string' ? body.segmentName : null;
+      // When no segment passed (e.g. Feature Release from dashboard), default to company's first department so contacts load
+      if (!segmentId) {
+        const firstDept = await prisma.companyDepartment.findFirst({
+          where: { companyId },
+          select: { id: true, customName: true, type: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (firstDept) {
+          segmentId = firstDept.id;
+          segmentName = firstDept.customName ?? firstDept.type.replace(/_/g, ' ');
+        }
       }
       runParams = {
         playId,
         signalTitle,
         signalSummary: typeof body.signalSummary === 'string' ? body.signalSummary.trim() || undefined : undefined,
-        segmentId: typeof body.segmentId === 'string' ? body.segmentId : undefined,
-        segmentName: typeof body.segmentName === 'string' ? body.segmentName : undefined,
+        segmentId: segmentId ?? undefined,
+        segmentName: segmentName ?? undefined,
       };
     }
 

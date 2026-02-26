@@ -379,16 +379,19 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
       setGenerated(data);
       setStatus('ready');
 
-      // Load contacts for the segment
+      // Load contacts for the segment (or first group with contacts if no segment)
       const segId = data.segmentId ?? runParams.segmentId;
-      if (segId) {
-        const contactsRes = await fetch(`/api/companies/${companyId}/contacts/by-department`);
-        if (contactsRes.ok) {
-          const contactsData = await contactsRes.json();
-          const group = contactsData.groups?.find(
-            (g: { department: { id: string | null }; contacts: Contact[] }) =>
-              g.department.id === segId
-          );
+      const contactsRes = await fetch(`/api/companies/${companyId}/contacts/by-department`);
+      if (contactsRes.ok) {
+        const contactsData = await contactsRes.json();
+        const groups = (contactsData.groups ?? []) as Array<{ department: { id: string | null }; contacts: Contact[] }>;
+        if (segId) {
+          const group = groups.find((g) => g.department.id === segId);
+          if (group) setContacts(group.contacts ?? []);
+        } else {
+          // No segment (e.g. feature release): show first department that has contacts, or first group
+          const withContacts = groups.filter((g) => (g.contacts?.length ?? 0) > 0);
+          const group = withContacts[0] ?? groups[0];
           if (group) setContacts(group.contacts ?? []);
         }
       }
