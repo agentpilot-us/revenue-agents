@@ -109,6 +109,7 @@ export default async function DashboardPage({
     dueForNextTouch,
     recentActivities,
     pipelineByCompany,
+    eventCampaign,
   ] = await Promise.all([
     prisma.company.findMany({
       where: { userId: session.user.id },
@@ -205,6 +206,13 @@ export default async function DashboardPage({
         opportunitySize: { not: null },
       },
       _sum: { opportunitySize: true },
+    }),
+    prisma.segmentCampaign.findFirst({
+      where: {
+        slug: 'celigo-connect-2026',
+        company: { userId: session.user.id },
+      },
+      select: { id: true },
     }),
   ]);
 
@@ -309,7 +317,16 @@ export default async function DashboardPage({
       href: `/dashboard/companies/${c.id}`,
     });
   }
-  const todaysTasks = [...playTasks, ...autoTasks];
+  const eventTask = eventCampaign
+    ? [
+        {
+          id: 'event-invite',
+          label: 'Create sales page and invite users to the event',
+          href: '/go/celigo-connect-2026',
+        },
+      ]
+    : [];
+  const todaysTasks = [...eventTask, ...playTasks, ...autoTasks];
 
   const pipelineMap = new Map(
     pipelineByCompany.map((p) => [

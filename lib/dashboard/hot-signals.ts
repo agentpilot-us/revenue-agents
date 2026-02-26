@@ -289,10 +289,15 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
     });
   }
 
+  // Exclude generic anonymous "Page view" from hot signals (e.g. demo)
+  const filtered = signals.filter(
+    (s) => !(s.headline === 'Page view' && s.description === 'Anonymous page view')
+  );
+
   // Sort by date descending
-  signals.sort(
+  filtered.sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  return signals.slice(0, 10);
+  return filtered.slice(0, 10);
 }
