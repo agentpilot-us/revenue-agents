@@ -3,6 +3,7 @@
  * Mark a playbook run step as complete (with optional outcome).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
@@ -56,7 +57,7 @@ export async function POST(
   await prisma.$transaction([
     prisma.playbookRunStep.update({
       where: { id: stepId },
-      data: { completedAt: now, outcome: outcome ?? undefined },
+      data: { completedAt: now, outcome: (outcome ?? undefined) as Prisma.InputJsonValue | undefined },
     }),
     prisma.playbookRun.update({
       where: { id: runStep.runId },

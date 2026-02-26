@@ -610,7 +610,7 @@ function StartPlaybookModal({
           templateId: selected,
           triggerContext: {
             triggerDate,
-            triggerLabel: triggerLabel || selectedTemplate?.name ?? undefined,
+            triggerLabel: (triggerLabel || selectedTemplate?.name) ?? undefined,
           },
         }),
       });

@@ -3,6 +3,7 @@
  * Mark a playbook run step as skipped; advance to next step.
  */
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
@@ -47,7 +48,7 @@ export async function POST(
   await prisma.$transaction([
     prisma.playbookRunStep.update({
       where: { id: stepId },
-      data: { completedAt: now, outcome: { skipped: true } },
+      data: { completedAt: now, outcome: { skipped: true } as Prisma.InputJsonValue },
     }),
     prisma.playbookRun.update({
       where: { id: runStep.runId },
