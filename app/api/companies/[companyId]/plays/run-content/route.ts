@@ -56,9 +56,6 @@ export async function POST(
               },
             },
           },
-          companyDepartment: {
-            select: { id: true, customName: true, type: true },
-          },
         },
       });
       if (!signal) {
@@ -69,15 +66,11 @@ export async function POST(
       }
       const playId = (signal.suggestedPlay ?? 're_engagement') as string;
       const segmentId =
-        body.segmentId ??
-        signal.companyDepartmentId ??
-        signal.company.departments[0]?.id ??
-        null;
+        body.segmentId ?? signal.company.departments[0]?.id ?? null;
       const segment =
-        segmentId &&
-        (signal.companyDepartment?.id === segmentId
-          ? signal.companyDepartment
-          : signal.company.departments.find((d) => d.id === segmentId));
+        segmentId
+          ? signal.company.departments.find((d) => d.id === segmentId)
+          : null;
       const segmentName =
         segment != null
           ? (segment.customName ?? segment.type.replace(/_/g, ' '))
