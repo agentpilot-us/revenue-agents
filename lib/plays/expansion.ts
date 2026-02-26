@@ -26,6 +26,8 @@ export const expansion: PlayConfig = {
     'get_product_details',
     'apply_department_product_research',
     'run_play',
+    'deploy_sales_page_to_vercel',
+    'deploy_custom_landing_page',
   ],
   buildSystemPrompt: (ctx: PlayContext) => {
     const { companyName, companyDomain, stage, tier, messagingSection } = ctx;

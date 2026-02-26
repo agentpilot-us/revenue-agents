@@ -78,16 +78,15 @@ export default async function CampaignLandingPage({ params }: Props) {
   const campaign = await getCampaign(slugOrId);
   if (!campaign) notFound();
 
-  // Check authentication if enabled and company has domain
-  const authEnabled = process.env.ENABLE_LANDING_PAGE_AUTH !== 'false';
-  const companyDomain = campaign.company.domain;
-
-  if (authEnabled && companyDomain) {
-    const auth = await requireLandingPageAuth(campaign.id);
-    if (!auth.authenticated && auth.redirect) {
-      redirect(auth.redirect);
-    }
-  }
+  // Demo: landing page auth verification commented out so /go/... pages load without sign-in
+  // const authEnabled = process.env.ENABLE_LANDING_PAGE_AUTH !== 'false';
+  // const companyDomain = campaign.company.domain;
+  // if (authEnabled && companyDomain) {
+  //   const auth = await requireLandingPageAuth(campaign.id);
+  //   if (!auth.authenticated && auth.redirect) {
+  //     redirect(auth.redirect);
+  //   }
+  // }
 
   const isMulti = Boolean(
     (campaign as { isMultiDepartment?: boolean }).isMultiDepartment &&

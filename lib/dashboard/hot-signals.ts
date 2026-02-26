@@ -80,6 +80,7 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
       departmentId: true,
       campaignId: true,
       campaign: { select: { companyId: true } },
+      department: { select: { customName: true } },
     },
     orderBy: { visitedAt: 'desc' },
   });
@@ -133,7 +134,9 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
         });
       }
     } else {
-      // Tier 3: page view
+      // Tier 3: page view — when we have a known visitor, suggest Run play instead of View details
+      const hasKnownVisitor = Boolean(visit.visitorEmail);
+      const playId = hasKnownVisitor ? 're_engagement' : undefined;
       signals.push({
         companyId,
         companyName,
@@ -143,8 +146,16 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
         description: visit.visitorEmail
           ? `Visit from ${visit.visitorEmail}`
           : 'Anonymous page view',
-        ctaLabel: 'View details',
-        ctaHref: `/dashboard/companies/${companyId}`,
+        ctaLabel: playId ? 'Run Re-Engagement play' : 'View details',
+        ctaHref: playId
+          ? buildNextBestActionHref({
+              companyId,
+              playId,
+              segmentId: visit.departmentId ?? undefined,
+              segmentName: visit.department?.customName ?? undefined,
+              triggerText: visit.visitorEmail ? `Page view from ${visit.visitorEmail}` : undefined,
+            })
+          : `/dashboard/companies/${companyId}`,
         color: 'green',
         date: visit.visitedAt.toISOString(),
         departmentId: visit.departmentId ?? undefined,

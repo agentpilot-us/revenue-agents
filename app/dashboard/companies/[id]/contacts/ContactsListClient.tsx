@@ -420,15 +420,17 @@ export function ContactsListClient({
         </Link>
       </div>
 
-      {/* Buying groups from Account Intelligence — Find contacts per group */}
-      <div id="buying-groups" className="rounded-lg border border-zinc-600 p-4 bg-zinc-800/80">
-        <h3 className="font-medium text-slate-100 text-sm mb-1">Buying groups</h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Departments from Account Intelligence. Find contacts for each group.
-        </p>
+      {/* Find contacts by buying group — single clean section */}
+      <div id="buying-groups" className="rounded-lg border border-zinc-600 bg-zinc-800/80 overflow-hidden">
+        <div className="px-4 py-3 border-b border-zinc-600/80">
+          <h3 className="font-medium text-slate-100 text-sm">Find contacts by buying group</h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Departments from Account Intelligence. Find or view contacts per group.
+          </p>
+        </div>
         {departments.length > 0 ? (
           <>
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-zinc-600/50 bg-zinc-800/50">
               <Button
                 onClick={handleFindAndEnrichAll}
                 disabled={findAndEnrichRunning}
@@ -444,54 +446,56 @@ export function ContactsListClient({
                 )}
               </Button>
               {findAndEnrichResult && !findAndEnrichRunning && (
-                <span className="text-sm text-slate-400">
+                <span className="text-xs text-slate-400">
                   {findAndEnrichResult.contactsAdded} added, {findAndEnrichResult.enriched} enriched
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {departments.map((dept) => (
-              <div
-                key={dept.id}
-                id={`dept-${dept.id}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-600 bg-zinc-800/50 px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <div className="font-medium text-slate-100 truncate">{dept.name}</div>
-                  <div className="text-xs text-slate-400">
-                    {(dept.contactCount ?? 0) > 0
-                      ? `${dept.contactCount} contact${dept.contactCount === 1 ? '' : 's'}`
-                      : 'No contacts yet'}
+            <ul className="divide-y divide-zinc-600/50">
+              {departments.map((dept) => (
+                <li
+                  key={dept.id}
+                  id={`dept-${dept.id}`}
+                  className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-zinc-700/30 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium text-slate-100 text-sm">{dept.name}</span>
+                    <span className="ml-2 text-xs text-slate-500">
+                      {(dept.contactCount ?? 0) > 0
+                        ? `${dept.contactCount} contact${dept.contactCount === 1 ? '' : 's'}`
+                        : 'No contacts yet'}
+                    </span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link href={`/dashboard/companies/${companyId}/discover-contacts?department=${dept.id}`}>
-                    <Button variant="outline" size="sm">Find contacts</Button>
-                  </Link>
-                  {(dept.contactCount ?? 0) > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-slate-300 hover:text-white"
-                      onClick={() => {
-                        setDepartmentFilter(dept.id);
-                        setTimeout(() => {
-                          document.getElementById('contacts-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }, 100);
-                      }}
-                    >
-                      View contacts
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-            </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link href={`/dashboard/companies/${companyId}/discover-contacts?department=${dept.id}`}>
+                      <Button variant="outline" size="sm" className="h-8 text-xs">
+                        Find contacts
+                      </Button>
+                    </Link>
+                    {(dept.contactCount ?? 0) > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-slate-400 hover:text-white"
+                        onClick={() => {
+                          setDepartmentFilter(dept.id);
+                          setTimeout(() => {
+                            document.getElementById('contacts-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 100);
+                        }}
+                      >
+                        View contacts
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </>
         ) : (
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-zinc-600 bg-zinc-800/50 px-4 py-3">
+          <div className="flex items-center justify-between gap-4 px-4 py-4">
             <p className="text-sm text-slate-400">
-              Complete Account Intelligence first to see buying groups (departments) here.
+              Complete Account Intelligence first to see buying groups here.
             </p>
             <Link href={`/dashboard/companies/${companyId}/intelligence`}>
               <Button variant="outline" size="sm">Set up Account Intelligence</Button>

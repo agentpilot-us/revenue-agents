@@ -4,7 +4,7 @@
  */
 
 /** Platform domains that can access any landing page (e.g. internal / AgentPilot team) */
-export const ALLOWED_PLATFORM_DOMAINS = ['agentpilot.us'] as const;
+export const ALLOWED_PLATFORM_DOMAINS = ['agentpilot.us', 'stradexai.com'] as const;
 
 /**
  * Returns true if the email domain is an allowed platform domain (e.g. @agentpilot.us).

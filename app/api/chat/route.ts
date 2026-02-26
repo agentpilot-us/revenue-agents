@@ -37,6 +37,7 @@ import { sendEmail as resendSendEmail } from '@/lib/tools/resend';
 import { createCalendarEvent } from '@/lib/tools/cal';
 import { isToolConfigured } from '@/lib/service-config';
 import { chatTools } from '@/app/api/chat/tools';
+import { vercelDeployTools } from '@/app/api/chat/tools/vercel-deploy';
 import {
   getNextTouchContext,
   getActiveEnrollmentContext,
@@ -569,6 +570,10 @@ LANDING PAGE & CAMPAIGN MANAGEMENT:
 - Use launch_campaign to create new landing pages. Example: "Launch a landing page for the Autonomous Vehicles group"
 - When showing campaign engagement, include visits, unique visitors, chat interactions, and CTA clicks
 
+SALES PAGE DEPLOYMENT (Vercel):
+- deploy_sales_page_to_vercel: Deploy a pre-built sales page for Account Expansion, Partner Enablement, or Referral Program. Use when the user says "Create a sales page for Account Expansion" or "Deploy the Partner Enablement page". Pass playName (accountExpansion | partnerEnablement | referralProgram) and optional companyId/ctaUrl.
+- deploy_custom_landing_page: Deploy a custom page with user-provided title, valueProp, benefits, pricing, ctaLabel, ctaUrl. Use when the user wants a one-off landing page (e.g. webinar, product launch). After deployment, confirm success, share the live URL prominently, and offer to create more or make changes.
+
 ACCOUNT ACTIVITY TRACKING:
 - Use get_account_changes to show recent activity and changes. Example queries: "What's changed at this account in the last week?", "What's new at [company]?"
 - This tool returns new contacts, email engagements, campaign visits, and research updates
@@ -614,6 +619,7 @@ Work step-by-step and explain what you're doing.`;
 
     const allTools: Record<string, Tool> = {
       ...chatTools,
+      ...vercelDeployTools,
       search_linkedin_contacts: toolWithSchema({
         description: 'Search for contacts on LinkedIn by company, job title, and keywords',
         inputSchema: z.object({

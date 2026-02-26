@@ -50,45 +50,27 @@ export async function POST(
     const ipAddress = getIPAddress(headersList);
     const userAgent = headersList.get('user-agent') || undefined;
 
-    // Check authentication if enabled and company has domain
-    const authEnabled = process.env.ENABLE_LANDING_PAGE_AUTH !== 'false';
-    const companyDomain = campaign.company.domain;
+    // Demo: landing page auth verification commented out so chat works without sign-in
+    // const authEnabled = process.env.ENABLE_LANDING_PAGE_AUTH !== 'false';
+    // const companyDomain = campaign.company.domain;
     let visitorId: string | undefined;
     let sessionId: string | undefined;
 
-    if (authEnabled && companyDomain) {
-      const cookieStore = await cookies();
-      const sessionToken = cookieStore.get('landing_page_session')?.value || null;
-
-      if (!sessionToken) {
-        await logSecurityEvent({
-          eventType: 'unauthorized_access',
-          severity: 'medium',
-          campaignId,
-          ipAddress,
-          userAgent,
-          details: { reason: 'no_session_token' },
-        });
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const validation = await validateLandingPageSession(sessionToken, campaignId);
-
-      if (!validation.valid) {
-        await logSecurityEvent({
-          eventType: 'unauthorized_access',
-          severity: 'medium',
-          campaignId,
-          ipAddress,
-          userAgent,
-          details: { reason: 'invalid_session' },
-        });
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      visitorId = validation.visitorId;
-      sessionId = sessionToken;
-    }
+    // if (authEnabled && companyDomain) {
+    //   const cookieStore = await cookies();
+    //   const sessionToken = cookieStore.get('landing_page_session')?.value || null;
+    //   if (!sessionToken) {
+    //     await logSecurityEvent({ eventType: 'unauthorized_access', severity: 'medium', campaignId, ipAddress, userAgent, details: { reason: 'no_session_token' } });
+    //     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    //   }
+    //   const validation = await validateLandingPageSession(sessionToken, campaignId);
+    //   if (!validation.valid) {
+    //     await logSecurityEvent({ eventType: 'unauthorized_access', severity: 'medium', campaignId, ipAddress, userAgent, details: { reason: 'invalid_session' } });
+    //     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    //   }
+    //   visitorId = validation.visitorId;
+    //   sessionId = sessionToken;
+    // }
 
     // Rate limiting
     const rateLimitIdentifier = visitorId || ipAddress || 'unknown';
