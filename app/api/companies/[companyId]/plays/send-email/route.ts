@@ -100,8 +100,11 @@ Send this email now. Return only "sent" when complete.`,
       ],
     } as Parameters<typeof anthropic.beta.messages.create>[0]);
 
-    // Check that send succeeded
-    const responseText = response.content
+    // Non-streaming response: BetaMessage with content array (Stream not used here)
+    type MessageResponse = { content: Array<{ type: string; text?: string }> };
+    const message = response as MessageResponse;
+
+    const responseText = message.content
       .filter((c) => c.type === 'text')
       .map((c) => (c as { text: string }).text)
       .join('');
@@ -109,7 +112,7 @@ Send this email now. Return only "sent" when complete.`,
     const succeeded =
       responseText.toLowerCase().includes('sent') ||
       responseText.toLowerCase().includes('success') ||
-      response.content.some((c) => c.type === 'mcp_tool_result');
+      message.content.some((c) => c.type === 'mcp_tool_result');
 
     if (!succeeded) {
       console.error('Gmail MCP send response:', responseText);
