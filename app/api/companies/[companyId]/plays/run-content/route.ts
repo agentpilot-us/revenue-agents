@@ -91,6 +91,7 @@ export async function POST(
           { error: 'playId and signalTitle are required when not using signalId' },
           { status: 400 }
         );
+      }
       let segmentId: string | null = typeof body.segmentId === 'string' ? body.segmentId : null;
       let segmentName: string | null = typeof body.segmentName === 'string' ? body.segmentName : null;
       // When no segment passed (e.g. Feature Release from dashboard), default to company's first department so contacts load
@@ -114,12 +115,25 @@ export async function POST(
       };
     }
 
-    const prompt = buildPlayPromptFromSignal({
+    let prompt = buildPlayPromptFromSignal({
       playId: runParams.playId,
       signalTitle: runParams.signalTitle,
       signalSummary: runParams.signalSummary ?? null,
       segmentName: runParams.segmentName ?? null,
     });
+
+    // Event invite: inject event landing page URL so email and LinkedIn include the link (same as feature release workflow)
+    if (runParams.playId === 'event_invite') {
+      const eventCampaign = await prisma.segmentCampaign.findFirst({
+        where: { companyId, userId: session.user.id, slug: 'celigo-connect-2026' },
+        select: { url: true },
+      });
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      const eventUrl = eventCampaign?.url ?? `${baseUrl}/go/celigo-connect-2026`;
+      prompt = `${prompt}\n\nInclude this event landing page link in the email and LinkedIn message as the primary CTA: ${eventUrl}. Use it as the main call-to-action (e.g. "Register here" or "Get your spot").`;
+    }
 
     const [emailResult, linkedinResult, talkingPointsResult] = await Promise.allSettled([
       generateOneContent({

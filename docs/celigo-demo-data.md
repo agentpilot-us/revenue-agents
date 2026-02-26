@@ -101,6 +101,21 @@ If the demo has extra departments or stale data:
 
 3. **Re-run the full seed** to recreate contacts and campaigns (seed is idempotent for company/departments; it may skip or update existing records).
 
+## Adding an event-based sales page (e.g. CONNECT 2026)
+
+The Celigo seed now creates **three** sales pages:
+
+1. **RevOps** — `celigo-lattice-revops`
+2. **IT** — `celigo-lattice-it`
+3. **Event** — `celigo-connect-2026` (upcoming event: Celigo CONNECT 2026)
+
+The event page is company-wide (no department), with headline/body/CTA focused on the conference and a **Register for CONNECT 2026** button linking to `https://celigo.com/connect`.
+
+**To add a different event page:**
+
+- **Option A — Re-run the seed:** The seed is idempotent; it upserts the three campaigns. To change the event page, edit `buildCampaigns()` in `prisma/seed-demo-celigo.ts` (the third campaign, `slug: 'celigo-connect-2026'`), then run the seed again.
+- **Option B — One-off script:** Create a script that finds your user + company, then `prisma.segmentCampaign.upsert` with a unique `slug`, `type: 'landing_page'`, `pageType: 'event_invite'`, and your event headline, body, and `ctaUrl`. The page will be available at `/go/<slug>`.
+
 ## Verifying the run page shows contacts
 
 1. Sign in as the demo user.

@@ -18,24 +18,52 @@ export type NextBestActionItem = {
  * Returns next best actions from suggested plays, then fallbacks from account state.
  * Never returns empty: at least one action (e.g. add first company) is returned.
  */
+const EVENT_CAMPAIGN_SLUG = 'celigo-connect-2026';
+
 export async function getNextBestActions(
   userId: string
 ): Promise<NextBestActionItem[]> {
-  const companies = await prisma.company.findMany({
-    where: { userId },
-    orderBy: { updatedAt: 'desc' },
-    take: 20,
-    include: {
-      departments: {
-        include: {
-          _count: { select: { contacts: true } },
-          segmentCampaigns: { select: { id: true } },
+  const [companies, eventCampaign] = await Promise.all([
+    prisma.company.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+      include: {
+        departments: {
+          include: {
+            _count: { select: { contacts: true } },
+            segmentCampaigns: { select: { id: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.segmentCampaign.findFirst({
+      where: { slug: EVENT_CAMPAIGN_SLUG, company: { userId } },
+      select: { id: true, companyId: true },
+    }),
+  ]);
 
   const actions: NextBestActionItem[] = [];
+
+  // 0. Event invite: sales page builder first, then choose contacts to invite (workflow for learning)
+  if (eventCampaign) {
+    const companyName =
+      companies.find((c) => c.id === eventCampaign.companyId)?.name ?? '';
+    const eventInviteParams = new URLSearchParams({
+      playId: 'event_invite',
+      signalTitle: 'Celigo CONNECT 2026 — Invitation',
+    });
+    actions.push({
+      companyId: eventCampaign.companyId,
+      companyName,
+      departmentId: null,
+      departmentName: '',
+      label: 'Create sales page and invite users to the event',
+      ctaLabel: 'Invite users to event',
+      ctaHref: `/dashboard/companies/${eventCampaign.companyId}/create-content?${eventInviteParams.toString()}`,
+      priority: 0,
+    });
+  }
 
   // 1. Suggested plays — take ALL suggestions per company (up to 3), not just the first
   for (const company of companies) {

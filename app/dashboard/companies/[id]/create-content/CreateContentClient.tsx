@@ -169,6 +169,31 @@ export function CreateContentClient({
         </div>
       )}
 
+      {searchParams.get('playId') === 'event_invite' && (
+        <div className="mb-6 p-5 rounded-xl bg-indigo-900/30 border border-indigo-700">
+          <h3 className="font-semibold text-white mb-2">Event invitation — sales page</h3>
+          <p className="text-slate-300 text-sm mb-4">
+            Your event landing page is live. View it below, then choose which contacts to invite.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/go/celigo-connect-2026"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-500 bg-indigo-600/50 text-white text-sm font-medium hover:bg-indigo-600 transition-colors"
+            >
+              View event page
+            </Link>
+            <Link
+              href={`/dashboard/companies/${companyId}/plays/run?playId=event_invite&signalTitle=${encodeURIComponent('Celigo CONNECT 2026 — Invitation')}`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-900 text-sm font-semibold transition-colors"
+            >
+              Choose contacts to invite →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {!hasIntelligence && (
         <div className="mb-6 p-4 rounded-lg bg-amber-900/30 border border-amber-700 text-amber-200 text-sm">
           Complete Account Intelligence first so the agent can use research and account messaging.{' '}

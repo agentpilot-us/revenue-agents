@@ -12,7 +12,7 @@
  *   - Company: Lattice HQ
  *   - CompanyDepartment x4 (RevOps, IT, PeopleOps, Finance) — by DepartmentType
  *   - Contact x12 (3 per department)
- *   - SegmentCampaign x2 (RevOps page, IT page)
+ *   - SegmentCampaign x3 (RevOps page, IT page, CONNECT 2026 event page)
  */
 
 import { PrismaClient, ContentType, Prisma, DepartmentType, DepartmentStatus } from '@prisma/client';
@@ -455,6 +455,45 @@ function buildCampaigns(
         caseStudy: { title: 'Therabody — Eliminated Seasonal Labor with Automation', summary: 'Automated order-to-fulfillment across Shopify, NetSuite, and 3PL. Seasonal hiring eliminated. Operations now focused on growth.' },
       } as unknown as Prisma.InputJsonValue,
     },
+    // Event-based sales page: Celigo CONNECT 2026 (company-wide, no department)
+    // Uses sections so /go/celigo-connect-2026 renders StaticSalesPage with template + CTA
+    {
+      userId,
+      companyId,
+      departmentId: null,
+      slug: 'celigo-connect-2026',
+      title: 'Celigo CONNECT 2026 — Annual Customer Summit',
+      description: 'Invite Lattice to Celigo CONNECT 2026. Sessions on AI automation, Salesforce + NetSuite integration, and RevOps workflows.',
+      url: `${BASE_URL}/go/celigo-connect-2026`,
+      type: 'landing_page',
+      pageType: 'event_invite',
+      headline: 'Join 500+ automation leaders at Celigo CONNECT 2026',
+      subheadline: 'April 15–17, 2026 — San Francisco, CA + Virtual',
+      body:
+        "Celigo's annual customer conference is the place for IT, RevOps, and Operations teams to see what's next in iPaaS: AI-powered integration design, hands-on workshops for Salesforce + NetSuite + HR automation, and direct access to the Celigo product team.",
+      ctaLabel: 'Register for CONNECT 2026',
+      ctaUrl: 'https://celigo.com/connect',
+      sections: [
+        { type: 'hero', headline: 'Join 500+ automation leaders at Celigo CONNECT 2026', body: 'April 15–17, 2026 — San Francisco + Virtual. Sessions on AI-powered integration design, hands-on workshops, and direct access to the Celigo product team.' },
+        { type: 'value_props', items: [
+          { title: 'AI-Powered Automation', body: 'Sessions on Celigo AI Copilot and the future of integration design.' },
+          { title: 'Hands-on workshops', body: 'Salesforce + NetSuite integration, HR system automation, RevOps workflows.' },
+          { title: 'Direct access to product', body: 'Meet the Celigo team and shape the roadmap.' },
+        ]},
+        { type: 'event', name: 'Celigo CONNECT 2026', date: 'April 15–17, 2026', location: 'San Francisco, CA + Virtual', description: "Celigo's annual customer conference. Sessions on AI automation, integration best practices, and the future of iPaaS. Hands-on workshops and peer networking with 500+ automation professionals.", registerUrl: 'https://celigo.com/connect' },
+        { type: 'social_proof', quotes: [{ text: 'CONNECT is where we see what automation looks like at scale.', author: 'VP of IT', title: 'Gartner Peer Insights' }] },
+        { type: 'cta', headline: 'Reserve your spot', buttonLabel: 'Register for CONNECT 2026', buttonUrl: 'https://celigo.com/connect' },
+      ] as unknown as Prisma.InputJsonValue,
+      pageSections: {
+        valueProps: [
+          { headline: 'AI-Powered Automation', body: 'Sessions on Celigo AI Copilot and the future of integration design.' },
+          { headline: 'Hands-on workshops', body: 'Salesforce + NetSuite integration, HR system automation, RevOps workflows.' },
+          { headline: 'Direct access to product', body: 'Meet the Celigo team and shape the roadmap.' },
+        ],
+        socialProof: { quote: 'CONNECT is where we see what automation looks like at scale.', attribution: '— VP of IT, Gartner Peer Insights', gartner: '' },
+        caseStudy: { title: 'CDC Foundation — Automation-First', summary: 'From manual processes to fully integrated cloud. Every department now runs automated workflows.' },
+      } as unknown as Prisma.InputJsonValue,
+    },
   ];
 }
 
@@ -724,9 +763,11 @@ async function main() {
         companyId: campaign.companyId,
         departmentId: campaign.departmentId,
         headline: campaign.headline,
+        subheadline: (campaign as { subheadline?: string | null }).subheadline ?? null,
         body: campaign.body,
         ctaLabel: campaign.ctaLabel,
         pageSections: campaign.pageSections,
+        sections: (campaign as { sections?: unknown }).sections ?? undefined,
         url: campaign.url,
       },
     });
@@ -759,6 +800,7 @@ async function main() {
   console.log('Sales pages:');
   console.log(' RevOps:', `${BASE_URL}/go/celigo-lattice-revops`);
   console.log(' IT:    ', `${BASE_URL}/go/celigo-lattice-it`);
+  console.log(' Event: ', `${BASE_URL}/go/celigo-connect-2026`);
   console.log('');
   console.log('Next steps:');
   console.log(' 1. Open AgentPilot as demo-saas@agentpilot.us');

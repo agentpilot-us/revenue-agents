@@ -322,7 +322,7 @@ export default async function DashboardPage({
         {
           id: 'event-invite',
           label: 'Create sales page and invite users to the event',
-          href: '/go/celigo-connect-2026',
+          href: `/dashboard/companies/${eventCampaign.companyId}/create-content?playId=event_invite&signalTitle=${encodeURIComponent('Celigo CONNECT 2026 — Invitation')}`,
         },
       ]
     : [];

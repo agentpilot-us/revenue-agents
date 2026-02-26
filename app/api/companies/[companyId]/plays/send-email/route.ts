@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { checkCanSendToContact } from '@/lib/outreach/limits';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic();
@@ -73,6 +74,11 @@ export async function POST(
       .filter(Boolean)
       .join(' ');
     const toAddress = contact.email;
+
+    const limitCheck = await checkCanSendToContact(companyId, contact.id);
+    if (!limitCheck.ok) {
+      return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
+    }
 
     // Send via Gmail MCP
     const response = await anthropic.beta.messages.create({

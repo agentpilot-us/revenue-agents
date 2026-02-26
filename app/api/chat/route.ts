@@ -34,6 +34,7 @@ import {
   getCalendarRsvps,
 } from '@/lib/tools';
 import { sendEmail as resendSendEmail } from '@/lib/tools/resend';
+import { checkCanSendToContact } from '@/lib/outreach/limits';
 import { createCalendarEvent } from '@/lib/tools/cal';
 import { isToolConfigured } from '@/lib/service-config';
 import { chatTools } from '@/app/api/chat/tools';
@@ -932,6 +933,18 @@ Work step-by-step and explain what you're doing.`;
             throw new Error('Account context required. Open a company first.');
           }
 
+          let resolvedContactId = contactId ?? null;
+          if (!resolvedContactId && toEmail && companyId) {
+            const existing = await prisma.contact.findFirst({
+              where: { email: toEmail, companyId },
+            });
+            if (existing) resolvedContactId = existing.id;
+          }
+          const limitCheck = await checkCanSendToContact(companyId, resolvedContactId);
+          if (!limitCheck.ok) {
+            throw new Error(limitCheck.reason);
+          }
+
           const result = await resendSendEmail({
             to: toEmail,
             subject: params.subject,
@@ -940,13 +953,6 @@ Work step-by-step and explain what you're doing.`;
           });
           if (!result.ok) {
             throw new Error(result.error);
-          }
-          let resolvedContactId = contactId ?? null;
-          if (!resolvedContactId && toEmail && companyId) {
-            const existing = await prisma.contact.findFirst({
-              where: { email: toEmail, companyId },
-            });
-            if (existing) resolvedContactId = existing.id;
           }
           let activityId: string | null = null;
           if (resolvedContactId) {

@@ -32,6 +32,7 @@ type Contact = {
   email: string | null;
   linkedinUrl: string | null;
   engagementStatus: string;
+  emailsSentThisWeek?: number;
 };
 
 type PlayRunClientProps = {
@@ -256,6 +257,7 @@ function ContactRow({
 }) {
   const name = fullName(contact);
   const initials = [contact.firstName?.[0], contact.lastName?.[0]].filter(Boolean).join('').toUpperCase() || '?';
+  const emailsSentThisWeek = contact.emailsSentThisWeek ?? 0;
 
   return (
     <div className="flex items-start gap-3 py-3 border-b border-slate-700/50 last:border-0">
@@ -265,13 +267,18 @@ function ContactRow({
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-white truncate">{name}</p>
         <p className="text-xs text-slate-400 truncate">{contact.title ?? 'Unknown title'}</p>
+        {emailsSentThisWeek > 0 && (
+          <p className="text-xs text-amber-400/90 mt-0.5">
+            {emailsSentThisWeek === 1 ? '1 email this week' : `${emailsSentThisWeek} emails this week`}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          {contact.email && emailContent && (
+          {contact.email && (
             <SendEmailButton
               companyId={companyId}
               contactId={contact.id}
               contactName={name}
-              emailContent={emailContent}
+              emailContent={emailContent?.trim() || `Subject: Following up — ${name}\n\nHi,\n\nI wanted to reach out. Would love to connect when you have a moment.\n\nBest`}
             />
           )}
           {contact.linkedinUrl && (
@@ -347,6 +354,7 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [generated, setGenerated] = useState<GeneratedContent | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [accountEmailsSentThisWeek, setAccountEmailsSentThisWeek] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const runPlay = useCallback(async () => {
@@ -379,12 +387,20 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
       setGenerated(data);
       setStatus('ready');
 
-      // Load contacts for the segment (or first group with contacts if no segment)
+      // Load contacts for the segment (or first group with contacts if no segment), with email activity for this week
       const segId = data.segmentId ?? runParams.segmentId;
-      const contactsRes = await fetch(`/api/companies/${companyId}/contacts/by-department`);
+      const contactsRes = await fetch(
+        `/api/companies/${companyId}/contacts/by-department?includeEmailActivity=week`
+      );
       if (contactsRes.ok) {
         const contactsData = await contactsRes.json();
-        const groups = (contactsData.groups ?? []) as Array<{ department: { id: string | null }; contacts: Contact[] }>;
+        const groups = (contactsData.groups ?? []) as Array<{
+          department: { id: string | null };
+          contacts: Contact[];
+        }>;
+        if (typeof contactsData.accountEmailsSentThisWeek === 'number') {
+          setAccountEmailsSentThisWeek(contactsData.accountEmailsSentThisWeek);
+        }
         if (segId) {
           const group = groups.find((g) => g.department.id === segId);
           if (group) setContacts(group.contacts ?? []);
@@ -538,6 +554,11 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                       ? `${contacts.length} contacts — send or open LinkedIn`
                       : 'No contacts found for this segment'}
                   </p>
+                  {accountEmailsSentThisWeek != null && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Account: {accountEmailsSentThisWeek} email{accountEmailsSentThisWeek !== 1 ? 's' : ''} sent this week
+                    </p>
+                  )}
                 </div>
                 <div className="px-4 divide-y divide-slate-700/0">
                   {contacts.length > 0 ? (

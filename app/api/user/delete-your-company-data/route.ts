@@ -34,6 +34,18 @@ export async function POST() {
       where: { userId },
     });
 
+    // CompanyProduct rows reference CatalogProduct via productId with a RESTRICT FK,
+    // so we must remove them before deleting the user's catalog products.
+    const userCatalogProducts = await prisma.catalogProduct.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const catalogProductIds = userCatalogProducts.map((p) => p.id);
+
+    const companyProductCount = await prisma.companyProduct.deleteMany({
+      where: catalogProductIds.length ? { productId: { in: catalogProductIds } } : { id: undefined as never },
+    });
+
     const catalogCount = await prisma.catalogProduct.deleteMany({
       where: { userId },
     });
@@ -51,13 +63,14 @@ export async function POST() {
       productCount.count +
       profileCount.count +
       catalogCount.count +
+      companyProductCount.count +
       playbookCount.count +
       frameworkCount.count;
 
     return NextResponse.json({
       ok: true,
       deleted: total,
-      message: `Deleted all your company data: ${contentLibraryCount.count} content items, ${productCount.count} products, ${catalogCount.count} catalog products, ${profileCount.count} profiles, ${playbookCount.count} industry playbooks, ${frameworkCount.count} messaging frameworks.`,
+      message: `Deleted all your company data: ${contentLibraryCount.count} content items, ${productCount.count} products, ${catalogCount.count} catalog products, ${profileCount.count} profiles, ${companyProductCount.count} company-product links, ${playbookCount.count} industry playbooks, ${frameworkCount.count} messaging frameworks.`,
     });
   } catch (e) {
     console.error('POST /api/user/delete-your-company-data', e);

@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
+function sevenDaysAgoUTC(): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 7);
+  return d;
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
@@ -13,6 +19,7 @@ export async function GET(
     }
 
     const { companyId } = await params;
+    const includeEmailActivity = req.nextUrl.searchParams.get('includeEmailActivity') === 'week';
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId: session.user.id },
@@ -88,6 +95,34 @@ export async function GET(
     });
     const contactedContactIds = new Set(activitiesByContact.map((a) => a.contactId).filter(Boolean));
 
+    // Optional: email activity in last 7 days (per contact + account total)
+    let emailsSentByContact: Record<string, number> = {};
+    let accountEmailsSentThisWeek = 0;
+    if (includeEmailActivity && contactIds.length > 0) {
+      const since = sevenDaysAgoUTC();
+      const emailActivities = await prisma.activity.findMany({
+        where: {
+          companyId,
+          type: { in: ['Email', 'EMAIL_SENT'] },
+          createdAt: { gte: since },
+          contactId: { in: contactIds },
+        },
+        select: { contactId: true },
+      });
+      for (const a of emailActivities) {
+        if (a.contactId) {
+          emailsSentByContact[a.contactId] = (emailsSentByContact[a.contactId] ?? 0) + 1;
+        }
+      }
+      accountEmailsSentThisWeek = await prisma.activity.count({
+        where: {
+          companyId,
+          type: { in: ['Email', 'EMAIL_SENT'] },
+          createdAt: { gte: since },
+        },
+      });
+    }
+
     // Group contacts by department
     const contactsByDept: Record<string, typeof contacts> = {};
     const unassignedContacts: typeof contacts = [];
@@ -137,6 +172,7 @@ export async function GET(
         buyingRole: string | null;
         whyRelevant: string | null;
         engagementStatus: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged';
+        emailsSentThisWeek?: number;
       }>;
     };
 
@@ -172,6 +208,9 @@ export async function GET(
           buyingRole: c.persona?.name ?? null,
           whyRelevant: enriched?.whyRelevant ?? null,
           engagementStatus,
+          ...(includeEmailActivity && {
+            emailsSentThisWeek: emailsSentByContact[c.id] ?? 0,
+          }),
         };
       }),
     }));
@@ -210,12 +249,21 @@ export async function GET(
             buyingRole: c.persona?.name ?? null,
             whyRelevant: enriched?.whyRelevant ?? null,
             engagementStatus,
+            ...(includeEmailActivity && {
+              emailsSentThisWeek: emailsSentByContact[c.id] ?? 0,
+            }),
           };
         }),
       });
     }
 
-    return NextResponse.json({ groups: result });
+    const payload: { groups: DepartmentGroup[]; accountEmailsSentThisWeek?: number } = {
+      groups: result,
+    };
+    if (includeEmailActivity) {
+      payload.accountEmailsSentThisWeek = accountEmailsSentThisWeek;
+    }
+    return NextResponse.json(payload);
   } catch (error) {
     console.error('GET /api/companies/[companyId]/contacts/by-department error:', error);
     return NextResponse.json(

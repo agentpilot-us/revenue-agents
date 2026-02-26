@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { GoPageContent } from '@/app/go/GoPageContent';
 import { CampaignTrack } from '@/app/go/CampaignTrack';
+import { CeligoConnect2026Landing } from '@/app/go/CeligoConnect2026Landing';
 import { requireLandingPageAuth } from '@/lib/auth/landing-page-middleware';
 
 type PageSectionEvent = { title?: string; date?: string; description?: string; url?: string };
@@ -209,6 +210,15 @@ export default async function CampaignLandingPage({ params }: Props) {
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (campaign.slug === 'celigo-connect-2026') {
+    return (
+      <CeligoConnect2026Landing
+        campaignId={campaign.id}
+        title={campaign.headline ?? undefined}
+      />
     );
   }
 
