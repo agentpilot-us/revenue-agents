@@ -91,6 +91,7 @@ model User {
   segmentCampaigns        SegmentCampaign[]
   alerts                  Alert[]
   catalogProducts         CatalogProduct[]
+  playbookTemplates       PlaybookTemplate[]
 
   // Salesforce OAuth tokens (per-user)
   salesforceAccessToken    String?   @db.Text
@@ -165,6 +166,7 @@ model Company {
   stakeholderEngagementPlays StakeholderEngagementPlay[]
   useCaseExplorationPlays    UseCaseExplorationPlay[]
   renewalPlays               RenewalPlay[]
+  playbookRuns               PlaybookRun[]
 
   lastFitCalculation DateTime? // When product fit was last calculated
   fitCalculationData Json? // Cached product fit results (opportunities array) for quick retrieval
@@ -1483,4 +1485,84 @@ model SecurityAuditLog {
   @@index([eventType])
   @@index([createdAt])
   @@index([ipAddress])
+}
+
+// ----- Playbook: configurable account-level sequences (generalized RenewalPlay) -----
+model PlaybookTemplate {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String   // e.g. "90-Day Renewal", "New Logo 60-Day Pursuit"
+  description String?  @db.Text
+  isBuiltIn   Boolean  @default(false) // true for seed templates; user templates are false
+  triggerType String?  // renewal | new_logo | event | manual
+  isDefault   Boolean  @default(false)
+
+  steps   PlaybookTemplateStep[]
+  runs    PlaybookRun[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model PlaybookTemplateStep {
+  id         String   @id @default(cuid())
+  templateId String
+  template   PlaybookTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  order      Int      // 1-based step order
+  dayOffset  Int?     // days from trigger (negative = before, positive = after)
+  label      String?  // short label; name is full title
+  name       String?  // step title e.g. "Health Check & Kickoff"
+  description String? @db.Text
+  playId     String?  // play key for content generation
+  assetTypes Json?    // e.g. ["email", "linkedin", "talking_points"]
+  channel    String?  // email | linkedin | meeting | task | internal | call
+  promptHint String?  @db.Text // Injected into play buildPrompt for context-aware generation
+  assignedRole String? // e.g. "csm", "ae"
+  requiresApproval Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([templateId])
+}
+
+model PlaybookRun {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    PlaybookTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  currentStep     Int     @default(1)
+  status          String  @default("active") // active | paused | completed
+  stepCompletedAt Json?   // { "1": "ISO date", "2": "ISO date", ... }
+  triggerContext  Json?   // e.g. { renewalDate, eventDate, dealStage } for prompt context
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  steps PlaybookRunStep[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([templateId])
+  @@index([status])
+}
+
+model PlaybookRunStep {
+  id         String   @id @default(cuid())
+  runId      String
+  run        PlaybookRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepOrder  Int      // matches PlaybookTemplateStep.order
+  completedAt DateTime?
+  outcome    Json?    // step-specific result (e.g. summary, link)
+
+  createdAt DateTime @default(now())
+
+  @@unique([runId, stepOrder])
+  @@index([runId])
 }
