@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const companies = await prisma.company.findMany({
+    where: { isDemoAccount: false },
     select: { id: true, name: true, domain: true, industry: true, userId: true },
   });
 

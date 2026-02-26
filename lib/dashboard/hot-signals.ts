@@ -2,6 +2,7 @@ import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { getPlayDisplayName, type PlayId } from '@/lib/plays/plays-config';
 import { RELEVANCE_HOT_SIGNALS_MIN, RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
+import { buildNextBestActionHref } from '@/lib/dashboard/signal-play-href';
 
 const execPattern =
   /CFO|CIO|CTO|CISO|CEO|VP|Vice President|Head|President|Director/i;
@@ -257,13 +258,21 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
       month: 'short',
       year: 'numeric',
     });
+    const firstCompanyId = companyIds[0];
     signals.push({
       companyId: '',
       companyName: '',
       headline: 'New feature release ready to share',
       description: `"${featureRelease.title}" — ${dateLabel}`,
       ctaLabel: 'Run Feature Release play',
-      ctaHref: '/chat?play=expansion',
+      ctaHref:
+        firstCompanyId
+          ? buildNextBestActionHref({
+              companyId: firstCompanyId,
+              playId: 'feature_release',
+              triggerText: `New feature release: ${featureRelease.title}`,
+            })
+          : '/dashboard/plays',
       color: 'green',
       date: featureRelease.createdAt.toISOString(),
     });

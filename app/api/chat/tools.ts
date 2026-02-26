@@ -52,6 +52,25 @@ export const chatTools = {
       });
       if (!company) return { error: 'Company not found' };
       try {
+        const isDemo = await isDemoAccount(companyId);
+        if (isDemo) {
+          const stored = await prisma.accountSignal.findMany({
+            where: { companyId },
+            orderBy: { publishedAt: 'desc' },
+            take: 10,
+          });
+          return {
+            companyName: company.name,
+            signals: stored.map((s) => ({
+              type: s.type,
+              title: s.title,
+              summary: s.summary,
+              url: s.url,
+              relevanceScore: s.relevanceScore,
+              suggestedPlay: s.suggestedPlay ?? undefined,
+            })),
+          };
+        }
         const signals = await fetchAccountSignals(
           company.name,
           company.domain ?? '',

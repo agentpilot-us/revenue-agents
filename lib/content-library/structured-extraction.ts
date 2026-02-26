@@ -341,7 +341,7 @@ function buildRecommendations(
   if (caseStudiesCount === 0 && productUrl) {
     recs.push({
       priority: 3,
-      action: `Crawl ${productUrl}/customers for case studies`,
+      action: 'Add case studies from your customers page.',
       reason: 'Case studies are the highest-impact content for landing pages and outreach.',
       inputType: 'url',
     });
@@ -499,7 +499,7 @@ export function scoreContentLibraryHealth(
       type: 'value_propositions',
       severity: 'critical',
       message: 'No value propositions found — AI outreach and landing pages will be generic.',
-      suggestedAction: 'Scrape your homepage or product overview page.',
+      suggestedAction: 'Add content from your homepage or product overview.',
       suggestedUrl: productUrl,
     });
   }
@@ -508,7 +508,7 @@ export function scoreContentLibraryHealth(
       type: 'capabilities',
       severity: 'critical',
       message: 'Not enough product capabilities found — not enough to personalize by buying group.',
-      suggestedAction: 'Scrape your product or features page.',
+      suggestedAction: 'Add content from your product or features page.',
       suggestedUrl: productUrl ? `${productUrl}/product` : undefined,
     });
   }
@@ -526,7 +526,7 @@ export function scoreContentLibraryHealth(
       type: 'case_studies',
       severity: 'critical',
       message: 'No case studies — landing pages and chat cannot reference customer success.',
-      suggestedAction: 'Crawl your /customers or /case-studies page.',
+      suggestedAction: 'Add content from your customers or case studies page.',
       suggestedUrl: productUrl ? `${productUrl}/customers` : undefined,
     });
   } else if (caseStudiesCount === 1) {
@@ -542,7 +542,7 @@ export function scoreContentLibraryHealth(
       type: 'personas',
       severity: 'important',
       message: 'No target personas identified — buying group mapping will be less precise.',
-      suggestedAction: 'Scrape your "Who we serve" or solutions page.',
+      suggestedAction: 'Add content from your "Who we serve" or solutions page.',
     });
   }
   if (useCases.length === 0) {
@@ -550,7 +550,7 @@ export function scoreContentLibraryHealth(
       type: 'use_cases',
       severity: 'important',
       message: 'No use cases — chat and outreach cannot match your product to buyer problems.',
-      suggestedAction: 'Scrape your use cases or solutions page.',
+      suggestedAction: 'Add content from your use cases or solutions page.',
       suggestedUrl: productUrl ? `${productUrl}/use-cases` : undefined,
     });
   }
@@ -559,7 +559,7 @@ export function scoreContentLibraryHealth(
       type: 'pricing',
       severity: 'nice-to-have',
       message: 'Pricing stance not captured — AI may give inconsistent answers about cost.',
-      suggestedAction: 'Scrape your pricing page or upload a pricing FAQ.',
+      suggestedAction: 'Add your pricing page or a pricing FAQ.',
       suggestedUrl: productUrl ? `${productUrl}/pricing` : undefined,
     });
   }
@@ -568,7 +568,7 @@ export function scoreContentLibraryHealth(
       type: 'differentiators',
       severity: 'nice-to-have',
       message: 'No differentiators found — AI cannot contrast you against competitors.',
-      suggestedAction: 'Scrape your "Why us" or comparison page.',
+      suggestedAction: 'Add content from your "Why us" or comparison page.',
     });
   }
 

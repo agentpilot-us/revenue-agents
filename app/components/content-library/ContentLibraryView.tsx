@@ -5,7 +5,6 @@ import type { ContentType } from '@prisma/client';
 import type { GetCompanySetupStateUser } from '@/app/actions/content-library-setup';
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
-import { ContentLibraryActions } from '@/app/components/content-library/ContentLibraryActions';
 import { ContentLibraryHealthPanel } from '@/app/components/content-library/ContentLibraryHealthPanel';
 import { ContentLibraryItemRow } from '@/app/components/content-library/ContentLibraryItemRow';
 import { ProductRowActions } from '@/app/components/content-library/ProductRowActions';
@@ -58,7 +57,6 @@ export async function ContentLibraryView({ company }: Props) {
   );
 
   const firecrawlConfigured = isServiceConfigured('firecrawl');
-  const firstPendingId = items.find((i) => !i.userConfirmed)?.id ?? null;
 
   return (
     <div className="p-8 bg-gray-50 dark:bg-zinc-900 min-h-screen">
@@ -70,7 +68,7 @@ export async function ContentLibraryView({ company }: Props) {
             Your company data
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Pull data from your website or upload files. The AI uses this content to personalize outreach and value propositions.
+            The AI uses this content to personalize outreach and value propositions.
           </p>
           <Link
             href="/dashboard?skip_content_prompt=1"
@@ -81,9 +79,7 @@ export async function ContentLibraryView({ company }: Props) {
         </div>
       </div>
 
-      <ContentLibraryActions />
-
-      <ContentLibraryHealthPanel firstPendingId={firstPendingId} />
+      <ContentLibraryHealthPanel />
 
       {/* Company info */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6">
@@ -163,7 +159,6 @@ export async function ContentLibraryView({ company }: Props) {
                       hasPreviousContent={!!item.previousContent}
                       userConfirmed={item.userConfirmed}
                       content={item.content as Record<string, unknown> | null}
-                      scrollId={item.id === firstPendingId ? 'pending-review' : undefined}
                     />
                   ))}
                 </ul>

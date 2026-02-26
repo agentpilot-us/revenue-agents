@@ -1,31 +1,32 @@
 /**
  * buildSignalPlayHref
  *
- * Use this wherever a signal CTA links to create-content.
- * Replaces bare /chat?play=... links on signal cards with a
- * pre-filled create-content URL that carries signal context.
+ * Builds the URL for "Run [play]" CTAs on the dashboard.
+ * Points to the new /plays/run page (Option B) instead of create-content.
  *
- * Usage in your signal card component:
+ * Usage in signal cards, next-best-actions, hot signals panel:
  *
  *   <Link href={buildSignalPlayHref({
  *     companyId: signal.companyId,
  *     playId: 're_engagement',
- *     segmentId: signal.suggestedSegmentId,   // optional
- *     segmentName: 'RevOps',                  // optional
- *     signalTitle: signal.title,
+ *     signalId: signal.id,           // preferred — run page loads signal from DB
+ *     segmentName: 'RevOps',
+ *     signalTitle: signal.title,     // fallback if signalId not available
  *     signalSummary: signal.summary,
  *   })}>
  *     Run Re-Engagement play →
  *   </Link>
  */
 
-export type SignalPlayHrefParams = {
+type SignalPlayHrefParams = {
   companyId: string;
-  playId: string;
+  playId?: string;
   segmentId?: string | null;
   segmentName?: string | null;
-  signalTitle: string;
+  signalTitle?: string;
   signalSummary?: string | null;
+  /** When provided, run page loads signal from DB — inline params become fallback */
+  signalId?: string | null;
 };
 
 export function buildSignalPlayHref({
@@ -35,34 +36,66 @@ export function buildSignalPlayHref({
   segmentName,
   signalTitle,
   signalSummary,
+  signalId,
 }: SignalPlayHrefParams): string {
-  const base = `/dashboard/companies/${companyId}/create-content`;
+  // New destination: dedicated play run page
+  const base = `/dashboard/companies/${companyId}/plays/run`;
   const params = new URLSearchParams();
 
-  params.set('playId', playId);
-  params.set('signalTitle', signalTitle);
-  if (signalSummary) params.set('signalSummary', signalSummary);
-  if (segmentName) params.set('segmentName', segmentName);
-  if (segmentId) params.set('segmentId', segmentId);
+  // signalId lets the run page load everything from DB — minimal URL
+  if (signalId) {
+    params.set('signalId', signalId);
+    // Still pass inline params as fallback / display hints
+    if (playId) params.set('playId', playId);
+    if (segmentName) params.set('segmentName', segmentName);
+    if (segmentId) params.set('segmentId', segmentId);
+  } else {
+    // No signalId — pass everything inline
+    if (playId) params.set('playId', playId);
+    if (signalTitle) params.set('signalTitle', signalTitle);
+    if (signalSummary) params.set('signalSummary', signalSummary);
+    if (segmentName) params.set('segmentName', segmentName);
+    if (segmentId) params.set('segmentId', segmentId);
+  }
 
   return `${base}?${params.toString()}`;
 }
 
 /**
- * Example: updating the Hot Signals card CTA
+ * buildNextBestActionHref
  *
- * BEFORE:
- *   ctaHref: `/chat?play=expansion&accountId=${companyId}&segmentId=${segmentId}`
+ * For next-best-action items that have no signal (engine-suggested plays).
+ * Still points to the run page but uses play context params directly.
  *
- * AFTER:
- *   ctaHref: buildSignalPlayHref({
- *     companyId,
- *     playId: signal.suggestedPlay ?? 're_engagement',
- *     segmentName: signal.segmentName,
- *     signalTitle: signal.title,
- *     signalSummary: signal.summary,
+ * Usage in next-best-actions panel:
+ *
+ *   ctaHref: buildNextBestActionHref({
+ *     companyId: company.id,
+ *     playId: suggestion.play.id,
+ *     segmentId: suggestion.segment.id,
+ *     segmentName: suggestion.segment.name,
+ *     triggerText: suggestion.triggerText,
  *   })
- *
- * This is the only change needed in hot-signals.ts or wherever
- * the signal card CTAs are built.
  */
+export function buildNextBestActionHref({
+  companyId,
+  playId,
+  segmentId,
+  segmentName,
+  triggerText,
+}: {
+  companyId: string;
+  playId: string;
+  segmentId?: string;
+  segmentName?: string;
+  triggerText?: string;
+}): string {
+  const base = `/dashboard/companies/${companyId}/plays/run`;
+  const params = new URLSearchParams();
+  params.set('playId', playId);
+  if (segmentId) params.set('segmentId', segmentId);
+  if (segmentName) params.set('segmentName', segmentName);
+  // triggerText becomes a synthetic "signal title" so the run page has a hook
+  if (triggerText) params.set('signalTitle', triggerText);
+  return `${base}?${params.toString()}`;
+}

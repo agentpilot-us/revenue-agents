@@ -22,12 +22,7 @@ function fetchHealth(): Promise<ContentHealthScore> {
   });
 }
 
-type ContentLibraryHealthPanelProps = {
-  /** When set, "pending review" message becomes a link that scrolls to the first pending item. */
-  firstPendingId?: string | null;
-};
-
-export function ContentLibraryHealthPanel({ firstPendingId }: ContentLibraryHealthPanelProps = {}) {
+export function ContentLibraryHealthPanel() {
   const [health, setHealth] = useState<ContentHealthScore | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,19 +95,6 @@ export function ContentLibraryHealthPanel({ firstPendingId }: ContentLibraryHeal
             </span>
           </div>
         </div>
-        {health.pendingReviewCount > 0 && (
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            {firstPendingId ? (
-              <a href="#pending-review" className="hover:underline font-medium">
-                {health.pendingReviewCount} item{health.pendingReviewCount !== 1 ? 's' : ''} pending your review — scroll to review
-              </a>
-            ) : (
-              <>
-                {health.pendingReviewCount} item{health.pendingReviewCount !== 1 ? 's' : ''} pending your review. Review each item below and click &quot;Review extraction and confirm&quot; → &quot;Looks good&quot;.
-              </>
-            )}
-          </p>
-        )}
         {health.lowConfidenceCount > 0 && (
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {health.lowConfidenceCount} low-confidence extraction{health.lowConfidenceCount !== 1 ? 's' : ''} — consider reviewing
@@ -183,9 +165,6 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
         <span className="text-gray-500 dark:text-gray-400">
           {displayHave}/{total}
           {have > total && <span className="ml-0.5 text-gray-400 dark:text-gray-500">({have} found)</span>}
-          {dimension.pendingCount != null && dimension.pendingCount > 0 && (
-            <span className="ml-1 text-amber-600 dark:text-amber-400">({dimension.pendingCount} pending)</span>
-          )}
         </span>
       </div>
       <div className="h-2 rounded-full bg-slate-100 dark:bg-zinc-700 overflow-hidden">

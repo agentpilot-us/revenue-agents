@@ -459,6 +459,81 @@ function buildCampaigns(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DEMO ACCOUNT SIGNALS (show in dashboard hot signals + company Activity without Exa)
+// publishedAt within last 48h, relevanceScore >= 7 so they appear in hot signals
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildDemoSignals(companyId: string, userId: string): Array<{
+  companyId: string;
+  userId: string;
+  type: string;
+  title: string;
+  summary: string;
+  url: string;
+  publishedAt: Date;
+  relevanceScore: number;
+  suggestedPlay: string | null;
+  status: string;
+}> {
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+  return [
+    {
+      companyId,
+      userId,
+      type: 'product_announcement',
+      title: 'Lattice launches new performance management features',
+      summary: 'Lattice announced updates to its performance and engagement suite, with stronger integrations for HR and People teams. Good moment to reach out to People Ops and RevOps.',
+      url: 'https://lattice.com/blog/performance-management-2026',
+      publishedAt: yesterday,
+      relevanceScore: 8,
+      suggestedPlay: 'feature_release',
+      status: 'new',
+    },
+    {
+      companyId,
+      userId,
+      type: 'executive_hire',
+      title: 'Lattice appoints new VP of Revenue Operations',
+      summary: 'Sarah Chen joined as VP of RevOps to scale quote-to-cash and GTM systems. Strong champion candidate for integration and RevOps conversations.',
+      url: 'https://lattice.com/about/leadership',
+      publishedAt: twoDaysAgo,
+      relevanceScore: 9,
+      suggestedPlay: 'new_buying_group',
+      status: 'new',
+    },
+    {
+      companyId,
+      userId,
+      type: 'industry_news',
+      title: 'Lattice expands enterprise customer base in SaaS vertical',
+      summary: 'Lattice is seeing increased adoption among mid-market and enterprise SaaS companies. Integration and automation pain points are top of mind.',
+      url: 'https://lattice.com/press/enterprise-growth',
+      publishedAt: yesterday,
+      relevanceScore: 7,
+      suggestedPlay: 're_engagement',
+      status: 'new',
+    },
+    {
+      companyId,
+      userId,
+      type: 'earnings_call',
+      title: 'Lattice reports strong Q4 results, raises full-year guidance',
+      summary: 'Revenue beat expectations; management highlighted investment in product and go-to-market. Budget cycles may be opening for RevOps and IT tools.',
+      url: 'https://investors.lattice.com/earnings',
+      publishedAt: twoDaysAgo,
+      relevanceScore: 8,
+      suggestedPlay: 're_engagement',
+      status: 'new',
+    },
+  ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -472,6 +547,18 @@ async function main() {
     process.exit(1);
   }
   console.log('Using user:', user.email);
+
+  // Set user company basics so "Your company data" page loads (getCompanySetupState requires companyWebsite).
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      companyName: 'Celigo',
+      companyWebsite: 'https://celigo.com',
+      companyIndustry: 'Technology',
+      primaryIndustrySellTo: 'SaaS',
+    },
+  });
+  console.log('Updated user company info (Celigo) so Your company data loads.');
 
   let product = await prisma.product.findFirst({
     where: { userId: user.id, name: 'Celigo Integration Platform' },
@@ -646,6 +733,26 @@ async function main() {
     console.log('Upserted SegmentCampaign:', campaign.slug);
   }
 
+  // Demo account signals (show in dashboard hot signals + company Activity without Exa)
+  const existingSignalCount = await prisma.accountSignal.count({
+    where: { companyId: company.id },
+  });
+  if (existingSignalCount < 4) {
+    const demoSignals = buildDemoSignals(company.id, user.id);
+    for (const signal of demoSignals) {
+      const existing = await prisma.accountSignal.findFirst({
+        where: { companyId: company.id, url: signal.url },
+      });
+      if (!existing) {
+        await prisma.accountSignal.create({ data: signal });
+        console.log('Created AccountSignal:', signal.type);
+      }
+    }
+    console.log('Demo account signals ready (dashboard hot signals + company Activity).');
+  } else {
+    console.log('Using existing demo account signals.');
+  }
+
   console.log('\n──────────────────────────────────────────');
   console.log('Celigo / Lattice demo environment seeded.');
   console.log('');
@@ -657,7 +764,8 @@ async function main() {
   console.log(' 1. Open AgentPilot as demo-saas@agentpilot.us');
   console.log(' 2. Verify: Your company data → 3 products + 2 success stories + 1 event + 1 feature release');
   console.log(' 3. Verify: Target companies → Lattice HQ → 4 buying groups, 12 contacts, 2 sales pages');
-  console.log(' 4. Optional: Dashboard → Demo setup → select Lattice HQ → Build demo → Lock as demo');
+  console.log(' 4. Verify: Dashboard hot signals + company Activity tab show demo signals (no Exa run)');
+  console.log(' 5. Optional: Dashboard → Demo setup → select Lattice HQ → Build demo → Lock as demo');
   console.log('──────────────────────────────────────────\n');
 }
 

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { getSuggestedPlays } from '@/lib/plays/engine';
-import { buildSignalPlayHref } from '@/lib/dashboard/signal-play-href';
+import { buildNextBestActionHref } from '@/lib/dashboard/signal-play-href';
 
 export type NextBestActionItem = {
   companyId: string;
@@ -57,12 +57,12 @@ export async function getNextBestActions(
         departmentName: suggestion.segment.name,
         label: `${company.name} — ${suggestion.triggerText}`,
         ctaLabel: `Run "${suggestion.play.name}"`,
-        ctaHref: buildSignalPlayHref({
+        ctaHref: buildNextBestActionHref({
           companyId: company.id,
           playId: suggestion.play.id,
           segmentId: suggestion.segment.id,
           segmentName: suggestion.segment.name,
-          signalTitle: suggestion.triggerText,
+          triggerText: suggestion.triggerText,
         }),
         playId: suggestion.play.id,
         priority,
@@ -92,12 +92,12 @@ export async function getNextBestActions(
             departmentName: deptName,
             label: `${company.name} — ${triggerText}`,
             ctaLabel: 'Run "Open New Buying Group"',
-            ctaHref: buildSignalPlayHref({
+            ctaHref: buildNextBestActionHref({
               companyId: company.id,
               playId: 'new_buying_group',
               segmentId: dept.id,
               segmentName: deptName,
-              signalTitle: triggerText,
+              triggerText,
             }),
             playId: 'new_buying_group',
             priority: 0,
