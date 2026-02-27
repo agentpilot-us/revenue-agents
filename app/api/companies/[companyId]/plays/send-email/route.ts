@@ -48,7 +48,7 @@ export async function POST(
       );
     }
 
-    // Load contact
+    // Load contact (include salesforceId for CRM log)
     const contact = await prisma.contact.findFirst({
       where: { id: body.contactId, companyId },
       select: {
@@ -58,6 +58,7 @@ export async function POST(
         email: true,
         title: true,
         companyDepartmentId: true,
+        salesforceId: true,
       },
     });
     if (!contact) {
@@ -131,9 +132,9 @@ Send this email now. Return only "sent" when complete.`,
       );
     }
 
-    // Log activity (schema: summary, content, type; no description field)
+    // Log activity (schema: summary, content, type; store messageId in metadata when available for tracking)
     const activitySummary = `Email sent to ${toName} (${toAddress}): ${body.subject}`;
-    await prisma.activity
+    const activity = await prisma.activity
       .create({
         data: {
           companyId,
@@ -149,12 +150,15 @@ Send this email now. Return only "sent" when complete.`,
             to: toAddress,
             toName,
             sentAt: new Date().toISOString(),
+            channel: 'gmail_mcp',
+            sentVia: 'plays_run',
           },
           agentUsed: 'plays',
         },
       })
       .catch((e) => {
         console.warn('Activity log failed:', e);
+        return null;
       });
 
     // Update contact for lastActivity / Re-Engagement loop
@@ -169,6 +173,35 @@ Send this email now. Return only "sent" when complete.`,
       .catch((e) => {
         console.warn('Contact update failed:', e);
       });
+
+    // Log to Salesforce when user has connected Salesforce and contact has salesforceId
+    if (activity && contact.salesforceId) {
+      try {
+        const { pushActivityToSalesforceForUser } = await import(
+          '@/lib/integrations/salesforce-push-activity'
+        );
+        const user = await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { salesforceAccessToken: true },
+        });
+        if (user?.salesforceAccessToken) {
+          const sfResult = await pushActivityToSalesforceForUser({
+            userId: session.user.id,
+            contactSalesforceId: contact.salesforceId,
+            type: 'email',
+            subject: body.subject,
+            body: body.body,
+            summary: activitySummary,
+            createdAt: new Date(),
+          });
+          if (!sfResult.ok) {
+            console.warn('Salesforce push failed:', sfResult.error);
+          }
+        }
+      } catch (e) {
+        console.warn('Salesforce push error:', e);
+      }
+    }
 
     return NextResponse.json({ success: true, sent: true, to: toAddress });
   } catch (error: unknown) {

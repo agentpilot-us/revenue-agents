@@ -13,6 +13,7 @@ import {
   BarChart3,
   Presentation,
   Users,
+  Map,
 } from 'lucide-react';
 
 const navigation: Array<{
@@ -22,6 +23,7 @@ const navigation: Array<{
   badgeCount?: number;
 }> = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Your Roadmap', href: '/dashboard/roadmap', icon: Map },
   { name: 'Target companies', href: '/dashboard/companies', icon: Building2 },
   { name: 'Create content', href: '/dashboard/create-content', icon: FileText },
   { name: 'Your company data', href: '/dashboard/content-library', icon: BookOpen },

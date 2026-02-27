@@ -1,3 +1,11 @@
+const SLACK_WEBHOOK_PREFIX = 'https://hooks.slack.com/';
+const SLACK_REQUEST_TIMEOUT_MS = 5000;
+
+/** Reject non-Slack webhook URLs to prevent SSRF. */
+function isValidSlackWebhookUrl(url: string): boolean {
+  return url.startsWith(SLACK_WEBHOOK_PREFIX);
+}
+
 export async function sendSlackAlert({
   webhookUrl,
   title,
@@ -11,6 +19,14 @@ export async function sendSlackAlert({
   data: Record<string, unknown>;
   alertId: string;
 }): Promise<boolean> {
+  if (!isValidSlackWebhookUrl(webhookUrl)) {
+    console.error('[Alerts] Invalid Slack webhook URL (must start with https://hooks.slack.com/)');
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SLACK_REQUEST_TIMEOUT_MS);
+
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const blocks: unknown[] = [
@@ -34,6 +50,7 @@ export async function sendSlackAlert({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: title, blocks }),
+      signal: controller.signal,
     });
     if (!res.ok) {
       throw new Error(`Slack ${res.status}`);
@@ -43,5 +60,7 @@ export async function sendSlackAlert({
   } catch (e) {
     console.error('[Alerts] Slack error:', e);
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }

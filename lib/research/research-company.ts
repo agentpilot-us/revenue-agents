@@ -3,6 +3,8 @@ import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
 import { researchCompany } from '@/lib/tools/perplexity';
 import { prisma } from '@/lib/db';
+import { isDemoUser } from '@/lib/demo/context';
+import { generateDemoAware } from '@/lib/demo/llm-adapter';
 import {
   buyingGroupDetailSchema,
   companyResearchSchema,
@@ -57,7 +59,7 @@ export async function runPerplexityResearchOnly(
   const [user, contentLibrary] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { companyName: true, companyWebsite: true },
+      select: { email: true, companyName: true, companyWebsite: true },
     }),
     loadContentLibraryContext(userId).catch(() => null),
   ]);
@@ -144,6 +146,20 @@ export async function runPerplexityResearchOnly(
 6. BUYING GROUPS: which departments or teams at ${companyName} make decisions about B2B software purchases in areas like: ${productNames}? What are their priorities and what titles do the decision-makers hold?
 
 Focus on finding specific, actionable intelligence that would help a B2B sales rep engage the right people at ${companyName} with relevant messaging.`;
+  }
+
+  // Demo users: short-circuit Perplexity and return a canned summary
+  if (user && isDemoUser(user)) {
+    const demo = await generateDemoAware({
+      user: { email: user.email },
+      company: null,
+      scenario: 'research_summary',
+      payload: { companyName, companyDomain, researchQuery },
+    });
+    // generateDemoAware returns a small object; normalize to our shape
+    if (demo && typeof (demo as any).summary === 'string') {
+      return { ok: true, summary: (demo as any).summary as string };
+    }
   }
 
   const perplexityResult = await researchCompany({

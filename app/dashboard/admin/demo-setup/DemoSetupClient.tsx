@@ -4,7 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, Circle, Loader2, Lock } from 'lucide-react';
-import { lockAsDemo, createDemoCampaign, seedDemoActivities, seedDemoCampaignVisits, seedDemoData } from '@/app/dashboard/admin/demo-setup/actions';
+import {
+  lockAsDemo,
+  createDemoCampaign,
+  seedDemoActivities,
+  seedDemoCampaignVisits,
+  seedDemoData,
+  seedDemoRoadmapForCompany,
+} from '@/app/dashboard/admin/demo-setup/actions';
 
 type CompanyForDemo = {
   id: string;
@@ -36,6 +43,8 @@ export function DemoSetupClient({ companies, verticals, userId }: Props) {
   const [lockError, setLockError] = useState<string | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
+  const [roadmapLoading, setRoadmapLoading] = useState(false);
+  const [roadmapError, setRoadmapError] = useState<string | null>(null);
 
   const company = companies.find((c) => c.id === companyId);
   const step1Done = !!company?.researchData && (company?._count.departments ?? 0) > 0;
@@ -125,6 +134,21 @@ export function DemoSetupClient({ companies, verticals, userId }: Props) {
       setSeedError(e instanceof Error ? e.message : 'Seed failed');
     } finally {
       setSeedLoading(false);
+    }
+  }
+
+  async function handleSeedDemoRoadmap() {
+    if (!companyId) return;
+    setRoadmapLoading(true);
+    setRoadmapError(null);
+    try {
+      const res = await seedDemoRoadmapForCompany(companyId);
+      if (!res.ok) throw new Error(res.error);
+      router.refresh();
+    } catch (e) {
+      setRoadmapError(e instanceof Error ? e.message : 'Roadmap seed failed');
+    } finally {
+      setRoadmapLoading(false);
     }
   }
 
@@ -221,9 +245,19 @@ export function DemoSetupClient({ companies, verticals, userId }: Props) {
                 Seed demo data
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleSeedDemoRoadmap}
+              disabled={roadmapLoading}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-4 py-2 text-slate-300 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {roadmapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Seed Adaptive Roadmap
+            </button>
           </div>
           {buildError && <p className="text-red-400">{buildError}</p>}
           {seedError && <p className="text-red-400">{seedError}</p>}
+          {roadmapError && <p className="text-red-400">{roadmapError}</p>}
 
           {allStepsDone && (
             <div className="rounded-lg border border-slate-700 bg-zinc-800/50 p-4 space-y-3">

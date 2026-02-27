@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { enrichCompanyWithExa } from '@/lib/exa/enrich-company';
 
 export async function GET() {
   const session = await auth();
@@ -36,7 +37,17 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
       },
     });
-    return NextResponse.json({ company });
+
+    // Trigger Exa enrichment in background (signals + contact discovery)
+    void enrichCompanyWithExa(company.id).catch((e) => {
+      console.error('Exa enrichment error:', e);
+    });
+
+    return NextResponse.json({
+      company,
+      status: 'researching',
+      message: 'Company created. AI is researching now...',
+    });
   } catch (e) {
     console.error('Create company error:', e);
     return NextResponse.json(

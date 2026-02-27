@@ -92,6 +92,7 @@ model User {
   alerts                  Alert[]
   catalogProducts         CatalogProduct[]
   playbookTemplates       PlaybookTemplate[]
+  adaptiveRoadmaps        AdaptiveRoadmap[]
 
   // Salesforce OAuth tokens (per-user)
   salesforceAccessToken    String?   @db.Text
@@ -175,6 +176,7 @@ model Company {
   agentContext     Json? // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
   segmentCampaigns SegmentCampaign[]
   accountSignals   AccountSignal[]
+  roadmapTargets   RoadmapTarget[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
   workflowStep                   Int? // 1, 2, or 3
@@ -190,6 +192,10 @@ model Company {
   lastCrawlAt         DateTime? // Last time content was crawled for this company
   nextCrawlAt         DateTime? // Next scheduled crawl
   lastContentChangeAt DateTime? // Last time content change was detected
+
+  // Exa post-create enrichment (signals + contact discovery)
+  exaEnrichmentStartedAt   DateTime?
+  exaEnrichmentCompletedAt DateTime?
 
   // Demo mode: frozen account for demos (no API/LLM calls)
   isDemoAccount Boolean   @default(false)
@@ -223,6 +229,8 @@ model AccountSignal {
   status         String   @default("new") // new | seen | acted
 
   createdAt DateTime @default(now())
+
+  roadmapPlans RoadmapPlan[]
 
   @@index([companyId, publishedAt])
   @@index([userId, status, relevanceScore])
@@ -306,6 +314,7 @@ model Contact {
   eventAttendances           EventAttendance[]
   stakeholderEngagementPlays StakeholderEngagementPlay[]
   contactSequenceEnrollments ContactSequenceEnrollment[]
+  roadmapContacts            RoadmapContact[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -342,9 +351,15 @@ model Activity {
   userId              String
   user                User               @relation(fields: [userId], references: [id])
 
-  resendEmailId String?
-  calEventId    String?
-  agentUsed     String?
+  resendEmailId   String?
+  calEventId      String?
+  agentUsed       String?
+
+  // Gmail MCP / email tracking (webhook updates)
+  gmailMessageId  String?
+  emailOpenedAt   DateTime?
+  emailOpenCount  Int       @default(0)
+  emailClickedAt  DateTime?
 
   createdAt DateTime @default(now())
 
@@ -355,6 +370,7 @@ model Activity {
   @@index([contactId])
   @@index([type])
   @@index([resendEmailId])
+  @@index([gmailMessageId])
   @@index([createdAt])
 }
 
@@ -625,6 +641,7 @@ model CompanyDepartment {
   segmentCampaigns        SegmentCampaign[]
   campaignVisits          CampaignVisit[]
   content                 CompanyDepartmentContent[]
+  roadmapTargets          RoadmapTarget[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1485,6 +1502,216 @@ model SecurityAuditLog {
   @@index([eventType])
   @@index([createdAt])
   @@index([ipAddress])
+}
+
+// ============================================
+// ADAPTIVE ROADMAP (AE-level selling motion)
+// ============================================
+
+model AdaptiveRoadmap {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // e.g. enterprise_expansion | channel_influence | value_of_data
+  roadmapType String
+
+  // Structured as JSON so we can evolve shape without migrations
+  // { goalText, metric, timeHorizon, successDefinition }
+  objective       Json?
+  // { tone, personalizationDepth, primaryChannels, contentTypes, ... }
+  contentStrategy Json?
+
+  targets        RoadmapTarget[]
+  signalRules    RoadmapSignalRule[]
+  actionMappings RoadmapActionMapping[]
+  conditions     RoadmapCondition[]
+  plans          RoadmapPlan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Roadmap-scoped representation of a target: company or division.
+// Ties back to Company / CompanyDepartment where possible so we can
+// reuse existing data (contacts, intel, pipeline).
+model RoadmapTarget {
+  id        String @id @default(cuid())
+  roadmapId String
+  roadmap   AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  // company | division
+  targetType String
+  name       String
+
+  // Optional link back to core account models
+  companyId      String?
+  company        Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyDepartmentId String?
+  companyDepartment   CompanyDepartment? @relation(fields: [companyDepartmentId], references: [id], onDelete: SetNull)
+
+  parentTargetId String?
+  parentTarget   RoadmapTarget? @relation("RoadmapTargetToSelf", fields: [parentTargetId], references: [id], onDelete: SetNull)
+  childTargets   RoadmapTarget[] @relation("RoadmapTargetToSelf")
+
+  // Roadmap-specific state
+  stage        String?  // e.g. Cold, Warm, Active, Trusted Partner
+  healthScore  Float?
+  lastSignalAt DateTime?
+  lastActionAt DateTime?
+
+  // Cached intel for roadmap view (company profile, pain points, initiatives, etc.)
+  intelligence Json?
+
+  contacts RoadmapContact[]
+  plans    RoadmapPlan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roadmapId])
+  @@index([companyId])
+  @@index([companyDepartmentId])
+}
+
+// Roadmap-scoped contact wrapper so we can track relationship stage,
+// territory, and partner-specific fields without changing core Contact.
+model RoadmapContact {
+  id       String @id @default(cuid())
+  targetId String
+  target   RoadmapTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  personaRole      String? // "Partner AE", "VP AI/ML", etc.
+  connectionStatus String? // unknown | identified | connected | engaged | champion
+  lastContactedAt  DateTime?
+  lastRespondedAt  DateTime?
+  preferredChannel String? // email | linkedin | phone
+
+  // Channel influence–specific metadata (nullable elsewhere)
+  territory             String? // e.g. "Enterprise Banking, West"
+  relationshipStage     String? // e.g. connected | engaged | trusted_partner
+  activeDealsInTerritory Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetId])
+  @@index([contactId])
+}
+
+// What signals should the roadmap watch for?
+model RoadmapSignalRule {
+  id        String @id @default(cuid())
+  roadmapId String
+  roadmap   AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  name        String
+  // earnings_call | product_announcement | job_posting_signal | regulatory | partner_activity | ...
+  category    String
+  description String? @db.Text
+
+  // Simple arrays keep Phase 1 deterministic and debuggable
+  keywords String[]
+  sources  String[] // e.g. ["news", "linkedin", "job_boards"]
+
+  priorityWeight Int @default(1)
+
+  actionMappings RoadmapActionMapping[]
+  plans          RoadmapPlan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roadmapId])
+  @@index([category])
+}
+
+// When a rule/category matches, what action should we take?
+model RoadmapActionMapping {
+  id        String @id @default(cuid())
+  roadmapId String
+  roadmap   AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  signalRuleId String?
+  signalRule   RoadmapSignalRule? @relation(fields: [signalRuleId], references: [id], onDelete: SetNull)
+
+  // Optional direct mapping by category when no specific ruleId is used.
+  signalCategory String?
+
+  // generate_email | generate_page | alert | research_account | research_contacts | setup_company_data | ...
+  actionType String
+  // notify_only | draft_review | auto_execute
+  autonomyLevel String @default("draft_review")
+
+  promptHint String? @db.Text
+
+  plans RoadmapPlan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roadmapId])
+  @@index([signalRuleId])
+  @@index([signalCategory])
+}
+
+model RoadmapCondition {
+  id        String @id @default(cuid())
+  roadmapId String
+  roadmap   AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  // e.g. event_window, product_launch, regulation_change
+  type   String
+  config Json
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roadmapId])
+  @@index([type])
+}
+
+// AE-level unit of work: what to do next given a signal + roadmap config.
+model RoadmapPlan {
+  id        String @id @default(cuid())
+  roadmapId String
+  roadmap   AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  signalId String?
+  signal   AccountSignal? @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
+  signalRuleId String?
+  signalRule   RoadmapSignalRule? @relation(fields: [signalRuleId], references: [id], onDelete: SetNull)
+
+  actionMappingId String?
+  actionMapping   RoadmapActionMapping? @relation(fields: [actionMappingId], references: [id], onDelete: SetNull)
+
+  targetId String?
+  target   RoadmapTarget? @relation(fields: [targetId], references: [id], onDelete: SetNull)
+
+  status        String @default("pending") // pending | approved | dismissed | executed
+  autonomyLevel String @default("draft_review")
+
+  // Lightweight content preview + UI metadata
+  previewPayload Json?
+  // Matching explanation: rule name, keywords, confidence, etc.
+  matchInfo Json?
+  dismissReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roadmapId])
+  @@index([signalId])
+  @@index([targetId])
+  @@index([status])
 }
 
 // ----- Playbook: configurable account-level sequences (generalized RenewalPlay) -----

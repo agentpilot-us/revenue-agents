@@ -6,6 +6,7 @@ import {
   getNextBestActions,
   getMomentumWeekComparison,
 } from '@/lib/dashboard';
+import { ensureDemoRoadmap } from '@/lib/demo/load-roadmap';
 import { StatusBar } from '@/app/components/dashboard/StatusBar';
 import { DashboardShell } from '@/app/components/dashboard/DashboardShell';
 import { ThreeColumnLayout } from '@/app/components/dashboard/ThreeColumnLayout';
@@ -70,6 +71,12 @@ export default async function DashboardPage({
     redirect('/api/auth/signin');
   }
 
+  // For demo users, make sure a persona-specific AdaptiveRoadmap exists.
+  await ensureDemoRoadmap(
+    session.user.id,
+    (session.user as { email?: string | null }).email ?? null
+  );
+
   const params = await searchParams;
   const [contentLibraryCounts, catalogProductCount, industryPlaybookCount] =
     await Promise.all([
@@ -98,6 +105,7 @@ export default async function DashboardPage({
   const startOfThisWeek = startOfWeek(new Date());
 
   const [
+    roadmap,
     companiesRaw,
     campaignCounts,
     lastActivities,
@@ -111,6 +119,34 @@ export default async function DashboardPage({
     pipelineByCompany,
     eventCampaign,
   ] = await Promise.all([
+    prisma.adaptiveRoadmap.findFirst({
+      where: { userId: session.user.id },
+      include: {
+        targets: {
+          include: {
+            company: { select: { name: true } },
+            companyDepartment: {
+              select: { type: true, customName: true },
+            },
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    engagementScore: true,
+                    isResponsive: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    }),
     prisma.company.findMany({
       where: { userId: session.user.id },
       orderBy: { updatedAt: 'desc' },
@@ -355,6 +391,68 @@ export default async function DashboardPage({
       (a.ctaHref.startsWith('/chat') || a.ctaHref.includes('/create-content'))
   );
 
+  // Default radar accounts based on companies/departments
+  let accountsForRadar = companies.map((c) => ({
+    id: c.id,
+    name: c.name,
+    pagesLive: c.pagesLive,
+    lastActivity: c.lastActivity,
+    coveragePct: c.coveragePct,
+    borderColor: c.borderColor,
+    departments: c.departments.map((d) => ({
+      id: d.id,
+      name: d.shortName,
+      contactCount: d.contactCount,
+      hasCampaign: d.hasCampaign,
+    })),
+  }));
+
+  // When a channel_influence roadmap is present (e.g. Sercante), adapt the
+  // radar to show roadmap-defined partner segments (typically Salesforce AE
+  // teams) and their penetration/activity instead of generic company cards.
+  if (roadmap && roadmap.roadmapType === 'channel_influence') {
+    const divisionTargets = roadmap.targets.filter((t) => t.targetType === 'division');
+    if (divisionTargets.length > 0) {
+      accountsForRadar = divisionTargets.map((t) => {
+        const totalContacts = t.contacts.length;
+        const engagedContacts = t.contacts.filter((rc) => {
+          if (rc.connectionStatus === 'engaged' || rc.connectionStatus === 'champion') return true;
+          if (rc.relationshipStage === 'engaged' || rc.relationshipStage === 'trusted_partner')
+            return true;
+          const c = rc.contact;
+          return !!c && (c.isResponsive || (c.engagementScore ?? 0) > 0);
+        }).length;
+        const coveragePct =
+          totalContacts === 0 ? 0 : Math.round((engagedContacts / totalContacts) * 100);
+        const name =
+          t.companyDepartment?.customName ??
+          t.companyDepartment?.type?.replace(/_/g, ' ') ??
+          t.name;
+
+        let borderColor: 'green' | 'amber' | 'gray' | 'red' = 'gray';
+        if (coveragePct >= 60) borderColor = 'green';
+        else if (coveragePct > 0) borderColor = 'amber';
+
+        return {
+          id: t.id,
+          name,
+          pagesLive: engagedContacts,
+          lastActivity: t.lastActionAt ?? t.lastSignalAt ?? new Date(),
+          coveragePct,
+          borderColor,
+          departments: [
+            {
+              id: t.id,
+              name,
+              contactCount: totalContacts,
+              hasCampaign: engagedContacts > 0,
+            },
+          ],
+        };
+      });
+    }
+  }
+
   return (
     <DashboardShell
       statusBar={
@@ -403,18 +501,8 @@ export default async function DashboardPage({
           </>
         }
         center={
-              <AccountRadarGrid
-                accounts={companies.map((c) => ({
-                  ...c,
-                  departments: c.departments.map((d) => ({
-                    id: d.id,
-                    name: d.shortName,
-                    contactCount: d.contactCount,
-                    hasCampaign: d.hasCampaign,
-                  })),
-                }))}
-              />
-            }
+          <AccountRadarGrid accounts={accountsForRadar} />
+        }
         right={
           <>
             <MomentumThisWeek momentum={momentum} />

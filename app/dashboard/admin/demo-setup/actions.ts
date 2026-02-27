@@ -2,7 +2,10 @@
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { ensureDemoRoadmap } from '@/lib/demo/load-roadmap';
+import { getDemoPersona } from '@/lib/demo/context';
 import { revalidatePath } from 'next/cache';
+import { DepartmentType, DepartmentStatus } from '@prisma/client';
 
 const VERTICALS = ['saas', 'pharma', 'semiconductor', 'fintech'] as const;
 
@@ -230,3 +233,499 @@ export async function seedDemoData(companyId: string): Promise<{ ok: true } | { 
   if (!vis.ok) return vis;
   return { ok: true };
 }
+
+/**
+ * Seed AdaptiveRoadmap targets and contacts for demo personas so the
+ * Account Radar and Roadmap views have meaningful, Roadmap-driven data.
+ * Currently focuses on creating partner/division targets and relationship
+ * penetration for the demo scenarios.
+ */
+export async function seedDemoRoadmapForCompany(
+  companyId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Unauthorized' };
+  if (process.env.ALLOW_DEMO_SETUP !== 'true') return { ok: false, error: 'Demo setup not enabled' };
+
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, userId: session.user.id },
+    select: { id: true, name: true },
+  });
+  if (!company) return { ok: false, error: 'Company not found' };
+
+  const email = (session.user as { email?: string | null }).email ?? null;
+  const persona = getDemoPersona(email);
+  if (!persona) {
+    return { ok: false, error: 'Current user is not a recognized demo persona' };
+  }
+
+  // Ensure base roadmap exists
+  await ensureDemoRoadmap(session.user.id, email);
+  const roadmap = await prisma.adaptiveRoadmap.findFirst({
+    where: { userId: session.user.id },
+    select: { id: true, roadmapType: true },
+  });
+  if (!roadmap) return { ok: false, error: 'Failed to create or load AdaptiveRoadmap' };
+
+  if (persona === 'sercante') {
+    // Channel influence: partner = Salesforce; division = Enterprise Sales, Financial Services
+    // Use the selected company as the partner org for now.
+    let partnerTarget = await prisma.roadmapTarget.findFirst({
+      where: {
+        roadmapId: roadmap.id,
+        companyId: company.id,
+        targetType: 'company',
+      },
+    });
+    if (!partnerTarget) {
+      partnerTarget = await prisma.roadmapTarget.create({
+        data: {
+          roadmapId: roadmap.id,
+          targetType: 'company',
+          name: company.name,
+          companyId: company.id,
+          stage: 'Active Partner',
+        },
+      });
+    }
+
+    let fsDivision = await prisma.roadmapTarget.findFirst({
+      where: {
+        roadmapId: roadmap.id,
+        parentTargetId: partnerTarget.id,
+        targetType: 'division',
+      },
+    });
+    if (!fsDivision) {
+      fsDivision = await prisma.roadmapTarget.create({
+        data: {
+          roadmapId: roadmap.id,
+          targetType: 'division',
+          name: 'Enterprise Sales — Financial Services',
+          parentTargetId: partnerTarget.id,
+          stage: 'Building Relationships',
+        },
+      });
+    }
+
+    const existingContacts = await prisma.roadmapContact.count({
+      where: { targetId: fsDivision.id },
+    });
+    if (existingContacts === 0) {
+      await prisma.roadmapContact.createMany({
+        data: [
+          {
+            targetId: fsDivision.id,
+            personaRole: 'Partner AE',
+            connectionStatus: 'engaged',
+            relationshipStage: 'engaged',
+            territory: 'Enterprise Banking, West',
+            activeDealsInTerritory: 4,
+          },
+          {
+            targetId: fsDivision.id,
+            personaRole: 'Partner AE',
+            connectionStatus: 'connected',
+            relationshipStage: 'connected',
+            territory: 'Enterprise Insurance, National',
+            activeDealsInTerritory: 2,
+          },
+          {
+            targetId: fsDivision.id,
+            personaRole: 'Partner SE',
+            connectionStatus: 'champion',
+            relationshipStage: 'trusted_partner',
+            territory: 'Financial Services, West',
+            activeDealsInTerritory: 0,
+          },
+        ],
+      });
+    }
+
+    return { ok: true };
+  }
+
+  if (persona === 'nvidia_gm') {
+    // Enterprise expansion: GM divisions as roadmap targets + demo contacts/signals/plans
+    // Ensure a company-level target for GM
+    let gmTarget = await prisma.roadmapTarget.findFirst({
+      where: {
+        roadmapId: roadmap.id,
+        companyId: company.id,
+        targetType: 'company',
+      },
+    });
+    if (!gmTarget) {
+      gmTarget = await prisma.roadmapTarget.create({
+        data: {
+          roadmapId: roadmap.id,
+          targetType: 'company',
+          name: company.name,
+          companyId: company.id,
+          stage: 'Expanding',
+        },
+      });
+    }
+
+    type DivisionSeed = {
+      label: string;
+      type: DepartmentType;
+      stage: string;
+      notes: string;
+    };
+
+    const divisions: DivisionSeed[] = [
+      {
+        label: 'Vehicle Engineering & Simulation',
+        type: DepartmentType.ENGINEERING,
+        stage: 'Expansion Target',
+        notes:
+          'Ultium EV platform timelines and digital twin initiatives; heavy use of simulation (CFD/CAE) and battery thermal analysis.',
+      },
+      {
+        label: 'Autonomous Driving & ADAS (includes Cruise)',
+        type: DepartmentType.AUTONOMOUS_VEHICLES,
+        stage: 'Active Program',
+        notes:
+          'Cruise L4 robotaxis plus GM corporate AV/ADAS teams; needs scalable compute and simulation from development to deployment.',
+      },
+      {
+        label: 'Manufacturing & Supply Chain',
+        type: DepartmentType.MANUFACTURING_OPERATIONS,
+        stage: 'Expansion Target',
+        notes:
+          'Digital factories and supply chain optimization for Ultium plants; interest in quality control, predictive maintenance, and throughput.',
+      },
+      {
+        label: 'IT Infrastructure & AI Platform',
+        type: DepartmentType.IT_DATA_CENTER,
+        stage: 'Strategic Platform',
+        notes:
+          'DGX/HGX clusters and AI platform to support AV training, simulation, and broader enterprise AI workloads.',
+      },
+      {
+        label: 'Software-Defined Vehicle & Connected Services',
+        type: DepartmentType.CONNECTED_SERVICES,
+        stage: 'Emerging',
+        notes:
+          'Ultifi software-defined vehicle platform and connected services; in-vehicle AI and OTA feature roadmap.',
+      },
+    ];
+
+    // Create or update divisions, contacts, and roadmap contacts
+    for (const div of divisions) {
+      // Ensure CompanyDepartment exists
+      let dept = await prisma.companyDepartment.findUnique({
+        where: {
+          companyId_type: {
+            companyId: company.id,
+            type: div.type,
+          },
+        },
+      });
+      if (!dept) {
+        dept = await prisma.companyDepartment.create({
+          data: {
+            companyId: company.id,
+            type: div.type,
+            customName: div.label,
+            status: DepartmentStatus.EXPANSION_TARGET,
+            notes: div.notes,
+          },
+        });
+      } else if (!dept.customName || dept.customName !== div.label) {
+        await prisma.companyDepartment.update({
+          where: { id: dept.id },
+          data: { customName: div.label, notes: div.notes },
+        });
+      }
+
+      // Ensure RoadmapTarget division exists
+      let target = await prisma.roadmapTarget.findFirst({
+        where: {
+          roadmapId: roadmap.id,
+          parentTargetId: gmTarget.id,
+          companyDepartmentId: dept.id,
+          targetType: 'division',
+        },
+      });
+      if (!target) {
+        target = await prisma.roadmapTarget.create({
+          data: {
+            roadmapId: roadmap.id,
+            targetType: 'division',
+            name: div.label,
+            parentTargetId: gmTarget.id,
+            companyId: company.id,
+            companyDepartmentId: dept.id,
+            stage: div.stage,
+          },
+        });
+      }
+
+      // Create demo Contacts in the core contact model (1–2 per division)
+      const contactSeeds =
+        div.label === 'Vehicle Engineering & Simulation'
+          ? [
+              {
+                firstName: 'Alex',
+                lastName: 'Nguyen',
+                title: 'VP Vehicle Engineering',
+                email: 'alex.nguyen@gm.com',
+              },
+              {
+                firstName: 'Priya',
+                lastName: 'Srinivasan',
+                title: 'Director, Simulation & Digital Twins',
+                email: 'priya.srinivasan@gm.com',
+              },
+            ]
+          : div.label.startsWith('Autonomous Driving')
+            ? [
+                {
+                  firstName: 'David',
+                  lastName: 'Richardson',
+                  title: 'VP Autonomous Vehicle Engineering',
+                  email: 'david.richardson@gm.com',
+                },
+                {
+                  firstName: 'Maria',
+                  lastName: 'Lopez',
+                  title: 'Director, ADAS & Safety Systems',
+                  email: 'maria.lopez@gm.com',
+                },
+              ]
+            : [
+                {
+                  firstName: 'Jordan',
+                  lastName: 'Lee',
+                  title: `Director ${div.label}`,
+                  email: `jordan.lee+${div.type.toLowerCase()}@gm.com`,
+                },
+              ];
+
+      const contactIds: string[] = [];
+      for (const seed of contactSeeds) {
+        const existingCore = await prisma.contact.findFirst({
+          where: { companyId: company.id, email: seed.email },
+        });
+        if (existingCore) {
+          contactIds.push(existingCore.id);
+          continue;
+        }
+        const created = await prisma.contact.create({
+          data: {
+            firstName: seed.firstName,
+            lastName: seed.lastName,
+            email: seed.email,
+            title: seed.title,
+            companyId: company.id,
+            companyDepartmentId: dept.id,
+            linkedinUrl: `https://www.linkedin.com/in/${seed.firstName.toLowerCase()}-${seed.lastName.toLowerCase()}-gm`,
+            engagementScore: div.label.startsWith('Autonomous Driving') ? 70 : 30,
+            isResponsive: div.label.startsWith('Autonomous Driving'),
+          },
+        });
+        contactIds.push(created.id);
+      }
+
+      const existingContacts = await prisma.roadmapContact.count({
+        where: { targetId: target.id },
+      });
+      if (existingContacts === 0) {
+        await prisma.roadmapContact.createMany({
+          data: contactIds.map((contactId, index) => ({
+            targetId: target.id,
+            contactId,
+            personaRole:
+              index === 0 && div.label === 'Vehicle Engineering & Simulation'
+                ? 'Division Economic Buyer'
+                : index === 0 && div.label.startsWith('Autonomous Driving')
+                  ? 'AV Engineering Lead'
+                  : 'Division Stakeholder',
+            connectionStatus:
+              div.label.startsWith('Autonomous Driving') && index === 0 ? 'engaged' : 'identified',
+            relationshipStage:
+              div.label.startsWith('Autonomous Driving') && index === 0 ? 'engaged' : 'unknown',
+          })),
+        });
+      }
+    }
+
+    // Seed a small number of demo signals and plans so the dashboard
+    // immediately shows a realistic signal → plan flow.
+    const existingSignals = await prisma.accountSignal.count({
+      where: { companyId: company.id, userId: session.user.id },
+    });
+    if (existingSignals === 0) {
+      const now = new Date();
+      const earnings = await prisma.accountSignal.create({
+        data: {
+          companyId: company.id,
+          userId: session.user.id,
+          type: 'earnings_call',
+          title: 'GM earnings call: increased AV and digital factory investment',
+          summary:
+            'Latest GM earnings call highlighted accelerated investment in autonomous driving programs and digital manufacturing, especially for Ultium-powered vehicles.',
+          url: 'https://investor.gm.com/earnings/demo',
+          publishedAt: now,
+          relevanceScore: 9,
+          status: 'new',
+        },
+      });
+      const jobs = await prisma.accountSignal.create({
+        data: {
+          companyId: company.id,
+          userId: session.user.id,
+          type: 'job_posting_signal',
+          title: 'GM hiring Director, Simulation & Digital Twins',
+          summary:
+            'GM posted a role for Director, Simulation & Digital Twins focused on EV development and factory digitalization.',
+          url: 'https://careers.gm.com/job/demo-sim-director',
+          publishedAt: now,
+          relevanceScore: 8,
+          status: 'new',
+        },
+      });
+
+      // Simple rules/action mappings for the demo flow
+      const ruleEarnings = await prisma.roadmapSignalRule.create({
+        data: {
+          roadmapId: roadmap.id,
+          name: 'Earnings call — AV & digital factory',
+          category: 'earnings_call',
+          description: 'GM mentions investment in AV and digital manufacturing.',
+          keywords: ['earnings', 'autonomous', 'digital factory', 'Ultium'],
+          sources: ['news', 'financial_report'],
+          priorityWeight: 2,
+        },
+      });
+      const mappingEarnings = await prisma.roadmapActionMapping.create({
+        data: {
+          roadmapId: roadmap.id,
+          signalRuleId: ruleEarnings.id,
+          signalCategory: 'earnings_call',
+          actionType: 'generate_email',
+          autonomyLevel: 'draft_review',
+          promptHint:
+            'Draft an executive briefing email for the relevant GM division summarizing how NVIDIA can support the investments mentioned.',
+        },
+      });
+
+      const ruleJobs = await prisma.roadmapSignalRule.create({
+        data: {
+          roadmapId: roadmap.id,
+          name: 'Job posting — simulation & digital twins',
+          category: 'job_posting_signal',
+          description: 'New GM job postings for simulation and digital twin leadership.',
+          keywords: ['simulation', 'digital twin'],
+          sources: ['job_boards'],
+          priorityWeight: 1,
+        },
+      });
+      const mappingJobs = await prisma.roadmapActionMapping.create({
+        data: {
+          roadmapId: roadmap.id,
+          signalRuleId: ruleJobs.id,
+          signalCategory: 'job_posting_signal',
+          actionType: 'generate_email',
+          autonomyLevel: 'draft_review',
+          promptHint:
+            'Draft a short outreach email connecting NVIDIA Omniverse and GPU-accelerated simulation to the focus of this new role.',
+        },
+      });
+
+      // Attach one plan to Vehicle Engineering & Simulation and one to AV/ADAS
+      const vEngTarget = await prisma.roadmapTarget.findFirst({
+        where: { roadmapId: roadmap.id, name: 'Vehicle Engineering & Simulation' },
+      });
+      const avTarget = await prisma.roadmapTarget.findFirst({
+        where: { roadmapId: roadmap.id, name: { startsWith: 'Autonomous Driving' } },
+      });
+
+      if (vEngTarget) {
+        await prisma.roadmapPlan.create({
+          data: {
+            roadmapId: roadmap.id,
+            signalId: earnings.id,
+            signalRuleId: ruleEarnings.id,
+            actionMappingId: mappingEarnings.id,
+            targetId: vEngTarget.id,
+            status: 'pending',
+            autonomyLevel: 'draft_review',
+            previewPayload: {
+              subject: 'GM earnings: proposal to accelerate Ultium engineering timelines',
+              bodyPreview:
+                'GM’s latest earnings call highlighted increased investment in AV and digital factories. Here’s a tailored briefing for Vehicle Engineering & Simulation on how NVIDIA Omniverse and GPU-accelerated CAE/CFD can compress Ultium development by up to 50%.',
+            },
+            matchInfo: {
+              matchedKeywords: ['earnings', 'autonomous', 'digital factory'],
+              ruleName: ruleEarnings.name,
+              confidence: 0.9,
+            },
+          },
+        });
+      }
+
+      if (avTarget) {
+        await prisma.roadmapPlan.create({
+          data: {
+            roadmapId: roadmap.id,
+            signalId: earnings.id,
+            signalRuleId: ruleEarnings.id,
+            actionMappingId: mappingEarnings.id,
+            targetId: avTarget.id,
+            status: 'pending',
+            autonomyLevel: 'draft_review',
+            previewPayload: {
+              subject: 'Scaling Cruise learnings across GM’s AV and ADAS programs',
+              bodyPreview:
+                'The earnings call confirmed GM’s long-term commitment to both L4 Cruise robotaxis and L2+/L3 ADAS. This plan proposes a briefing to GM AV & ADAS leaders on standardizing on the NVIDIA DRIVE + Omniverse + DGX stack from development to deployment.',
+            },
+            matchInfo: {
+              matchedKeywords: ['earnings', 'autonomous'],
+              ruleName: ruleEarnings.name,
+              confidence: 0.9,
+            },
+          },
+        });
+      }
+
+      if (vEngTarget) {
+        await prisma.roadmapPlan.create({
+          data: {
+            roadmapId: roadmap.id,
+            signalId: jobs.id,
+            signalRuleId: ruleJobs.id,
+            actionMappingId: mappingJobs.id,
+            targetId: vEngTarget.id,
+            status: 'pending',
+            autonomyLevel: 'draft_review',
+            previewPayload: {
+              subject: 'Congrats on the new Simulation & Digital Twins leadership role',
+              bodyPreview:
+                'Saw GM is hiring a Director for Simulation & Digital Twins. This is a perfect moment to show how other OEMs are using NVIDIA Omniverse and GPU-accelerated simulation to hit aggressive EV timelines while cutting physical test costs by ~40%.',
+            },
+            matchInfo: {
+              matchedKeywords: ['simulation', 'digital twin'],
+              ruleName: ruleJobs.name,
+              confidence: 0.85,
+            },
+          },
+        });
+      }
+    }
+
+    return { ok: true };
+  }
+
+  // Other personas can be expanded later (e.g. Revenue Vessel/FedEx)
+  return { ok: true };
+
+    return { ok: true };
+  }
+
+  // Other personas can be expanded later (e.g. Revenue Vessel/FedEx)
+  return { ok: true };
+}
+
