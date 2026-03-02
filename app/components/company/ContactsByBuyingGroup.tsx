@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { WarmIndicator } from './WarmIndicator';
+import { FileText } from 'lucide-react';
 import { FindContactsModal } from './FindContactsModal';
 import {
   Select,
@@ -61,6 +62,17 @@ type Props = {
   /** Auto-open Add Contact modal with name pre-filled */
   autoAdd?: boolean;
   contactName?: string;
+  /** Open Prep Me panel with params (talking points for contact) */
+  onPrepMeOpen?: (params: {
+    companyId: string;
+    companyName: string;
+    divisionName?: string;
+    contactId?: string;
+    contactName?: string;
+    contactTitle?: string;
+    signalTitle?: string;
+    signalSummary?: string;
+  }) => void;
 };
 
 type Suggestion = {
@@ -79,6 +91,7 @@ export function ContactsByBuyingGroup({
   autoFind,
   autoAdd,
   contactName,
+  onPrepMeOpen,
 }: Props) {
   const [groups, setGroups] = useState<DepartmentGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -316,7 +329,24 @@ export function ContactsByBuyingGroup({
               <div className="space-y-2">
                 {group.contacts.map((contact) => (
                   <div key={contact.id} className="flex flex-col gap-2">
-                    <ContactRow contact={contact} />
+                    <ContactRow
+                      contact={contact}
+                      onPrepMe={
+                        onPrepMeOpen && group.department.name
+                          ? () => {
+                              const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
+                              onPrepMeOpen({
+                                companyId,
+                                companyName,
+                                divisionName: group.department.name,
+                                contactId: contact.id,
+                                contactName: name,
+                                contactTitle: contact.title ?? undefined,
+                              });
+                            }
+                          : undefined
+                      }
+                    />
                     {!group.department.id && (
                       <AssignToGroupRow
                         companyId={companyId}
@@ -433,11 +463,11 @@ function AssignToGroupRow({
   );
 }
 
-function ContactRow({ contact }: { contact: Contact }) {
+function ContactRow({ contact, onPrepMe }: { contact: Contact; onPrepMe?: () => void }) {
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
 
   return (
-    <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted">
+    <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted gap-2">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <WarmIndicator isWarm={contact.isWarm} />
         <div className="flex-1 min-w-0">
@@ -501,6 +531,18 @@ function ContactRow({ contact }: { contact: Contact }) {
           </div>
         </div>
       </div>
+      {onPrepMe && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="shrink-0 h-8 px-2 text-muted-foreground hover:text-foreground"
+          onClick={onPrepMe}
+          title="Prep Me — talking points for this contact"
+        >
+          <FileText className="h-4 w-4" />
+          <span className="sr-only">Prep</span>
+        </Button>
+      )}
     </div>
   );
 }

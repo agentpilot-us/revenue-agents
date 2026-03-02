@@ -10,7 +10,7 @@ const RegenerateSchema = z.object({
   contentId: z.string(),
   companyId: z.string(),
   divisionId: z.string().optional(),
-  channel: z.enum(['email', 'linkedin_inmail']),
+  channel: z.enum(['email', 'linkedin_inmail', 'linkedin_post', 'slack', 'sms', 'sales_page', 'presentation']),
   persona: z.enum(['csuite', 'vp', 'director', 'all']).optional(),
   contactIds: z.array(z.string()).optional(),
   triggerId: z.string().optional(),

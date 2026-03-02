@@ -4,7 +4,8 @@ export type ContentChannel =
   | 'linkedin_post'
   | 'slack'
   | 'sms'
-  | 'sales_page';
+  | 'sales_page'
+  | 'presentation';
 
 export type PersonaLevel = 'csuite' | 'vp' | 'director' | 'all';
 

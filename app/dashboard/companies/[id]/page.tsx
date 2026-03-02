@@ -2,8 +2,8 @@ import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
+import { getCaseStudiesForUI } from '@/lib/prompt-context';
 import { CompanyTabs } from '@/app/components/company/CompanyTabs';
-import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
 import { DepartmentStatus, ContentType } from '@prisma/client';
@@ -46,6 +46,10 @@ export default async function CompanyDetailPage({
     action?: string;
     contactName?: string;
     contentFilter?: string;
+    prepMe?: string;
+    signalTitle?: string;
+    signalSummary?: string;
+    divisionName?: string;
   }>;
 }) {
   const session = await auth();
@@ -76,6 +80,7 @@ export default async function CompanyDetailPage({
     contactName: search.contactName ?? undefined,
     contentFilter: search.contentFilter ?? undefined,
   };
+
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     select: {
@@ -118,6 +123,16 @@ export default async function CompanyDetailPage({
   });
 
   if (!company) notFound();
+
+  /** Prep Me from URL (e.g. from dashboard HotSignals "Prep Me" link). Opens panel on mount. */
+  const prepMeFromUrl =
+    search.prepMe
+      ? {
+          signalTitle: typeof search.signalTitle === 'string' ? search.signalTitle : undefined,
+          signalSummary: typeof search.signalSummary === 'string' ? search.signalSummary : undefined,
+          divisionName: typeof search.divisionName === 'string' ? search.divisionName : undefined,
+        }
+      : null;
 
   const companyProductsForTotals = await prisma.companyProduct.findMany({
     where: { companyId: id },
@@ -339,16 +354,19 @@ export default async function CompanyDetailPage({
   /** Edge case: URL references a division that was deleted (Spec 1). */
   const divisionInvalid = !!search.division && !divisionDept;
 
-  const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
-    where: {
-      userId: session.user.id,
-      type: { in: [ContentType.UseCase, ContentType.SuccessStory] },
-      isActive: true,
-    },
-    select: { id: true, title: true, type: true },
-    orderBy: { title: 'asc' },
-    take: 100,
-  });
+  const [contentLibraryForMessaging, caseStudies] = await Promise.all([
+    prisma.contentLibrary.findMany({
+      where: {
+        userId: session.user.id,
+        type: { in: [ContentType.UseCase, ContentType.SuccessStory] },
+        isActive: true,
+      },
+      select: { id: true, title: true, type: true },
+      orderBy: { title: 'asc' },
+      take: 100,
+    }),
+    getCaseStudiesForUI(session.user.id, company.industry ?? null),
+  ]);
 
   type DeptItem = (typeof departments)[number];
   const deptLabel = (d: { type: string; customName: string | null }) =>
@@ -531,16 +549,6 @@ export default async function CompanyDetailPage({
           </div>
         </div>
 
-        {initialTab === 'content' && (
-          <div className="mb-6">
-            <ProgressSteps
-              companyId={id}
-              companyName={company.name}
-              currentStep={!hasMessaging || !company.researchData || departments.length === 0 ? 1 : 2}
-            />
-          </div>
-        )}
-
         {/* Tabs: Overview, Buying Groups, Contacts, Content, Engagement, Signals (6-tab set) */}
         <div className="mb-6">
           <CompanyTabs
@@ -575,6 +583,7 @@ export default async function CompanyDetailPage({
             departments={departments}
             matrixDepartments={matrixDepartments}
             catalogProducts={catalogProducts}
+            caseStudies={caseStudies}
             activities={company.activities}
             contacts={company.contacts.map((c) => ({
               id: c.id,
@@ -586,6 +595,7 @@ export default async function CompanyDetailPage({
             accountMessaging={accountMessaging}
             contentLibraryUseCasesAndStories={contentLibraryForMessaging}
             initialTab={initialTab}
+            prepMeFromUrl={prepMeFromUrl}
             urlContext={divisionInvalid ? { ...urlContext, division: undefined } : urlContext}
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}

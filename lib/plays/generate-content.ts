@@ -22,7 +22,7 @@ import {
 } from '@/lib/content-library-rag';
 import { prisma } from '@/lib/db';
 
-export type GenerateContentType = 'email' | 'linkedin' | 'custom_url' | 'talking_points';
+export type GenerateContentType = 'email' | 'linkedin' | 'custom_url' | 'talking_points' | 'presentation';
 
 export async function generateOneContent(params: {
   companyId: string;
@@ -119,5 +119,22 @@ SUGGESTED NEXT STEP:
 - How to close the meeting and advance the deal
 
 Keep each section tight — this is a quick-reference sheet, not a script. Output plain text with the section headers above.`;
+
+    case 'presentation':
+      return `Generate a 3-5 slide presentation outline for a sales meeting with ${companyName}. Structure each slide as:
+
+SLIDE [N]: [Title]
+BULLETS:
+- [bullet point]
+SPEAKER NOTES: [what to say, 2-3 sentences]
+
+Suggested structure:
+Slide 1: Their world (account initiative/pain, not about us)
+Slide 2: How we map to that (product fit, specific to this division)
+Slide 3: Proof (case study or metric from a similar company)
+Slide 4: What changes for them (outcomes, not features)
+Slide 5: Suggested next step
+
+Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`;
   }
 }

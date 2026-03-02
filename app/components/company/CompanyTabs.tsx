@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
+import { PrepMePanel, type PrepMePanelParams } from '@/app/components/company/PrepMePanel';
 import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
 import type { EngagementRow } from '@/app/components/company/EngagementByBuyingGroup';
 import type { CampaignItem } from '@/app/components/company/CampaignsTab';
@@ -13,7 +14,7 @@ import { NextStepBar } from '@/app/components/company/NextStepBar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SignalDigest } from '@/app/components/company/SignalDigest';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 /** 6-tab set per Spec 2 (Tab Consolidation). No departments, campaigns, activity, messaging, map, expansion. */
 type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
@@ -63,6 +64,8 @@ type CompanyTabsProps = {
   departments: unknown[];
   matrixDepartments: unknown[];
   catalogProducts: unknown[];
+  /** Case studies for Division Intelligence Cards (Buying Groups tab). */
+  caseStudies?: Array<{ title: string; oneLiner: string; industry: string | null; department: string | null }>;
   activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
   contacts?: Array<{ id: string; firstName: string | null; lastName: string | null }>;
   contactCount: number;
@@ -102,6 +105,8 @@ type CompanyTabsProps = {
     contactName?: string;
     contentFilter?: string;
   };
+  /** When set (e.g. from dashboard Prep Me link), open Prep Me panel on mount with signal context */
+  prepMeFromUrl?: { signalTitle?: string; signalSummary?: string; divisionName?: string } | null;
 };
 
 const TABS: { id: TabId; label: string }[] = [
@@ -120,6 +125,7 @@ export function CompanyTabs({
   departments,
   matrixDepartments,
   catalogProducts,
+  caseStudies = [],
   activities,
   contactCount,
   expansionStrategy,
@@ -136,15 +142,49 @@ export function CompanyTabs({
   hasDepartments = false,
   hasContacts = false,
   urlContext,
+  prepMeFromUrl,
 }: CompanyTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'overview');
   const selectedDivision = urlContext?.division ?? null;
+  const [prepMeOpen, setPrepMeOpen] = useState(false);
+  const [prepMeParams, setPrepMeParams] = useState<PrepMePanelParams | null>(null);
+  const prepMeFromUrlOpened = useRef(false);
+
+  const openPrepMe = (params: PrepMePanelParams) => {
+    setPrepMeParams(params);
+    setPrepMeOpen(true);
+  };
 
   useEffect(() => {
     if (initialTab != null) setActiveTab(initialTab);
   }, [initialTab]);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (!prepMeFromUrl) {
+      prepMeFromUrlOpened.current = false;
+      return;
+    }
+    if (prepMeFromUrlOpened.current || !companyId || !companyName) return;
+    prepMeFromUrlOpened.current = true;
+    setPrepMeParams({
+      companyId,
+      companyName,
+      divisionName: prepMeFromUrl.divisionName,
+      signalTitle: prepMeFromUrl.signalTitle,
+      signalSummary: prepMeFromUrl.signalSummary,
+    });
+    setPrepMeOpen(true);
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    params.delete('prepMe');
+    params.delete('signalTitle');
+    params.delete('signalSummary');
+    params.delete('divisionName');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [prepMeFromUrl, companyId, companyName, pathname, router]);
 
   const setTab = (tabId: TabId) => {
     setActiveTab(tabId);
@@ -195,12 +235,22 @@ export function CompanyTabs({
         <div className="space-y-6">
           <DepartmentsTab
             companyId={companyId}
+            companyName={companyName}
             departments={departments as Parameters<typeof DepartmentsTab>[0]['departments']}
             segmentationStrategy={companyData?.segmentationStrategy}
             segmentationRationale={companyData?.segmentationRationale}
+            caseStudies={caseStudies}
+            onPrepMeOpen={openPrepMe}
           />
           <ExpansionStrategySection strategy={expansionStrategy} companyId={companyId} />
         </div>
+      )}
+
+      {prepMeOpen && prepMeParams && (
+        <PrepMePanel
+          {...prepMeParams}
+          onClose={() => setPrepMeOpen(false)}
+        />
       )}
 
       {activeTab === 'overview' && (
@@ -309,6 +359,7 @@ export function CompanyTabs({
           autoFind={urlContext?.action === 'find'}
           autoAdd={urlContext?.action === 'add'}
           contactName={urlContext?.contactName ?? undefined}
+          onPrepMeOpen={openPrepMe}
         />
       )}
 
@@ -342,7 +393,11 @@ export function CompanyTabs({
       )}
 
       {activeTab === 'signals' && (
-        <SignalDigestTab companyId={companyId} companyName={companyName} />
+        <SignalDigestTab
+          companyId={companyId}
+          companyName={companyName}
+          onPrepMeOpen={openPrepMe}
+        />
       )}
     </div>
   );
@@ -423,8 +478,23 @@ function BuyingGroupCoverageCard({
   );
 }
 
-function SignalDigestTab({ companyId, companyName }: { companyId: string; companyName: string }) {
-  return <SignalDigest companyId={companyId} companyName={companyName} days={7} />;
+function SignalDigestTab({
+  companyId,
+  companyName,
+  onPrepMeOpen,
+}: {
+  companyId: string;
+  companyName: string;
+  onPrepMeOpen?: (params: PrepMePanelParams) => void;
+}) {
+  return (
+    <SignalDigest
+      companyId={companyId}
+      companyName={companyName}
+      days={7}
+      onPrepMeOpen={onPrepMeOpen}
+    />
+  );
 }
 
 function ExpansionStrategySection({

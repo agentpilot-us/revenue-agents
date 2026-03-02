@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { buildContentUrl } from '@/lib/urls/content';
 
 type DepartmentOption = {
   id: string;
@@ -44,6 +46,11 @@ const MOCK_TRIGGER = {
 const CHANNELS = [
   { id: 'email', label: 'Email', icon: '✉', desc: 'Subject + 3–5 paragraph body' },
   { id: 'linkedin_inmail', label: 'LinkedIn InMail', icon: 'in', desc: '300 char hook + 1–2 paragraphs' },
+  { id: 'linkedin_post', label: 'LinkedIn Post', icon: '📝', desc: '1–3 paragraphs, conversational' },
+  { id: 'slack', label: 'Slack DM', icon: '💬', desc: '2–4 sentences, casual' },
+  { id: 'sms', label: 'Text / SMS', icon: '📱', desc: '160 chars or 2–3 sentences' },
+  { id: 'sales_page', label: 'Sales Page', icon: '🌐', desc: 'Outline hero + key value props' },
+  { id: 'presentation', label: 'Presentation', icon: '📊', desc: '3–5 slide outline with speaker notes for a sales meeting' },
 ] as const;
 
 const SENIORITY_LEVELS = [
@@ -93,6 +100,139 @@ const t = {
   amber: '#f59e0b',
 };
 
+type SlideItem = { slideNumber: number; title: string; bullets: string[]; speakerNotes: string };
+
+function PresentationSlidesOutput({
+  slides,
+  onCopyAll,
+  t: tokens,
+}: {
+  slides: SlideItem[];
+  onCopyAll: () => void;
+  t: typeof t;
+}) {
+  const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
+  const copySlide = (slide: SlideItem) => {
+    const text = `Slide ${slide.slideNumber}: ${slide.title}\n${slide.bullets.map((b) => `- ${b}`).join('\n')}${slide.speakerNotes ? `\nSpeaker notes: ${slide.speakerNotes}` : ''}`;
+    void navigator.clipboard.writeText(text);
+  };
+  return (
+    <div style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={onCopyAll}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            background: 'transparent',
+            border: `1px solid ${tokens.border}`,
+            color: tokens.text2,
+            cursor: 'pointer',
+          }}
+        >
+          Copy All
+        </button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {slides.map((slide) => (
+          <div
+            key={slide.slideNumber}
+            style={{
+              background: 'rgba(0,0,0,0.2)',
+              border: `1px solid ${tokens.border}`,
+              borderRadius: 8,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: `1px solid ${tokens.border}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 600, color: tokens.blue, flexShrink: 0 }}>
+                Slide {slide.slideNumber}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: tokens.text1, flex: 1, minWidth: 0 }}>
+                {slide.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => copySlide(slide)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: 'transparent',
+                  border: `1px solid ${tokens.border}`,
+                  color: tokens.text2,
+                  cursor: 'pointer',
+                }}
+              >
+                Copy Slide
+              </button>
+            </div>
+            <div style={{ padding: '12px 16px' }}>
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: tokens.text2, lineHeight: 1.6 }}>
+                {slide.bullets.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
+              </ul>
+              {slide.speakerNotes && (
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedNotes((prev) => ({
+                        ...prev,
+                        [slide.slideNumber]: !prev[slide.slideNumber],
+                      }))
+                    }
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: tokens.blue,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    {expandedNotes[slide.slideNumber] ? '▼' : '▶'} Speaker notes
+                  </button>
+                  {expandedNotes[slide.slideNumber] && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        padding: 10,
+                        borderRadius: 6,
+                        background: 'rgba(0,0,0,0.2)',
+                        fontSize: 12,
+                        color: tokens.text3,
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {slide.speakerNotes}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ContentTabV2({
   companyId,
   companyName,
@@ -105,6 +245,7 @@ export function ContentTabV2({
   autoCreate,
   initialContactId,
 }: Props) {
+  const router = useRouter();
   const [trigger] = useState(MOCK_TRIGGER);
 
   const initialDivisions = useMemo(
@@ -197,11 +338,18 @@ export function ContentTabV2({
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [generated, setGenerated] = useState<{
+    id?: string;
     subject?: string;
     hook?: string;
     body?: string;
+    slides?: Array<{ slideNumber: number; title: string; bullets: string[]; speakerNotes: string }>;
   } | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+  const [findingContacts, setFindingContacts] = useState(false);
+  const [findError, setFindError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedDivisionId) {
@@ -266,6 +414,27 @@ export function ContentTabV2({
 
   const selectedDiv = divisions.find((d) => d.id === selectedDivisionId);
 
+  // Keep URL in sync with Content tab state so deep-links remain shareable.
+  useEffect(() => {
+    const primaryContactId = selectedContacts[0];
+    const personaMap: Record<typeof seniorityFilter, 'csuite' | 'vp' | 'director' | 'all'> = {
+      'C-Suite': 'csuite',
+      VP: 'vp',
+      Director: 'director',
+      All: 'all',
+    };
+    const persona = personaMap[seniorityFilter];
+    const url = buildContentUrl({
+      companyId,
+      divisionId: selectedDivisionId ?? undefined,
+      channel: selectedChannel as 'email' | 'linkedin_inmail',
+      persona,
+      contactId: primaryContactId,
+      triggerId: signalId,
+    });
+    router.replace(url, { scroll: false });
+  }, [router, companyId, selectedDivisionId, selectedChannel, seniorityFilter, selectedContacts, signalId]);
+
   const toggleContact = (id: string) => {
     setSelectedContacts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -274,7 +443,8 @@ export function ContentTabV2({
   };
 
   const handleGenerate = async () => {
-    if (!selectedDivisionId || selectedContacts.length === 0) return;
+    if (!selectedDivisionId) return;
+    if (selectedChannel !== 'presentation' && selectedContacts.length === 0) return;
     setGenerateError(null);
     setIsGenerating(true);
     setIsGenerated(false);
@@ -308,9 +478,11 @@ export function ContentTabV2({
       }
       const data = await res.json();
       setGenerated({
+        id: data.contentId ?? undefined,
         subject: data.subject ?? undefined,
         hook: data.hook ?? undefined,
         body: data.body ?? '',
+        slides: Array.isArray(data.slides) ? data.slides : undefined,
       });
       setIsGenerated(true);
     } catch (e) {
@@ -319,6 +491,133 @@ export function ContentTabV2({
       );
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!generated?.id) {
+      await handleGenerate();
+      return;
+    }
+    setGenerateError(null);
+    setIsGenerating(true);
+    setIsGenerated(false);
+    try {
+      const personaMap: Record<typeof seniorityFilter, 'csuite' | 'vp' | 'director' | 'all'> = {
+        'C-Suite': 'csuite',
+        VP: 'vp',
+        Director: 'director',
+        All: 'all',
+      };
+      const res = await fetch('/api/content/regenerate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contentId: generated.id,
+          companyId,
+          divisionId: selectedDivisionId ?? undefined,
+          channel: selectedChannel,
+          persona: personaMap[seniorityFilter],
+          contactIds: selectedContacts,
+          triggerId: signalId,
+          activeActionIndex: activeAction,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setGenerateError(data?.error ?? 'Failed to regenerate content.');
+        return;
+      }
+      const data = await res.json();
+      setGenerated({
+        id: data.contentId ?? generated.id,
+        subject: data.subject ?? generated.subject,
+        hook: data.hook ?? generated.hook,
+        body: data.body ?? generated.body,
+        slides: Array.isArray(data.slides) ? data.slides : generated.slides,
+      });
+      setIsGenerated(true);
+    } catch (e) {
+      setGenerateError(
+        e instanceof Error ? e.message : 'Failed to regenerate content.'
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!generated?.body || selectedContacts.length === 0 || !selectedDivisionId) return;
+    setSendError(null);
+    setSendSuccess(null);
+    setSending(true);
+    try {
+      const res = await fetch('/api/content/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId,
+          divisionId: selectedDivisionId,
+          channel: selectedChannel,
+          contactIds: selectedContacts,
+          subject: generated.subject,
+          hook: generated.hook,
+          body: generated.body,
+          contentId: generated.id,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setSendError(data?.error ?? 'Failed to send content.');
+        return;
+      }
+      setSendSuccess(
+        selectedChannel === 'email'
+          ? 'Email ready to send (mock).'
+          : 'InMail ready to send (mock).'
+      );
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : 'Failed to send content.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleFindContacts = async () => {
+    if (!selectedDivisionId) return;
+    setFindError(null);
+    setFindingContacts(true);
+    try {
+      const res = await fetch(
+        `/api/companies/${companyId}/divisions/${selectedDivisionId}/contacts/find`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setFindError(data?.error ?? 'Failed to start contact discovery.');
+        return;
+      }
+      // After find completes, refetch contacts for this division
+      const data = await res.json();
+      if (Array.isArray(data.results) && data.results.length > 0) {
+        // Trigger a refresh by forcing contacts effect to re-run
+        setSelectedContacts([]);
+        setIsGenerated(false);
+      }
+    } catch (e) {
+      setFindError(
+        e instanceof Error ? e.message : 'Failed to start contact discovery.'
+      );
+    } finally {
+      setFindingContacts(false);
     }
   };
 
@@ -631,6 +930,7 @@ export function ContentTabV2({
                   <br />
                   <button
                     type="button"
+                    onClick={handleFindContacts}
                     style={{
                       color: t.blue,
                       background: 'none',
@@ -640,8 +940,19 @@ export function ContentTabV2({
                       marginTop: 4,
                     }}
                   >
-                    Find contacts with Exa →
+                    {findingContacts ? 'Finding contacts…' : 'Find contacts with Exa →'}
                   </button>
+                  {findError && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: 11,
+                        color: t.amber,
+                      }}
+                    >
+                      {findError}
+                    </div>
+                  )}
                 </div>
               ) : (
                 filteredContacts.map((c) => {
@@ -840,37 +1151,53 @@ export function ContentTabV2({
           </div>
 
           {/* Generate */}
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={selectedContacts.length === 0 || isGenerating}
-            style={{
-              width: '100%',
-              padding: 14,
-              borderRadius: 10,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: selectedContacts.length === 0 ? 'default' : 'pointer',
-              background:
-                selectedContacts.length === 0
-                  ? t.text4
-                  : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              border: 'none',
-              color: '#fff',
-              letterSpacing: '0.02em',
-              opacity: isGenerating ? 0.7 : 1,
-            }}
-          >
-            {isGenerating
+          {(() => {
+            const needContacts = selectedChannel !== 'presentation';
+            const canGenerate = selectedDivisionId && (needContacts ? selectedContacts.length > 0 : true);
+            const disabled = !canGenerate || isGenerating;
+            const label = isGenerating
               ? 'Generating...'
-              : selectedContacts.length === 0
-              ? 'Select contacts to generate'
-              : `Generate ${
-                  CHANNELS.find((c) => c.id === selectedChannel)?.label
-                } for ${selectedContacts.length} contact${
-                  selectedContacts.length > 1 ? 's' : ''
-                }`}
-          </button>
+              : !selectedDivisionId
+                ? 'Select a division'
+                : needContacts && selectedContacts.length === 0
+                  ? 'Select contacts to generate'
+                  : selectedChannel === 'presentation'
+                    ? `Generate ${CHANNELS.find((c) => c.id === selectedChannel)?.label}`
+                    : `Generate ${CHANNELS.find((c) => c.id === selectedChannel)?.label} for ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}`;
+            return (
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={disabled}
+                style={{
+                  width: '100%',
+                  padding: 14,
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: disabled ? 'default' : 'pointer',
+                  background: disabled ? t.text4 : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  border: 'none',
+                  color: '#fff',
+                  letterSpacing: '0.02em',
+                  opacity: isGenerating ? 0.7 : 1,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })()}
+          {(generateError || sendError || sendSuccess) && (
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                color: generateError || sendError ? t.amber : t.text2,
+              }}
+            >
+              {generateError || sendError || sendSuccess}
+            </div>
+          )}
         </div>
 
         {/* Right: content output */}
@@ -1041,12 +1368,14 @@ export function ContentTabV2({
                         color: t.text1,
                       }}
                     >
-                      {selectedChannel === 'email' ? 'Email' : 'LinkedIn InMail'}
+                      {CHANNELS.find((c) => c.id === selectedChannel)?.label ?? selectedChannel}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       type="button"
+                      onClick={handleRegenerate}
+                      disabled={isGenerating || !generated}
                       style={{
                         padding: '6px 14px',
                         borderRadius: 6,
@@ -1060,21 +1389,25 @@ export function ContentTabV2({
                     >
                       ↻ Regenerate
                     </button>
-                    <button
-                      type="button"
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: 6,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: 'transparent',
-                        border: `1px solid ${t.border}`,
-                        color: t.text2,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ✎ Edit
-                    </button>
+                    {selectedChannel !== 'presentation' && (
+                      <button
+                        type="button"
+                        onClick={handleSend}
+                        disabled={sending || !generated?.body || selectedContacts.length === 0}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: 'transparent',
+                          border: `1px solid ${t.border}`,
+                          color: t.text2,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✉ Send
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1141,26 +1474,45 @@ export function ContentTabV2({
                   </div>
                 )}
 
-                {/* Body */}
-                <div style={{ padding: '16px 20px' }}>
-                  <div
-                    style={{
-                      fontFamily:
-                        "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                      fontSize: 13,
-                      lineHeight: 1.7,
-                      color: t.text2,
-                      whiteSpace: 'pre-wrap',
-                      padding: 16,
-                      borderRadius: 8,
-                      background: 'rgba(0,0,0,0.2)',
-                      border: `1px solid ${t.border}`,
+                {/* Presentation slides */}
+                {selectedChannel === 'presentation' && generated?.slides && generated.slides.length > 0 && (
+                  <PresentationSlidesOutput
+                    slides={generated.slides}
+                    onCopyAll={() => {
+                      const text = generated.slides!
+                        .map(
+                          (s) =>
+                            `Slide ${s.slideNumber}: ${s.title}\n${s.bullets.map((b) => `- ${b}`).join('\n')}${s.speakerNotes ? `\nSpeaker notes: ${s.speakerNotes}` : ''}`
+                        )
+                        .join('\n\n');
+                      void navigator.clipboard.writeText(text);
                     }}
-                  >
-                    {generated?.body ??
-                      'Content generation not available for this channel.'}
+                    t={t}
+                  />
+                )}
+
+                {/* Body (email, linkedin, etc.) */}
+                {selectedChannel !== 'presentation' && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <div
+                      style={{
+                        fontFamily:
+                          "ui-monospace, 'Cascadia Code', Consolas, monospace",
+                        fontSize: 13,
+                        lineHeight: 1.7,
+                        color: t.text2,
+                        whiteSpace: 'pre-wrap',
+                        padding: 16,
+                        borderRadius: 8,
+                        background: 'rgba(0,0,0,0.2)',
+                        border: `1px solid ${t.border}`,
+                      }}
+                    >
+                      {generated?.body ??
+                        'Content generation not available for this channel.'}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}

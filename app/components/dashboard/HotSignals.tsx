@@ -88,6 +88,13 @@ export function HotSignals({ signals }: HotSignalsProps) {
                       {s.ctaLabel}
                     </Link>
 
+                    <Link
+                      href={`/dashboard/companies/${s.companyId}?tab=overview&prepMe=1&signalTitle=${encodeURIComponent(s.headline)}&signalSummary=${encodeURIComponent(s.description ?? '')}&divisionName=${encodeURIComponent(s.divisionName ?? '')}`}
+                      className={dash.btnSecondary}
+                    >
+                      Prep Me
+                    </Link>
+
                     {s.secondaryCtaLabel && s.secondaryCtaHref && (
                       <Link href={s.secondaryCtaHref} className={dash.btnSecondary}>
                         {s.secondaryCtaLabel}

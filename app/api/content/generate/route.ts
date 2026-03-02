@@ -21,7 +21,15 @@ import {
 const GenerateSchema = z.object({
   companyId: z.string(),
   divisionId: z.string().optional(),
-  channel: z.enum(['email', 'linkedin_inmail']),
+  channel: z.enum([
+    'email',
+    'linkedin_inmail',
+    'linkedin_post',
+    'slack',
+    'sms',
+    'sales_page',
+    'presentation',
+  ]),
   persona: z.enum(['csuite', 'vp', 'director', 'all']).optional(),
   contactIds: z.array(z.string()).optional(),
   triggerId: z.string().optional(),
@@ -151,15 +159,44 @@ export async function POST(req: NextRequest) {
     if (channel === 'email') {
       contentInstruction =
         'Generate an email: include a "Subject:" line first, then a blank line, then the email body (plain text, 2-4 short paragraphs). Use the context below for the target account and your company\'s messaging and value props.';
-    } else {
-      // linkedin_inmail
+    } else if (channel === 'linkedin_inmail') {
       contentInstruction =
         'Generate a LinkedIn InMail. First write a one-sentence hook not longer than 300 characters, prefixed with "HOOK:". Then a blank line, then the full InMail body prefixed with "BODY:". Use the context below for the target account and your company messaging. Output plain text only.';
+    } else if (channel === 'linkedin_post') {
+      contentInstruction =
+        'Generate a LinkedIn post: 1–3 short paragraphs, conversational and value-driven. Do NOT include any labels or markdown; output plain text only.';
+    } else if (channel === 'slack') {
+      contentInstruction =
+        'Generate a short Slack DM: 2–4 sentences, friendly but professional. Output plain text only.';
+    } else if (channel === 'sms') {
+      contentInstruction =
+        'Generate a brief SMS/text message: maximum 2–3 sentences, concise and clear. Output plain text only.';
+    } else if (channel === 'presentation') {
+      contentInstruction = `Generate a 3-5 slide presentation outline for a sales meeting with ${company.name}. Structure each slide as:
+
+SLIDE [N]: [Title]
+BULLETS:
+- [bullet point]
+SPEAKER NOTES: [what to say, 2-3 sentences]
+
+Suggested structure:
+Slide 1: Their world (account initiative/pain, not about us)
+Slide 2: How we map to that (product fit, specific to this division)
+Slide 3: Proof (case study or metric from a similar company)
+Slide 4: What changes for them (outcomes, not features)
+Slide 5: Suggested next step
+
+Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`;
+    } else {
+      // sales_page
+      contentInstruction =
+        'Generate a short outline for a division-specific sales page: include a headline, 3–5 bullet points of value props, and one suggested CTA label. Output as plain text with clear line breaks.';
     }
 
-    const systemPrompt = `You are a B2B sales content writer. The user is creating ${
-      channel === 'email' ? 'an email' : 'a LinkedIn InMail'
-    } for the target account "${company.name}".
+    const systemPrompt = `You are a B2B sales content writer. The user is creating ${channel.replace(
+      '_',
+      ' '
+    )} for the target account "${company.name}".
 ${personaLine}${departmentContext}${recipientsSection}
 
 ${contentInstruction}
@@ -176,12 +213,16 @@ ${messagingSection}${accountSection}${researchSection}`;
 
     const { text } = await generateText({
       model: getChatModel(),
-      maxOutputTokens: 1500,
+      maxOutputTokens: channel === 'presentation' ? 2500 : 1500,
       system: systemPrompt,
       prompt:
         channel === 'email'
           ? `Generate the email as specified. Output only the email text.`
-          : `Generate the InMail as specified. Output only the HOOK and BODY sections.`,
+          : channel === 'linkedin_inmail'
+            ? `Generate the InMail as specified. Output only the HOOK and BODY sections.`
+            : channel === 'presentation'
+              ? `Generate the presentation outline as specified. Output only the SLIDE/BULLETS/SPEAKER NOTES blocks.`
+              : `Generate the content as specified. Output only the raw text content.`,
     });
 
     const raw = text.trim();
@@ -206,22 +247,66 @@ ${messagingSection}${accountSection}${researchSection}`;
       });
     }
 
-    // linkedin_inmail
-    let hook = '';
-    let body = raw;
-    const hookMatch = raw.match(/HOOK:\s*(.+)/i);
-    if (hookMatch) {
-      hook = hookMatch[1].trim();
-      const bodyIndex = raw.toLowerCase().indexOf('body:');
-      if (bodyIndex >= 0) {
-        body = raw.slice(bodyIndex + 'body:'.length).trim();
+    if (channel === 'linkedin_inmail') {
+      let hook = '';
+      let body = raw;
+      const hookMatch = raw.match(/HOOK:\s*(.+)/i);
+      if (hookMatch) {
+        hook = hookMatch[1].trim();
+        const bodyIndex = raw.toLowerCase().indexOf('body:');
+        if (bodyIndex >= 0) {
+          body = raw.slice(bodyIndex + 'body:'.length).trim();
+        }
       }
+
+      return NextResponse.json({
+        contentId: crypto.randomUUID(),
+        hook,
+        body,
+      });
     }
 
+    if (channel === 'presentation') {
+      const slides: Array<{ slideNumber: number; title: string; bullets: string[]; speakerNotes: string }> = [];
+      const slideBlocks = raw.split(/\n(?=SLIDE\s*\d+\s*:)/im);
+      for (const block of slideBlocks) {
+        const numMatch = block.match(/^SLIDE\s*(\d+)\s*:\s*(.+?)(?=\n|$)/im);
+        if (!numMatch) continue;
+        const slideNumber = parseInt(numMatch[1], 10);
+        const title = numMatch[2].trim();
+        let bullets: string[] = [];
+        let speakerNotes = '';
+        const bulletsMatch = block.match(/BULLETS?\s*:\s*([\s\S]*?)(?=SPEAKER\s+NOTES\s*:|$)/im);
+        if (bulletsMatch) {
+          bullets = bulletsMatch[1]
+            .split(/\n/)
+            .map((l) => l.replace(/^[\s\-*]*/, '').trim())
+            .filter(Boolean);
+        }
+        const notesMatch = block.match(/SPEAKER\s+NOTES\s*:\s*([\s\S]*?)$/im);
+        if (notesMatch) {
+          speakerNotes = notesMatch[1].trim();
+        }
+        slides.push({ slideNumber, title, bullets, speakerNotes });
+      }
+      if (slides.length === 0) {
+        slides.push({
+          slideNumber: 1,
+          title: 'Presentation',
+          bullets: [raw],
+          speakerNotes: '',
+        });
+      }
+      return NextResponse.json({
+        contentId: crypto.randomUUID(),
+        slides,
+      });
+    }
+
+    // Other channels: body-only content
     return NextResponse.json({
       contentId: crypto.randomUUID(),
-      hook,
-      body,
+      body: raw,
     });
   } catch (error) {
     console.error('POST /api/content/generate error:', error);

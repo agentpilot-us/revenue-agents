@@ -7,6 +7,7 @@ import { discoverDepartments, type DiscoveredDepartment } from '@/app/actions/di
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { DivisionIntelligenceCard } from '@/app/dashboard/companies/[id]/buying-groups/DivisionIntelligenceCard';
 
 type TargetRoles = {
   economicBuyer?: string[];
@@ -52,16 +53,40 @@ type CompanyDepartmentWithRelations = {
   lastActivity: { summary: string; type: string; createdAt: Date } | null;
 };
 
+type CaseStudyForUI = {
+  title: string;
+  oneLiner: string;
+  industry: string | null;
+  department: string | null;
+};
+
+type PrepMePanelParams = {
+  companyId: string;
+  companyName: string;
+  divisionName?: string;
+  contactId?: string;
+  contactName?: string;
+  contactTitle?: string;
+  signalTitle?: string;
+  signalSummary?: string;
+};
+
 export function DepartmentsTab({
   companyId,
+  companyName,
   departments: initialDepartments,
   segmentationStrategy,
   segmentationRationale,
+  caseStudies = [],
+  onPrepMeOpen,
 }: {
   companyId: string;
+  companyName?: string;
   departments: CompanyDepartmentWithRelations[];
   segmentationStrategy?: string | null;
   segmentationRationale?: string | null;
+  caseStudies?: CaseStudyForUI[];
+  onPrepMeOpen?: (params: PrepMePanelParams) => void;
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
   useEffect(() => {
@@ -216,6 +241,44 @@ export function DepartmentsTab({
           </div>
         ) : (
           departments.map((dept) => {
+            const hasValueProp = !!dept.valueProp?.trim();
+            if (hasValueProp) {
+              const products = dept.companyProducts.map((cp) => ({
+                productName: cp.product.name,
+                relevance: cp.fitScore != null ? Number(cp.fitScore) : 0,
+                talkingPoint: cp.fitReasoning ?? null,
+              }));
+              const divisionName = dept.customName || dept.type.replace(/_/g, ' ');
+              return (
+                <DivisionIntelligenceCard
+                  key={dept.id}
+                  department={{
+                    id: dept.id,
+                    type: dept.type,
+                    customName: dept.customName,
+                    valueProp: dept.valueProp,
+                    useCase: dept.useCase,
+                    objectionHandlers: dept.objectionHandlers,
+                    targetRoles: dept.targetRoles,
+                    estimatedOpportunity: dept.estimatedOpportunity,
+                    _count: dept._count,
+                  }}
+                  products={products}
+                  caseStudies={caseStudies}
+                  companyId={companyId}
+                  onPrepMe={
+                    onPrepMeOpen && companyName
+                      ? () =>
+                          onPrepMeOpen({
+                            companyId,
+                            companyName,
+                            divisionName,
+                          })
+                      : undefined
+                  }
+                />
+              );
+            }
             const deptARR = dept.companyProducts
               .filter((cp) => cp.status === 'ACTIVE')
               .reduce((sum, cp) => sum + (cp.arr ?? 0), 0);
@@ -232,12 +295,15 @@ export function DepartmentsTab({
                 key={dept.id}
                 dept={dept}
                 companyId={companyId}
+                companyName={companyName}
                 deptARR={deptARR}
                 oppSum={oppSum}
                 topFit={topFit}
                 whyNow={whyNow}
                 statusColors={statusColors}
                 statusIcons={statusIcons}
+                showRunAccountIntelligence
+                onPrepMeOpen={onPrepMeOpen}
               />
             );
           })
@@ -250,21 +316,27 @@ export function DepartmentsTab({
 function BuyingGroupCard({
   dept: initialDept,
   companyId,
+  companyName,
   deptARR,
   oppSum,
   topFit,
   whyNow,
   statusColors,
   statusIcons,
+  showRunAccountIntelligence = false,
+  onPrepMeOpen,
 }: {
   dept: CompanyDepartmentWithRelations;
   companyId: string;
+  companyName?: string;
   deptARR: number;
   oppSum: number;
   topFit: { fitScore: number | null; fitReasoning: string | null } | undefined;
   whyNow: string | null;
   statusColors: Record<DepartmentStatus, string>;
   statusIcons: Record<DepartmentStatus, string>;
+  showRunAccountIntelligence?: boolean;
+  onPrepMeOpen?: (params: PrepMePanelParams) => void;
 }) {
   const [dept, setDept] = useState(initialDept);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -391,16 +463,42 @@ function BuyingGroupCard({
       {dept.contacts.length > 0 && (
         <div className="mb-3">
           <div className="text-xs font-medium text-muted-foreground uppercase mb-1">Contacts</div>
-          <ul className="text-sm space-y-0.5 text-card-foreground">
-            {dept.contacts.map((c) => (
-              <li key={c.id}>
-                {[c.firstName, c.lastName].filter(Boolean).join(' ').trim() || 'Unknown'}
-                {c.title && ` (${c.title})`}
-                {c.personaName && (
-                  <span className="text-muted-foreground"> — {c.personaName}</span>
-                )}
-              </li>
-            ))}
+          <ul className="text-sm space-y-1.5 text-card-foreground">
+            {dept.contacts.map((c) => {
+              const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
+              const divisionName = dept.customName || dept.type.replace(/_/g, ' ');
+              return (
+                <li key={c.id} className="flex items-center justify-between gap-2 py-1">
+                  <span>
+                    {fullName}
+                    {c.title && ` (${c.title})`}
+                    {c.personaName && (
+                      <span className="text-muted-foreground"> — {c.personaName}</span>
+                    )}
+                  </span>
+                  {onPrepMeOpen && companyName && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0 h-7 px-2 text-muted-foreground hover:text-foreground text-xs"
+                      onClick={() =>
+                        onPrepMeOpen({
+                          companyId,
+                          companyName,
+                          divisionName,
+                          contactId: c.id,
+                          contactName: fullName,
+                          contactTitle: c.title ?? undefined,
+                        })
+                      }
+                      title="Prep Me — talking points"
+                    >
+                      Prep
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -528,6 +626,18 @@ function BuyingGroupCard({
         </div>
       )}
 
+      {showRunAccountIntelligence && (
+        <div className="mb-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
+          <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+            Run Account Intelligence to get value prop, product fit, and objection handlers for this division.
+          </p>
+          <Button size="sm" asChild>
+            <Link href={`/dashboard/companies/${companyId}/intelligence`}>
+              Run Account Intelligence
+            </Link>
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 pt-3 border-t">
         <Button size="sm" asChild>
           <Link href={`/dashboard/companies/${companyId}/discover-contacts?department=${dept.id}`}>

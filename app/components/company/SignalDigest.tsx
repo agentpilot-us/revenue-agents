@@ -16,10 +16,22 @@ interface Signal {
   metadata: { contactId?: string; departmentId?: string; campaignId?: string };
 }
 
+type PrepMeOpenParams = {
+  companyId: string;
+  companyName: string;
+  divisionName?: string;
+  contactId?: string;
+  contactName?: string;
+  contactTitle?: string;
+  signalTitle?: string;
+  signalSummary?: string;
+};
+
 interface SignalDigestProps {
   companyId: string;
   companyName: string;
   days?: number;
+  onPrepMeOpen?: (params: PrepMeOpenParams) => void;
 }
 
 function formatDate(dateString: string): string {
@@ -89,7 +101,7 @@ function handleCTAAction(action: string, companyId: string) {
   }
 }
 
-export function SignalDigest({ companyId, companyName, days = 7 }: SignalDigestProps) {
+export function SignalDigest({ companyId, companyName, days = 7, onPrepMeOpen }: SignalDigestProps) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTier3, setShowTier3] = useState(false);
@@ -157,13 +169,30 @@ export function SignalDigest({ companyId, companyName, days = 7 }: SignalDigestP
                   <h4 className="font-semibold text-sm mb-1">{signal.headline}</h4>
                   <p className="text-sm opacity-90">{signal.description}</p>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleCTAAction(signal.cta.action, companyId)}
-                  className="shrink-0"
-                >
-                  {signal.cta.label}
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                  {onPrepMeOpen && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        onPrepMeOpen({
+                          companyId,
+                          companyName,
+                          signalTitle: signal.headline,
+                          signalSummary: signal.description,
+                        })
+                      }
+                    >
+                      Prep Me
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => handleCTAAction(signal.cta.action, companyId)}
+                  >
+                    {signal.cta.label}
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -176,35 +205,54 @@ export function SignalDigest({ companyId, companyName, days = 7 }: SignalDigestP
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             Strategic company changes
           </h3>
-          {tier2Signals.slice(0, 3).map((signal, idx) => (
-            <div
-              key={idx}
-              className={`rounded-lg border p-4 ${tierColor(signal.tier)}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium uppercase">
-                      {tierLabel(signal.tier)}
-                    </span>
-                    <span className="text-xs opacity-75">
-                      {formatDate(signal.date)}
-                    </span>
+          {tier2Signals.slice(0, 3).map((signal, idx) => {
+            return (
+              <div
+                key={idx}
+                className={`rounded-lg border p-4 ${tierColor(signal.tier)}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium uppercase">
+                        {tierLabel(signal.tier)}
+                      </span>
+                      <span className="text-xs opacity-75">
+                        {formatDate(signal.date)}
+                      </span>
+                    </div>
+                    <h4 className="font-semibold text-sm mb-1">{signal.headline}</h4>
+                    <p className="text-sm opacity-90">{signal.description}</p>
                   </div>
-                  <h4 className="font-semibold text-sm mb-1">{signal.headline}</h4>
-                  <p className="text-sm opacity-90">{signal.description}</p>
+                  <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    {onPrepMeOpen && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          onPrepMeOpen({
+                            companyId,
+                            companyName,
+                            signalTitle: signal.headline,
+                            signalSummary: signal.description,
+                          })
+                        }
+                      >
+                        Prep Me
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCTAAction(signal.cta.action, companyId)}
+                    >
+                      {signal.cta.label}
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleCTAAction(signal.cta.action, companyId)}
-                  className="shrink-0"
-                >
-                  {signal.cta.label}
-                </Button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -237,14 +285,33 @@ export function SignalDigest({ companyId, companyName, days = 7 }: SignalDigestP
                       <h4 className="font-medium text-sm mb-0.5">{signal.headline}</h4>
                       <p className="text-xs opacity-75">{signal.description}</p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleCTAAction(signal.cta.action, companyId)}
-                      className="shrink-0 text-xs"
-                    >
-                      {signal.cta.label}
-                    </Button>
+                    <div className="flex gap-2 shrink-0">
+                      {onPrepMeOpen && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs"
+                          onClick={() =>
+                            onPrepMeOpen({
+                              companyId,
+                              companyName,
+                              signalTitle: signal.headline,
+                              signalSummary: signal.description,
+                            })
+                          }
+                        >
+                          Prep Me
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleCTAAction(signal.cta.action, companyId)}
+                        className="text-xs"
+                      >
+                        {signal.cta.label}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
