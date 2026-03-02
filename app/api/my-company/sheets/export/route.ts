@@ -12,7 +12,6 @@ export async function GET() {
 
   const userId = session.user.id;
 
-  // @ts-expect-error MyCompanySheetConfig model is newly added; Prisma client types may not be regenerated yet.
   const config = await prisma.myCompanySheetConfig.findUnique({
     where: { userId },
   });
