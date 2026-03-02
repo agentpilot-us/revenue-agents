@@ -14,7 +14,6 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // @ts-expect-error MyCompanySheetConfig model is newly added; Prisma client types may not be regenerated yet.
   const config = await prisma.myCompanySheetConfig.findUnique({
     where: { userId: session.user.id },
   });
@@ -35,7 +34,6 @@ export async function PATCH(req: NextRequest) {
     const json = await req.json();
     const input = SheetConfigSchema.parse(json);
 
-    // @ts-expect-error MyCompanySheetConfig model is newly added; Prisma client types may not be regenerated yet.
     const config = await prisma.myCompanySheetConfig.upsert({
       where: { userId: session.user.id },
       update: {
