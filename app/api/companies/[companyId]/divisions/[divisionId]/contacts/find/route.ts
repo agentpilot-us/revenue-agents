@@ -2,12 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { findContactsForDepartment } from '@/app/actions/find-contacts';
+import type { SeniorityLevel } from '@/lib/contacts/resolve-search-context';
 
 const BodySchema = z.object({
   seniority: z
     .array(z.enum(['csuite', 'vp', 'director', 'manager_director', 'ic']))
     .optional(),
 });
+
+/** Map API seniority values to SeniorityLevel used by findContactsForDepartment. */
+const API_TO_SENIORITY_LEVEL: Record<string, SeniorityLevel> = {
+  csuite: 'c_level',
+  vp: 'vp',
+  director: 'manager_director',
+  manager_director: 'manager_director',
+  ic: 'specialist',
+};
 
 export async function POST(
   req: NextRequest,
@@ -27,10 +37,16 @@ export async function POST(
       // empty / invalid body falls back to defaults
     }
 
-    const seniorityLevels =
+    const rawLevels =
       body.seniority && body.seniority.length > 0
         ? body.seniority
         : (['vp', 'manager_director'] as const);
+    const seniorityLevels: SeniorityLevel[] = (() => {
+      const mapped = rawLevels
+        .map((s) => API_TO_SENIORITY_LEVEL[s])
+        .filter((s): s is SeniorityLevel => s != null);
+      return mapped.length > 0 ? mapped : (['vp', 'manager_director'] as SeniorityLevel[]);
+    })();
 
     const result = await findContactsForDepartment(
       companyId,
