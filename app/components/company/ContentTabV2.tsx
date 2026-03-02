@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type DepartmentOption = {
   id: string;
@@ -107,7 +107,7 @@ export function ContentTabV2({
 }: Props) {
   const [trigger] = useState(MOCK_TRIGGER);
 
-  const divisions = useMemo(
+  const initialDivisions = useMemo(
     () =>
       (departments.length > 0
         ? departments
@@ -115,9 +115,60 @@ export function ContentTabV2({
       ).map((d) => ({
         id: d.id,
         name: d.customName || d.type.replace(/_/g, ' '),
+        contactCount: 0,
       })),
     [departments]
   );
+
+  const [divisions, setDivisions] = useState(initialDivisions);
+  const [divisionsError, setDivisionsError] = useState<string | null>(null);
+  const [loadingDivisions, setLoadingDivisions] = useState(false);
+
+  useEffect(() => {
+    setDivisions(initialDivisions);
+  }, [initialDivisions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingDivisions(true);
+        setDivisionsError(null);
+        const res = await fetch(`/api/companies/${companyId}/divisions`);
+        if (!res.ok) {
+          throw new Error('Failed to load divisions');
+        }
+        const data = await res.json();
+        const apiDivisions = (data?.divisions ?? []) as Array<{
+          id: string;
+          name: string;
+          contactCount?: number;
+        }>;
+        if (!cancelled && Array.isArray(apiDivisions) && apiDivisions.length > 0) {
+          setDivisions(
+            apiDivisions.map((d) => ({
+              id: d.id,
+              name: d.name,
+              contactCount: d.contactCount ?? 0,
+            }))
+          );
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setDivisionsError(
+            e instanceof Error ? e.message : 'Unable to load divisions right now.'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDivisions(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
 
   const initialDivision =
     initialDepartmentId && divisions.some((d) => d.id === initialDepartmentId)
@@ -131,26 +182,89 @@ export function ContentTabV2({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
   const [activeAction, setActiveAction] = useState(0);
+  const [allContacts, setAllContacts] = useState<
+    Array<{
+      id: string;
+      name: string;
+      title: string | null;
+      email: string | null;
+      linkedin: boolean;
+      engagement: 'active' | 'warm' | 'cold' | 'new';
+      levelRank: number;
+      levelLabel: string;
+    }>
+  >([]);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [generated, setGenerated] = useState<{
+    subject?: string;
+    hook?: string;
+    body?: string;
+  } | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
-  // Phase-1 shell: single mock contact scoped to the current division.
-  const mockContacts = useMemo(
-    () => [
-      {
-        id: 'c1',
-        name: 'David Chen',
-        title: 'VP Vehicle Software Engineering',
-        level: 'VP',
-        email: 'd.chen@example.com',
-        linkedin: true,
-        engagement: 'new',
-      },
-    ],
-    []
-  );
+  useEffect(() => {
+    if (!selectedDivisionId) {
+      setAllContacts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingContacts(true);
+        setContactsError(null);
+        const res = await fetch(
+          `/api/companies/${companyId}/divisions/${selectedDivisionId}/contacts`
+        );
+        if (!res.ok) {
+          throw new Error('Failed to load contacts');
+        }
+        const data = await res.json();
+        const contacts = (data?.contacts ?? []) as Array<{
+          id: string;
+          name: string;
+          title: string | null;
+          email: string | null;
+          linkedin: boolean;
+          engagement: 'active' | 'warm' | 'cold' | 'new';
+          levelRank: number;
+          levelLabel: string;
+        }>;
+        if (!cancelled) {
+          setAllContacts(contacts);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setContactsError(
+            e instanceof Error ? e.message : 'Unable to load contacts right now.'
+          );
+          setAllContacts([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingContacts(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, selectedDivisionId]);
 
-  const filteredContacts = mockContacts; // persona filtering to be wired later
+  const filteredContacts = useMemo(() => {
+    if (!allContacts.length) return [];
+    const maxRank =
+      seniorityFilter === 'C-Suite'
+        ? 0
+        : seniorityFilter === 'VP'
+          ? 1
+          : seniorityFilter === 'Director'
+            ? 2
+            : 4;
+    return allContacts.filter((c) => c.levelRank <= maxRank);
+  }, [allContacts, seniorityFilter]);
 
-  const selectedDiv = divisions.find((d) => d.id === selectedDivisionId ?? undefined);
+  const selectedDiv = divisions.find((d) => d.id === selectedDivisionId);
 
   const toggleContact = (id: string) => {
     setSelectedContacts((prev) =>
@@ -159,26 +273,59 @@ export function ContentTabV2({
     setIsGenerated(false);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!selectedDivisionId || selectedContacts.length === 0) return;
+    setGenerateError(null);
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    setIsGenerated(false);
+    setGenerated(null);
+    try {
+      const personaMap: Record<typeof seniorityFilter, 'csuite' | 'vp' | 'director' | 'all'> = {
+        'C-Suite': 'csuite',
+        VP: 'vp',
+        Director: 'director',
+        All: 'all',
+      };
+      const res = await fetch('/api/content/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          companyId,
+          divisionId: selectedDivisionId,
+          channel: selectedChannel,
+          persona: personaMap[seniorityFilter],
+          contactIds: selectedContacts,
+          triggerId: signalId,
+          activeActionIndex: activeAction,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setGenerateError(data?.error ?? 'Failed to generate content.');
+        return;
+      }
+      const data = await res.json();
+      setGenerated({
+        subject: data.subject ?? undefined,
+        hook: data.hook ?? undefined,
+        body: data.body ?? '',
+      });
       setIsGenerated(true);
-    }, 600);
+    } catch (e) {
+      setGenerateError(
+        e instanceof Error ? e.message : 'Failed to generate content.'
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const engagementColor = (e: string) =>
     e === 'active' ? t.green : e === 'warm' ? t.amber : e === 'new' ? t.blue : t.text4;
 
-  const priorityColor =
-    trigger.priority === 'CRITICAL' ? t.red : trigger.priority === 'HIGH' ? t.amber : t.text3;
-
-  const generatedContent =
-    selectedChannel === 'email'
-      ? MOCK_EMAIL
-      : selectedChannel === 'linkedin_inmail'
-      ? MOCK_INMAIL
-      : null;
+  const priorityColor = trigger.priority === 'HIGH' ? t.amber : t.text3;
 
   return (
     <div
@@ -358,6 +505,7 @@ export function ContentTabV2({
                 setSelectedDivisionId(e.target.value || null);
                 setSelectedContacts([]);
                 setIsGenerated(false);
+                setGenerated(null);
               }}
               style={{
                 width: '100%',
@@ -375,9 +523,21 @@ export function ContentTabV2({
               {divisions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
+                  {d.contactCount ? ` (${d.contactCount})` : ''}
                 </option>
               ))}
             </select>
+            {divisionsError && (
+              <p
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: t.amber,
+                }}
+              >
+                {divisionsError}
+              </p>
+            )}
           </div>
 
           {/* Buying group */}
@@ -445,114 +605,152 @@ export function ContentTabV2({
               ))}
             </div>
 
-            {/* Contact list (mock) */}
+            {/* Contact list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {filteredContacts.map((c) => {
-                const selected = selectedContacts.includes(c.id);
-                return (
+              {loadingContacts ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: t.text4,
+                    textAlign: 'center',
+                    padding: 16,
+                  }}
+                >
+                  Loading contacts…
+                </div>
+              ) : filteredContacts.length === 0 ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: t.text4,
+                    textAlign: 'center',
+                    padding: 16,
+                  }}
+                >
+                  No contacts at this seniority level.
+                  <br />
                   <button
-                    key={c.id}
                     type="button"
-                    onClick={() => toggleContact(c.id)}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      background: selected ? t.blueBg : 'transparent',
-                      border: `1px solid ${
-                        selected ? t.blueBorder : t.border
-                      }`,
+                      color: t.blue,
+                      background: 'none',
+                      border: 'none',
                       cursor: 'pointer',
-                      textAlign: 'left',
-                      width: '100%',
+                      fontSize: 12,
+                      marginTop: 4,
                     }}
                   >
-                    <div
+                    Find contacts with Exa →
+                  </button>
+                </div>
+              ) : (
+                filteredContacts.map((c) => {
+                  const selected = selectedContacts.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleContact(c.id)}
                       style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 4,
-                        flexShrink: 0,
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        background: selected ? t.blue : 'transparent',
-                        border: `2px solid ${
-                          selected ? t.blue : t.border
+                        gap: 10,
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        background: selected ? t.blueBg : 'transparent',
+                        border: `1px solid ${
+                          selected ? t.blueBorder : t.border
                         }`,
-                        fontSize: 11,
-                        color: '#fff',
-                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
                       }}
                     >
-                      {selected ? '✓' : ''}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 4,
+                          flexShrink: 0,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: selected ? t.text1 : t.text2,
-                          }}
-                        >
-                          {c.name}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            letterSpacing: '0.06em',
-                            padding: '1px 5px',
-                            borderRadius: 3,
-                            background: `${engagementColor(c.engagement)}15`,
-                            color: engagementColor(c.engagement),
-                          }}
-                        >
-                          {c.engagement}
-                        </span>
-                      </div>
-                      <div
-                        style={{
+                          justifyContent: 'center',
+                          background: selected ? t.blue : 'transparent',
+                          border: `2px solid ${
+                            selected ? t.blue : t.border
+                          }`,
                           fontSize: 11,
-                          color: t.text3,
-                          marginTop: 1,
+                          color: '#fff',
+                          fontWeight: 700,
                         }}
                       >
-                        {c.title}
+                        {selected ? '✓' : ''}
                       </div>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-                        <span
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
                           style={{
-                            fontSize: 10,
-                            color: t.text4,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
                           }}
                         >
-                          ✉ {c.email}
-                        </span>
-                        {c.linkedin && (
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: selected ? t.text1 : t.text2,
+                            }}
+                          >
+                            {c.name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              letterSpacing: '0.06em',
+                              padding: '1px 5px',
+                              borderRadius: 3,
+                              background: `${engagementColor(c.engagement)}15`,
+                              color: engagementColor(c.engagement),
+                            }}
+                          >
+                            {c.engagement}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: t.text3,
+                            marginTop: 1,
+                          }}
+                        >
+                          {c.title}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
                           <span
                             style={{
                               fontSize: 10,
-                              color: t.blue,
+                              color: t.text4,
                             }}
                           >
-                            in LinkedIn
+                            ✉ {c.email}
                           </span>
-                        )}
+                          {c.linkedin && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: t.blue,
+                              }}
+                            >
+                              in LinkedIn
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -591,6 +789,7 @@ export function ContentTabV2({
                   onClick={() => {
                     setSelectedChannel(ch.id);
                     setIsGenerated(false);
+                    setGenerated(null);
                   }}
                   style={{
                     padding: '10px 10px',
@@ -880,7 +1079,7 @@ export function ContentTabV2({
                 </div>
 
                 {/* Subject / hook */}
-                {selectedChannel === 'email' && generatedContent && (
+                {selectedChannel === 'email' && generated && generated.subject && (
                   <div
                     style={{
                       padding: '12px 20px',
@@ -906,12 +1105,12 @@ export function ContentTabV2({
                         color: t.text1,
                       }}
                     >
-                      {generatedContent.subject}
+                      {generated.subject}
                     </div>
                   </div>
                 )}
 
-                {selectedChannel === 'linkedin_inmail' && generatedContent && (
+                {selectedChannel === 'linkedin_inmail' && generated && generated.hook && (
                   <div
                     style={{
                       padding: '12px 20px',
@@ -937,7 +1136,7 @@ export function ContentTabV2({
                         color: t.text1,
                       }}
                     >
-                      {generatedContent.hook}
+                      {generated.hook}
                     </div>
                   </div>
                 )}
@@ -958,8 +1157,8 @@ export function ContentTabV2({
                       border: `1px solid ${t.border}`,
                     }}
                   >
-                    {generatedContent?.body ??
-                      'Content generation not available for this channel in the demo shell.'}
+                    {generated?.body ??
+                      'Content generation not available for this channel.'}
                   </div>
                 </div>
               </div>
