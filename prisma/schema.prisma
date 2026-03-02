@@ -94,6 +94,10 @@ model User {
   playbookTemplates       PlaybookTemplate[]
   adaptiveRoadmaps        AdaptiveRoadmap[]
 
+  // My Company intelligence hub
+  internalDocuments      InternalDocument[]
+  myCompanySheetConfig   MyCompanySheetConfig?
+
   // Salesforce OAuth tokens (per-user)
   salesforceAccessToken    String?   @db.Text
   salesforceRefreshToken   String?   @db.Text
@@ -1051,6 +1055,44 @@ model CompanyProduct {
   @@index([companyDepartmentId])
   @@index([productId])
   @@index([status])
+}
+
+// Internal document store for "My Company" intelligence hub
+model InternalDocument {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String? @db.Text
+  source      String? // upload | url | note | integration
+  url         String?
+
+  tags     String[]
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Google Sheets configuration for My Company outbound sync
+model MyCompanySheetConfig {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  spreadsheetId String
+  sheetName     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
+  @@index([spreadsheetId])
 }
 
 // ============================================

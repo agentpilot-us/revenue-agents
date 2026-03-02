@@ -260,8 +260,61 @@ type SuccessStoryContent = {
   valueProp?: string;
 };
 
+/** Case study row for UI (Division Intelligence Cards, etc.). */
+export type CaseStudyForUI = {
+  title: string;
+  oneLiner: string;
+  industry: string | null;
+  department: string | null;
+};
+
+/**
+ * Return case studies as structured objects for UI (same filter logic as getCaseStudiesBlock).
+ */
+export async function getCaseStudiesForUI(
+  userId: string,
+  industry?: string | null,
+  department?: string | null
+): Promise<CaseStudyForUI[]> {
+  const where: { userId: string; type: typeof ContentType.SuccessStory; isActive: boolean } = {
+    userId,
+    type: ContentType.SuccessStory,
+    isActive: true,
+  };
+
+  const orConditions: Array<{ industry?: string | null; department?: string | null }> = [];
+  if (industry) {
+    orConditions.push({ industry }, { industry: null }, { industry: '' });
+  }
+  if (department) {
+    orConditions.push({ department });
+  }
+  if (orConditions.length > 0) {
+    (where as Record<string, unknown>).OR = orConditions;
+  }
+
+  const stories = await prisma.contentLibrary.findMany({
+    where: { ...where, archivedAt: null },
+    orderBy: [{ industry: 'desc' }, { department: 'desc' }, { title: 'asc' }],
+    take: 15,
+  });
+
+  return stories.map((s) => {
+    const content = (s.content as SuccessStoryContent | null) ?? {};
+    const headline = content.headline ?? s.title;
+    const oneLiner = content.oneLiner ?? content.valueProp ?? '';
+    return {
+      title: headline,
+      oneLiner,
+      industry: s.industry ?? null,
+      department: s.department ?? null,
+    };
+  });
+}
+
 /**
  * Build CASE STUDIES prompt block from ContentLibrary SuccessStory, filtered by industry/department.
+ * Uses getCaseStudiesForUI and formats the result for AI prompts.
  */
 export async function getCaseStudiesBlock(
   userId: string,

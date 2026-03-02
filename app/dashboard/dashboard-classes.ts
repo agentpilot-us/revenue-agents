@@ -151,7 +151,7 @@ export const PRIMARY_NAV_KEYS: string[] = [
   'Demo setup',
   'Waitlist',
   'Target Accounts',
-  'Your company data',
+  'My Company',
   'Analytics',
 ];
 

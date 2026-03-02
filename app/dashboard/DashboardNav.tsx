@@ -25,7 +25,7 @@ const navigation: Array<{
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Your Sales Map', href: '/dashboard/roadmap', icon: Map },
   { name: 'Target Accounts', href: '/dashboard/companies', icon: Building2 },
-  { name: 'Your company data', href: '/dashboard/content-library', icon: BookOpen },
+  { name: 'My Company', href: '/dashboard/my-company', icon: BookOpen },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Webhooks', href: '/dashboard/webhooks', icon: Bolt },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
