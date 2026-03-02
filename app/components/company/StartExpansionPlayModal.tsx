@@ -39,7 +39,7 @@ export function StartExpansionPlayModal({
     setLoading(true);
     onClose();
     // Single expansion flow: open company Messaging tab to work with the agent
-    router.push(`/dashboard/companies/${companyId}?tab=messaging`);
+    router.push(`/dashboard/companies/${companyId}?tab=content`);
     setLoading(false);
   };
 

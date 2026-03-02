@@ -104,13 +104,13 @@ export function AccountIntelligenceClient({
   useEffect(() => {
     if (!researchDone || !hasResearch) return;
     step2Ref.current?.scrollIntoView({ behavior: 'smooth' });
-    router.replace(pathname ?? `/dashboard/companies/${companyId}/intelligence`);
+    router.replace(pathname ?? `/dashboard/companies/${companyId}?tab=contacts`);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on researchDone; banner stays until user dismisses or URL replace hides it
   }, [researchDone, hasResearch, pathname, companyId, router]);
 
   const handleDismissBanner = () => {
     setBannerDismissed(true);
-    router.replace(pathname ?? `/dashboard/companies/${companyId}/intelligence`);
+    router.replace(pathname ?? `/dashboard/companies/${companyId}?tab=contacts`);
   };
 
   const handleGenerateMessaging = async () => {
@@ -823,7 +823,7 @@ export function AccountIntelligenceClient({
                   {generating ? 'Generating…' : hasMessaging ? 'Regenerate messaging' : 'Create messaging'}
                 </Button>
                 {hasMessaging && (
-                  <Link href={`/dashboard/companies/${companyId}?tab=messaging`}>
+                  <Link href={`/dashboard/companies/${companyId}?tab=content`}>
                     <Button variant="outline" size="sm" className="border-slate-600 text-slate-300">
                       View / edit messaging
                     </Button>

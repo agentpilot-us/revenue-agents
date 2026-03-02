@@ -15,17 +15,16 @@ import {
   Users,
   Map,
 } from 'lucide-react';
+import { dash, PRIMARY_NAV_KEYS, UTILITY_NAV_KEYS } from '@/app/dashboard/dashboard-classes';
 
 const navigation: Array<{
   name: string;
   href: string;
   icon: typeof Home;
-  badgeCount?: number;
 }> = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Your Roadmap', href: '/dashboard/roadmap', icon: Map },
-  { name: 'Target companies', href: '/dashboard/companies', icon: Building2 },
-  { name: 'Create content', href: '/dashboard/create-content', icon: FileText },
+  { name: 'Your Sales Map', href: '/dashboard/roadmap', icon: Map },
+  { name: 'Target Accounts', href: '/dashboard/companies', icon: Building2 },
   { name: 'Your company data', href: '/dashboard/content-library', icon: BookOpen },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Webhooks', href: '/dashboard/webhooks', icon: Bolt },
@@ -35,7 +34,8 @@ const navigation: Array<{
 
 export function DashboardNav({ allowDemoSetup = false }: { allowDemoSetup?: boolean }) {
   const pathname = usePathname();
-  const links = allowDemoSetup
+
+  const allLinks = allowDemoSetup
     ? [
         ...navigation.slice(0, 2),
         { name: 'Demo setup', href: '/dashboard/admin/demo-setup', icon: Presentation },
@@ -44,35 +44,45 @@ export function DashboardNav({ allowDemoSetup = false }: { allowDemoSetup?: bool
       ]
     : navigation;
 
+  const primaryLinks = allLinks.filter((l) => PRIMARY_NAV_KEYS.includes(l.name));
+  const utilityLinks = allLinks.filter((l) => UTILITY_NAV_KEYS.includes(l.name));
+
+  const renderLink = (item: (typeof allLinks)[number]) => {
+    const Icon = item.icon;
+    const isActive =
+      item.href === '/dashboard'
+        ? pathname === '/dashboard'
+        : pathname.startsWith(item.href);
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`${dash.sidebarNavItem} ${
+          isActive ? dash.sidebarNavItemActive : dash.sidebarNavItemDefault
+        }`}
+      >
+        <Icon
+          className={`${dash.sidebarNavIcon} ${
+            isActive ? dash.sidebarNavIconActive : dash.sidebarNavIconDefault
+          }`}
+        />
+        <span className="flex-1">{item.name}</span>
+      </Link>
+    );
+  };
+
   return (
-    <nav className="space-y-1">
-      {links.map((item) => {
-        const Icon = item.icon;
-        const isActive =
-          item.href === '/dashboard'
-            ? pathname === '/dashboard'
-            : pathname.startsWith(item.href);
-        const count = 0;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
-              isActive
-                ? 'bg-zinc-800 text-amber-400'
-                : 'text-slate-300 hover:bg-zinc-800 hover:text-white'
-            }`}
-          >
-            <Icon className="h-5 w-5 shrink-0" />
-            <span className="flex-1">{item.name}</span>
-            {count > 0 && (
-              <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-zinc-900">
-                {count > 99 ? '99+' : count}
-              </span>
-            )}
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <nav className={dash.sidebarNav}>
+        {primaryLinks.map(renderLink)}
+      </nav>
+
+      <div className={dash.sidebarDivider} />
+
+      <div className={dash.sidebarFooter}>
+        {utilityLinks.map(renderLink)}
+      </div>
+    </>
   );
 }

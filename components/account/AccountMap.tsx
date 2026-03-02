@@ -100,7 +100,7 @@ export const AccountMap: React.FC<AccountMapProps> = ({
         </div>
       </div>
 
-      {/* Columns by microsegment */}
+      {/* Columns by division */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {microsegments.map((segment) => {
           const segmentContacts = contacts.filter(

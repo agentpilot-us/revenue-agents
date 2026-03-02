@@ -36,7 +36,7 @@ export default async function CreateContentPage() {
             {companies.map((company) => (
               <li key={company.id}>
                 <Link
-                  href={`/dashboard/companies/${company.id}/create-content`}
+                  href={`/dashboard/companies/${company.id}?tab=content&contentFilter=sales-page&action=create`}
                   className="block rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 hover:border-gray-300 dark:hover:border-zinc-600 hover:shadow-sm transition-colors"
                 >
                   <p className="font-semibold text-gray-900 dark:text-gray-100">{company.name}</p>

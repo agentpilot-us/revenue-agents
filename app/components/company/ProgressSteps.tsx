@@ -13,13 +13,13 @@ const steps = [
   {
     id: 1 as const,
     label: 'Account Intelligence',
-    path: (id: string) => `/dashboard/companies/${id}/intelligence`,
+    path: (id: string) => `/dashboard/companies/${id}?tab=contacts&action=find`,
     description: 'Research account and identify departments',
   },
   {
     id: 2 as const,
     label: 'AI Powered Custom Sales Pages + Chat',
-    path: (id: string) => `/dashboard/companies/${id}?tab=campaigns`,
+    path: (id: string) => `/dashboard/companies/${id}?tab=content`,
     description: 'Create landing page with chat, launch to get URL',
   },
 ];

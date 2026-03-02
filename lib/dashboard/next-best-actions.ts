@@ -1,6 +1,29 @@
 import { prisma } from '@/lib/db';
 import { getSuggestedPlays } from '@/lib/plays/engine';
 import { buildNextBestActionHref } from '@/lib/dashboard/signal-play-href';
+import { buildContentUrl } from '@/lib/urls/content';
+
+/** Build company page URL with 6-tab set (Spec 1). */
+function companyTabUrl(
+  companyId: string,
+  opts: {
+    tab: 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
+    division?: string | null;
+    type?: string;
+    signal?: string;
+    action?: string;
+    contentFilter?: string;
+  }
+): string {
+  const params = new URLSearchParams();
+  params.set('tab', opts.tab);
+  if (opts.division) params.set('division', opts.division);
+  if (opts.type) params.set('type', opts.type);
+  if (opts.signal) params.set('signal', opts.signal);
+  if (opts.action) params.set('action', opts.action);
+  if (opts.contentFilter) params.set('contentFilter', opts.contentFilter);
+  return `/dashboard/companies/${companyId}?${params.toString()}`;
+}
 
 export type NextBestActionItem = {
   companyId: string;
@@ -12,6 +35,15 @@ export type NextBestActionItem = {
   ctaHref: string;
   playId?: string;
   priority: number; // lower = higher priority
+  // Roadmap division card (enterprise_expansion)
+  divisionTargetId?: string;
+  stage?: string;
+  situationSummary?: string;
+  recommendation?: string;
+  objectiveLine?: string;
+  secondaryCtaLabel?: string;
+  secondaryCtaHref?: string;
+  urgency?: string;
 };
 
 /**
@@ -49,10 +81,6 @@ export async function getNextBestActions(
   if (eventCampaign) {
     const companyName =
       companies.find((c) => c.id === eventCampaign.companyId)?.name ?? '';
-    const eventInviteParams = new URLSearchParams({
-      playId: 'event_invite',
-      signalTitle: 'Celigo CONNECT 2026 — Invitation',
-    });
     actions.push({
       companyId: eventCampaign.companyId,
       companyName,
@@ -60,12 +88,15 @@ export async function getNextBestActions(
       departmentName: '',
       label: 'Create sales page and invite users to the event',
       ctaLabel: 'Invite users to event',
-      ctaHref: `/dashboard/companies/${eventCampaign.companyId}/create-content?${eventInviteParams.toString()}`,
+      ctaHref: buildContentUrl({
+        companyId: eventCampaign.companyId,
+        channel: 'sales_page',
+      }),
       priority: 0,
     });
   }
 
-  // 1. Suggested plays — take ALL suggestions per company (up to 3), not just the first
+  // 1. Recommended plans — take ALL suggestions per company (up to 3), not just the first
   for (const company of companies) {
     const suggestions = await getSuggestedPlays(company.id, userId);
 
@@ -120,12 +151,10 @@ export async function getNextBestActions(
             departmentName: deptName,
             label: `${company.name} — ${triggerText}`,
             ctaLabel: 'Run "Open New Buying Group"',
-            ctaHref: buildNextBestActionHref({
+            ctaHref: buildContentUrl({
               companyId: company.id,
-              playId: 'new_buying_group',
-              segmentId: dept.id,
-              segmentName: deptName,
-              triggerText,
+              divisionId: dept.id,
+              channel: 'sales_page',
             }),
             playId: 'new_buying_group',
             priority: 0,
@@ -148,7 +177,11 @@ export async function getNextBestActions(
           departmentName: deptName,
           label: `${company.name} — Find contacts for ${deptName}`,
           ctaLabel: 'Find contacts',
-          ctaHref: `/dashboard/companies/${company.id}/departments/${dept.id}#contacts`,
+          ctaHref: companyTabUrl(company.id, {
+            tab: 'contacts',
+            division: dept.id,
+            action: 'find',
+          }),
           priority: 3,
         });
       }
@@ -191,7 +224,7 @@ export async function getNextBestActions(
         departmentName: '',
         label: `Open ${first!.name} to see next steps`,
         ctaLabel: 'Open account',
-        ctaHref: `/dashboard/companies/${first!.id}`,
+        ctaHref: companyTabUrl(first!.id, { tab: 'overview' }),
         priority: 5,
       },
     ];
@@ -211,4 +244,111 @@ export async function getNextUpSuggestions(
     return actions;
   }
   return actions.slice(0, 8);
+}
+
+const PERSONAS_NEEDED = 3;
+
+/**
+ * Roadmap-driven next best actions for enterprise_expansion: division-specific
+ * recommendations (research, create page placeholder, view page, find more contacts).
+ */
+export async function getNextBestActionsFromRoadmap(
+  userId: string,
+  roadmapId: string,
+  objectiveGoalText: string
+): Promise<NextBestActionItem[]> {
+  const { getDivisionCardsForRadar } = await import('@/lib/dashboard/division-radar');
+  const data = await getDivisionCardsForRadar(userId, roadmapId);
+  if (!data || data.divisions.length === 0) return [];
+
+  const actions: NextBestActionItem[] = [];
+  let priority = 0;
+  const isExpansion = (stage: string) =>
+    stage === 'Expansion Target' || stage === 'Active Program';
+
+  for (const d of data.divisions) {
+    const contacts = d.contactCount;
+    const salesPage = d.salesPageStatus;
+    const hasPage = salesPage === 'live' || salesPage === 'placeholder';
+
+    let situationSummary: string;
+    let recommendation: string;
+    let ctaLabel: string;
+    let ctaHref: string;
+    let secondaryCtaLabel: string | undefined;
+    let secondaryCtaHref: string | undefined;
+
+    const divId = d.companyDepartmentId ?? undefined;
+    if (contacts === 0) {
+      situationSummary = `No contacts identified yet.`;
+      recommendation = `Research the buying group to identify VP of AI/ML, LOB Owner, and IT Architecture Lead before building a sales page.`;
+      ctaLabel = 'Research Buying Group';
+      ctaHref = companyTabUrl(d.companyId, { tab: 'contacts', division: divId, action: 'find' });
+      secondaryCtaLabel = 'View Division';
+      secondaryCtaHref = companyTabUrl(d.companyId, { tab: 'overview', division: divId });
+    } else if (contacts < PERSONAS_NEEDED) {
+      if (hasPage) {
+        situationSummary = `Contacts: ${contacts} identified — buying group incomplete.`;
+        recommendation = `Expand the buying group — you have ${contacts} of ${PERSONAS_NEEDED}.`;
+        ctaLabel = 'Find More Contacts';
+        ctaHref = companyTabUrl(d.companyId, { tab: 'contacts', division: divId, action: 'find' });
+      } else {
+        situationSummary = `${contacts} contact${contacts !== 1 ? 's' : ''} identified, but no sales page.`;
+        recommendation = `Create a division-specific sales page to share with the buying group.`;
+        ctaLabel = 'Create Sales Page Placeholder';
+        ctaHref = buildContentUrl({
+          companyId: d.companyId,
+          divisionId: divId,
+          channel: 'sales_page',
+        });
+        secondaryCtaLabel = contacts > 1 ? 'View Contacts' : 'View Contact';
+        secondaryCtaHref = companyTabUrl(d.companyId, { tab: 'contacts', division: divId });
+      }
+    } else if (!hasPage) {
+      situationSummary = `${contacts} contacts identified, no sales page.`;
+      recommendation = `Buying group is mapped. Build a sales page to begin engagement.`;
+      ctaLabel = 'Create Sales Page Placeholder';
+      ctaHref = buildContentUrl({
+        companyId: d.companyId,
+        divisionId: divId,
+        channel: 'sales_page',
+      });
+      secondaryCtaLabel = 'View Contacts';
+      secondaryCtaHref = companyTabUrl(d.companyId, { tab: 'contacts', division: divId });
+    } else if (salesPage === 'placeholder') {
+      situationSummary = `Sales page placeholder created.`;
+      recommendation = `Waiting for HTML content.`;
+      ctaLabel = 'View Placeholder';
+      ctaHref = d.salesPageSlug ? `/go/${d.salesPageSlug}` : companyTabUrl(d.companyId, { tab: 'overview' });
+      secondaryCtaLabel = 'View Division';
+      secondaryCtaHref = companyTabUrl(d.companyId, { tab: 'overview', division: divId });
+    } else {
+      situationSummary = `Page is LIVE. ${contacts} contact${contacts !== 1 ? 's' : ''}. Consider expanding buying group.`;
+      recommendation = `Page is live. Consider expanding the buying group or starting outreach.`;
+      ctaLabel = 'View Page';
+      ctaHref = d.salesPageSlug ? `/go/${d.salesPageSlug}` : companyTabUrl(d.companyId, { tab: 'overview' });
+      secondaryCtaLabel = 'Find More Contacts';
+      secondaryCtaHref = companyTabUrl(d.companyId, { tab: 'contacts', division: divId });
+    }
+
+    actions.push({
+      companyId: d.companyId,
+      companyName: d.companyName,
+      departmentId: d.companyDepartmentId,
+      departmentName: d.name,
+      label: `${d.companyName} — ${d.name}: ${situationSummary}`,
+      ctaLabel,
+      ctaHref,
+      priority: priority++,
+      divisionTargetId: d.targetId,
+      stage: d.stage,
+      situationSummary,
+      recommendation,
+      objectiveLine: isExpansion(d.stage) ? `Advances objective: ${objectiveGoalText}` : undefined,
+      secondaryCtaLabel,
+      secondaryCtaHref,
+    });
+  }
+
+  return actions.slice(0, 6);
 }

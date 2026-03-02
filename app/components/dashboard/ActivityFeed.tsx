@@ -60,7 +60,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                       a.companyId && (
                         <>
                           <Link
-                            href={`/dashboard/companies/${a.companyId}${a.companyDepartmentId ? `/departments/${a.companyDepartmentId}` : ''}`}
+                            href={`/dashboard/companies/${a.companyId}${a.companyDepartmentId ? `?tab=overview&division=${a.companyDepartmentId}` : '?tab=overview'}`}
                             className="text-xs text-amber-400 hover:text-amber-300"
                           >
                             Draft emails →

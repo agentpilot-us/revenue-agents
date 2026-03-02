@@ -37,7 +37,7 @@ export function CampaignEngagementPreview({ campaignId, companyId }: Props) {
 
   if (loading) {
     return (
-      <div className="text-sm text-gray-500 dark:text-gray-400">Loading engagement metrics...</div>
+      <div className="text-sm text-muted-foreground">Loading engagement metrics...</div>
     );
   }
 
@@ -46,31 +46,31 @@ export function CampaignEngagementPreview({ campaignId, companyId }: Props) {
   }
 
   return (
-    <div className="mt-4 p-4 bg-gray-50 dark:bg-zinc-900 rounded-lg">
-      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+    <div className="mt-4 p-4 bg-muted rounded-lg">
+      <h4 className="text-sm font-semibold text-card-foreground mb-3">
         Engagement Preview
       </h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div>
-          <div className="text-gray-500 dark:text-gray-400">Visits</div>
-          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="text-muted-foreground">Visits</div>
+          <div className="text-lg font-semibold text-card-foreground">
             {metrics.totalVisits}
           </div>
         </div>
         <div>
-          <div className="text-gray-500 dark:text-gray-400">Unique Visitors</div>
-          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="text-muted-foreground">Unique Visitors</div>
+          <div className="text-lg font-semibold text-card-foreground">
             {metrics.uniqueVisitors}
           </div>
         </div>
         <div>
-          <div className="text-gray-500 dark:text-gray-400">Chat Interactions</div>
-          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="text-muted-foreground">Chat Interactions</div>
+          <div className="text-lg font-semibold text-card-foreground">
             {metrics.chatMessages}
           </div>
         </div>
         <div>
-          <div className="text-gray-500 dark:text-gray-400">CTA Clicks</div>
+          <div className="text-muted-foreground">CTA Clicks</div>
           <div className="text-lg font-semibold text-green-600 dark:text-green-400">
             {metrics.ctaClicks}
           </div>

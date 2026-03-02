@@ -38,7 +38,7 @@ export function AccountCard({
   };
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-5 hover:border-slate-600 transition-colors">
+    <div className="rounded-lg border border-border bg-card/80 p-5 hover:border-border transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Link

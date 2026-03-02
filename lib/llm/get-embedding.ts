@@ -1,11 +1,10 @@
 /**
  * Central embedding model for RAG (content library and messaging).
- * Default: Gemini when GOOGLE_GENERATIVE_AI_API_KEY is set (1536 dim to match DB);
- * otherwise OpenAI text-embedding-3-small.
+ * Prefer Google (Gemini) when GOOGLE_GENERATIVE_AI_API_KEY is set to avoid OpenAI quota/billing.
  *
  * Env:
- * - GOOGLE_GENERATIVE_AI_API_KEY (or LLM_PROVIDER=gemini) → Gemini gemini-embedding-001, 1536 dim
- * - else → OpenAI text-embedding-3-small (OPENAI_API_KEY)
+ * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini gemini-embedding-001, 1536 dim
+ * - else → OpenAI text-embedding-3-small (OPENAI_API_KEY); can hit quota errors.
  *
  * If you switch provider, re-ingest content so all vectors use the same dimension.
  */

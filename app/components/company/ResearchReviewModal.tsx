@@ -347,10 +347,10 @@ export function ResearchReviewModal({
             </section>
           )}
 
-          {/* Micro-Segments */}
+          {/* Divisions */}
           <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
             <div className="flex justify-between items-center mb-3">
-              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Micro-Segments</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Divisions</h2>
               <span className="text-xs text-green-600 dark:text-green-400">✅ AI Generated</span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">

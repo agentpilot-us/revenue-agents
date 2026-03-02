@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
@@ -41,8 +42,8 @@ export async function GET(_req: NextRequest) {
 
 type PutBody = {
   roadmapType?: string;
-  objective?: unknown;
-  contentStrategy?: unknown;
+  objective?: Prisma.InputJsonValue;
+  contentStrategy?: Prisma.InputJsonValue;
 };
 
 export async function PUT(req: NextRequest) {
@@ -58,7 +59,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const data: Pick<PutBody, 'roadmapType' | 'objective' | 'contentStrategy'> = {};
+  const data: Prisma.AdaptiveRoadmapUpdateInput = {};
   if (typeof body.roadmapType === 'string' && body.roadmapType.trim()) {
     data.roadmapType = body.roadmapType.trim();
   }
@@ -103,9 +104,9 @@ export async function PUT(req: NextRequest) {
     : await prisma.adaptiveRoadmap.create({
         data: {
           userId: session.user.id,
-          roadmapType: data.roadmapType ?? 'enterprise_expansion',
-          objective: data.objective ?? null,
-          contentStrategy: data.contentStrategy ?? null,
+          roadmapType: (typeof data.roadmapType === 'string' ? data.roadmapType : undefined) ?? 'enterprise_expansion',
+          objective: data.objective ?? undefined,
+          contentStrategy: data.contentStrategy ?? undefined,
         },
         include: {
           targets: {

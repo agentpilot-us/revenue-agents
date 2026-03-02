@@ -61,7 +61,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
   if (loading) {
     return (
       <div className="p-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">Loading research data...</p>
+        <p className="text-xs text-muted-foreground">Loading research data...</p>
       </div>
     );
   }
@@ -69,14 +69,14 @@ export function CompanyResearchDisplay({ companyId }: Props) {
   if (!researchData) {
     return (
       <div className="p-2 space-y-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-muted-foreground">
           No research data yet. Use &quot;Research with AI&quot; above, or{' '}
-          <Link href={`/dashboard/companies/${companyId}/intelligence`} className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link href={`/dashboard/companies/${companyId}?tab=contacts&action=find`} className="text-blue-600 dark:text-blue-400 hover:underline">
             set up Account Intelligence
           </Link>{' '}
           for the guided flow.
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-muted-foreground">
           You need your company name and at least one product in{' '}
           <Link href="/dashboard/content-library" className="text-blue-600 dark:text-blue-400 hover:underline">
             Your company data
@@ -99,10 +99,10 @@ export function CompanyResearchDisplay({ companyId }: Props) {
   if (!hasData) {
     return (
       <div className="p-2 space-y-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-muted-foreground">
           Research data exists but is empty. Use &quot;Research with AI&quot; above to populate account intelligence.
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-muted-foreground">
           Research requires your company name and at least one product in{' '}
           <Link href="/dashboard/content-library" className="text-blue-600 dark:text-blue-400 hover:underline">
             Your company data
@@ -116,7 +116,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <h3 className="text-sm font-semibold text-card-foreground">
           📊 Account Research
         </h3>
         <span className="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
@@ -128,7 +128,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
         {/* Company Basics */}
         {(researchData.employees || researchData.headquarters || researchData.revenue) && (
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Company Basics</h4>
+            <h4 className="font-medium text-card-foreground mb-1">Company Basics</h4>
             <div className="text-gray-600 dark:text-gray-300 space-y-0.5">
               {researchData.employees && <div>Employees: {researchData.employees}</div>}
               {researchData.headquarters && <div>HQ: {researchData.headquarters}</div>}
@@ -140,7 +140,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
         {/* Business Overview */}
         {researchData.businessOverview && (
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Business Overview</h4>
+            <h4 className="font-medium text-card-foreground mb-1">Business Overview</h4>
             <p className="text-gray-600 dark:text-gray-300">{researchData.businessOverview}</p>
           </div>
         )}
@@ -148,7 +148,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
         {/* Key Initiatives */}
         {researchData.keyInitiatives && researchData.keyInitiatives.length > 0 && (
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Key Initiatives</h4>
+            <h4 className="font-medium text-card-foreground mb-1">Key Initiatives</h4>
             <ul className="text-gray-600 dark:text-gray-300 space-y-0.5 list-disc list-inside">
               {researchData.keyInitiatives.map((initiative, i) => (
                 <li key={i}>{initiative}</li>
@@ -160,7 +160,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
         {/* Tech Stack Hints */}
         {researchData.techStack && researchData.techStack.length > 0 && (
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Tech Stack Hints</h4>
+            <h4 className="font-medium text-card-foreground mb-1">Tech Stack Hints</h4>
             <div className="flex flex-wrap gap-2">
               {researchData.techStack.map((tech, i) => (
                 <span
@@ -174,10 +174,10 @@ export function CompanyResearchDisplay({ companyId }: Props) {
           </div>
         )}
 
-        {/* Micro-Segments */}
+        {/* Divisions */}
         {researchData.departments && researchData.departments.length > 0 && (
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Micro-Segments</h4>
+            <h4 className="font-medium text-card-foreground mb-2">Divisions</h4>
             <div className="space-y-3">
               {researchData.departments.map((dept, i) => {
                 const deptName = dept.customName || dept.type.replace(/_/g, ' ');
@@ -194,7 +194,7 @@ export function CompanyResearchDisplay({ companyId }: Props) {
                     key={i}
                     className="border-l-2 border-blue-500 pl-3 py-1 bg-gray-50 dark:bg-zinc-700/50 rounded"
                   >
-                    <div className="font-medium text-gray-900 dark:text-gray-100">{deptName}</div>
+                    <div className="font-medium text-card-foreground">{deptName}</div>
                     {dept.useCase && (
                       <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
                         Use Case: {dept.useCase}

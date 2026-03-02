@@ -301,7 +301,7 @@ export async function GET(
         headline: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} (Score: ${s.relevanceScore})`,
         description: s.summary,
         cta: {
-          label: playLabel ? `Run ${playLabel} play` : 'View signal',
+          label: playLabel ? 'View Plan' : 'View signal',
           action: `activity:${companyId}`,
         },
         metadata: {},

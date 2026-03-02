@@ -65,11 +65,11 @@ export function AlertSettingsForm({
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-      <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
+      <div className="rounded-lg border border-border bg-card p-6">
         <label className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Enable Alerts</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+            <h3 className="font-semibold text-card-foreground">Enable Alerts</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               Get notified when high-value visitors engage with your landing pages
             </p>
           </div>
@@ -77,15 +77,15 @@ export function AlertSettingsForm({
             type="checkbox"
             checked={formData.enabled}
             onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-            className="rounded border-gray-300 dark:border-zinc-600"
+            className="rounded border-input"
           />
         </label>
       </div>
 
       {formData.enabled && (
         <>
-          <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Notification Channels</h3>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="font-semibold text-card-foreground mb-4">Notification Channels</h3>
             <div className="space-y-4">
               <label className="flex items-center gap-3">
                 <input
@@ -95,13 +95,13 @@ export function AlertSettingsForm({
                   className="rounded"
                 />
                 <div>
-                  <span className="font-medium text-gray-900 dark:text-gray-100">Email</span>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Send to {userEmail || 'your account email'}</p>
+                  <span className="font-medium text-card-foreground">Email</span>
+                  <p className="text-sm text-muted-foreground">Send to {userEmail || 'your account email'}</p>
                 </div>
               </label>
               {formData.email && (
                 <div className="ml-7 space-y-2">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Delivery</p>
+                  <p className="text-sm font-medium text-muted-foreground">Delivery</p>
                   <label className="flex items-center gap-2">
                     <input
                       type="radio"
@@ -110,7 +110,7 @@ export function AlertSettingsForm({
                       onChange={() => setFormData({ ...formData, emailDigest: 'instant' })}
                       className="rounded"
                     />
-                    <span className="text-gray-900 dark:text-gray-100">Instant (one email per alert)</span>
+                    <span className="text-card-foreground">Instant (one email per alert)</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -120,7 +120,7 @@ export function AlertSettingsForm({
                       onChange={() => setFormData({ ...formData, emailDigest: 'daily' })}
                       className="rounded"
                     />
-                    <span className="text-gray-900 dark:text-gray-100">Daily digest (one email per day)</span>
+                    <span className="text-card-foreground">Daily digest (one email per day)</span>
                   </label>
                 </div>
               )}
@@ -131,11 +131,11 @@ export function AlertSettingsForm({
                   onChange={(e) => setFormData({ ...formData, slack: e.target.checked })}
                   className="rounded"
                 />
-                <span className="font-medium text-gray-900 dark:text-gray-100">Slack</span>
+                <span className="font-medium text-card-foreground">Slack</span>
               </label>
               {formData.slack && (
                 <div className="ml-7">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Slack Webhook URL
                   </label>
                   <input
@@ -143,10 +143,10 @@ export function AlertSettingsForm({
                     value={formData.slackWebhookUrl}
                     onChange={(e) => setFormData({ ...formData, slackWebhookUrl: e.target.value })}
                     placeholder="https://hooks.slack.com/services/..."
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900"
+                    className="w-full px-3 py-2 border border-input rounded-lg bg-input"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                       Get your Slack webhook URL →
                     </a>
                   </p>
@@ -159,13 +159,13 @@ export function AlertSettingsForm({
                   onChange={(e) => setFormData({ ...formData, inApp: e.target.checked })}
                   className="rounded"
                 />
-                <span className="font-medium text-gray-900 dark:text-gray-100">In-App Notifications</span>
+                <span className="font-medium text-card-foreground">In-App Notifications</span>
               </label>
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Alert Types</h3>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="font-semibold text-card-foreground mb-4">Alert Types</h3>
             <div className="space-y-3">
               {[
                 { key: 'highValueVisitor', label: 'High-value visitor from target account', icon: '🎯' },
@@ -182,16 +182,16 @@ export function AlertSettingsForm({
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
                     className="rounded"
                   />
-                  <span className="text-gray-900 dark:text-gray-100">{icon} {label}</span>
+                  <span className="text-card-foreground">{icon} {label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-6">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Advanced</h3>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h3 className="font-semibold text-card-foreground mb-4">Advanced</h3>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Custom Webhook URL (optional)
               </label>
               <input
@@ -199,9 +199,9 @@ export function AlertSettingsForm({
                 value={formData.webhookUrl}
                 onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
                 placeholder="https://your-service.com/webhook"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-900"
+                className="w-full px-3 py-2 border border-input rounded-lg bg-input"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Integrate with Zapier, Make, or your own service</p>
+              <p className="text-xs text-muted-foreground mt-1">Integrate with Zapier, Make, or your own service</p>
             </div>
           </div>
         </>

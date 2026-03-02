@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { dash } from '@/app/dashboard/dashboard-classes';
 
 function formatRange(min: number, max: number): string {
   const fmt = (n: number) =>
@@ -16,42 +17,61 @@ type CompanyPipeline = {
 type PipelineBuiltProps = { companies: CompanyPipeline[] };
 
 export function PipelineBuilt({ companies }: PipelineBuiltProps) {
+  const totalPipeline = companies.reduce((s, c) => s + c.pipeline, 0);
+  const totalPotential = companies.reduce(
+    (acc, c) => {
+      if (c.potential) {
+        acc.min += c.potential.min;
+        acc.max += c.potential.max;
+      }
+      return acc;
+    },
+    { min: 0, max: 0 }
+  );
+
   return (
-    <section className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
-      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        Pipeline built
-      </h2>
+    <section className={dash.cardTight}>
+      <h2 className={`${dash.sectionTitle} mb-3`}>Pipeline Built</h2>
+
       {companies.length === 0 ? (
-        <p className="text-sm text-slate-500">No accounts yet.</p>
+        <p className={dash.emptyStateText}>No accounts yet.</p>
       ) : (
-        <ul className="space-y-2">
-          {companies.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
-              <Link
-                href={`/dashboard/companies/${c.id}`}
-                className="text-sm text-slate-200 hover:text-amber-400"
-              >
-                {c.name}
-              </Link>
-              {c.pipeline > 0 ? (
-                <span className="text-sm tabular-nums text-slate-400">
-                  ${(c.pipeline / 1000).toFixed(0)}K
-                </span>
-              ) : c.potential ? (
-                <span className="text-sm tabular-nums text-slate-400">
-                  {formatRange(c.potential.min, c.potential.max)}
-                </span>
-              ) : (
+        <>
+          {/* Total headline */}
+          {(totalPipeline > 0 || totalPotential.max > 0) && (
+            <div className="mb-3">
+              <div className="text-xl font-bold text-[var(--ap-text-primary)]">
+                {totalPipeline > 0
+                  ? `$${(totalPipeline / 1_000_000).toFixed(0)}M`
+                  : formatRange(totalPotential.min, totalPotential.max)}
+              </div>
+              <div className="text-[10px] text-[var(--ap-text-faint)] mt-0.5">
+                across {companies.length} account{companies.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )}
+
+          {/* Company list */}
+          <div className="space-y-0">
+            {companies.map((c) => (
+              <div key={c.id} className={dash.momentumRow}>
                 <Link
                   href={`/dashboard/companies/${c.id}`}
-                  className="text-sm text-amber-400/90 hover:text-amber-400"
+                  className="text-[12px] text-[var(--ap-text-secondary)] hover:text-[var(--ap-blue)] transition-colors truncate flex-1"
                 >
-                  Research complete — calculate →
+                  {c.name}
                 </Link>
-              )}
-            </li>
-          ))}
-        </ul>
+                <span className="text-[12px] tabular-nums font-medium text-[var(--ap-text-muted)] shrink-0 ml-2">
+                  {c.pipeline > 0
+                    ? `$${(c.pipeline / 1000).toFixed(0)}K`
+                    : c.potential
+                      ? formatRange(c.potential.min, c.potential.max)
+                      : '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

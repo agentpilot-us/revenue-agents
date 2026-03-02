@@ -116,15 +116,15 @@ export default async function SettingsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold mb-2 text-gray-900">Settings</h1>
-        <p className="text-gray-600 mb-8">
+        <h1 className="text-3xl font-bold mb-2 text-card-foreground">Settings</h1>
+        <p className="text-muted-foreground mb-8">
           Manage your connected services and preferences. Agent Configuration applies to all accounts.
         </p>
 
         {/* Tabs */}
-        <div className="mb-8 border-b border-gray-200">
+        <div className="mb-8 border-b border-border">
           <nav className="-mb-px flex space-x-8">
             <Link
               href="/dashboard/settings"
@@ -134,19 +134,19 @@ export default async function SettingsPage() {
             </Link>
             <Link
               href="/dashboard/messaging"
-              className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
+              className="border-transparent text-muted-foreground hover:text-foreground hover:border-border whitespace-nowrap py-4 px-1 border-b-2 font-medium"
             >
               Messaging frameworks
             </Link>
             <Link
               href="/dashboard/settings#your-company-data"
-              className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
+              className="border-transparent text-muted-foreground hover:text-foreground hover:border-border whitespace-nowrap py-4 px-1 border-b-2 font-medium"
             >
               Your company data
             </Link>
             <Link
               href="/dashboard/settings#profile"
-              className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium"
+              className="border-transparent text-muted-foreground hover:text-foreground hover:border-border whitespace-nowrap py-4 px-1 border-b-2 font-medium"
             >
               Profile
             </Link>
@@ -155,19 +155,19 @@ export default async function SettingsPage() {
 
         {/* Agent Configuration / Connected tools */}
         <div id="services" className="space-y-8">
-          <h2 className="text-xl font-semibold text-gray-900">Integrations</h2>
+          <h2 className="text-xl font-semibold text-card-foreground">Integrations</h2>
 
           {/* Salesforce */}
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-900">CRM</h3>
+            <h3 className="text-lg font-semibold mb-4 text-card-foreground">CRM</h3>
             <SalesforceSettingsBlock
               isConnected={isSalesforceConnected}
               lastSyncedAt={lastSalesforceSync?.salesforceLastSyncedAt ?? null}
             />
           </div>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8">Agent Configuration</h2>
-          <p className="text-gray-600 text-sm max-w-2xl">
+          <h2 className="text-xl font-semibold text-card-foreground mt-8">Agent Configuration</h2>
+          <p className="text-muted-foreground text-sm max-w-2xl">
             These connected tools are used by the expansion agent across all your accounts. They are configured once per workspace via environment variables (by your administrator). There is no per-account tool configuration.
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -178,21 +178,21 @@ export default async function SettingsPage() {
 
           {services.map((category) => (
             <div key={category.category}>
-              <h2 className="text-xl font-semibold mb-4 text-gray-900">{category.category}</h2>
+              <h2 className="text-xl font-semibold mb-4 text-card-foreground">{category.category}</h2>
 
               <div className="space-y-4">
                 {category.items.map((service) => (
                   <div
                     key={service.name}
-                    className="bg-white border border-gray-200 rounded-lg p-6"
+                    className="bg-card border border-border rounded-lg p-6"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
                         <div className="text-3xl">{service.icon}</div>
                         <div>
-                          <h3 className="font-semibold text-lg text-gray-900">{service.name}</h3>
-                          <p className="text-gray-600 text-sm">{service.description}</p>
-                          <p className="text-gray-500 text-sm mt-2">{service.stats}</p>
+                          <h3 className="font-semibold text-lg text-card-foreground">{service.name}</h3>
+                          <p className="text-muted-foreground text-sm">{service.description}</p>
+                          <p className="text-muted-foreground text-sm mt-2">{service.stats}</p>
                         </div>
                       </div>
                       <div>
@@ -201,7 +201,7 @@ export default async function SettingsPage() {
                             ✓ Connected
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-muted text-card-foreground">
                             Not Configured
                           </span>
                         )}
@@ -218,9 +218,9 @@ export default async function SettingsPage() {
                       />
                     )}
                     {service.name === 'Firecrawl' && service.status === 'not_configured' && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <p className="text-sm text-gray-600 mb-2">
-                          Get an API key at firecrawl.dev, add <code className="text-xs bg-gray-100 px-1 rounded">FIRECRAWL_API_KEY</code> to <code className="text-xs bg-gray-100 px-1 rounded">.env.local</code>, then restart the dev server.
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Get an API key at firecrawl.dev, add <code className="text-xs bg-muted px-1 rounded">FIRECRAWL_API_KEY</code> to <code className="text-xs bg-muted px-1 rounded">.env.local</code>, then restart the dev server.
                         </p>
                         <Link
                           href="/dashboard/content-library"
@@ -238,22 +238,22 @@ export default async function SettingsPage() {
 
           {/* Onboarding checklist */}
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-gray-100">Onboarding checklist</h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+            <h3 className="font-semibold text-lg mb-2 text-card-foreground">Onboarding checklist</h3>
+            <p className="text-muted-foreground text-sm mb-4">
               Complete these once to get the most from the agent:
             </p>
-            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li>• Set your company name (Profile below) for your company data matching</li>
               <li>• Upload content: products, industry playbooks, case studies (Your company data)</li>
               <li>• Connect tools above (Resend, Cal.com, etc.) — via env vars</li>
-              <li>• Add your first target company (Target companies → Add target company), then run Account Intelligence</li>
+              <li>• Add your first target account (Target Accounts → Add target account), then run Account Intelligence</li>
             </ul>
           </div>
 
           {/* Enterprise Add-ons */}
-          <div className="bg-gray-100 border border-gray-300 rounded-lg p-6">
-            <h3 className="font-semibold text-lg mb-2 text-gray-900">🔒 Enterprise Add-Ons</h3>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-muted border border-border rounded-lg p-6">
+            <h3 className="font-semibold text-lg mb-2 text-card-foreground">🔒 Enterprise Add-Ons</h3>
+            <p className="text-muted-foreground mb-4">
               Want to use your own Gmail, Salesforce, or custom integrations?
             </p>
             <a
@@ -275,12 +275,12 @@ export default async function SettingsPage() {
 
         {/* Your company data (content library) */}
         <div id="your-company-data" className="mt-12 pt-8 border-t border-gray-200">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900">Your company data</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Your company data</h2>
+          <p className="text-muted-foreground mb-4">
             Content library, products, catalog, industry playbooks, and messaging frameworks. Stored under Your company data / Content Library.
           </p>
-          <div className="bg-white border border-gray-200 rounded-lg p-6 dark:bg-zinc-800 dark:border-zinc-700">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <div className="bg-card border border-border rounded-lg p-6 dark:bg-zinc-800 dark:border-zinc-700">
+            <p className="text-muted-foreground mb-4">
               Permanently remove all your company data to start fresh. Your profile and target companies are not affected.
             </p>
             <DeleteYourCompanyDataButton />
@@ -289,7 +289,7 @@ export default async function SettingsPage() {
 
         {/* Profile section */}
         <div id="profile" className="mt-12 pt-8 border-t border-gray-200">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900">Profile</h2>
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Profile</h2>
           <UserProfileSettings 
             userId={user?.id ?? session.user.id}
             initialName={user?.name ?? (typeof session.user?.name === 'string' ? session.user.name : '')}
@@ -302,9 +302,9 @@ export default async function SettingsPage() {
 
         {/* Billing section */}
         <div className="mt-12 pt-8 border-t border-gray-200">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900">Billing</h2>
-          <div className="bg-white border border-gray-200 rounded-lg p-6 dark:bg-zinc-800 dark:border-zinc-700">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Billing</h2>
+          <div className="bg-card border border-border rounded-lg p-6 dark:bg-zinc-800 dark:border-zinc-700">
+            <p className="text-muted-foreground mb-4">
               Manage your subscription, view usage, and upgrade your plan.
             </p>
             <Link

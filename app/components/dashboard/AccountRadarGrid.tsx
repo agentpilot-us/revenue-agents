@@ -1,4 +1,8 @@
+import Link from 'next/link';
 import { AccountRadarCard } from './AccountRadarCard';
+import { DivisionRadarCard } from './DivisionRadarCard';
+import { dash } from '@/app/dashboard/dashboard-classes';
+import type { DivisionCard } from '@/lib/dashboard/division-radar';
 
 type Account = {
   id: string;
@@ -15,26 +19,60 @@ type Account = {
   }>;
 };
 
-type AccountRadarGridProps = { accounts: Account[] };
+type DivisionRadar = {
+  divisions: DivisionCard[];
+  companyName: string;
+  objectiveSummary: string;
+  expansionTargetCount: number;
+};
 
-export function AccountRadarGrid({ accounts }: AccountRadarGridProps) {
+type AccountRadarGridProps = {
+  accounts: Account[];
+  divisionRadar?: DivisionRadar | null;
+};
+
+export function AccountRadarGrid({ accounts, divisionRadar }: AccountRadarGridProps) {
+  if (divisionRadar && divisionRadar.divisions.length > 0) {
+    return (
+      <section>
+        <div className={dash.sectionHeader}>
+          <h2 className={dash.sectionTitle}>
+            Account Radar — {divisionRadar.companyName}
+          </h2>
+          <span className={dash.sectionSubtitle}>
+            {divisionRadar.divisions.length} divisions
+            {divisionRadar.expansionTargetCount > 0 &&
+              ` · ${divisionRadar.expansionTargetCount} expansion targets`}
+          </span>
+        </div>
+
+        <div className={dash.divisionCardGrid}>
+          {divisionRadar.divisions.map((d) => (
+            <DivisionRadarCard key={d.targetId} division={d} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className="rounded-lg">
-      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        Account radar
-      </h2>
+    <section>
+      <div className={dash.sectionHeader}>
+        <h2 className={dash.sectionTitle}>Account Radar</h2>
+      </div>
+
       {accounts.length === 0 ? (
-        <div className="rounded-lg border border-slate-700 bg-zinc-800/80 p-6 text-center">
-          <p className="text-slate-400 text-sm">No accounts yet.</p>
-          <a
+        <div className={`${dash.card} text-center py-8`}>
+          <p className={dash.emptyStateText}>No accounts yet.</p>
+          <Link
             href="/dashboard/companies/new"
-            className="mt-2 inline-block text-sm text-amber-400 hover:text-amber-300"
+            className={`${dash.btnPrimary} mt-3`}
           >
             Add your first target company →
-          </a>
+          </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={dash.divisionCardGrid}>
           {accounts.map((a) => (
             <AccountRadarCard
               key={a.id}

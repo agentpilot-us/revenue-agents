@@ -3,9 +3,37 @@ import { prisma } from '@/lib/db';
 import { getPlayDisplayName, type PlayId } from '@/lib/plays/plays-config';
 import { RELEVANCE_HOT_SIGNALS_MIN, RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
 import { buildNextBestActionHref } from '@/lib/dashboard/signal-play-href';
+import { resolveDivisionForSignal } from '@/lib/signals/division-resolution';
+import { buildContentUrl } from '@/lib/urls/content';
 
 const execPattern =
   /CFO|CIO|CTO|CISO|CEO|VP|Vice President|Head|President|Director/i;
+
+/** Build company page URL with 6-tab set and optional context (Spec 1). */
+function companyTabUrl(
+  companyId: string,
+  opts: {
+    tab: 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
+    division?: string | null;
+    type?: string;
+    signal?: string;
+    contact?: string;
+    action?: string;
+    contactName?: string;
+    contentFilter?: string;
+  }
+): string {
+  const params = new URLSearchParams();
+  params.set('tab', opts.tab);
+  if (opts.division) params.set('division', opts.division);
+  if (opts.type) params.set('type', opts.type);
+  if (opts.signal) params.set('signal', opts.signal);
+  if (opts.contact) params.set('contact', opts.contact);
+  if (opts.action) params.set('action', opts.action);
+  if (opts.contactName) params.set('contactName', opts.contactName);
+  if (opts.contentFilter) params.set('contentFilter', opts.contentFilter);
+  return `/dashboard/companies/${companyId}?${params.toString()}`;
+}
 
 export type HotSignal = {
   companyId: string;
@@ -21,8 +49,11 @@ export type HotSignal = {
   campaignId?: string;
   /** When set, this signal is from AccountSignal and can be dismissed via PATCH /api/signals/[id]/dismiss */
   signalId?: string;
-  /** When set, CTA is POST to run-play (use RunPlayButton), not navigation */
-  runPlaySignalId?: string;
+  /** Division name when roadmap is enterprise_expansion (no more "Run X play") */
+  divisionName?: string;
+  /** Secondary CTA e.g. View in Division */
+  secondaryCtaLabel?: string;
+  secondaryCtaHref?: string;
 };
 
 function classifyTier1(
@@ -47,8 +78,12 @@ function classifyTier1(
 /**
  * Returns hot signals (last 48h) across all user companies for the dashboard.
  * Tier 1 -> red, Tier 2 -> amber, Tier 3 -> green.
+ * When roadmap is enterprise_expansion, adds divisionName and Roadmap-aware CTAs (no "Run X play").
  */
-export async function getHotSignals(userId: string): Promise<HotSignal[]> {
+export async function getHotSignals(
+  userId: string,
+  options?: { roadmap?: { roadmapType: string } | null }
+): Promise<HotSignal[]> {
   const fortyEightHoursAgo = new Date();
   fortyEightHoursAgo.setHours(fortyEightHoursAgo.getHours() - 48);
 
@@ -60,6 +95,7 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
   const companyById = new Map(companies.map((c) => [c.id, c.name]));
 
   const signals: HotSignal[] = [];
+  const isRoadmapDriven = options?.roadmap?.roadmapType === 'enterprise_expansion';
 
   if (companyIds.length === 0) return signals;
 
@@ -98,6 +134,22 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
       ? visitsByCompany[visit.visitorCompany] ?? 0
       : 0;
 
+    const visitResolved =
+      isRoadmapDriven
+        ? await resolveDivisionForSignal({
+            userId,
+            companyId,
+            contactEmail: visit.visitorEmail ?? null,
+            companyDepartmentId: visit.departmentId ?? null,
+          })
+        : { division: null as { id: string; name: string } | null };
+    const divisionName = visitResolved.division?.name ?? null;
+    const divId = visitResolved.division?.id ?? visit.departmentId ?? undefined;
+    const viewInDivisionHref = companyTabUrl(companyId, {
+      tab: 'overview',
+      division: divId ?? undefined,
+    });
+
     if (classifyTier1(visit, visitCount)) {
       let headline = '';
       let description = '';
@@ -126,17 +178,23 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
           headline,
           description,
           ctaLabel: 'Draft follow-up email',
-          ctaHref: `/dashboard/companies/${companyId}${visit.departmentId ? `/departments/${visit.departmentId}` : ''}`,
+          ctaHref: companyTabUrl(companyId, {
+            tab: 'content',
+            division: divId,
+            type: 'email',
+          }),
           color: 'red',
           date: visit.visitedAt.toISOString(),
           departmentId: visit.departmentId ?? undefined,
           campaignId: visit.campaignId,
+          divisionName: divisionName ?? undefined,
+          secondaryCtaLabel: divisionName ? 'View in Division' : undefined,
+          secondaryCtaHref: divisionName ? viewInDivisionHref : undefined,
         });
       }
     } else {
-      // Tier 3: page view — when we have a known visitor, suggest Run play instead of View details
       const hasKnownVisitor = Boolean(visit.visitorEmail);
-      const playId = hasKnownVisitor ? 're_engagement' : undefined;
+      const playId = hasKnownVisitor && !isRoadmapDriven ? 're_engagement' : undefined;
       signals.push({
         companyId,
         companyName,
@@ -146,20 +204,31 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
         description: visit.visitorEmail
           ? `Visit from ${visit.visitorEmail}`
           : 'Anonymous page view',
-        ctaLabel: playId ? 'Run Re-Engagement play' : 'View details',
-        ctaHref: playId
-          ? buildNextBestActionHref({
-              companyId,
-              playId,
-              segmentId: visit.departmentId ?? undefined,
-              segmentName: visit.department?.customName ?? undefined,
-              triggerText: visit.visitorEmail ? `Page view from ${visit.visitorEmail}` : undefined,
-            })
-          : `/dashboard/companies/${companyId}`,
+        ctaLabel:
+          isRoadmapDriven
+            ? (hasKnownVisitor ? 'Draft Follow-Up' : 'View details')
+            : (playId ? 'View Plan' : 'View details'),
+        ctaHref:
+          isRoadmapDriven
+            ? (hasKnownVisitor
+                ? companyTabUrl(companyId, { tab: 'content', division: divId, type: 'email' })
+                : companyTabUrl(companyId, { tab: 'overview' }))
+            : playId
+              ? buildNextBestActionHref({
+                  companyId,
+                  playId,
+                  segmentId: visit.departmentId ?? undefined,
+                  segmentName: visit.department?.customName ?? undefined,
+                  triggerText: visit.visitorEmail ? `Page view from ${visit.visitorEmail}` : undefined,
+                })
+              : companyTabUrl(companyId, { tab: 'overview' }),
         color: 'green',
         date: visit.visitedAt.toISOString(),
         departmentId: visit.departmentId ?? undefined,
         campaignId: visit.campaignId,
+        divisionName: divisionName ?? undefined,
+        secondaryCtaLabel: divisionName ? 'View in Division' : undefined,
+        secondaryCtaHref: divisionName ? viewInDivisionHref : undefined,
       });
     }
   }
@@ -208,7 +277,10 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
       headline: `${activity.contact?.title ?? 'Contact'} replied to email`,
       description: `${contactName} responded to your outreach`,
       ctaLabel: 'View contact',
-      ctaHref: `/dashboard/companies/${activity.companyId}${activity.contactId ? `?contactId=${activity.contactId}` : ''}`,
+      ctaHref: companyTabUrl(activity.companyId, {
+        tab: 'contacts',
+        division: activity.companyDepartmentId ?? undefined,
+      }),
       color: isExec ? 'red' : 'green',
       date: activity.createdAt.toISOString(),
       contactId: activity.contactId ?? undefined,
@@ -236,19 +308,42 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
           ? 'amber'
           : 'green';
     const playLabel = getPlayDisplayName((s.suggestedPlay ?? undefined) as PlayId | undefined);
+    const useRoadmapCta = isRoadmapDriven;
+    const resolved =
+      useRoadmapCta
+        ? await resolveDivisionForSignal({
+            userId,
+            companyId: s.companyId,
+            signalTitle: s.title,
+            signalSummary: s.summary,
+          })
+        : { division: null as { id: string; name: string } | null };
+    const divisionId = resolved.division?.id;
+    const divisionName = resolved.division?.name;
+    const hasPlanLikeCta = useRoadmapCta || !!playLabel;
     signals.push({
       companyId: s.companyId,
       companyName: s.company.name,
       headline: s.title,
       description: s.summary,
-      ctaLabel: playLabel ? `Run ${playLabel} play` : 'View account',
-      ctaHref: playLabel
-        ? `/api/signals/${s.id}/run-play`
-        : `/dashboard/companies/${s.companyId}`,
+      ctaLabel: hasPlanLikeCta ? 'View Plan' : 'View account',
+      ctaHref: hasPlanLikeCta
+        ? buildContentUrl({
+            companyId: s.companyId,
+            triggerId: s.id,
+            divisionId: divisionId ?? undefined,
+            channel: 'email',
+          })
+        : companyTabUrl(s.companyId, { tab: 'overview' }),
       color,
       date: s.publishedAt.toISOString(),
       signalId: s.id,
-      runPlaySignalId: playLabel ? s.id : undefined,
+      departmentId: divisionId,
+      divisionName,
+      secondaryCtaLabel: divisionName ? 'View in Division' : undefined,
+      secondaryCtaHref: divisionName
+        ? companyTabUrl(s.companyId, { tab: 'overview', division: divisionId ?? undefined })
+        : undefined,
     });
   }
 
@@ -264,7 +359,7 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
     select: { id: true, title: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
   });
-  if (featureRelease) {
+  if (featureRelease && !isRoadmapDriven) {
     const dateLabel = featureRelease.createdAt.toLocaleDateString('en-US', {
       month: 'short',
       year: 'numeric',
@@ -275,7 +370,7 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
       companyName: '',
       headline: 'New feature release ready to share',
       description: `"${featureRelease.title}" — ${dateLabel}`,
-      ctaLabel: 'Run Feature Release play',
+      ctaLabel: 'View Plan',
       ctaHref:
         firstCompanyId
           ? buildNextBestActionHref({
@@ -294,7 +389,8 @@ export async function getHotSignals(userId: string): Promise<HotSignal[]> {
     (s) => !(s.headline === 'Page view' && s.description === 'Anonymous page view')
   );
 
-  // Sort by date descending
+  // Sort by date descending. Edge case: when multiple signals apply to the same division,
+  // we show the most recent first (latest by publishedAt/date); each CTA uses one signal per card.
   filtered.sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );

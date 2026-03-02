@@ -5,21 +5,18 @@ import Link from 'next/link';
 import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
 import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
 import type { EngagementRow } from '@/app/components/company/EngagementByBuyingGroup';
-import { AccountMessagingTab } from '@/app/components/company/AccountMessagingTab';
-import { CampaignsTab, type CampaignItem } from '@/app/components/company/CampaignsTab';
+import type { CampaignItem } from '@/app/components/company/CampaignsTab';
 import { SalesforceBlock } from '@/app/components/company/SalesforceBlock';
 import { ContactsByBuyingGroup } from '@/app/components/company/ContactsByBuyingGroup';
-import { ContentTab } from '@/app/components/company/ContentTab';
-import { ActivityTimeline } from '@/app/components/company/ActivityTimeline';
+import { ContentTabV2 as ContentTab } from '@/app/components/company/ContentTabV2';
 import { NextStepBar } from '@/app/components/company/NextStepBar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { AccountMap } from '@/components/account/AccountMap';
-import { ExpansionCanvas } from '@/components/account/ExpansionCanvas';
 import { SignalDigest } from '@/app/components/company/SignalDigest';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
-type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns' | 'map' | 'expansion';
+/** 6-tab set per Spec 2 (Tab Consolidation). No departments, campaigns, activity, messaging, map, expansion. */
+type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
 
 type AccountMessagingData = {
   id: string;
@@ -95,19 +92,25 @@ type CompanyTabsProps = {
   hasResearch?: boolean;
   hasDepartments?: boolean;
   hasContacts?: boolean;
+  /** URL context from searchParams for deep-links (Spec 1): division, type, signal, contact, action, contactName, contentFilter */
+  urlContext?: {
+    division?: string;
+    type?: string;
+    signal?: string;
+    contact?: string;
+    action?: string;
+    contactName?: string;
+    contentFilter?: string;
+  };
 };
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'departments', label: 'Buying Groups' },
+  { id: 'buying-groups', label: 'Buying Groups' },
   { id: 'contacts', label: 'Contacts' },
-  { id: 'campaigns', label: 'Sales Page' },
-  { id: 'engagement', label: 'Engagement' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'messaging', label: 'Messaging' },
   { id: 'content', label: 'Content' },
-  { id: 'expansion', label: 'Expansion' },
-  { id: 'map', label: 'Account Map' },
+  { id: 'engagement', label: 'Engagement' },
+  { id: 'signals', label: 'Signals' },
 ];
 
 export function CompanyTabs({
@@ -132,8 +135,12 @@ export function CompanyTabs({
   hasResearch = false,
   hasDepartments = false,
   hasContacts = false,
+  urlContext,
 }: CompanyTabsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'overview');
+  const selectedDivision = urlContext?.division ?? null;
 
   useEffect(() => {
     if (initialTab != null) setActiveTab(initialTab);
@@ -142,6 +149,10 @@ export function CompanyTabs({
   const setTab = (tabId: TabId) => {
     setActiveTab(tabId);
     onTabChange?.(tabId);
+    const params = new URLSearchParams();
+    params.set('tab', tabId);
+    if (selectedDivision) params.set('division', selectedDivision);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   return (
@@ -180,7 +191,7 @@ export function CompanyTabs({
         </nav>
       </div>
 
-      {activeTab === 'departments' && (
+      {activeTab === 'buying-groups' && (
         <div className="space-y-6">
           <DepartmentsTab
             companyId={companyId}
@@ -291,7 +302,14 @@ export function CompanyTabs({
       )}
 
       {activeTab === 'contacts' && (
-        <ContactsByBuyingGroup companyId={companyId} companyName={companyName} />
+        <ContactsByBuyingGroup
+          companyId={companyId}
+          companyName={companyName}
+          initialDepartmentId={urlContext?.division ?? undefined}
+          autoFind={urlContext?.action === 'find'}
+          autoAdd={urlContext?.action === 'add'}
+          contactName={urlContext?.contactName ?? undefined}
+        />
       )}
 
       {activeTab === 'content' && (
@@ -304,6 +322,12 @@ export function CompanyTabs({
             type: d.type,
           }))}
           hasMessaging={!!accountMessaging}
+          initialDepartmentId={urlContext?.division ?? undefined}
+          signalId={urlContext?.signal ?? undefined}
+          initialType={urlContext?.type ?? undefined}
+          contentFilter={urlContext?.contentFilter ?? undefined}
+          autoCreate={urlContext?.action === 'create'}
+          initialContactId={urlContext?.contact ?? undefined}
         />
       )}
 
@@ -317,43 +341,8 @@ export function CompanyTabs({
         </div>
       )}
 
-      {activeTab === 'messaging' && (
-        <AccountMessagingTab
-          companyId={companyId}
-          companyName={companyName}
-          initialData={accountMessaging as React.ComponentProps<typeof AccountMessagingTab>['initialData']}
-          contentLibrary={contentLibraryUseCasesAndStories}
-        />
-      )}
-
-      {activeTab === 'campaigns' && (
-        <CampaignsTab
-          companyId={companyId}
-          companyName={companyName}
-          initialCampaigns={campaigns}
-          departments={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
-            id: d.id,
-            customName: d.customName ?? null,
-            type: d.type,
-          }))}
-          companyData={companyData ? {
-            name: companyName,
-            website: companyData.website,
-            keyInitiatives: companyData.keyInitiatives,
-          } : undefined}
-        />
-      )}
-
-      {activeTab === 'activity' && (
+      {activeTab === 'signals' && (
         <SignalDigestTab companyId={companyId} companyName={companyName} />
-      )}
-
-      {activeTab === 'map' && (
-        <AccountMapTab companyId={companyId} companyName={companyName} domain={companyData?.domain || undefined} />
-      )}
-
-      {activeTab === 'expansion' && (
-        <ExpansionCanvasTab companyId={companyId} companyName={companyName} />
       )}
     </div>
   );
@@ -372,7 +361,7 @@ function GetStartedCard({
   hasDepartments: boolean;
   hasContacts: boolean;
 }) {
-  const intelligenceHref = `/dashboard/companies/${companyId}/intelligence`;
+  const intelligenceHref = `/dashboard/companies/${companyId}?tab=contacts&action=find`;
   return (
     <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
       <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Get started with {companyName}</h2>
@@ -431,110 +420,6 @@ function BuyingGroupCoverageCard({
         {withContacts} of {total} groups have contacts; {withLivePages} have live pages.
       </p>
     </div>
-  );
-}
-
-function AccountMapTab({ companyId, companyName, domain }: { companyId: string; companyName: string; domain?: string }) {
-  const router = useRouter();
-  const [data, setData] = React.useState<{ account: { name: string; domain?: string }; microsegments: any[]; contacts: any[] } | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch(`/api/companies/${companyId}/account-map`);
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      } catch (error) {
-        console.error('Failed to fetch account map data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [companyId]);
-
-  if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading account map...</div>;
-  }
-
-  if (!data) {
-    return <div className="p-6 text-center text-red-500">Failed to load account map data</div>;
-  }
-
-  return (
-    <AccountMap
-      accountName={data.account.name}
-      domain={data.account.domain || domain}
-      microsegments={data.microsegments}
-      contacts={data.contacts}
-      onOpenContactActivity={(contactId) => {
-        router.push(`/dashboard/companies/${companyId}/contacts/${contactId}`);
-      }}
-      onOpenSegmentPage={(segmentId) => {
-        router.push(`/dashboard/companies/${companyId}/segments/${segmentId}/page`);
-      }}
-      onOpenContactDiscovery={(segmentId) => {
-        router.push(`/dashboard/companies/${companyId}/discover-contacts?departmentId=${segmentId}`);
-      }}
-    />
-  );
-}
-
-function ExpansionCanvasTab({ companyId, companyName }: { companyId: string; companyName: string }) {
-  const router = useRouter();
-  const [data, setData] = React.useState<{ microsegments: any[] } | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch(`/api/companies/${companyId}/expansion-canvas`);
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      } catch (error) {
-        console.error('Failed to fetch expansion canvas data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [companyId]);
-
-  if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading expansion canvas...</div>;
-  }
-
-  if (!data) {
-    return <div className="p-6 text-center text-red-500">Failed to load expansion canvas data</div>;
-  }
-
-  return (
-    <ExpansionCanvas
-      accountName={companyName}
-      microsegments={data.microsegments}
-      onCreateSegmentPage={(segmentId) => {
-        router.push(`/dashboard/companies/${companyId}?tab=campaigns&departmentIds=${segmentId}`);
-      }}
-      onOpenSegmentPage={(segmentId, pageUrl) => {
-        if (pageUrl) {
-          window.open(pageUrl, '_blank');
-        } else {
-          router.push(`/dashboard/companies/${companyId}/segments/${segmentId}/page`);
-        }
-      }}
-      onOpenEngagementPlay={(segmentId) => {
-        router.push(`/dashboard/companies/${companyId}/segments/${segmentId}/engage`);
-      }}
-      onOpenChampionExpansion={(segmentId) => {
-        // TODO: Open champion expansion modal
-        router.push(`/chat?play=expansion&accountId=${companyId}&segmentId=${segmentId}`);
-      }}
-    />
   );
 }
 

@@ -134,7 +134,7 @@ export function ResearchCompleteScreen({ results }: ResearchCompleteScreenProps)
           <Link
             href={`/dashboard/companies/${results.companyId}/plays/run?suggested=true`}
           >
-            Launch first play →
+            Launch first plan →
           </Link>
         </Button>
       </div>

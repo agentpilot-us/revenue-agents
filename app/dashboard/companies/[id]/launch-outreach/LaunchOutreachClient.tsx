@@ -70,70 +70,70 @@ export function LaunchOutreachClient({
 
   const handleLaunchAgent = () => {
     // Single expansion flow: open company Messaging tab to work with the agent
-    router.push(`/dashboard/companies/${companyId}?tab=messaging`);
+    router.push(`/dashboard/companies/${companyId}?tab=content`);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/companies/${companyId}/contacts`} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+        <Link href={`/dashboard/companies/${companyId}/contacts`} className="text-muted-foreground hover:text-foreground">
           ← Back to contacts
         </Link>
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Launch outreach</h1>
-        <p className="text-gray-600 dark:text-gray-300 mt-1">
+        <h1 className="text-2xl font-bold text-card-foreground">Launch outreach</h1>
+        <p className="text-muted-foreground mt-1">
           Choose tactics, prioritize contacts, and generate outreach for {companyName}.
         </p>
       </div>
 
-      <section className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Tactics</h2>
+      <section className="rounded-lg border border-border p-6 bg-card/50">
+        <h2 className="text-lg font-semibold text-card-foreground mb-3">Tactics</h2>
         <div className="flex flex-wrap gap-6">
-          <label className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <label className="flex items-center gap-2 text-card-foreground">
             <input
               type="checkbox"
               checked={email}
               onChange={(e) => setEmail(e.target.checked)}
-              className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
+              className="rounded border-input bg-input"
             />
             <span>Email</span>
           </label>
-          <label className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <label className="flex items-center gap-2 text-card-foreground">
             <input
               type="checkbox"
               checked={linkedin}
               onChange={(e) => setLinkedin(e.target.checked)}
-              className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
+              className="rounded border-input bg-input"
             />
             <span>LinkedIn</span>
           </label>
-          <label className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <label className="flex items-center gap-2 text-card-foreground">
             <input
               type="checkbox"
               checked={events}
               onChange={(e) => setEvents(e.target.checked)}
-              className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
+              className="rounded border-input bg-input"
             />
             <span>Events</span>
           </label>
         </div>
       </section>
 
-      <section className="rounded-lg border border-gray-200 dark:border-zinc-600 p-6 bg-white dark:bg-zinc-800/50">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Contact prioritization</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+      <section className="rounded-lg border border-border p-6 bg-card/50">
+        <h2 className="text-lg font-semibold text-card-foreground mb-3">Contact prioritization</h2>
+        <p className="text-sm text-muted-foreground mb-4">
           Select which contacts to include. You can filter by department first.
         </p>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             Department filter
           </label>
           <select
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
-            className="rounded border border-gray-300 dark:border-zinc-500 px-3 py-2 text-sm bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100"
+            className="rounded border border-input px-3 py-2 text-sm bg-input text-foreground"
           >
             <option value="">All departments</option>
             {departments.map((d) => (
@@ -143,9 +143,9 @@ export function LaunchOutreachClient({
             ))}
           </select>
         </div>
-        <div className="border border-gray-200 dark:border-zinc-600 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+        <div className="border border-border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
           <table className="min-w-full">
-            <thead className="bg-gray-50 dark:bg-zinc-800 sticky top-0">
+            <thead className="bg-muted sticky top-0">
               <tr>
                 <th className="px-4 py-2 text-left">
                   <input
@@ -156,36 +156,36 @@ export function LaunchOutreachClient({
                         contactsInDepartment.filter((c) => selectableIds.has(c.id)).length
                     }
                     onChange={toggleAll}
-                    className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
+                    className="rounded border-input bg-input"
                   />
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                   Name
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                   Title
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                   Department
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-zinc-600">
+            <tbody className="divide-y divide-border">
               {contactsInDepartment.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-zinc-700/50">
+                <tr key={c.id} className="hover:bg-muted">
                   <td className="px-4 py-2">
                     <input
                       type="checkbox"
                       checked={selectedIds.has(c.id)}
                       onChange={() => toggle(c.id)}
-                      className="rounded border-gray-300 dark:border-zinc-500 dark:bg-zinc-700"
+                      className="rounded border-input bg-input"
                     />
                   </td>
-                  <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
+                  <td className="px-4 py-2 font-medium text-card-foreground">
                     {[c.firstName, c.lastName].filter(Boolean).join(' ').trim() || '—'}
                   </td>
-                  <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{c.title ?? '—'}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-2 text-sm text-muted-foreground">{c.title ?? '—'}</td>
+                  <td className="px-4 py-2 text-sm text-muted-foreground">
                     {c.departmentName ?? '—'}
                   </td>
                 </tr>
@@ -205,7 +205,7 @@ export function LaunchOutreachClient({
         <Button onClick={handleLaunchAgent}>
           Work with agent
         </Button>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm text-muted-foreground">
           Opens the expansion agent on the Messaging tab to draft emails, calendar invites, and outreach.
         </span>
       </div>

@@ -201,27 +201,27 @@ export function FindContactsModal({
 
         {step === 'config' && (
           <>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               I'll search for contacts in {companyName}'s {departmentName} department.
             </p>
-            <p className="text-sm font-medium text-gray-700 mt-3">Seniority levels:</p>
-            <div className="space-y-2 mt-2 border rounded-lg p-4 bg-gray-50">
+            <p className="text-sm font-medium text-foreground mt-3">Seniority levels:</p>
+            <div className="space-y-2 mt-2 border rounded-lg p-4 bg-muted">
               {SENIORITY_OPTIONS.map((s) => (
                 <label key={s.id} className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={seniority.includes(s.id)}
                     onChange={() => toggleSeniority(s.id)}
-                    className="mt-1 rounded border-gray-300"
+                    className="mt-1 rounded border-input"
                   />
                   <div>
                     <span className="text-sm font-medium">{s.label}</span>
-                    <p className="text-xs text-gray-500">{s.sub}</p>
+                    <p className="text-xs text-muted-foreground">{s.sub}</p>
                   </div>
                 </label>
               ))}
             </div>
-            <p className="text-sm font-medium text-gray-700 mt-3">Search scope:</p>
+            <p className="text-sm font-medium text-foreground mt-3">Search scope:</p>
             <div className="flex flex-wrap gap-3 mt-2">
               {SCOPE_OPTIONS.map((s) => (
                 <label key={s.id} className="flex items-center gap-2 cursor-pointer">
@@ -229,7 +229,7 @@ export function FindContactsModal({
                     type="checkbox"
                     checked={scope.includes(s.id)}
                     onChange={() => toggleScope(s.id)}
-                    className="rounded border-gray-300"
+                    className="rounded border-input"
                   />
                   <span className="text-sm">{s.label}</span>
                 </label>
@@ -253,7 +253,7 @@ export function FindContactsModal({
 
         {step === 'searching' && (
           <>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               {scope.includes('apollo') ? 'Searching Apollo for contacts…' : 'Searching for contacts…'}
             </p>
             <div className="mt-4 space-y-2">
@@ -263,7 +263,7 @@ export function FindContactsModal({
                 </div>
               ))}
               {steps.length > 0 && (
-                <p className="text-sm text-gray-500 mt-2">This may take ~1–2 minutes.</p>
+                <p className="text-sm text-muted-foreground mt-2">This may take ~1–2 minutes.</p>
               )}
             </div>
           </>
@@ -271,14 +271,14 @@ export function FindContactsModal({
 
         {step === 'results' && (
           <>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Found {results.length} contacts in {departmentName}. Select contacts to add.
             </p>
             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
               {results.map((r) => (
                 <div
                   key={r.id}
-                  className="border rounded-lg p-4 bg-white hover:bg-gray-50 cursor-pointer"
+                  className="border rounded-lg p-4 bg-card hover:bg-muted border-border cursor-pointer"
                   onClick={() => toggleSelect(r.id)}
                 >
                   <label className="flex items-start gap-3 cursor-pointer">
@@ -286,13 +286,13 @@ export function FindContactsModal({
                       type="checkbox"
                       checked={selectedIds.has(r.id)}
                       onChange={() => toggleSelect(r.id)}
-                      className="mt-1 rounded border-gray-300"
+                      className="mt-1 rounded border-input"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium">
                         {[r.firstName, r.lastName].filter(Boolean).join(' ').trim() || 'Unknown'}
                       </div>
-                      <div className="text-sm text-gray-600">{r.title}</div>
+                      <div className="text-sm text-muted-foreground">{r.title}</div>
                       {r.linkedinUrl && (
                         <a
                           href={r.linkedinUrl}
@@ -304,14 +304,14 @@ export function FindContactsModal({
                           LinkedIn
                         </a>
                       )}
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         {r.email ? (
                           <>Email: {r.email} {r.emailVerified ? ' (verified)' : ''}</>
                         ) : (
                           'Email: Not found'
                         )}
                       </div>
-                      {r.phone && <div className="text-xs text-gray-500">Phone: {r.phone}</div>}
+                      {r.phone && <div className="text-xs text-muted-foreground">Phone: {r.phone}</div>}
                       {r.personaName && (
                         <div className="mt-2 text-xs">
                           Matched Persona: {r.personaName}
@@ -319,7 +319,7 @@ export function FindContactsModal({
                         </div>
                       )}
                       {r.whyRelevant && (
-                        <div className="mt-1 text-xs text-gray-600">Why relevant: {r.whyRelevant}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">Why relevant: {r.whyRelevant}</div>
                       )}
                     </div>
                   </label>
@@ -347,13 +347,13 @@ export function FindContactsModal({
 
         {step === 'added' && addedSummary && (
           <>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Added {addedSummary.added} contact{addedSummary.added !== 1 ? 's' : ''} to {departmentName}.
             </p>
-            <p className="text-sm font-medium text-gray-700 mt-3">
+            <p className="text-sm font-medium text-foreground mt-3">
               Your {departmentName} dept now has {existingContactNames.length + addedSummary.added} contacts:
             </p>
-            <ul className="text-sm text-gray-600 list-disc list-inside mt-1">
+            <ul className="text-sm text-muted-foreground list-disc list-inside mt-1">
               {existingContactNames.slice(0, 3).map((n) => (
                 <li key={n}>{n} – Existing</li>
               ))}
@@ -364,9 +364,9 @@ export function FindContactsModal({
                 <li>... and more</li>
               )}
             </ul>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-              <h3 className="font-semibold text-gray-900 mb-2">Multi-Contact Strategy</h3>
-              <p className="text-sm text-gray-600 mb-3">
+            <div className="mt-4 p-4 bg-muted rounded-lg border">
+              <h3 className="font-semibold text-card-foreground mb-2">Multi-Contact Strategy</h3>
+              <p className="text-sm text-muted-foreground mb-3">
                 You now have coverage across the buying committee:
               </p>
               <ul className="text-sm space-y-1">
@@ -376,7 +376,7 @@ export function FindContactsModal({
                   </li>
                 ))}
               </ul>
-              <p className="text-sm text-gray-600 mt-3">
+              <p className="text-sm text-muted-foreground mt-3">
                 Suggested sequence: Reach out to Economic Buyer first, then Technical Buyer, then Program Managers.
               </p>
             </div>
@@ -386,7 +386,7 @@ export function FindContactsModal({
               </Button>
               <Button asChild>
                 <Link href={`/chat?play=expansion&accountId=${companyId}`}>
-                  Launch Multi-Contact Play
+                  Launch Multi-Contact Plan
                 </Link>
               </Button>
             </DialogFooter>

@@ -6,9 +6,12 @@ import {
   getNextBestActions,
   getMomentumWeekComparison,
 } from '@/lib/dashboard';
+import { getDivisionCardsForRadar } from '@/lib/dashboard/division-radar';
 import { ensureDemoRoadmap } from '@/lib/demo/load-roadmap';
 import { StatusBar } from '@/app/components/dashboard/StatusBar';
+import { ObjectiveBar } from '@/app/components/dashboard/ObjectiveBar';
 import { DashboardShell } from '@/app/components/dashboard/DashboardShell';
+import { DashboardRefreshOnFocus } from '@/app/components/dashboard/DashboardRefreshOnFocus';
 import { ThreeColumnLayout } from '@/app/components/dashboard/ThreeColumnLayout';
 import { HotSignals } from '@/app/components/dashboard/HotSignals';
 import { NextBestAction } from '@/app/components/dashboard/NextBestAction';
@@ -110,7 +113,6 @@ export default async function DashboardPage({
     campaignCounts,
     lastActivities,
     engagedThisWeekCount,
-    hotSignals,
     nextBestActions,
     momentum,
     playsNeedingAction,
@@ -185,7 +187,6 @@ export default async function DashboardPage({
         createdAt: { gte: startOfThisWeek },
       },
     }),
-    getHotSignals(session.user.id),
     getNextBestActions(session.user.id),
     getMomentumWeekComparison(session.user.id),
     // ExpansionPlay = tracked expansion by dept+product (status, nextActionDue). Not tactical plays (lib/plays).
@@ -255,6 +256,25 @@ export default async function DashboardPage({
   const campaignCountByCompany = new Map(
     campaignCounts.map((c) => [c.companyId, c._count])
   );
+
+  // Hot signals with roadmap context (division name, no "Run X play" when enterprise_expansion)
+  const hotSignalsWithRoadmap = await getHotSignals(session.user.id, { roadmap });
+
+  // Division-first radar for enterprise_expansion (e.g. NVIDIA/GM demo)
+  let divisionRadarData: Awaited<ReturnType<typeof getDivisionCardsForRadar>> = null;
+  let nextBestActionsToUse = nextBestActions;
+  if (roadmap?.roadmapType === 'enterprise_expansion' && roadmap.id) {
+    divisionRadarData = await getDivisionCardsForRadar(session.user.id, roadmap.id);
+    if (divisionRadarData && divisionRadarData.divisions.length > 0) {
+      const { getNextBestActionsFromRoadmap } = await import('@/lib/dashboard/next-best-actions');
+      const obj = roadmap.objective as { goalText?: string } | null;
+      nextBestActionsToUse = await getNextBestActionsFromRoadmap(
+        session.user.id,
+        roadmap.id,
+        obj?.goalText ?? 'Land new use cases at target account.'
+      );
+    }
+  }
   const lastActivityByCompany = new Map<string, Date>();
   for (const a of lastActivities) {
     if (a.companyId && !lastActivityByCompany.has(a.companyId)) {
@@ -262,7 +282,7 @@ export default async function DashboardPage({
     }
   }
   const companyIdsWithHotSignal = new Set(
-    hotSignals.filter((s) => s.color === 'red').map((s) => s.companyId)
+    hotSignalsWithRoadmap.filter((s) => s.color === 'red').map((s) => s.companyId)
   );
 
   const companies = companiesRaw.map((c) => {
@@ -315,17 +335,24 @@ export default async function DashboardPage({
   );
 
   const playTasks = [
-    ...playsNeedingAction.map((p) => ({
-      id: p.id,
-      label: `${p.company.name} — ${p.companyDepartment?.customName ?? p.companyDepartment?.type?.replace(/_/g, ' ') ?? 'Dept'}`,
-      href: `/dashboard/companies/${p.company.id}/departments/${p.companyDepartment?.id ?? ''}`,
-    })),
+    ...playsNeedingAction.map((p) => {
+      const companyId = p.company.id;
+      const divId = p.companyDepartment?.id ?? '';
+      const href = divId
+        ? `/dashboard/companies/${companyId}?tab=overview&division=${divId}`
+        : `/dashboard/companies/${companyId}?tab=overview`;
+      return {
+        id: p.id,
+        label: `${p.company.name} — ${p.companyDepartment?.customName ?? p.companyDepartment?.type?.replace(/_/g, ' ') ?? 'Dept'}`,
+        href,
+      };
+    }),
     ...dueForNextTouch
       .filter((e) => e.contact.companyId)
       .map((e) => ({
         id: `touch-${e.id}`,
         label: `Next touch: ${[e.contact.firstName, e.contact.lastName].filter(Boolean).join(' ').trim() || 'Contact'} (${e.sequence.name})`,
-        href: `/chat?play=expansion&accountId=${e.contact.companyId}`,
+        href: `/dashboard/companies/${e.contact.companyId}?tab=content&contact=${e.contact.id}`,
       })),
   ];
 
@@ -336,21 +363,21 @@ export default async function DashboardPage({
         autoTasks.push({
           id: `page-${c.id}-${d.id}`,
           label: `Create sales page for ${c.name} → ${d.shortName}`,
-          href: `/dashboard/companies/${c.id}/departments/${d.id}`,
+          href: `/dashboard/companies/${c.id}?tab=content&division=${d.id}&contentFilter=sales-page&action=create`,
         });
       }
       if (d.contactCount === 0) {
         autoTasks.push({
           id: `contacts-${c.id}-${d.id}`,
           label: `Find contacts for ${c.name} → ${d.shortName}`,
-          href: `/dashboard/companies/${c.id}/departments/${d.id}`,
+          href: `/dashboard/companies/${c.id}?tab=contacts&division=${d.id}&action=find`,
         });
       }
     }
     autoTasks.push({
       id: `research-${c.id}`,
       label: `Research ${c.name} buying groups`,
-      href: `/dashboard/companies/${c.id}`,
+      href: `/dashboard/companies/${c.id}?tab=overview`,
     });
   }
   const eventTask = eventCampaign
@@ -358,7 +385,7 @@ export default async function DashboardPage({
         {
           id: 'event-invite',
           label: 'Create sales page and invite users to the event',
-          href: `/dashboard/companies/${eventCampaign.companyId}/create-content?playId=event_invite&signalTitle=${encodeURIComponent('Celigo CONNECT 2026 — Invitation')}`,
+          href: `/dashboard/companies/${eventCampaign.companyId}?tab=content&contentFilter=sales-page&action=create`,
         },
       ]
     : [];
@@ -385,7 +412,7 @@ export default async function DashboardPage({
     if (minSum > 0 || maxSum > 0) potentialByCompany.set(c.id, { min: minSum, max: maxSum });
   }
 
-  const launchPlays = nextBestActions.filter(
+  const launchPlays = nextBestActionsToUse.filter(
     (a) =>
       a.playId &&
       (a.ctaHref.startsWith('/chat') || a.ctaHref.includes('/create-content'))
@@ -407,10 +434,13 @@ export default async function DashboardPage({
     })),
   }));
 
+  // When enterprise_expansion (e.g. NVIDIA/GM), show division cards as primary radar.
+  if (divisionRadarData && divisionRadarData.divisions.length > 0) {
+    accountsForRadar = []; // Grid will use divisionCards instead
+  } else if (roadmap && roadmap.roadmapType === 'channel_influence') {
   // When a channel_influence roadmap is present (e.g. Sercante), adapt the
   // radar to show roadmap-defined partner segments (typically Salesforce AE
   // teams) and their penetration/activity instead of generic company cards.
-  if (roadmap && roadmap.roadmapType === 'channel_influence') {
     const divisionTargets = roadmap.targets.filter((t) => t.targetType === 'division');
     if (divisionTargets.length > 0) {
       accountsForRadar = divisionTargets.map((t) => {
@@ -453,16 +483,40 @@ export default async function DashboardPage({
     }
   }
 
+  // Edge case: AE with no Roadmap — no objective bar, no division cards; tabs and division filter use company departments (Spec 1).
+  const objectiveBar =
+    roadmap?.roadmapType === 'enterprise_expansion' &&
+    divisionRadarData &&
+    divisionRadarData.divisions.length > 0 ? (
+      <ObjectiveBar
+        goalText={divisionRadarData.objectiveSummary}
+        landedCount={0}
+        targetCount={divisionRadarData.expansionTargetCount > 0 ? divisionRadarData.expansionTargetCount : undefined}
+        divisionStates={divisionRadarData.divisions.slice(0, 5).map((d) => ({ name: d.name, stage: d.stage }))}
+        progressPct={divisionRadarData.divisions.length > 0 ? Math.min(100, Math.round((totalContacts / (divisionRadarData.divisions.length * 3)) * 100)) : undefined}
+      />
+    ) : null;
+
+  const contactsLabelForBar =
+    divisionRadarData && divisionRadarData.divisions.length > 0
+      ? `${totalContacts} of ${divisionRadarData.divisions.length * 3} found`
+      : undefined;
+
   return (
     <DashboardShell
       statusBar={
-        <StatusBar
-          accountsTracked={companies.length}
-          buyingGroupsMapped={buyingGroupsMapped}
-          contactsFound={totalContacts}
-          pagesLive={totalPages}
-          engagedThisWeek={engagedThisWeekCount}
-        />
+        <>
+          {objectiveBar}
+          <StatusBar
+            accountsTracked={companies.length}
+            buyingGroupsMapped={buyingGroupsMapped}
+            contactsFound={totalContacts}
+            pagesLive={totalPages}
+            engagedThisWeek={engagedThisWeekCount}
+            signalsThisWeek={hotSignalsWithRoadmap.length}
+            contactsLabel={contactsLabelForBar}
+          />
+        </>
       }
       activityFeed={
         <ActivityFeed
@@ -492,16 +546,20 @@ export default async function DashboardPage({
         />
       }
     >
+      <DashboardRefreshOnFocus />
       <ThreeColumnLayout
         left={
           <>
-            <HotSignals signals={hotSignals} />
-            <NextBestAction actions={nextBestActions} />
+            <HotSignals signals={hotSignalsWithRoadmap} />
+            <NextBestAction actions={nextBestActionsToUse} />
             <TodaysTasks tasks={todaysTasks} />
           </>
         }
         center={
-          <AccountRadarGrid accounts={accountsForRadar} />
+          <AccountRadarGrid
+            accounts={accountsForRadar}
+            divisionRadar={divisionRadarData}
+          />
         }
         right={
           <>

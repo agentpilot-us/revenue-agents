@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { dash } from '@/app/dashboard/dashboard-classes';
 
 type Task = { id: string; label: string; href: string };
 
@@ -6,28 +7,38 @@ type TodaysTasksProps = { tasks: Task[] };
 
 export function TodaysTasks({ tasks }: TodaysTasksProps) {
   return (
-    <section className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
-      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        Today&apos;s tasks
-      </h2>
+    <section className={dash.card}>
+      <div className={dash.sectionHeader}>
+        <h2 className={dash.sectionTitle}>Today&apos;s Tasks</h2>
+        {tasks.length > 0 && (
+          <span className={dash.sectionSubtitle}>
+            {tasks.length} task{tasks.length !== 1 ? 's' : ''} · sorted by impact
+          </span>
+        )}
+      </div>
+
       {tasks.length === 0 ? (
-        <p className="text-sm text-slate-500">No tasks due today.</p>
+        <p className={dash.emptyStateText}>No tasks due today.</p>
       ) : (
-        <ul className="space-y-2">
+        <div className="rounded-lg border border-[var(--ap-border-default)] overflow-hidden bg-[var(--ap-bg-surface)]">
           {tasks.map((t) => (
-            <li key={t.id}>
-              <Link
-                href={t.href}
-                className="flex items-center gap-2 text-sm text-slate-300 hover:text-slate-100"
+            <Link key={t.id} href={t.href} className={dash.taskRow}>
+              {/* Checkbox placeholder */}
+              <div
+                className="mt-0.5 h-[18px] w-[18px] shrink-0 rounded border-2 border-[var(--ap-border-medium)] flex items-center justify-center"
+                aria-hidden
               >
-                <span className="text-slate-500" aria-hidden>
-                  [ ]
-                </span>
-                {t.label}
-              </Link>
-            </li>
+                <span className="text-[10px] text-[var(--ap-text-faint)]">☐</span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold text-[var(--ap-text-primary)] leading-snug">
+                  {t.label}
+                </p>
+              </div>
+            </Link>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );

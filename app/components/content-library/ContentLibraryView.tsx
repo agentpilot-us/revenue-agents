@@ -6,6 +6,7 @@ import type { GetCompanySetupStateUser } from '@/app/actions/content-library-set
 import { FirecrawlSetupCard } from '@/app/components/FirecrawlSetupCard';
 import { isServiceConfigured } from '@/lib/service-config';
 import { ContentLibraryHealthPanel } from '@/app/components/content-library/ContentLibraryHealthPanel';
+import { ContentLibraryActions } from '@/app/components/content-library/ContentLibraryActions';
 import { ContentLibraryItemRow } from '@/app/components/content-library/ContentLibraryItemRow';
 import { ProductRowActions } from '@/app/components/content-library/ProductRowActions';
 import { IndustryPlaybookRowActions } from '@/app/components/content-library/IndustryPlaybookRowActions';
@@ -78,6 +79,9 @@ export async function ContentLibraryView({ company }: Props) {
           </Link>
         </div>
       </div>
+
+      {/* Import from URL, full site, or upload — uses Firecrawl when configured */}
+      <ContentLibraryActions />
 
       <ContentLibraryHealthPanel />
 

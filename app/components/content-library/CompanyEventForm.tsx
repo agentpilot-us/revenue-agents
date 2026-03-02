@@ -74,24 +74,24 @@ export function CompanyEventForm({ initialData }: Props) {
         </div>
       )}
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Event Title *</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Event Title *</h2>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Automotive Innovation Summit 2024"
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
           required
         />
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Event Type</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Event Type</h2>
         <select
           value={eventType}
           onChange={(e) => setEventType(e.target.value)}
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
         >
           <option value="webinar">Webinar</option>
           <option value="conference">Conference</option>
@@ -102,35 +102,35 @@ export function CompanyEventForm({ initialData }: Props) {
         </select>
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Date</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Date</h2>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
         />
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Description</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Description</h2>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe the event..."
           rows={5}
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
         />
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Source URL (optional)</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Source URL (optional)</h2>
         <input
           type="url"
           value={sourceUrl}
           onChange={(e) => setSourceUrl(e.target.value)}
           placeholder="https://example.com/event"
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
         />
       </section>
 

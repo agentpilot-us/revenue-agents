@@ -1,11 +1,12 @@
 /**
  * Central chat model for the app. Use getChatModel() everywhere so we can switch
- * provider via env.
+ * provider via env. Research uses Perplexity for web search; this model is for
+ * structuring/synthesis only (no OpenAI here).
  *
  * Env (priority order):
  * - USE_MOCK_LLM=true → mock model (no API calls)
- * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude (use to avoid Gemini free-tier quota)
- * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
+ * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude
+ * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini (avoids OpenAI quota)
  * - else ANTHROPIC_API_KEY → Claude
  */
 import { createAnthropic } from '@ai-sdk/anthropic';

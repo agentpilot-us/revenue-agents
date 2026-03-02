@@ -14,15 +14,15 @@ export function NavBar({ isAuthenticated }: NavBarProps) {
     <nav
       className={
         isDashboard
-          ? 'sticky top-0 z-50 bg-zinc-900 border-b border-slate-700 shadow-sm'
-          : 'sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm'
+          ? 'sticky top-0 z-50 bg-background border-b border-border shadow-sm'
+          : 'sticky top-0 z-50 bg-card border-b border-border shadow-sm'
       }
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link
             href="/"
-            className={`flex items-center space-x-3 ${isDashboard ? 'text-slate-100' : 'text-slate-900'}`}
+            className={`flex items-center space-x-3 ${isDashboard ? 'text-foreground' : 'text-card-foreground'}`}
           >
             <img
               src="/agentpilot-logo.png"

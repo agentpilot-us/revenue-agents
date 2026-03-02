@@ -75,36 +75,36 @@ export function ResourceLinkForm({ initialData }: Props) {
         </div>
       )}
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Resource Title *</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Resource Title *</h2>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Guide to Autonomous Vehicle Development"
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
           required
         />
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">URL *</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">URL *</h2>
         <input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/resource"
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
           required
         />
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Resource Type</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Resource Type</h2>
         <select
           value={resourceType}
           onChange={(e) => setResourceType(e.target.value)}
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
         >
           <option value="whitepaper">Whitepaper</option>
           <option value="guide">Guide</option>
@@ -115,14 +115,14 @@ export function ResourceLinkForm({ initialData }: Props) {
         </select>
       </section>
 
-      <section className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-800">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Description</h2>
+      <section className="border border-border rounded-lg p-4 bg-card">
+        <h2 className="font-semibold text-card-foreground mb-3">Description</h2>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe the resource..."
           rows={4}
-          className="w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+          className="w-full rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
         />
       </section>
 

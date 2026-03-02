@@ -214,9 +214,9 @@ export function AccountMessagingTab({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">Account Messaging</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+      <div className="bg-card rounded-lg shadow p-6 border border-border">
+        <h2 className="text-xl font-semibold text-card-foreground mb-1">Account Messaging</h2>
+        <p className="text-sm text-muted-foreground mb-4">
           Content AI will use when drafting outreach to {companyName}.
         </p>
         {message && (
@@ -242,8 +242,8 @@ export function AccountMessagingTab({
 
         <div className="space-y-6">
           <section>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Why {companyName}?</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Bullet points on why this account should care.</p>
+            <h3 className="font-medium text-card-foreground mb-2">Why {companyName}?</h3>
+            <p className="text-sm text-muted-foreground mb-2">Bullet points on why this account should care.</p>
             {whyThisCompany.map((bullet, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <input
@@ -251,7 +251,7 @@ export function AccountMessagingTab({
                   value={bullet}
                   onChange={(e) => setWhyBullet(i, e.target.value)}
                   placeholder="e.g. Industry shift toward EV requires new quality tooling"
-                  className="flex-1 rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                  className="flex-1 rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
                 />
                 <Button
                   type="button"
@@ -270,13 +270,13 @@ export function AccountMessagingTab({
           </section>
 
           <section>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Relevant use cases</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+            <h3 className="font-medium text-card-foreground mb-2">Relevant use cases</h3>
+            <p className="text-sm text-muted-foreground mb-2">
               Select use cases that apply to this account. They&apos;re used for messaging and content generation. From your company data (Use Cases).
             </p>
             <div className="space-y-2">
               {useCases.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No use cases in your company data. Add some in Your company data first.</p>
+                <p className="text-sm text-muted-foreground">No use cases in your company data. Add some in Your company data first.</p>
               ) : (
                 useCases.map((uc) => {
                   const selected = useCasesSelected.find((u) => u.contentLibraryId === uc.id);
@@ -287,7 +287,7 @@ export function AccountMessagingTab({
                         'p-3 rounded border',
                         selected
                           ? 'border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-zinc-600'
+                          : 'border-border'
                       )}
                     >
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -297,7 +297,7 @@ export function AccountMessagingTab({
                           onChange={() => toggleUseCase(uc.id, uc.title)}
                           className="rounded"
                         />
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{uc.title}</span>
+                        <span className="font-medium text-card-foreground">{uc.title}</span>
                       </label>
                       {selected && (
                         <input
@@ -305,7 +305,7 @@ export function AccountMessagingTab({
                           value={selected.customNote ?? ''}
                           onChange={(e) => setUseCaseNote(uc.id, e.target.value)}
                           placeholder="Optional note or department fit"
-                          className="mt-2 w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm"
+                          className="mt-2 w-full rounded border border-input bg-input text-foreground px-3 py-1.5 text-sm"
                         />
                       )}
                     </div>
@@ -316,11 +316,11 @@ export function AccountMessagingTab({
           </section>
 
           <section>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Relevant success stories</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">From your Content Library (Success Stories).</p>
+            <h3 className="font-medium text-card-foreground mb-2">Relevant success stories</h3>
+            <p className="text-sm text-muted-foreground mb-2">From your Content Library (Success Stories).</p>
             <div className="space-y-2">
               {successStories.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No success stories in content library.</p>
+                <p className="text-sm text-muted-foreground">No success stories in content library.</p>
               ) : (
                 successStories.map((ss) => {
                   const selected = successStoriesSelected.find((s) => s.contentLibraryId === ss.id);
@@ -331,7 +331,7 @@ export function AccountMessagingTab({
                         'p-3 rounded border',
                         selected
                           ? 'border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-zinc-600'
+                          : 'border-border'
                       )}
                     >
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -341,7 +341,7 @@ export function AccountMessagingTab({
                           onChange={() => toggleSuccessStory(ss.id)}
                           className="rounded"
                         />
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{ss.title}</span>
+                        <span className="font-medium text-card-foreground">{ss.title}</span>
                       </label>
                       {selected && (
                         <input
@@ -349,7 +349,7 @@ export function AccountMessagingTab({
                           value={selected.whyRelevant}
                           onChange={(e) => setStoryWhyRelevant(ss.id, e.target.value)}
                           placeholder="Why relevant for this account"
-                          className="mt-2 w-full rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm"
+                          className="mt-2 w-full rounded border border-input bg-input text-foreground px-3 py-1.5 text-sm"
                         />
                       )}
                     </div>
@@ -360,7 +360,7 @@ export function AccountMessagingTab({
           </section>
 
           <section>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Objection handlers</h3>
+            <h3 className="font-medium text-card-foreground mb-2">Objection handlers</h3>
             {objectionHandlers.map((o, i) => (
               <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
                 <input
@@ -368,14 +368,14 @@ export function AccountMessagingTab({
                   value={o.objection}
                   onChange={(e) => setObjection(i, e.target.value)}
                   placeholder="Objection"
-                  className="flex-1 rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                  className="flex-1 rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
                 />
                 <input
                   type="text"
                   value={o.response}
                   onChange={(e) => setResponse(i, e.target.value)}
                   placeholder="Response"
-                  className="flex-1 rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                  className="flex-1 rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
                 />
                 <Button
                   type="button"
@@ -394,7 +394,7 @@ export function AccountMessagingTab({
           </section>
 
           <section>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Do not mention</h3>
+            <h3 className="font-medium text-card-foreground mb-2">Do not mention</h3>
             {doNotMention.map((d, i) => (
               <div key={i} className="flex flex-col sm:flex-row gap-2 mb-2">
                 <input
@@ -402,14 +402,14 @@ export function AccountMessagingTab({
                   value={d.topic}
                   onChange={(e) => setDnMTopic(i, e.target.value)}
                   placeholder="Topic"
-                  className="flex-1 rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                  className="flex-1 rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
                 />
                 <input
                   type="text"
                   value={d.reason}
                   onChange={(e) => setDnMReason(i, e.target.value)}
                   placeholder="Reason"
-                  className="flex-1 rounded border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                  className="flex-1 rounded border border-input bg-input text-foreground px-3 py-2 text-sm"
                 />
                 <Button
                   type="button"

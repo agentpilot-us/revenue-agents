@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { DashboardNav } from '@/app/dashboard/DashboardNav';
+import { dash } from '@/app/dashboard/dashboard-classes';
 
 export default async function DashboardLayout({
   children,
@@ -27,16 +28,20 @@ export default async function DashboardLayout({
   const allowDemoSetup = process.env.ALLOW_DEMO_SETUP === 'true';
 
   return (
-    <div className="min-h-screen bg-zinc-900">
-      <aside className="fixed left-0 top-0 z-40 h-full w-56 border-r border-slate-700 bg-zinc-900">
-        <div className="flex h-full flex-col px-4 py-6">
-          <h2 className="mb-6 px-2 text-sm font-semibold text-slate-400 uppercase tracking-wider">
-            Dashboard
-          </h2>
+    <div className={dash.page}>
+      <aside className={dash.sidebar}>
+        <div className={dash.sidebarInner}>
+          {/* Brand */}
+          <div className={dash.sidebarBrand}>
+            <div className={dash.sidebarBrandIcon}>A</div>
+            <span className={dash.sidebarBrandText}>AgentPilot</span>
+          </div>
+
+          {/* Nav */}
           <DashboardNav allowDemoSetup={allowDemoSetup} />
         </div>
       </aside>
-      <main className="pl-56">{children}</main>
+      <main className={dash.main}>{children}</main>
     </div>
   );
 }

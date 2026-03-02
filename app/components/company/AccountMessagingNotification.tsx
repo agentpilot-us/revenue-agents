@@ -41,7 +41,7 @@ export function AccountMessagingNotification({ companyId }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 ml-4">
-          <Link href={`/dashboard/companies/${companyId}?tab=messaging`}>
+          <Link href={`/dashboard/companies/${companyId}?tab=content`}>
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600">
               Review Messaging
             </Button>

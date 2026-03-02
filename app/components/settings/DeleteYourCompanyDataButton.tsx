@@ -47,12 +47,12 @@ export function DeleteYourCompanyDataButton() {
       </Button>
 
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent className="bg-white dark:bg-zinc-800">
+        <DialogContent className="bg-card">
           <DialogHeader>
-            <DialogTitle className="text-gray-900 dark:text-gray-100">
+            <DialogTitle className="text-card-foreground">
               Delete all your company data
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-300">
+            <DialogDescription className="text-muted-foreground">
               This will permanently remove your content library (case studies, events, use cases), products, catalog products, product profiles, industry playbooks, and messaging frameworks. Your profile and target companies will not be affected. This cannot be undone.
             </DialogDescription>
           </DialogHeader>

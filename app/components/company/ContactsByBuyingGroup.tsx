@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 type Contact = {
@@ -48,6 +54,13 @@ type DepartmentGroup = {
 type Props = {
   companyId: string;
   companyName: string;
+  /** URL context: pre-select division (Spec 1) */
+  initialDepartmentId?: string;
+  /** Auto-open Find Contacts modal for this division */
+  autoFind?: boolean;
+  /** Auto-open Add Contact modal with name pre-filled */
+  autoAdd?: boolean;
+  contactName?: string;
 };
 
 type Suggestion = {
@@ -59,10 +72,20 @@ type Suggestion = {
 };
 type DeptOption = { id: string; name: string };
 
-export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
+export function ContactsByBuyingGroup({
+  companyId,
+  companyName,
+  initialDepartmentId,
+  autoFind,
+  autoAdd,
+  contactName,
+}: Props) {
   const [groups, setGroups] = useState<DepartmentGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFindContacts, setShowFindContacts] = useState<string | null>(null);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const autoFindFired = useRef(false);
+  const autoAddFired = useRef(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DeptOption[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -86,6 +109,22 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  useEffect(() => {
+    if (!autoFind || !initialDepartmentId || loading || autoFindFired.current) return;
+    const hasDept = groups.some((g) => g.department?.id === initialDepartmentId);
+    if (hasDept) {
+      autoFindFired.current = true;
+      setShowFindContacts(initialDepartmentId);
+    }
+  }, [autoFind, initialDepartmentId, loading, groups]);
+
+  useEffect(() => {
+    if (autoAdd && !autoAddFired.current) {
+      autoAddFired.current = true;
+      setShowAddContact(true);
+    }
+  }, [autoAdd]);
 
   async function handleSuggestGroups() {
     setSuggestLoading(true);
@@ -133,7 +172,7 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
   }
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading contacts...</div>;
+    return <div className="p-6 text-center text-muted-foreground">Loading contacts...</div>;
   }
 
   const totalContacts = groups.reduce((sum, g) => sum + g.contacts.length, 0);
@@ -142,10 +181,10 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-xl font-semibold text-card-foreground">
             Contacts by Buying Group
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {totalContacts} total contact{totalContacts !== 1 ? 's' : ''}
           </p>
         </div>
@@ -159,8 +198,8 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
       </div>
 
       {groups.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg border-gray-200">
-          <p className="text-gray-500 mb-4">No contacts yet</p>
+        <div className="text-center py-12 border-2 border-dashed rounded-lg border-border">
+          <p className="text-muted-foreground mb-4">No contacts yet</p>
           <Button asChild>
             <Link href={`/dashboard/companies/${companyId}/contacts`}>
               Add Contacts
@@ -171,15 +210,15 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
         groups.map((group) => (
           <div
             key={group.department.id || 'unassigned'}
-            className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700"
+            className="bg-card rounded-lg shadow p-6 border border-border"
           >
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="text-lg font-semibold text-card-foreground">
                   {group.department.name}
                 </h3>
                 {group.department.targetRoles && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     {(() => {
                       const roles = group.department.targetRoles;
                       const roleTypes: string[] = [];
@@ -216,15 +255,15 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
             </div>
 
             {!group.department.id && suggestions.length > 0 && (
-              <div className="mb-4 p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-zinc-800/50 space-y-3">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Suggested assignments</p>
+              <div className="mb-4 p-4 rounded-lg border border-border bg-accent/50 space-y-3">
+                <p className="text-sm font-medium text-card-foreground">Suggested assignments</p>
                 {suggestions.map((s) => (
                   <div
                     key={s.contactId}
                     className="flex flex-wrap items-center gap-2 text-sm"
                   >
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{s.contactName}</span>
-                    {s.title && <span className="text-gray-500 dark:text-gray-400">({s.title})</span>}
+                    <span className="font-medium text-card-foreground">{s.contactName}</span>
+                    {s.title && <span className="text-muted-foreground">({s.title})</span>}
                     <Select
                       value={selectedDeptByContact[s.contactId] ?? s.suggestedDepartmentId}
                       onValueChange={(val) =>
@@ -260,7 +299,7 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
             )}
 
             {group.contacts.length === 0 ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400 py-4">
+              <div className="text-sm text-muted-foreground py-4">
                 No contacts in this buying group yet.
                 {group.department.id && (
                   <Button
@@ -314,6 +353,27 @@ export function ContactsByBuyingGroup({ companyId, companyName }: Props) {
           </div>
         ))
       )}
+
+      <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add contact</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {contactName ? `Add "${contactName}" to a buying group.` : 'Add a new contact to a buying group.'}
+          </p>
+          <Link
+            href={
+              initialDepartmentId
+                ? `/dashboard/companies/${companyId}/add-contacts?departmentId=${initialDepartmentId}${contactName ? `&name=${encodeURIComponent(contactName)}` : ''}`
+                : `/dashboard/companies/${companyId}/add-contacts`
+            }
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 px-4 py-2"
+          >
+            Open Add Contact
+          </Link>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -377,12 +437,12 @@ function ContactRow({ contact }: { contact: Contact }) {
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
 
   return (
-    <div className="flex items-center justify-between p-3 border border-gray-200 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700/50">
+    <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <WarmIndicator isWarm={contact.isWarm} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900 dark:text-gray-100">{fullName}</span>
+            <span className="font-medium text-card-foreground">{fullName}</span>
             {contact.buyingRole && (
               <Badge variant="outline" className="text-xs">
                 {contact.buyingRole}
@@ -397,7 +457,7 @@ function ContactRow({ contact }: { contact: Contact }) {
                       'h-2 w-2 rounded-full shrink-0',
                       status === 'Engaged' && 'bg-green-500',
                       status === 'Contacted' && 'bg-blue-500',
-                      status === 'Enriched' && 'bg-gray-400 dark:bg-gray-500',
+                      status === 'Enriched' && 'bg-muted-foreground',
                       status === 'Not enriched' && 'bg-amber-400'
                     )}
                     title={status}
@@ -414,16 +474,16 @@ function ContactRow({ contact }: { contact: Contact }) {
             })()}
           </div>
           {contact.whyRelevant && (
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 italic">
+            <p className="text-xs text-muted-foreground mt-1 italic">
               {contact.whyRelevant}
             </p>
           )}
-          <div className="text-sm text-gray-600 dark:text-gray-400 space-x-3 mt-1">
+          <div className="text-sm text-muted-foreground space-x-3 mt-1">
             {contact.title && <span>{contact.title}</span>}
             {contact.email && (
               <a
                 href={`mailto:${contact.email}`}
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-primary hover:underline"
               >
                 {contact.email}
               </a>
@@ -433,7 +493,7 @@ function ContactRow({ contact }: { contact: Contact }) {
                 href={contact.linkedinUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-primary hover:underline"
               >
                 LinkedIn
               </a>

@@ -62,22 +62,22 @@ export function TargetAccountCard({
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all">
+    <div className="rounded-lg border border-border bg-card p-5 hover:border-border hover:shadow-sm transition-all">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Link
             href={`/dashboard/companies/${companyId}`}
-            className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors block"
+            className="font-semibold text-card-foreground hover:text-primary transition-colors block"
           >
             {companyName}
           </Link>
           
           <div className="flex items-center gap-2 mt-1">
             {industry && (
-              <span className="text-sm text-gray-600 dark:text-gray-400">{industry}</span>
+              <span className="text-sm text-muted-foreground">{industry}</span>
             )}
             {arr && (
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-sm font-medium text-card-foreground">
                 {formatARR(arr)}
               </span>
             )}
@@ -105,7 +105,7 @@ export function TargetAccountCard({
           )}
           
           {lastActivity && (
-            <p className="text-gray-500 dark:text-gray-400 text-xs mt-2">
+            <p className="text-muted-foreground text-xs mt-2">
               Last activity: {formatLastActivity(lastActivity)}
             </p>
           )}

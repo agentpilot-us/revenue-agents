@@ -36,7 +36,7 @@ export default async function CompanySetupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <CompanySetupWizard initialData={initialData} />
     </div>
   );

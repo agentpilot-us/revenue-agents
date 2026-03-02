@@ -37,6 +37,23 @@ export type PerplexityOnlyResult =
   | { ok: true; summary: string }
   | { ok: false; error: string };
 
+const OPENAI_QUOTA_HINT =
+  'Research uses Perplexity for web search. To avoid OpenAI quota, set GOOGLE_GENERATIVE_AI_API_KEY in .env.local so chat and embeddings use Google (Gemini). Or set LLM_PROVIDER=anthropic and ANTHROPIC_API_KEY for chat; embeddings still need GOOGLE_GENERATIVE_AI_API_KEY.';
+
+function isOpenAIQuotaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    (/quota|billing|exceeded/i.test(msg) && /openai|platform\.openai\.com/i.test(msg)) ||
+    msg.includes('You exceeded your current quota')
+  );
+}
+
+function getFriendlyResearchError(err: unknown): string {
+  if (isOpenAIQuotaError(err)) return OPENAI_QUOTA_HINT;
+  if (err instanceof Error) return err.message;
+  return 'Research failed unexpectedly.';
+}
+
 /**
  * Run only the Perplexity (web search) step. Use with structureResearchWithClaude for two-phase research with UI status.
  * When dealContext is provided, research query is adjusted for stalled/champion_in/existing_deployed.
@@ -275,13 +292,10 @@ export async function discoverBuyingGroupsForAccount(
     return { ok: true, data: parsed.data, perplexitySummary: perplexityResult.summary };
   } catch (err) {
     console.error('discoverBuyingGroupsForAccount error:', err);
-    if (err instanceof Error) {
-      if (err.message.includes('429') || err.message.includes('rate limit')) {
-        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
-      }
-      return { ok: false, error: err.message };
+    if (err instanceof Error && (err.message.includes('429') || err.message.includes('rate limit'))) {
+      return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
     }
-    return { ok: false, error: 'Discovery failed unexpectedly.' };
+    return { ok: false, error: getFriendlyResearchError(err) };
   }
 }
 
@@ -416,13 +430,10 @@ export async function enrichBuyingGroup(
     return { ok: true, data: parsed.data };
   } catch (err) {
     console.error('enrichBuyingGroup error:', err);
-    if (err instanceof Error) {
-      if (err.message.includes('429') || err.message.includes('rate limit')) {
-        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
-      }
-      return { ok: false, error: err.message };
+    if (err instanceof Error && (err.message.includes('429') || err.message.includes('rate limit'))) {
+      return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
     }
-    return { ok: false, error: 'Enrichment failed unexpectedly.' };
+    return { ok: false, error: getFriendlyResearchError(err) };
   }
 }
 
@@ -480,13 +491,10 @@ export async function scoreProductFitForGroup(
     return { ok: true, products: parsed.data.products };
   } catch (err) {
     console.error('scoreProductFitForGroup error:', err);
-    if (err instanceof Error) {
-      if (err.message.includes('429') || err.message.includes('rate limit')) {
-        return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
-      }
-      return { ok: false, error: err.message };
+    if (err instanceof Error && (err.message.includes('429') || err.message.includes('rate limit'))) {
+      return { ok: false, error: 'Rate limit exceeded. Please try again in a moment.' };
     }
-    return { ok: false, error: 'Product fit scoring failed unexpectedly.' };
+    return { ok: false, error: getFriendlyResearchError(err) };
   }
 }
 
@@ -726,10 +734,10 @@ You MUST output at least one micro-segment. Do not return an empty microSegments
       if (generateError.message.includes('timeout') || generateError.message.includes('Timeout')) {
         return { ok: false, error: 'Research timed out. Please try again.' };
       }
-      return { ok: false, error: generateError.message };
+      return { ok: false, error: getFriendlyResearchError(generateError) };
     }
 
-    return { ok: false, error: 'Research failed unexpectedly.' };
+    return { ok: false, error: getFriendlyResearchError(generateError) };
   }
 }
 
@@ -980,16 +988,16 @@ You MUST output at least one micro-segment. Do not return an empty microSegments
         if (generateError.message.includes('timeout') || generateError.message.includes('Timeout')) {
           return { ok: false, error: 'Research timed out. Please try again.' };
         }
-        return { ok: false, error: generateError.message };
+        return { ok: false, error: getFriendlyResearchError(generateError) };
       }
 
-      return { ok: false, error: 'Research failed unexpectedly.' };
+      return { ok: false, error: getFriendlyResearchError(generateError) };
     }
   } catch (error) {
     console.error('researchCompanyForAccount error:', error);
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Research failed',
+      error: getFriendlyResearchError(error),
     };
   }
 }

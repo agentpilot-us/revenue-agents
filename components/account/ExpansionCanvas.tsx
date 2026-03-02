@@ -150,7 +150,7 @@ export const ExpansionCanvas: React.FC<ExpansionCanvasProps> = ({
       {/* Summary */}
       <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
         <div className="text-sm text-slate-700">
-          <span className="font-medium">{totalSegments}</span> microsegments ·{" "}
+          <span className="font-medium">{totalSegments}</span> divisions ·{" "}
           <span className="font-medium">{liveSegments}</span> with pages ·{" "}
           <span className="font-medium">{engagedSegments}</span> engaged
         </div>
@@ -162,7 +162,7 @@ export const ExpansionCanvas: React.FC<ExpansionCanvasProps> = ({
         <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">
-              Identified microsegments
+              Identified divisions
             </h2>
             <p className="mt-0.5 text-xs text-slate-600">
               All potential buying groups at this account.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Copy, RefreshCw, Send } from 'lucide-react';
 import {
@@ -28,12 +29,41 @@ type Props = {
   companyName: string;
   departments: DepartmentOption[];
   hasMessaging?: boolean;
+  /** URL context: pre-select division (Spec 1) */
+  initialDepartmentId?: string;
+  /** Load signal for "Generating based on signal" context */
+  signalId?: string;
+  /** Pre-select content type (email, linkedin, executive-briefing, one-pager) */
+  initialType?: string;
+  /** Filter library view (sales-page, email, etc.) */
+  contentFilter?: string;
+  /** Auto-start create flow (e.g. sales page) */
+  autoCreate?: boolean;
+  /** Pre-select contact for email/LinkedIn */
+  initialContactId?: string;
 };
 
-export function ContentTab({ companyId, companyName, departments, hasMessaging = false }: Props) {
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(
-    departments.length > 0 ? departments[0].id : null
-  );
+export function ContentTab({
+  companyId,
+  companyName,
+  departments,
+  hasMessaging = false,
+  initialDepartmentId,
+  signalId,
+  initialType,
+  contentFilter,
+  autoCreate,
+  initialContactId,
+}: Props) {
+  const initialDept =
+    initialDepartmentId && departments.some((d) => d.id === initialDepartmentId)
+      ? initialDepartmentId
+      : departments.length > 0
+        ? departments[0].id
+        : null;
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(initialDept);
+  const [signalContext, setSignalContext] = useState<{ title: string; summary: string; source?: string } | null>(null);
+  const [signalContextError, setSignalContextError] = useState(false);
   const [content, setContent] = useState<ContentData>({
     emailSubject: null,
     emailBody: null,
@@ -107,6 +137,40 @@ export function ContentTab({ companyId, companyName, departments, hasMessaging =
     })();
     return () => { cancelled = true; };
   }, [selectedDepartmentId, companyId, hasMessaging]);
+
+  useEffect(() => {
+    if (!signalId) {
+      setSignalContext(null);
+      setSignalContextError(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/signals/${signalId}`);
+        if (cancelled) return;
+        if (!res.ok) {
+          setSignalContextError(true);
+          setSignalContext(null);
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setSignalContext({
+          title: data.title ?? 'Signal',
+          summary: data.summary ?? '',
+          source: data.source?.type,
+        });
+        setSignalContextError(false);
+      } catch {
+        if (!cancelled) {
+          setSignalContextError(true);
+          setSignalContext(null);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [signalId]);
 
   const generateContent = async (contentType: 'email' | 'linkedin' | 'talk_track') => {
     if (!selectedDepartmentId) return;
@@ -241,6 +305,37 @@ export function ContentTab({ companyId, companyName, departments, hasMessaging =
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Content Generation
         </h2>
+        {(signalId || signalContextError) && (
+          <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+            {signalContext ? (
+              <>
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">Generating based on signal</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{signalContext.title}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{signalContext.summary}</p>
+                {signalContext.source && (
+                  <p className="text-xs text-gray-500 mt-1">Source: {signalContext.source}</p>
+                )}
+              </>
+            ) : signalContextError ? (
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                No signal context loaded. You can add context manually or{' '}
+                <Link href={`/dashboard/companies/${companyId}?tab=signals`} className="underline font-medium">
+                  browse recent signals
+                </Link>{' '}
+                for this account.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500">Loading signal context…</p>
+            )}
+          </div>
+        )}
+        {/* Edge case (1): signal with unknown division — AE can pick manually (Spec 1) */}
+        {(signalContext || signalContextError) &&
+          !(initialDepartmentId && departments.some((d) => d.id === initialDepartmentId)) && (
+          <p className="mb-3 text-xs text-amber-700 dark:text-amber-300">
+            Division unknown — select a buying group below.
+          </p>
+        )}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Buying Group

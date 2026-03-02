@@ -699,6 +699,9 @@ model SegmentCampaign {
   isMultiDepartment Boolean @default(false)
   departmentConfig  Json? // { departments: [{ id, name, slug, headline?, body?, pageSections? }] } when isMultiDepartment
 
+  // placeholder = reserved URL, "Coming Soon" shell; live = real content (default for legacy)
+  status String? // "placeholder" | "live"
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

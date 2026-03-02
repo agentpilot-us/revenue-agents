@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Copy, BarChart3 } from 'lucide-react';
 
-type TabId = 'departments' | 'overview' | 'contacts' | 'content' | 'engagement' | 'activity' | 'messaging' | 'campaigns' | 'map' | 'expansion';
+/** 6-tab set per Spec 2 (Tab Consolidation). */
+type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
 
 type Props = {
   companyId: string;
@@ -35,8 +36,7 @@ export function NextStepBar({
 
   const isOnCompletedTab =
     (currentTab === 'contacts' && hasContacts) ||
-    (currentTab === 'content' && hasContent) ||
-    (currentTab === 'campaigns' && hasCampaign);
+    (currentTab === 'content' && (hasContent || hasCampaign));
 
   const copyUrl = () => {
     if (campaignUrl && typeof navigator !== 'undefined') {
@@ -92,7 +92,7 @@ export function NextStepBar({
       <div className="rounded-lg border border-slate-700 bg-zinc-800/50 p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
         <span className="text-slate-300 text-sm">{statusLabel}</span>
         {nextStep && (
-          <Link href={`/dashboard/companies/${companyId}?tab=${nextStep === 'Find contacts' ? 'contacts' : nextStep === 'Content' ? 'content' : 'campaigns'}`}>
+          <Link href={`/dashboard/companies/${companyId}?tab=${nextStep === 'Find contacts' ? 'contacts' : 'content'}`}>
             <Button size="sm" variant="outline" className="border-slate-600 text-slate-200">
               Next: {nextStep} →
             </Button>
@@ -121,8 +121,10 @@ export function NextStepBar({
 
   const nextHref =
     nextStep === 'account-intelligence'
-      ? `/dashboard/companies/${companyId}/intelligence`
-      : `/dashboard/companies/${companyId}?tab=${nextStep}`;
+      ? `/dashboard/companies/${companyId}?tab=contacts&action=find`
+      : nextStep === 'campaigns'
+        ? `/dashboard/companies/${companyId}?tab=content&contentFilter=sales-page`
+        : `/dashboard/companies/${companyId}?tab=${nextStep}`;
 
   return (
     <div className="rounded-lg border border-slate-700 bg-zinc-800/50 p-4 mb-6 flex flex-wrap items-center justify-between gap-4">

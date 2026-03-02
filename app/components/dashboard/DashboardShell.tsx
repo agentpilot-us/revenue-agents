@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { dash } from '@/app/dashboard/dashboard-classes';
 
 type DashboardShellProps = {
   statusBar: ReactNode;
@@ -12,23 +13,29 @@ export function DashboardShell({
   activityFeed,
 }: DashboardShellProps) {
   return (
-    <div className="min-h-screen bg-zinc-900 text-slate-100">
+    <div className={dash.page}>
+      {/* Subtle grid texture for depth */}
       <div
-        className="fixed inset-0 pointer-events-none opacity-[0.03]"
+        className={dash.gridOverlay}
         style={{
           backgroundImage: `
-            linear-gradient(to right, rgb(248 250 252) 1px, transparent 1px),
-            linear-gradient(to bottom, rgb(248 250 252) 1px, transparent 1px)
+            linear-gradient(to right, currentColor 1px, transparent 1px),
+            linear-gradient(to bottom, currentColor 1px, transparent 1px)
           `,
           backgroundSize: '24px 24px',
         }}
       />
+
       <div className="relative">
-        <header className="sticky top-0 z-10 border-b border-slate-700 bg-zinc-900">
+        <header className={dash.header}>
           {statusBar}
         </header>
+
         <main>{children}</main>
-        <footer className="border-t border-slate-700">{activityFeed}</footer>
+
+        <footer className={dash.activityFeed}>
+          {activityFeed}
+        </footer>
       </div>
     </div>
   );

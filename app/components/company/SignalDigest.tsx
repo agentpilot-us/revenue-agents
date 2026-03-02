@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { buildContentUrl } from '@/lib/urls/content';
 
 type SignalTier = 1 | 2 | 3;
 
@@ -70,9 +71,10 @@ function handleCTAAction(action: string, companyId: string) {
     case 'contact':
       window.location.href = `/dashboard/companies/${companyId}/contacts/${id}`;
       break;
-    case 'campaign':
-      window.location.href = `/dashboard/companies/${companyId}?tab=campaigns`;
+    case 'campaign': {
+      window.location.href = buildContentUrl({ companyId });
       break;
+    }
     case 'content':
       window.location.href = `/dashboard/content-library/${id}/changes`;
       break;
@@ -80,7 +82,7 @@ function handleCTAAction(action: string, companyId: string) {
       window.location.href = `/dashboard/companies/${companyId}?tab=overview`;
       break;
     case 'activity':
-      window.location.href = `/dashboard/companies/${companyId}?tab=activity`;
+      window.location.href = `/dashboard/companies/${companyId}?tab=signals`;
       break;
     default:
       console.warn('Unknown CTA action:', action);

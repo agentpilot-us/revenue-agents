@@ -1,0 +1,662 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2758
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import \{ useState, useEffect \} from "react";\
+\
+// \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+// AGENTPILOT ADAPTIVE ROADMAP DASHBOARD - PRODUCTION SPEC\
+// Enterprise Expansion: NVIDIA \uc0\u8594  General Motors\
+// \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+\
+// Demo data representing what the Roadmap engine would produce\
+const ROADMAP = \{\
+  type: "enterprise_expansion",\
+  objective: \{\
+    goalText: "Land 2 new divisional NVIDIA use cases at GM",\
+    metric: "new_divisional_use_cases",\
+    targetCount: 2,\
+    timeHorizon: "this_year",\
+    progress: \{ landed: 0, active: 2, monitoring: 3 \},\
+  \},\
+\};\
+\
+const DIVISIONS = [\
+  \{\
+    id: "d1", name: "Autonomous Driving & ADAS", stage: "Active Program", stageIcon: "\uc0\u9679 ",\
+    stageColor: "#22c55e", contacts: 2, personasNeeded: 3, coverage: 67,\
+    salesPage: "placeholder", lastSignal: "2 hours ago",\
+    latestSignal: "VP of AV Engineering viewed your ADAS sales page",\
+    signalType: "page_view",\
+    isExpansionTarget: true,\
+  \},\
+  \{\
+    id: "d2", name: "Manufacturing & Supply Chain", stage: "Expansion Target", stageIcon: "\uc0\u9678 ",\
+    stageColor: "#f59e0b", contacts: 1, personasNeeded: 3, coverage: 33,\
+    salesPage: null, lastSignal: "2 days ago",\
+    latestSignal: "GM posted 3 AI/ML Engineer roles in Manufacturing",\
+    signalType: "job_posting",\
+    isExpansionTarget: true,\
+  \},\
+  \{\
+    id: "d3", name: "IT Infrastructure & AI Platform", stage: "Strategic Platform", stageIcon: "\uc0\u9733 ",\
+    stageColor: "#3b82f6", contacts: 2, personasNeeded: 3, coverage: 67,\
+    salesPage: "live", lastSignal: "Today",\
+    latestSignal: "mark.haener@gm.com viewed IT page (3rd time this week)",\
+    signalType: "page_view",\
+    isExpansionTarget: false,\
+  \},\
+  \{\
+    id: "d4", name: "Vehicle Engineering & Simulation", stage: "Expansion Target", stageIcon: "\uc0\u9678 ",\
+    stageColor: "#f59e0b", contacts: 2, personasNeeded: 3, coverage: 67,\
+    salesPage: null, lastSignal: "3 days ago",\
+    latestSignal: "VP of Simulation posted about digital twin initiatives",\
+    signalType: "linkedin_activity",\
+    isExpansionTarget: true,\
+  \},\
+  \{\
+    id: "d5", name: "Software-Defined Vehicle", stage: "Emerging", stageIcon: "\uc0\u9702 ",\
+    stageColor: "#6b7280", contacts: 0, personasNeeded: 3, coverage: 0,\
+    salesPage: null, lastSignal: null,\
+    latestSignal: null, signalType: null,\
+    isExpansionTarget: false,\
+  \},\
+];\
+\
+const SIGNALS = [\
+  \{\
+    id: "s1", type: "earnings_call", icon: "\uc0\u55357 \u56522 ", color: "#a855f7",\
+    title: "Mary Barra mentioned $2B AV investment in earnings call",\
+    division: "Autonomous Driving & ADAS", divisionId: "d1",\
+    detail: "Q4 earnings transcript references autonomous vehicle safety and ADAS investment as top-3 corporate priority",\
+    time: "3 hours ago", isExpansionTarget: true,\
+    primaryCTA: "Draft Executive Briefing", secondaryCTA: "Read Transcript",\
+  \},\
+  \{\
+    id: "s2", type: "job_posting", icon: "\uc0\u55357 \u56508 ", color: "#f59e0b",\
+    title: "GM posted 3 AI/ML Engineer roles in Manufacturing",\
+    division: "Manufacturing & Supply Chain", divisionId: "d2",\
+    detail: "Roles focus on predictive maintenance and quality control AI \'97 directly maps to NVIDIA Omniverse capabilities",\
+    time: "2 days ago", isExpansionTarget: true,\
+    primaryCTA: "Draft Outreach", secondaryCTA: "View Jobs",\
+  \},\
+  \{\
+    id: "s3", type: "page_view", icon: "\uc0\u55357 \u56385 ", color: "#22c55e",\
+    title: "mark.haener@gm.com viewed IT Infrastructure page (3rd time)",\
+    division: "IT Infrastructure & AI Platform", divisionId: "d3",\
+    detail: "Repeat engagement signals strong interest \'97 Mark is VP of AI Platform Engineering",\
+    time: "Today", isExpansionTarget: false,\
+    primaryCTA: "Draft Follow-Up", secondaryCTA: "View in Division",\
+  \},\
+  \{\
+    id: "s4", type: "linkedin_activity", icon: "\uc0\u55357 \u56492 ", color: "#0ea5e9",\
+    title: "VP of Simulation posted about digital twin initiatives",\
+    division: "Vehicle Engineering & Simulation", divisionId: "d4",\
+    detail: "Posted about evaluating digital twin platforms for crash simulation \'97 NVIDIA Omniverse is a direct fit",\
+    time: "3 days ago", isExpansionTarget: true,\
+    primaryCTA: "Draft Connection Request", secondaryCTA: "View Profile",\
+  \},\
+  \{\
+    id: "s5", type: "news", icon: "\uc0\u55357 \u56560 ", color: "#ec4899",\
+    title: "GM announces partnership with Qualcomm for next-gen cockpits",\
+    division: "Software-Defined Vehicle", divisionId: "d5",\
+    detail: "SDV division actively evaluating compute platforms \'97 competitive signal, Qualcomm gaining ground",\
+    time: "1 day ago", isExpansionTarget: false,\
+    primaryCTA: "Create Competitive Brief", secondaryCTA: "Read Article",\
+  \},\
+];\
+\
+function generateNBAs(divisions) \{\
+  return divisions\
+    .sort((a, b) => \{\
+      const stagePriority = \{ "Expansion Target": 0, "Active Program": 1, "Strategic Platform": 2, "Emerging": 3 \};\
+      const pa = stagePriority[a.stage] ?? 4;\
+      const pb = stagePriority[b.stage] ?? 4;\
+      if (pa !== pb) return pa - pb;\
+      return (b.contacts > 0 ? 1 : 0) - (a.contacts > 0 ? 1 : 0);\
+    \})\
+    .map((d) => \{\
+      let recommendation, actionType, primaryCTA, urgency;\
+      const hasSignal = d.lastSignal && d.lastSignal !== null;\
+      if (d.contacts === 0) \{\
+        recommendation = `No contacts identified yet. Research the buying group to find VP of AI/ML, LOB Owner, and IT Architecture Lead before any outreach.`;\
+        actionType = "research";\
+        primaryCTA = "Research Buying Group";\
+        urgency = "low";\
+      \} else if (d.contacts < d.personasNeeded && !d.salesPage) \{\
+        if (hasSignal && d.isExpansionTarget) \{\
+          recommendation = `$\{d.contacts\} of $\{d.personasNeeded\} buying group contacts identified. Recent signal activity suggests momentum \'97 draft outreach to existing contacts while expanding the buying group.`;\
+          actionType = "outreach";\
+          primaryCTA = "Draft Outreach";\
+          urgency = "high";\
+        \} else \{\
+          recommendation = `$\{d.contacts\} of $\{d.personasNeeded\} buying group contacts identified. Build a division-specific sales page to share with the buying group, then find remaining contacts.`;\
+          actionType = "content";\
+          primaryCTA = "Create Sales Page";\
+          urgency = "medium";\
+        \}\
+      \} else if (d.salesPage === "placeholder") \{\
+        recommendation = `Sales page placeholder created. Waiting for HTML content. Once live, draft personalized outreach to $\{d.contacts\} contacts referencing the page.`;\
+        actionType = "content";\
+        primaryCTA = "View Placeholder";\
+        urgency = "medium";\
+      \} else if (d.salesPage === "live" && hasSignal) \{\
+        recommendation = `Page is live and getting engagement. $\{d.contacts < d.personasNeeded ? `Expand the buying group ($\{d.contacts\}/$\{d.personasNeeded\}) and ` : ""\}draft follow-up to contacts showing repeat interest.`;\
+        actionType = "nurture";\
+        primaryCTA = d.contacts < d.personasNeeded ? "Find More Contacts" : "Draft Follow-Up";\
+        urgency = "high";\
+      \} else if (!d.salesPage && d.contacts >= d.personasNeeded) \{\
+        recommendation = `Buying group is mapped ($\{d.contacts\}/$\{d.personasNeeded\}). Build a sales page to begin structured engagement.`;\
+        actionType = "content";\
+        primaryCTA = "Create Sales Page";\
+        urgency = "medium";\
+      \} else \{\
+        recommendation = `Monitor for signal activity. Consider proactive outreach to build initial relationships.`;\
+        actionType = "research";\
+        primaryCTA = "Research Division";\
+        urgency = "low";\
+      \}\
+      return \{ ...d, recommendation, actionType, primaryCTA, urgency \};\
+    \});\
+\}\
+\
+const TASKS = [\
+  \{ id: "t1", title: "Draft executive briefing for ADAS division", division: "Autonomous Driving & ADAS", signal: "Earnings call: $2B AV investment mentioned", objective: "Advances objective: Land 2 new NVIDIA use cases", priority: "high", type: "outreach" \},\
+  \{ id: "t2", title: "Research Manufacturing buying group", division: "Manufacturing & Supply Chain", signal: "3 AI/ML jobs posted \'97 division investing in AI capability", objective: "Expansion target #2 for your objective", priority: "high", type: "research" \},\
+  \{ id: "t3", title: "Follow up with mark.haener@gm.com", division: "IT Infrastructure & AI Platform", signal: "Viewed IT page 3 times this week \'97 strong engagement", objective: "Maintain strategic platform relationship", priority: "medium", type: "nurture" \},\
+  \{ id: "t4", title: "Draft LinkedIn connection request to VP of Simulation", division: "Vehicle Engineering & Simulation", signal: "Posted about evaluating digital twin platforms", objective: "Expansion target \'97 NVIDIA Omniverse is a direct fit", priority: "medium", type: "outreach" \},\
+];\
+\
+// \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+// COMPONENTS\
+// \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+\
+function ObjectiveBar(\{ objective \}) \{\
+  const pct = (objective.progress.landed / objective.targetCount) * 100;\
+  return (\
+    <div style=\{\{\
+      background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",\
+      border: "1px solid rgba(59,130,246,0.2)",\
+      borderRadius: 12, padding: "16px 24px", marginBottom: 20,\
+      display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,\
+    \}\}>\
+      <div style=\{\{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 280 \}\}>\
+        <div style=\{\{\
+          width: 40, height: 40, borderRadius: 10,\
+          background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",\
+          display: "flex", alignItems: "center", justifyContent: "center",\
+          fontSize: 18, fontWeight: 700, color: "#fff",\
+        \}\}>\uc0\u55356 \u57263 </div>\
+        <div>\
+          <div style=\{\{ fontSize: 13, color: "#94a3b8", fontWeight: 500, letterSpacing: "0.02em" \}\}>ROADMAP OBJECTIVE</div>\
+          <div style=\{\{ fontSize: 15, color: "#e2e8f0", fontWeight: 600, marginTop: 2 \}\}>\{objective.goalText\}</div>\
+        </div>\
+      </div>\
+      <div style=\{\{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" \}\}>\
+        <Stat label="Landed" value=\{objective.progress.landed\} total=\{objective.targetCount\} color="#22c55e" />\
+        <Stat label="Active" value=\{objective.progress.active\} color="#f59e0b" />\
+        <Stat label="Monitoring" value=\{objective.progress.monitoring\} color="#6b7280" />\
+        <div style=\{\{ width: 120, marginLeft: 8 \}\}>\
+          <div style=\{\{ display: "flex", justifyContent: "space-between", marginBottom: 4 \}\}>\
+            <span style=\{\{ fontSize: 11, color: "#64748b" \}\}>Progress</span>\
+            <span style=\{\{ fontSize: 11, color: "#94a3b8", fontWeight: 600 \}\}>\{objective.progress.landed\}/\{objective.targetCount\}</span>\
+          </div>\
+          <div style=\{\{ height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)" \}\}>\
+            <div style=\{\{ height: "100%", width: `$\{Math.max(pct, 4)\}%`, background: "linear-gradient(90deg, #3b82f6, #22c55e)", borderRadius: 3, transition: "width 0.6s ease" \}\} />\
+          </div>\
+        </div>\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+function Stat(\{ label, value, total, color \}) \{\
+  return (\
+    <div style=\{\{ textAlign: "center" \}\}>\
+      <div style=\{\{ fontSize: 22, fontWeight: 700, color \}\}>\
+        \{value\}\{total !== undefined && <span style=\{\{ fontSize: 13, color: "#475569" \}\}>/\{total\}</span>\}\
+      </div>\
+      <div style=\{\{ fontSize: 11, color: "#64748b", marginTop: 1 \}\}>\{label\}</div>\
+    </div>\
+  );\
+\}\
+\
+function SignalCard(\{ signal, onDismiss \}) \{\
+  const [dismissed, setDismissed] = useState(false);\
+  if (dismissed) return null;\
+  return (\
+    <div style=\{\{\
+      background: "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95))",\
+      border: "1px solid rgba(255,255,255,0.06)",\
+      borderLeft: `3px solid $\{signal.color\}`,\
+      borderRadius: 10, padding: "14px 16px", marginBottom: 10,\
+      transition: "all 0.2s ease", cursor: "default",\
+    \}\}\
+      onMouseEnter=\{e => \{ e.currentTarget.style.borderColor = `rgba(255,255,255,0.12)`; e.currentTarget.style.transform = "translateX(2px)"; \}\}\
+      onMouseLeave=\{e => \{ e.currentTarget.style.borderColor = `rgba(255,255,255,0.06)`; e.currentTarget.style.transform = "none"; \}\}\
+    >\
+      <div style=\{\{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 \}\}>\
+        <span style=\{\{ fontSize: 14 \}\}>\{signal.icon\}</span>\
+        <span style=\{\{\
+          fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: signal.color,\
+          textTransform: "uppercase",\
+        \}\}>\{signal.type.replace("_", " ")\}</span>\
+        <span style=\{\{ fontSize: 11, color: "#475569", marginLeft: "auto" \}\}>\{signal.time\}</span>\
+      </div>\
+      <div style=\{\{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", lineHeight: 1.4, marginBottom: 4 \}\}>\
+        \{signal.title\}\
+      </div>\
+      <div style=\{\{ fontSize: 12, color: "#94a3b8", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 \}\}>\
+        <span style=\{\{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: signal.isExpansionTarget ? "#f59e0b" : "#3b82f6" \}\} />\
+        \{signal.division\}\
+      </div>\
+      <div style=\{\{ fontSize: 11, color: "#64748b", lineHeight: 1.5, marginBottom: 10 \}\}>\
+        \{signal.detail\}\
+      </div>\
+      \{signal.isExpansionTarget && (\
+        <div style=\{\{ fontSize: 10, color: "#f59e0b", marginBottom: 10, fontWeight: 500, opacity: 0.8 \}\}>\
+          \uc0\u8599  Expansion target for your objective\
+        </div>\
+      )\}\
+      <div style=\{\{ display: "flex", gap: 8, flexWrap: "wrap" \}\}>\
+        <button style=\{\{\
+          background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff",\
+          border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, fontWeight: 600,\
+          cursor: "pointer", transition: "all 0.15s ease",\
+        \}\}\
+          onMouseEnter=\{e => e.target.style.transform = "scale(1.03)"\}\
+          onMouseLeave=\{e => e.target.style.transform = "none"\}\
+        >\{signal.primaryCTA\}</button>\
+        <button style=\{\{\
+          background: "transparent", color: "#64748b", border: "1px solid rgba(255,255,255,0.08)",\
+          borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer",\
+        \}\}>\{signal.secondaryCTA\}</button>\
+        <button onClick=\{() => \{ setDismissed(true); onDismiss?.(signal.id); \}\} style=\{\{\
+          background: "transparent", color: "#475569", border: "none",\
+          padding: "6px 8px", fontSize: 11, cursor: "pointer", marginLeft: "auto",\
+        \}\}>Dismiss</button>\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+function DivisionCard(\{ div \}) \{\
+  const coverageColor = div.coverage >= 60 ? "#22c55e" : div.coverage >= 30 ? "#f59e0b" : "#ef4444";\
+  const pageStatus = div.salesPage === "live" ? \{ label: "LIVE", color: "#22c55e" \}\
+    : div.salesPage === "placeholder" ? \{ label: "PLACEHOLDER", color: "#f59e0b" \}\
+    : \{ label: "Not started", color: "#475569" \};\
+\
+  return (\
+    <div style=\{\{\
+      background: "linear-gradient(180deg, rgba(15,23,42,0.98), rgba(30,41,59,0.9))",\
+      border: "1px solid rgba(255,255,255,0.06)",\
+      borderRadius: 12, padding: 16, minWidth: 200, flex: "1 1 200px",\
+      transition: "all 0.2s ease", position: "relative", overflow: "hidden",\
+    \}\}\
+      onMouseEnter=\{e => \{ e.currentTarget.style.borderColor = "rgba(59,130,246,0.3)"; e.currentTarget.style.transform = "translateY(-2px)"; \}\}\
+      onMouseLeave=\{e => \{ e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.transform = "none"; \}\}\
+    >\
+      \{div.isExpansionTarget && (\
+        <div style=\{\{ position: "absolute", top: 0, right: 0, background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "#000", fontSize: 9, fontWeight: 700, padding: "3px 10px 3px 14px", borderBottomLeftRadius: 8, letterSpacing: "0.05em" \}\}>\
+          EXPANSION\
+        </div>\
+      )\}\
+      <div style=\{\{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 \}\}>\
+        <span style=\{\{ color: div.stageColor, fontSize: 12 \}\}>\{div.stageIcon\}</span>\
+        <span style=\{\{ fontSize: 10, fontWeight: 600, color: div.stageColor, textTransform: "uppercase", letterSpacing: "0.06em" \}\}>\
+          \{div.stage\}\
+        </span>\
+      </div>\
+      <div style=\{\{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", lineHeight: 1.3, marginBottom: 10, minHeight: 38 \}\}>\
+        \{div.name\}\
+      </div>\
+\
+      <div style=\{\{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 \}\}>\
+        <span style=\{\{ fontSize: 11, color: "#94a3b8" \}\}>Contacts: \{div.contacts\}/\{div.personasNeeded\}</span>\
+        <span style=\{\{ fontSize: 11, color: coverageColor, fontWeight: 600 \}\}>\{div.coverage\}%</span>\
+      </div>\
+      <div style=\{\{ height: 4, background: "rgba(255,255,255,0.05)", borderRadius: 2, marginBottom: 10, overflow: "hidden" \}\}>\
+        <div style=\{\{ height: "100%", width: `$\{div.coverage\}%`, background: coverageColor, borderRadius: 2, transition: "width 0.5s ease" \}\} />\
+      </div>\
+\
+      <div style=\{\{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 \}\}>\
+        <span style=\{\{ color: "#64748b" \}\}>Sales page</span>\
+        <span style=\{\{ color: pageStatus.color, fontWeight: 600, fontSize: 10, letterSpacing: "0.04em" \}\}>\{pageStatus.label\}</span>\
+      </div>\
+      <div style=\{\{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 10 \}\}>\
+        <span style=\{\{ color: "#64748b" \}\}>Last signal</span>\
+        <span style=\{\{ color: div.lastSignal ? "#94a3b8" : "#374151" \}\}>\{div.lastSignal || "None"\}</span>\
+      </div>\
+\
+      \{div.latestSignal && (\
+        <div style=\{\{\
+          background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "8px 10px",\
+          marginBottom: 10, borderLeft: `2px solid $\{div.stageColor\}`,\
+        \}\}>\
+          <div style=\{\{ fontSize: 10, color: "#64748b", marginBottom: 2 \}\}>Latest signal</div>\
+          <div style=\{\{ fontSize: 11, color: "#94a3b8", lineHeight: 1.4 \}\}>\{div.latestSignal\}</div>\
+        </div>\
+      )\}\
+\
+      <button style=\{\{\
+        width: "100%", background: div.contacts === 0 ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(59,130,246,0.05))",\
+        color: div.contacts === 0 ? "#64748b" : "#93c5fd", border: `1px solid $\{div.contacts === 0 ? "rgba(255,255,255,0.06)" : "rgba(59,130,246,0.2)"\}`,\
+        borderRadius: 6, padding: "7px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",\
+        transition: "all 0.15s ease",\
+      \}\}\
+        onMouseEnter=\{e => e.target.style.background = div.contacts === 0 ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg, rgba(59,130,246,0.25), rgba(59,130,246,0.1))"\}\
+        onMouseLeave=\{e => e.target.style.background = div.contacts === 0 ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(59,130,246,0.05))"\}\
+      >\
+        \{div.contacts === 0 ? "Research Division" : div.salesPage === "live" ? "View Division" : "View Division \uc0\u8594 "\}\
+      </button>\
+    </div>\
+  );\
+\}\
+\
+function NBACard(\{ nba \}) \{\
+  const urgencyColors = \{ high: "#ef4444", medium: "#f59e0b", low: "#6b7280" \};\
+  const actionIcons = \{ outreach: "\uc0\u9993 \u65039 ", content: "\u55357 \u56516 ", research: "\u55357 \u56589 ", nurture: "\u55358 \u56605 " \};\
+  return (\
+    <div style=\{\{\
+      background: "linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.9))",\
+      border: "1px solid rgba(255,255,255,0.06)",\
+      borderRadius: 10, padding: "14px 16px", marginBottom: 10,\
+      borderLeft: `3px solid $\{nba.stageColor\}`,\
+      transition: "all 0.2s ease",\
+    \}\}\
+      onMouseEnter=\{e => e.currentTarget.style.transform = "translateX(2px)"\}\
+      onMouseLeave=\{e => e.currentTarget.style.transform = "none"\}\
+    >\
+      <div style=\{\{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 \}\}>\
+        <span style=\{\{ color: nba.stageColor, fontSize: 11 \}\}>\{nba.stageIcon\}</span>\
+        <span style=\{\{ fontSize: 10, fontWeight: 700, color: nba.stageColor, textTransform: "uppercase", letterSpacing: "0.06em" \}\}>\{nba.stage\}</span>\
+        <span style=\{\{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: urgencyColors[nba.urgency] \}\} />\
+        <span style=\{\{ fontSize: 10, color: urgencyColors[nba.urgency], fontWeight: 600 \}\}>\{nba.urgency\}</span>\
+      </div>\
+      <div style=\{\{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 6 \}\}>\{nba.name\}</div>\
+      <div style=\{\{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 \}\}>\
+        <span style=\{\{ marginRight: 6 \}\}>\{actionIcons[nba.actionType]\}</span>\
+        \{nba.recommendation\}\
+      </div>\
+      \{nba.isExpansionTarget && (\
+        <div style=\{\{ fontSize: 10, color: "#f59e0b", marginBottom: 8, fontWeight: 500 \}\}>\
+          \uc0\u8599  Advances objective: \{ROADMAP.objective.goalText\}\
+        </div>\
+      )\}\
+      <div style=\{\{ display: "flex", gap: 8, flexWrap: "wrap" \}\}>\
+        <button style=\{\{\
+          background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff",\
+          border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, fontWeight: 600,\
+          cursor: "pointer", transition: "all 0.15s ease",\
+        \}\}\
+          onMouseEnter=\{e => e.target.style.transform = "scale(1.03)"\}\
+          onMouseLeave=\{e => e.target.style.transform = "none"\}\
+        >\{nba.primaryCTA\}</button>\
+        <button style=\{\{\
+          background: "transparent", color: "#64748b", border: "1px solid rgba(255,255,255,0.08)",\
+          borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer",\
+        \}\}>View \{nba.contacts > 0 ? "Contacts" : "Division"\}</button>\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+function TaskItem(\{ task \}) \{\
+  const priorityColors = \{ high: "#ef4444", medium: "#f59e0b", low: "#6b7280" \};\
+  const typeIcons = \{ outreach: "\uc0\u9993 \u65039 ", research: "\u55357 \u56589 ", nurture: "\u55358 \u56605 ", content: "\u55357 \u56516 " \};\
+  return (\
+    <div style=\{\{\
+      padding: "12px 14px", borderBottom: "1px solid rgba(255,255,255,0.04)",\
+      transition: "background 0.15s ease", cursor: "pointer",\
+    \}\}\
+      onMouseEnter=\{e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"\}\
+      onMouseLeave=\{e => e.currentTarget.style.background = "transparent"\}\
+    >\
+      <div style=\{\{ display: "flex", alignItems: "flex-start", gap: 10 \}\}>\
+        <div style=\{\{\
+          width: 18, height: 18, borderRadius: 4,\
+          border: `2px solid $\{priorityColors[task.priority]\}`,\
+          display: "flex", alignItems: "center", justifyContent: "center",\
+          fontSize: 10, flexShrink: 0, marginTop: 1, cursor: "pointer",\
+        \}\}>\{typeIcons[task.type]\}</div>\
+        <div style=\{\{ flex: 1 \}\}>\
+          <div style=\{\{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", lineHeight: 1.4, marginBottom: 3 \}\}>\
+            \{task.title\}\
+          </div>\
+          <div style=\{\{ fontSize: 11, color: "#64748b", lineHeight: 1.4 \}\}>\
+            <span style=\{\{ color: "#94a3b8" \}\}>\{task.division\}</span>\
+            \{" \'b7 "\}\
+            \{task.signal\}\
+          </div>\
+          <div style=\{\{ fontSize: 10, color: task.priority === "high" ? "#f59e0b" : "#475569", marginTop: 3, fontWeight: 500 \}\}>\
+            \{task.objective\}\
+          </div>\
+        </div>\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+// \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+// MAIN DASHBOARD\
+// \uc0\u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \u9552 \
+\
+export default function AdaptiveRoadmapDashboard() \{\
+  const nbas = generateNBAs([...DIVISIONS]);\
+  const [dismissed, setDismissed] = useState([]);\
+\
+  return (\
+    <div style=\{\{\
+      minHeight: "100vh",\
+      background: "#0b1120",\
+      color: "#e2e8f0",\
+      fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",\
+    \}\}>\
+      <style>\{`\
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');\
+        * \{ box-sizing: border-box; margin: 0; padding: 0; \}\
+        ::-webkit-scrollbar \{ width: 5px; \}\
+        ::-webkit-scrollbar-track \{ background: transparent; \}\
+        ::-webkit-scrollbar-thumb \{ background: rgba(255,255,255,0.1); border-radius: 4px; \}\
+        ::-webkit-scrollbar-thumb:hover \{ background: rgba(255,255,255,0.2); \}\
+      `\}</style>\
+\
+      \{/* Top Bar */\}\
+      <div style=\{\{\
+        background: "rgba(15,23,42,0.8)", backdropFilter: "blur(12px)",\
+        borderBottom: "1px solid rgba(255,255,255,0.05)",\
+        padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",\
+        position: "sticky", top: 0, zIndex: 50,\
+      \}\}>\
+        <div style=\{\{ display: "flex", alignItems: "center", gap: 12 \}\}>\
+          <div style=\{\{\
+            width: 32, height: 32, borderRadius: 8,\
+            background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",\
+            display: "flex", alignItems: "center", justifyContent: "center",\
+            fontSize: 16, fontWeight: 800, color: "#fff",\
+          \}\}>A</div>\
+          <span style=\{\{ fontSize: 16, fontWeight: 700, color: "#e2e8f0", letterSpacing: "-0.01em" \}\}>AgentPilot</span>\
+        </div>\
+        <div style=\{\{ display: "flex", gap: 24, fontSize: 13, color: "#64748b" \}\}>\
+          <span style=\{\{ color: "#e2e8f0", fontWeight: 600 \}\}>Dashboard</span>\
+          <span style=\{\{ cursor: "pointer" \}\}>Your Roadmap</span>\
+          <span style=\{\{ cursor: "pointer" \}\}>Target Accounts</span>\
+          <span style=\{\{ cursor: "pointer" \}\}>Content</span>\
+          <span style=\{\{ cursor: "pointer" \}\}>Analytics</span>\
+        </div>\
+        <div style=\{\{ display: "flex", alignItems: "center", gap: 12 \}\}>\
+          <div style=\{\{ fontSize: 11, color: "#64748b", textAlign: "right" \}\}>\
+            <div style=\{\{ color: "#94a3b8", fontWeight: 600 \}\}>NVIDIA AE</div>\
+            <div>Enterprise Expansion</div>\
+          </div>\
+          <div style=\{\{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg, #22c55e, #16a34a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700 \}\}>N</div>\
+        </div>\
+      </div>\
+\
+      \{/* Main Content */\}\
+      <div style=\{\{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" \}\}>\
+\
+        \{/* Objective Bar */\}\
+        <ObjectiveBar objective=\{ROADMAP.objective\} />\
+\
+        \{/* Stats Bar */\}\
+        <div style=\{\{\
+          display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap",\
+        \}\}>\
+          \{[\
+            \{ label: "Divisions Tracked", value: "5", sub: "across General Motors" \},\
+            \{ label: "Buying Groups Mapped", value: "5", sub: "7 of 15 contacts found" \},\
+            \{ label: "Sales Pages", value: "1 live", sub: "1 placeholder \'b7 3 not started" \},\
+            \{ label: "Signals This Week", value: "5", sub: "3 from expansion targets" \},\
+            \{ label: "Engagement", value: "4", sub: "page views + LinkedIn activity" \},\
+          ].map((s, i) => (\
+            <div key=\{i\} style=\{\{\
+              flex: "1 1 160px", background: "rgba(15,23,42,0.6)", border: "1px solid rgba(255,255,255,0.04)",\
+              borderRadius: 10, padding: "12px 16px",\
+            \}\}>\
+              <div style=\{\{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 \}\}>\{s.label\}</div>\
+              <div style=\{\{ fontSize: 18, fontWeight: 700, color: "#e2e8f0" \}\}>\{s.value\}</div>\
+              <div style=\{\{ fontSize: 10, color: "#475569", marginTop: 2 \}\}>\{s.sub\}</div>\
+            </div>\
+          ))\}\
+        </div>\
+\
+        \{/* Main 3-Column Layout */\}\
+        <div style=\{\{ display: "grid", gridTemplateColumns: "320px 1fr 300px", gap: 20, alignItems: "start" \}\}>\
+\
+          \{/* LEFT: Signals */\}\
+          <div>\
+            <div style=\{\{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 \}\}>\
+              <h2 style=\{\{ fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" \}\}>\
+                Hot Signals\
+              </h2>\
+              <span style=\{\{\
+                background: "rgba(239,68,68,0.15)", color: "#ef4444", fontSize: 11,\
+                fontWeight: 700, padding: "2px 8px", borderRadius: 10,\
+              \}\}>\{SIGNALS.filter(s => !dismissed.includes(s.id)).length\}</span>\
+            </div>\
+            \{SIGNALS.filter(s => !dismissed.includes(s.id)).map(s => (\
+              <SignalCard key=\{s.id\} signal=\{s\} onDismiss=\{id => setDismissed(p => [...p, id])\} />\
+            ))\}\
+          </div>\
+\
+          \{/* CENTER: NBAs + Radar + Tasks */\}\
+          <div>\
+            \{/* Next Best Action */\}\
+            <div style=\{\{ marginBottom: 24 \}\}>\
+              <div style=\{\{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 \}\}>\
+                <h2 style=\{\{ fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" \}\}>\
+                  Recommended Plans\
+                </h2>\
+                <span style=\{\{ fontSize: 11, color: "#475569" \}\}>Prioritized by objective</span>\
+              </div>\
+              \{nbas.slice(0, 4).map(n => <NBACard key=\{n.id\} nba=\{n\} />)\}\
+              \{nbas.length > 4 && (\
+                <button style=\{\{\
+                  width: "100%", background: "transparent", color: "#475569",\
+                  border: "1px dashed rgba(255,255,255,0.06)", borderRadius: 8,\
+                  padding: "8px", fontSize: 11, cursor: "pointer", marginTop: 4,\
+                \}\}>Show \{nbas.length - 4\} more division\{nbas.length - 4 > 1 ? "s" : ""\}</button>\
+              )\}\
+            </div>\
+\
+            \{/* Account Radar */\}\
+            <div style=\{\{ marginBottom: 24 \}\}>\
+              <div style=\{\{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 \}\}>\
+                <h2 style=\{\{ fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" \}\}>\
+                  Account Radar \'97 General Motors\
+                </h2>\
+                <span style=\{\{ fontSize: 11, color: "#475569" \}\}>5 divisions \'b7 2 expansion targets</span>\
+              </div>\
+              <div style=\{\{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 \}\}>\
+                \{DIVISIONS.map(d => <DivisionCard key=\{d.id\} div=\{d\} />)\}\
+              </div>\
+            </div>\
+\
+            \{/* Today's Tasks */\}\
+            <div>\
+              <div style=\{\{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 \}\}>\
+                <h2 style=\{\{ fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" \}\}>\
+                  Today's Tasks\
+                </h2>\
+                <span style=\{\{ fontSize: 11, color: "#475569" \}\}>\{TASKS.length\} tasks \'b7 sorted by impact</span>\
+              </div>\
+              <div style=\{\{\
+                background: "rgba(15,23,42,0.6)", border: "1px solid rgba(255,255,255,0.04)",\
+                borderRadius: 10, overflow: "hidden",\
+              \}\}>\
+                \{TASKS.map(t => <TaskItem key=\{t.id\} task=\{t\} />)\}\
+              </div>\
+            </div>\
+          </div>\
+\
+          \{/* RIGHT: Quick Stats + Pipeline */\}\
+          <div>\
+            \{/* This Week */\}\
+            <div style=\{\{\
+              background: "rgba(15,23,42,0.6)", border: "1px solid rgba(255,255,255,0.04)",\
+              borderRadius: 10, padding: 16, marginBottom: 16,\
+            \}\}>\
+              <h3 style=\{\{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 \}\}>This Week</h3>\
+              \{[\
+                \{ label: "Signals processed", value: "5", change: "+3 vs last week" \},\
+                \{ label: "Plans generated", value: "4", change: "2 high priority" \},\
+                \{ label: "Content created", value: "1", change: "1 placeholder page" \},\
+                \{ label: "Outreach sent", value: "0", change: "2 drafts pending" \},\
+                \{ label: "Responses", value: "0", change: "\'97" \},\
+              ].map((r, i) => (\
+                <div key=\{i\} style=\{\{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,0.03)" : "none" \}\}>\
+                  <span style=\{\{ fontSize: 12, color: "#94a3b8" \}\}>\{r.label\}</span>\
+                  <div style=\{\{ textAlign: "right" \}\}>\
+                    <span style=\{\{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" \}\}>\{r.value\}</span>\
+                    <div style=\{\{ fontSize: 10, color: "#475569" \}\}>\{r.change\}</div>\
+                  </div>\
+                </div>\
+              ))\}\
+            </div>\
+\
+            \{/* Pipeline */\}\
+            <div style=\{\{\
+              background: "rgba(15,23,42,0.6)", border: "1px solid rgba(255,255,255,0.04)",\
+              borderRadius: 10, padding: 16, marginBottom: 16,\
+            \}\}>\
+              <h3 style=\{\{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 \}\}>Pipeline \'97 General Motors</h3>\
+              <div style=\{\{ fontSize: 22, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 \}\}>$15M \'96 $75M</div>\
+              <div style=\{\{ fontSize: 11, color: "#475569", marginBottom: 12 \}\}>potential across 5 divisions</div>\
+              \{DIVISIONS.filter(d => d.isExpansionTarget).map(d => (\
+                <div key=\{d.id\} style=\{\{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" \}\}>\
+                  <span style=\{\{ width: 6, height: 6, borderRadius: "50%", background: d.stageColor \}\} />\
+                  <span style=\{\{ fontSize: 11, color: "#94a3b8", flex: 1 \}\}>\{d.name\}</span>\
+                  <span style=\{\{ fontSize: 10, color: d.stageColor, fontWeight: 600 \}\}>\{d.stage\}</span>\
+                </div>\
+              ))\}\
+            </div>\
+\
+            \{/* Map Health */\}\
+            <div style=\{\{\
+              background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05))",\
+              border: "1px solid rgba(59,130,246,0.15)",\
+              borderRadius: 10, padding: 16,\
+            \}\}>\
+              <h3 style=\{\{ fontSize: 11, fontWeight: 700, color: "#93c5fd", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 \}\}>Roadmap Health</h3>\
+              \{[\
+                \{ label: "Signal \uc0\u8594  Plan rate", value: "80%", good: true \},\
+                \{ label: "Buying group coverage", value: "47%", good: false \},\
+                \{ label: "Content readiness", value: "20%", good: false \},\
+                \{ label: "Engagement velocity", value: "Growing", good: true \},\
+              ].map((m, i) => (\
+                <div key=\{i\} style=\{\{ display: "flex", justifyContent: "space-between", padding: "5px 0" \}\}>\
+                  <span style=\{\{ fontSize: 11, color: "#94a3b8" \}\}>\{m.label\}</span>\
+                  <span style=\{\{ fontSize: 11, fontWeight: 600, color: m.good ? "#22c55e" : "#f59e0b" \}\}>\{m.value\}</span>\
+                </div>\
+              ))\}\
+            </div>\
+          </div>\
+        </div>\
+      </div>\
+    </div>\
+  );\
+\}}

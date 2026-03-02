@@ -346,6 +346,110 @@ export async function seedDemoRoadmapForCompany(
   }
 
   if (persona === 'nvidia_gm') {
+    // Ensure NVIDIA catalog products exist so "Build demo" (research) can run
+    const existingProducts = await prisma.catalogProduct.count({
+      where: { userId: session.user.id },
+    });
+    if (existingProducts === 0) {
+      const nvidiaProducts = [
+        {
+          name: 'NVIDIA DRIVE',
+          slug: 'nvidia-drive',
+          description:
+            'End-to-end autonomous vehicle development platform: simulation, perception, mapping, and in-vehicle compute for L2+ to L4/L5.',
+          targetDepartments: [
+            DepartmentType.ENGINEERING,
+            DepartmentType.AUTONOMOUS_VEHICLES,
+            DepartmentType.CONNECTED_SERVICES,
+          ] as DepartmentType[],
+          targetPersonas: ['VP Vehicle Engineering', 'AV/ADAS Director', 'Software-Defined Vehicle Lead'],
+          useCases: ['AV development', 'Simulation', 'In-vehicle compute'],
+          contentTags: ['automotive', 'autonomous', 'simulation'],
+        },
+        {
+          name: 'NVIDIA Omniverse',
+          slug: 'nvidia-omniverse',
+          description:
+            'Platform for 3D design collaboration and digital twin simulation; connects tools and teams for manufacturing and vehicle engineering.',
+          targetDepartments: [
+            DepartmentType.ENGINEERING,
+            DepartmentType.MANUFACTURING_OPERATIONS,
+            DepartmentType.INDUSTRIAL_DESIGN,
+          ] as DepartmentType[],
+          targetPersonas: ['VP Manufacturing', 'Digital Twin Lead', 'Simulation Director'],
+          useCases: ['Digital twin', 'Design collaboration', 'Factory simulation'],
+          contentTags: ['digital-twin', 'manufacturing', 'simulation'],
+        },
+        {
+          name: 'NVIDIA DGX',
+          slug: 'nvidia-dgx',
+          description:
+            'AI infrastructure and platform for training and inference; DGX/HGX systems for enterprise AI, AV training, and data center workloads.',
+          targetDepartments: [DepartmentType.IT_DATA_CENTER, DepartmentType.ENGINEERING] as DepartmentType[],
+          targetPersonas: ['VP IT', 'AI/ML Director', 'Data Center Lead'],
+          useCases: ['AI training', 'Simulation at scale', 'Enterprise AI platform'],
+          contentTags: ['AI', 'data-center', 'training'],
+        },
+      ];
+      for (const p of nvidiaProducts) {
+        await prisma.catalogProduct.create({
+          data: {
+            userId: session.user.id,
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            targetDepartments: p.targetDepartments,
+            targetPersonas: p.targetPersonas,
+            useCases: p.useCases,
+            contentTags: p.contentTags,
+          },
+        });
+      }
+      // Also create legacy Product rows so "Your company data" → Products section shows them
+      for (const p of nvidiaProducts) {
+        await prisma.product.create({
+          data: {
+            userId: session.user.id,
+            name: p.name,
+            description: p.description,
+            category: p.contentTags[0] ?? 'Platform',
+          },
+        });
+      }
+    } else {
+      // Already have catalog products; ensure legacy Product rows exist so "Your company data" → Products shows them
+      const legacyProductCount = await prisma.product.count({
+        where: { userId: session.user.id },
+      });
+      if (legacyProductCount === 0) {
+        const nvidiaProductNames = [
+          { name: 'NVIDIA DRIVE', description: 'End-to-end autonomous vehicle development platform.', category: 'Platform' },
+          { name: 'NVIDIA Omniverse', description: 'Platform for 3D design collaboration and digital twin simulation.', category: 'Platform' },
+          { name: 'NVIDIA DGX', description: 'AI infrastructure for training and inference.', category: 'Platform' },
+        ];
+        for (const p of nvidiaProductNames) {
+          await prisma.product.create({
+            data: { userId: session.user.id, name: p.name, description: p.description, category: p.category },
+          });
+        }
+      }
+    }
+
+    // Ensure NVIDIA company info so "Your company data" shows Company + Website (not empty)
+    const currentUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { companyName: true, companyWebsite: true },
+    });
+    if (!currentUser?.companyName?.trim() || !currentUser?.companyWebsite?.trim()) {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: {
+          companyName: currentUser?.companyName?.trim() || 'NVIDIA',
+          companyWebsite: currentUser?.companyWebsite?.trim() || 'https://www.nvidia.com',
+        },
+      });
+    }
+
     // Enterprise expansion: GM divisions as roadmap targets + demo contacts/signals/plans
     // Ensure a company-level target for GM
     let gmTarget = await prisma.roadmapTarget.findFirst({
@@ -715,12 +819,6 @@ export async function seedDemoRoadmapForCompany(
         });
       }
     }
-
-    return { ok: true };
-  }
-
-  // Other personas can be expanded later (e.g. Revenue Vessel/FedEx)
-  return { ok: true };
 
     return { ok: true };
   }

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import './agentpilot-tokens.css';
 import './globals.css';
 import { Toaster } from 'sonner';
 import Navigation from '@/components/Navigation';
@@ -25,7 +26,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={inter.className}>
         <TooltipProvider>
           <Providers>

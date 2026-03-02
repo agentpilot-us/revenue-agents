@@ -21,24 +21,24 @@ export default async function BillingPage() {
   const currentPlan = 'Free';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Billing</h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h1 className="text-3xl font-bold mb-2 text-card-foreground">Billing</h1>
+          <p className="text-muted-foreground">
             Manage your subscription and view usage
           </p>
         </div>
 
         {/* Current Plan */}
-        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+        <div className="bg-card border border-border rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">
             Current Plan
           </h2>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{currentPlan}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-2xl font-bold text-card-foreground">{currentPlan}</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 {currentPlan === 'Free'
                   ? 'Basic features included'
                   : 'Full access to all features'}
@@ -56,32 +56,32 @@ export default async function BillingPage() {
         </div>
 
         {/* Usage Statistics */}
-        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+        <div className="bg-card border border-border rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">
             Usage Statistics
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <dt className="text-sm font-medium text-muted-foreground">
                 Target Companies
               </dt>
-              <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">
+              <dd className="mt-1 text-3xl font-semibold text-card-foreground">
                 {companiesCount}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <dt className="text-sm font-medium text-muted-foreground">
                 Total Contacts
               </dt>
-              <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">
+              <dd className="mt-1 text-3xl font-semibold text-card-foreground">
                 {contactsCount}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <dt className="text-sm font-medium text-muted-foreground">
                 Campaigns
               </dt>
-              <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-gray-100">
+              <dd className="mt-1 text-3xl font-semibold text-card-foreground">
                 {campaignsCount}
               </dd>
             </div>
@@ -89,11 +89,11 @@ export default async function BillingPage() {
         </div>
 
         {/* Billing History (placeholder) */}
-        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+        <div className="bg-card border border-border rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">
             Billing History
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             {currentPlan === 'Free'
               ? 'No billing history available for free plans.'
               : 'Billing history will appear here once you upgrade.'}

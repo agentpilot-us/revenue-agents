@@ -4,20 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { HotSignal } from '@/lib/dashboard';
-import { RunPlayButton } from './RunPlayButton';
+import { dash } from '@/app/dashboard/dashboard-classes';
 
 type HotSignalsProps = { signals: HotSignal[] };
 
-const colorClasses = {
-  red: 'border-red-500/50 bg-red-500/5',
-  amber: 'border-amber-500/50 bg-amber-500/5',
-  green: 'border-emerald-500/50 bg-emerald-500/5',
-};
-
-const dotClasses = {
-  red: 'bg-red-500',
-  amber: 'bg-amber-500',
-  green: 'bg-emerald-500',
+const signalAccentColor: Record<string, string> = {
+  red: 'var(--ap-red)',
+  amber: 'var(--ap-amber)',
+  green: 'var(--ap-green)',
 };
 
 export function HotSignals({ signals }: HotSignalsProps) {
@@ -39,50 +33,73 @@ export function HotSignals({ signals }: HotSignalsProps) {
   };
 
   return (
-    <section className="rounded-lg border border-slate-700 bg-zinc-800/80 p-4">
-      <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        Hot signals
-      </h2>
+    <section className={dash.card}>
+      <div className={dash.sectionHeader}>
+        <h2 className={dash.sectionTitle}>Hot Signals</h2>
+        {signals.length > 0 && (
+          <span className={dash.sectionBadge}>{signals.length}</span>
+        )}
+      </div>
+
       {signals.length === 0 ? (
-        <p className="text-sm text-slate-500">No signals in the last 48 hours.</p>
+        <p className={dash.emptyStateText}>No signals in the last 48 hours.</p>
       ) : (
-        <ul className="space-y-2">
+        <div className="space-y-2.5">
           {signals.slice(0, 5).map((s) => (
-            <li
+            <div
               key={s.signalId ?? `${s.companyId}-${s.date}-${s.headline}`}
-              className={`rounded-md border p-2 ${colorClasses[s.color]}`}
+              className={dash.signalCard}
+              style={{ borderLeftColor: signalAccentColor[s.color] ?? 'var(--ap-blue)' }}
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2.5">
+                {/* Color dot */}
                 <span
-                  className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotClasses[s.color]}`}
+                  className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: signalAccentColor[s.color] ?? 'var(--ap-blue)' }}
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-200">{s.headline}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{s.description}</p>
-                  {s.companyName && (
-                    <p className="text-xs text-slate-400 mt-0.5">{s.companyName}</p>
+                  {/* Headline */}
+                  <p className="text-[13px] font-semibold text-[var(--ap-text-primary)] leading-snug">
+                    {s.headline}
+                  </p>
+
+                  {/* Description */}
+                  {s.description && (
+                    <p className="text-[11px] text-[var(--ap-text-faint)] mt-1 leading-relaxed">
+                      {s.description}
+                    </p>
                   )}
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {s.runPlaySignalId ? (
-                      <RunPlayButton
-                        signalId={s.runPlaySignalId}
-                        playLabel={s.ctaLabel}
+
+                  {/* Division / Company name */}
+                  {(s.divisionName || s.companyName) && (
+                    <p className="text-[11px] text-[var(--ap-text-muted)] mt-1 flex items-center gap-1.5">
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full"
+                        style={{ background: signalAccentColor[s.color] ?? 'var(--ap-blue)' }}
                       />
-                    ) : (
-                      <Link
-                        href={s.ctaHref}
-                        className="text-xs font-medium text-amber-400 hover:text-amber-300"
-                      >
-                        {s.ctaLabel} →
+                      {s.divisionName ?? s.companyName}
+                    </p>
+                  )}
+
+                  {/* CTAs */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <Link href={s.ctaHref} className={dash.btnPrimary}>
+                      {s.ctaLabel}
+                    </Link>
+
+                    {s.secondaryCtaLabel && s.secondaryCtaHref && (
+                      <Link href={s.secondaryCtaHref} className={dash.btnSecondary}>
+                        {s.secondaryCtaLabel}
                       </Link>
                     )}
+
                     {s.signalId && (
                       <button
                         type="button"
                         onClick={() => handleDismiss(s.signalId!)}
                         disabled={dismissingId === s.signalId}
-                        className="text-xs text-slate-500 hover:text-slate-400 disabled:opacity-50"
+                        className={`${dash.btnGhost} ml-auto`}
                       >
                         {dismissingId === s.signalId ? '…' : 'Dismiss'}
                       </button>
@@ -90,9 +107,9 @@ export function HotSignals({ signals }: HotSignalsProps) {
                   </div>
                 </div>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );

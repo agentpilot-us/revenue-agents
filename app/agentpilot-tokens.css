@@ -1,0 +1,408 @@
+/* ═══════════════════════════════════════════════════════════
+   AGENTPILOT DESIGN TOKENS
+   Single source of truth for the entire application.
+   
+   Usage: Import this file in your root layout (see app/layout.tsx).
+   Then use variables anywhere:
+     background: var(--ap-surface-base);
+     color: var(--ap-text-primary);
+   Or utility classes: .ap-surface, .ap-btn-primary, .ap-tab, etc.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Font: Inter is loaded via next/font in layout.tsx and applied to body. */
+:root {
+  /* ─── TYPOGRAPHY ─── */
+  --ap-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --ap-font-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+
+  --ap-text-xs:   10px;
+  --ap-text-sm:   11px;
+  --ap-text-base: 13px;
+  --ap-text-md:   14px;
+  --ap-text-lg:   16px;
+  --ap-text-xl:   18px;
+  --ap-text-2xl:  22px;
+  --ap-text-3xl:  28px;
+  --ap-text-4xl:  36px;
+
+  /* ─── SPACING SCALE ─── */
+  --ap-space-1:  4px;
+  --ap-space-2:  8px;
+  --ap-space-3:  12px;
+  --ap-space-4:  16px;
+  --ap-space-5:  20px;
+  --ap-space-6:  24px;
+  --ap-space-8:  32px;
+  --ap-space-10: 40px;
+  --ap-space-12: 48px;
+
+  /* ─── BORDER RADIUS ─── */
+  --ap-radius-sm:  6px;
+  --ap-radius-md:  8px;
+  --ap-radius-lg:  10px;
+  --ap-radius-xl:  12px;
+  --ap-radius-2xl: 16px;
+  --ap-radius-full: 9999px;
+
+  /* ─── SHADOWS ─── */
+  --ap-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.3);
+  --ap-shadow-md:  0 4px 12px rgba(0, 0, 0, 0.25);
+  --ap-shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.3);
+  --ap-shadow-glow-blue:   0 0 20px rgba(59, 130, 246, 0.15);
+  --ap-shadow-glow-green:  0 0 20px rgba(34, 197, 94, 0.15);
+  --ap-shadow-glow-amber:  0 0 20px rgba(245, 158, 11, 0.15);
+
+  /* ─── TRANSITIONS ─── */
+  --ap-transition-fast:   all 0.12s ease;
+  --ap-transition-base:   all 0.2s ease;
+  --ap-transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --ap-transition-spring: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+
+  /* ═══════════════════════════════════════════════════
+     DARK THEME (default)
+     ═══════════════════════════════════════════════════ */
+
+  /* Page backgrounds — 3 tiers of depth */
+  --ap-bg-page:        #0b1120;
+  --ap-bg-surface:     rgba(15, 23, 42, 0.6);
+  --ap-bg-elevated:    linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.9));
+  --ap-bg-elevated-solid: #0f172a;
+
+  /* Specialized surfaces */
+  --ap-bg-nav:         rgba(15, 23, 42, 0.8);
+  --ap-bg-modal:       rgba(15, 23, 42, 0.98);
+  --ap-bg-modal-overlay: rgba(0, 0, 0, 0.6);
+  --ap-bg-input:       rgba(255, 255, 255, 0.04);
+  --ap-bg-input-focus: rgba(255, 255, 255, 0.06);
+  --ap-bg-hover:       rgba(255, 255, 255, 0.03);
+  --ap-bg-active:      rgba(59, 130, 246, 0.08);
+
+  /* Sidebar */
+  --ap-bg-sidebar:         #0f172a;
+  --ap-sidebar-item-hover: rgba(255, 255, 255, 0.05);
+  --ap-sidebar-item-active: rgba(59, 130, 246, 0.12);
+  --ap-sidebar-text:       #64748b;
+  --ap-sidebar-text-active: #e2e8f0;
+  --ap-sidebar-icon:       #475569;
+  --ap-sidebar-icon-active: #3b82f6;
+
+  /* Borders — 4 opacity levels */
+  --ap-border-subtle:  rgba(255, 255, 255, 0.04);
+  --ap-border-default: rgba(255, 255, 255, 0.06);
+  --ap-border-medium:  rgba(255, 255, 255, 0.08);
+  --ap-border-strong:  rgba(255, 255, 255, 0.12);
+  --ap-border-accent:  rgba(59, 130, 246, 0.3);
+  --ap-border-input:   rgba(255, 255, 255, 0.08);
+  --ap-border-input-focus: rgba(59, 130, 246, 0.5);
+
+  /* Text hierarchy — 4 tiers */
+  --ap-text-primary:   #e2e8f0;
+  --ap-text-secondary: #94a3b8;
+  --ap-text-muted:     #64748b;
+  --ap-text-faint:     #475569;
+
+  /* Accent colors — semantic */
+  --ap-blue:     #3b82f6;
+  --ap-blue-hover: #2563eb;
+  --ap-blue-light: #93c5fd;
+  --ap-blue-bg:  rgba(59, 130, 246, 0.12);
+  --ap-blue-bg-hover: rgba(59, 130, 246, 0.2);
+
+  --ap-green:     #22c55e;
+  --ap-green-hover: #16a34a;
+  --ap-green-light: #86efac;
+  --ap-green-bg: rgba(34, 197, 94, 0.12);
+
+  --ap-amber:     #f59e0b;
+  --ap-amber-hover: #d97706;
+  --ap-amber-light: #fcd34d;
+  --ap-amber-bg: rgba(245, 158, 11, 0.12);
+
+  --ap-red:       #ef4444;
+  --ap-red-hover: #dc2626;
+  --ap-red-light: #fca5a5;
+  --ap-red-bg:   rgba(239, 68, 68, 0.12);
+
+  --ap-purple:    #8b5cf6;
+  --ap-purple-light: #c4b5fd;
+  --ap-purple-bg: rgba(139, 92, 246, 0.12);
+
+  --ap-cyan:      #0ea5e9;
+  --ap-cyan-bg:  rgba(14, 165, 233, 0.12);
+
+  --ap-pink:      #ec4899;
+  --ap-pink-bg:  rgba(236, 72, 153, 0.12);
+
+  /* Stage colors — for division badges */
+  --ap-stage-active:     #22c55e;
+  --ap-stage-expansion:  #f59e0b;
+  --ap-stage-strategic:  #3b82f6;
+  --ap-stage-emerging:   #6b7280;
+  --ap-stage-poc:        #8b5cf6;
+  --ap-stage-closed-won: #10b981;
+
+  /* Priority colors */
+  --ap-priority-high:   #ef4444;
+  --ap-priority-medium: #f59e0b;
+  --ap-priority-low:    #6b7280;
+
+  /* Coverage bar thresholds */
+  --ap-coverage-good:    #22c55e;
+  --ap-coverage-warning: #f59e0b;
+  --ap-coverage-critical: #ef4444;
+
+  /* Gradients — reusable branded */
+  --ap-gradient-brand:   linear-gradient(135deg, #3b82f6, #8b5cf6);
+  --ap-gradient-cta:     linear-gradient(135deg, #3b82f6, #2563eb);
+  --ap-gradient-success: linear-gradient(135deg, #22c55e, #16a34a);
+  --ap-gradient-warning: linear-gradient(135deg, #f59e0b, #d97706);
+  --ap-gradient-health:  linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05));
+  --ap-gradient-card:    linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.9));
+  --ap-gradient-card-v:  linear-gradient(180deg, rgba(15,23,42,0.98), rgba(30,41,59,0.9));
+  --ap-gradient-objective: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+
+  /* Button styles */
+  --ap-btn-primary-bg:    var(--ap-gradient-cta);
+  --ap-btn-primary-text:  #ffffff;
+  --ap-btn-primary-hover: linear-gradient(135deg, #2563eb, #1d4ed8);
+
+  --ap-btn-secondary-bg:     transparent;
+  --ap-btn-secondary-text:   #64748b;
+  --ap-btn-secondary-border: var(--ap-border-medium);
+  --ap-btn-secondary-hover-bg: rgba(255,255,255,0.04);
+
+  --ap-btn-ghost-text:   #475569;
+  --ap-btn-ghost-hover:  rgba(255,255,255,0.04);
+
+  /* Scrollbar */
+  --ap-scrollbar-track: transparent;
+  --ap-scrollbar-thumb: rgba(255,255,255,0.1);
+  --ap-scrollbar-thumb-hover: rgba(255,255,255,0.2);
+
+  /* Tab bar */
+  --ap-tab-text:         #64748b;
+  --ap-tab-text-active:  #3b82f6;
+  --ap-tab-border:       transparent;
+  --ap-tab-border-active: #3b82f6;
+  --ap-tab-bg-hover:     rgba(255,255,255,0.03);
+
+  /* Table */
+  --ap-table-header-bg:  rgba(15,23,42,0.8);
+  --ap-table-header-text: #94a3b8;
+  --ap-table-row-hover:  rgba(255,255,255,0.02);
+  --ap-table-border:     rgba(255,255,255,0.04);
+
+  /* Badge backgrounds */
+  --ap-badge-blue:   rgba(59,130,246,0.15);
+  --ap-badge-green:  rgba(34,197,94,0.15);
+  --ap-badge-amber:  rgba(245,158,11,0.15);
+  --ap-badge-red:    rgba(239,68,68,0.15);
+  --ap-badge-purple: rgba(139,92,246,0.15);
+  --ap-badge-gray:   rgba(107,114,128,0.15);
+}
+
+
+/* Theme application: globals.css :root/.dark map shadcn vars to --ap-* and
+   @layer base sets body to bg-background text-foreground. Tokens load first
+   so --background → --ap-bg-page etc. resolve correctly. */
+
+/* ═══════════════════════════════════════════════════
+   GLOBAL RESETS (scrollbar, focus, selection)
+   ═══════════════════════════════════════════════════ */
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--ap-scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--ap-scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ap-scrollbar-thumb-hover); }
+
+/* Focus ring — accessible, on-brand */
+:focus-visible {
+  outline: 2px solid var(--ap-blue);
+  outline-offset: 2px;
+  border-radius: var(--ap-radius-sm);
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: #fff;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   UTILITY CLASSES
+   Use alongside Tailwind or standalone. (.ap-*)
+   ═══════════════════════════════════════════════════ */
+
+.ap-surface       { background: var(--ap-bg-surface); border: 1px solid var(--ap-border-default); border-radius: var(--ap-radius-xl); }
+.ap-surface-elevated { background: var(--ap-gradient-card); border: 1px solid var(--ap-border-default); border-radius: var(--ap-radius-xl); }
+.ap-surface-interactive {
+  background: var(--ap-gradient-card);
+  border: 1px solid var(--ap-border-default);
+  border-radius: var(--ap-radius-xl);
+  transition: var(--ap-transition-base);
+  cursor: default;
+}
+.ap-surface-interactive:hover {
+  border-color: var(--ap-border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--ap-shadow-md);
+}
+
+.ap-card-accent { border-left: 3px solid var(--ap-blue); }
+
+.ap-section-header {
+  font-size: var(--ap-text-base);
+  font-weight: 700;
+  color: var(--ap-text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ap-label {
+  font-size: var(--ap-text-xs);
+  font-weight: 600;
+  color: var(--ap-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ap-stat-value {
+  font-size: var(--ap-text-xl);
+  font-weight: 700;
+  color: var(--ap-text-primary);
+}
+
+.ap-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--ap-btn-primary-bg);
+  color: var(--ap-btn-primary-text);
+  border: none; border-radius: var(--ap-radius-sm);
+  padding: 6px 14px; font-size: var(--ap-text-sm); font-weight: 600;
+  cursor: pointer; transition: var(--ap-transition-fast);
+  font-family: var(--ap-font-sans);
+}
+.ap-btn-primary:hover { background: var(--ap-btn-primary-hover); transform: scale(1.02); }
+
+.ap-btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--ap-btn-secondary-bg);
+  color: var(--ap-btn-secondary-text);
+  border: 1px solid var(--ap-border-medium);
+  border-radius: var(--ap-radius-sm);
+  padding: 6px 14px; font-size: var(--ap-text-sm);
+  cursor: pointer; transition: var(--ap-transition-fast);
+  font-family: var(--ap-font-sans);
+}
+.ap-btn-secondary:hover { background: var(--ap-btn-secondary-hover-bg); border-color: var(--ap-border-strong); }
+
+.ap-btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; color: var(--ap-btn-ghost-text);
+  border: none; padding: 6px 10px; font-size: var(--ap-text-sm);
+  cursor: pointer; transition: var(--ap-transition-fast);
+  font-family: var(--ap-font-sans);
+}
+.ap-btn-ghost:hover { background: var(--ap-btn-ghost-hover); color: var(--ap-text-secondary); }
+
+.ap-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--ap-text-xs); font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: var(--ap-radius-full);
+}
+.ap-badge-blue   { background: var(--ap-badge-blue);   color: var(--ap-blue-light); }
+.ap-badge-green  { background: var(--ap-badge-green);  color: var(--ap-green-light); }
+.ap-badge-amber  { background: var(--ap-badge-amber);  color: var(--ap-amber-light); }
+.ap-badge-red    { background: var(--ap-badge-red);    color: var(--ap-red-light); }
+.ap-badge-purple { background: var(--ap-badge-purple); color: var(--ap-purple-light); }
+.ap-badge-gray   { background: var(--ap-badge-gray);   color: #9ca3af; }
+
+.ap-progress-track {
+  height: 4px; background: rgba(255,255,255,0.05);
+  border-radius: 2px; overflow: hidden;
+}
+.ap-progress-fill {
+  height: 100%; border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.ap-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--ap-border-subtle);
+  padding: 0 var(--ap-space-6);
+}
+.ap-tab {
+  padding: 12px 20px; font-size: var(--ap-text-md); font-weight: 500;
+  color: var(--ap-tab-text); border-bottom: 2px solid transparent;
+  cursor: pointer; transition: var(--ap-transition-fast);
+  background: none; border-top: none; border-left: none; border-right: none;
+  font-family: var(--ap-font-sans);
+}
+.ap-tab:hover { color: var(--ap-text-secondary); background: var(--ap-tab-bg-hover); }
+.ap-tab[data-active="true"], .ap-tab.active {
+  color: var(--ap-tab-text-active); border-bottom-color: var(--ap-tab-border-active);
+  font-weight: 600;
+}
+
+.ap-tab-filter-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--ap-blue-bg); color: var(--ap-blue-light);
+  font-size: 9px; font-weight: 700; padding: 1px 6px;
+  border-radius: var(--ap-radius-full); margin-left: 6px;
+}
+
+.ap-input {
+  width: 100%; padding: 8px 12px;
+  background: var(--ap-bg-input); color: var(--ap-text-primary);
+  border: 1px solid var(--ap-border-input); border-radius: var(--ap-radius-md);
+  font-size: var(--ap-text-base); font-family: var(--ap-font-sans);
+  transition: var(--ap-transition-fast);
+}
+.ap-input:focus {
+  background: var(--ap-bg-input-focus);
+  border-color: var(--ap-border-input-focus);
+  outline: none;
+  box-shadow: var(--ap-shadow-glow-blue);
+}
+.ap-input::placeholder { color: var(--ap-text-faint); }
+
+.ap-select {
+  padding: 6px 32px 6px 12px;
+  background: var(--ap-bg-input); color: var(--ap-text-secondary);
+  border: 1px solid var(--ap-border-input); border-radius: var(--ap-radius-md);
+  font-size: var(--ap-text-sm); font-family: var(--ap-font-sans);
+  cursor: pointer; transition: var(--ap-transition-fast);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.ap-select:focus { border-color: var(--ap-border-input-focus); outline: none; }
+
+.ap-divider {
+  height: 1px; background: var(--ap-border-subtle);
+  margin: var(--ap-space-4) 0;
+}
+
+.ap-expansion-indicator {
+  font-size: var(--ap-text-xs);
+  color: var(--ap-amber);
+  font-weight: 500;
+}
+
+.ap-objective-line {
+  font-size: var(--ap-text-xs);
+  color: var(--ap-amber);
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.ap-empty-state {
+  text-align: center; padding: var(--ap-space-12) var(--ap-space-6);
+  color: var(--ap-text-muted);
+}
+.ap-empty-state-icon { font-size: 32px; margin-bottom: var(--ap-space-3); opacity: 0.5; }
+.ap-empty-state-title { font-size: var(--ap-text-md); font-weight: 600; color: var(--ap-text-secondary); margin-bottom: var(--ap-space-2); }
+.ap-empty-state-text { font-size: var(--ap-text-sm); color: var(--ap-text-muted); max-width: 320px; margin: 0 auto; line-height: 1.5; }

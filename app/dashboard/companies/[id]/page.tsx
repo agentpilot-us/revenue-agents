@@ -6,7 +6,6 @@ import { CompanyTabs } from '@/app/components/company/CompanyTabs';
 import { ProgressSteps } from '@/app/components/company/ProgressSteps';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
-import { PlaySuggestions } from '@/app/components/plays/PlaySuggestions';
 import { DepartmentStatus, ContentType } from '@prisma/client';
 
 /** Parse estimatedOpportunity string (e.g. "$50K-$150K", "$500K – $2M") to a number. Uses midpoint for ranges. */
@@ -38,14 +37,45 @@ export default async function CompanyDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    division?: string;
+    type?: string;
+    signal?: string;
+    contact?: string;
+    action?: string;
+    contactName?: string;
+    contentFilter?: string;
+  }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect('/api/auth/signin');
 
   const { id } = await params;
-  const { tab: tabParam } = await searchParams;
-  const validTabs = ['overview', 'departments', 'contacts', 'campaigns', 'engagement', 'activity', 'messaging', 'content', 'expansion', 'map'] as const;
+  const search = await searchParams;
+  const tabParam = search.tab;
+  /** 6-tab set per Spec 2. Legacy tab params map to new tab so old links still work. */
+  const validTabs = ['overview', 'buying-groups', 'contacts', 'content', 'engagement', 'signals'] as const;
+  const legacyTabMap: Record<string, (typeof validTabs)[number]> = {
+    departments: 'buying-groups',
+    campaigns: 'content',
+    activity: 'signals',
+    messaging: 'content',
+    map: 'contacts',
+    expansion: 'overview',
+  };
+  const resolvedTab = (tabParam && legacyTabMap[tabParam]) ?? (tabParam as (typeof validTabs)[number] | undefined);
+
+  /** URL context for deep-links (Spec 1). Passed to CompanyTabs for pre-loading. */
+  const urlContext = {
+    division: search.division ?? undefined,
+    type: search.type ?? undefined,
+    signal: search.signal ?? undefined,
+    contact: search.contact ?? undefined,
+    action: search.action ?? undefined,
+    contactName: search.contactName ?? undefined,
+    contentFilter: search.contentFilter ?? undefined,
+  };
   const company = await prisma.company.findFirst({
     where: { id, userId: session.user.id },
     select: {
@@ -288,9 +318,26 @@ export default async function CompanyDetailPage({
   const initialTab =
     setupIncomplete
       ? 'overview'
-      : (tabParam && validTabs.includes(tabParam as (typeof validTabs)[number])
-        ? (tabParam as (typeof validTabs)[number])
+      : (resolvedTab && validTabs.includes(resolvedTab)
+        ? resolvedTab
         : 'overview');
+
+  const TAB_LABELS: Record<(typeof validTabs)[number], string> = {
+    overview: 'Overview',
+    'buying-groups': 'Buying Groups',
+    contacts: 'Contacts',
+    content: 'Content',
+    engagement: 'Engagement',
+    signals: 'Signals',
+  };
+  const divisionDept = search.division
+    ? departments.find((d: { id: string }) => d.id === search.division)
+    : null;
+  const divisionName = divisionDept
+    ? (divisionDept.customName ?? (divisionDept as { type?: string }).type?.replace(/_/g, ' ') ?? 'Division')
+    : null;
+  /** Edge case: URL references a division that was deleted (Spec 1). */
+  const divisionInvalid = !!search.division && !divisionDept;
 
   const contentLibraryForMessaging = await prisma.contentLibrary.findMany({
     where: {
@@ -379,22 +426,68 @@ export default async function CompanyDetailPage({
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
-        <Link
-          href="/dashboard/companies"
-          className="flex items-center text-blue-600 hover:text-blue-700 mb-6"
-        >
-          ← Back to Target companies
-        </Link>
+        {/* Breadcrumb: Dashboard > Company > Tab > Division (Spec 1 Phase 5.2) */}
+        <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6" aria-label="Breadcrumb">
+          <Link href="/dashboard" className="text-primary hover:underline">
+            Dashboard
+          </Link>
+          <span aria-hidden>/</span>
+          <Link
+            href={`/dashboard/companies/${id}?tab=overview`}
+            className="text-primary hover:underline"
+          >
+            {company.name}
+          </Link>
+          <span aria-hidden>/</span>
+          <span className="text-foreground font-medium">
+            {TAB_LABELS[initialTab]}
+          </span>
+          {divisionName && (
+            <>
+              <span aria-hidden>/</span>
+              <Link
+                href={`/dashboard/companies/${id}?tab=${initialTab}`}
+                className="text-primary hover:underline"
+                title="Clear division filter"
+              >
+                {divisionName}
+              </Link>
+            </>
+          )}
+        </nav>
+
+        {/* Edge case: Deleted division — clear state, no 500 (Spec 1) */}
+        {divisionInvalid && (
+          <div className="mb-6 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              The division referenced by this link is no longer available.
+            </p>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/dashboard/companies/${id}?tab=${initialTab}`}
+                className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline"
+              >
+                Show all divisions
+              </Link>
+              <span className="text-amber-600 dark:text-amber-400" aria-hidden>|</span>
+              <Link
+                href={`/dashboard/companies/${id}?tab=overview`}
+                className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline"
+              >
+                Overview
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Company Header */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 mb-6 border border-gray-200 dark:border-zinc-700">
+        <div className="bg-card rounded-lg shadow p-6 mb-6 border border-border">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">{company.name}</h1>
-              <p className="text-gray-600 dark:text-gray-300">{company.domain ?? '—'}</p>
+              <h1 className="text-3xl font-bold mb-2 text-card-foreground">{company.name}</h1>
+              <p className="text-muted-foreground">{company.domain ?? '—'}</p>
             </div>
             <div className="flex items-center gap-2">
               {company.researchData ? (
@@ -405,31 +498,31 @@ export default async function CompanyDetailPage({
               <DeleteCompanyButton companyId={company.id} companyName={company.name} />
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <span>Industry: {company.industry || 'Not specified'}</span>
             <span>•</span>
             <span>{company.contacts.length} contacts</span>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-600 flex flex-wrap gap-6">
+          <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-6">
             <div>
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Current ARR</div>
-              <div className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current ARR</div>
+              <div className="text-xl font-semibold text-card-foreground">
                 ${currentARR.toLocaleString()}
               </div>
-              <Link href={`/dashboard/companies/${id}#engagement`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block">Engagement</Link>
+              <Link href={`/dashboard/companies/${id}#engagement`} className="text-xs text-primary hover:underline mt-1 inline-block">Engagement</Link>
             </div>
             <div>
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Expansion Opportunity</div>
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Expansion Opportunity</div>
               <div className="text-xl font-semibold text-green-600 dark:text-green-400">
                 ${expansionOpportunity.toLocaleString()}
               </div>
             </div>
             <div>
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Target ARR</div>
-              <div className="text-xl font-semibold text-gray-700 dark:text-gray-200">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Target ARR</div>
+              <div className="text-xl font-semibold text-card-foreground">
                 ${targetARR.toLocaleString()}
                 {expansionOpportunity > 0 && (
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-1">
+                  <span className="text-sm font-normal text-muted-foreground ml-1">
                     ({((expansionOpportunity / (currentARR || 1)) * 100).toFixed(0)}% growth potential)
                   </span>
                 )}
@@ -438,9 +531,7 @@ export default async function CompanyDetailPage({
           </div>
         </div>
 
-        <PlaySuggestions companyId={company.id} />
-
-        {initialTab === 'campaigns' && (
+        {initialTab === 'content' && (
           <div className="mb-6">
             <ProgressSteps
               companyId={id}
@@ -450,7 +541,7 @@ export default async function CompanyDetailPage({
           </div>
         )}
 
-        {/* Tabs: Departments, Overview, Contacts, Engagement, Activity, Messaging, Campaigns */}
+        {/* Tabs: Overview, Buying Groups, Contacts, Content, Engagement, Signals (6-tab set) */}
         <div className="mb-6">
           <CompanyTabs
             companyId={company.id}
@@ -495,6 +586,7 @@ export default async function CompanyDetailPage({
             accountMessaging={accountMessaging}
             contentLibraryUseCasesAndStories={contentLibraryForMessaging}
             initialTab={initialTab}
+            urlContext={divisionInvalid ? { ...urlContext, division: undefined } : urlContext}
             campaigns={campaigns}
             researchDataKey={company.updatedAt?.getTime() ?? 0}
             engagementByDept={engagementByDept}

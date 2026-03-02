@@ -65,7 +65,7 @@ export function EngagementByBuyingGroup({ companyId, companyName, rows }: Props)
                 >
                   <td className="p-3">
                     <Link
-                      href={`/dashboard/companies/${companyId}/departments/${row.id}`}
+                      href={`/dashboard/companies/${companyId}?tab=overview&division=${row.id}`}
                       className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       {row.name}

@@ -110,7 +110,7 @@ export function DraftFollowUpModal({
                   <ul className="text-gray-600">
                     <li>Account: {result.context.accountName}</li>
                     {result.context.contactName && <li>Contact: {result.context.contactName}</li>}
-                    {result.context.departmentName && <li>Department: {result.context.departmentName}</li>}
+                    {result.context.departmentName && <li>Division: {result.context.departmentName}</li>}
                   </ul>
                 </div>
                 <div className="mb-4">

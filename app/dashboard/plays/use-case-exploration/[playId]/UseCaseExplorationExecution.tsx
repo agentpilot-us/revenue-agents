@@ -276,7 +276,7 @@ export function UseCaseExplorationExecution({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
-              href={`/dashboard/companies/${companyId}/departments/${departmentId}`}
+              href={`/dashboard/companies/${companyId}?tab=overview&division=${departmentId}`}
               className="text-sm px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100"
             >
               View department / add contacts

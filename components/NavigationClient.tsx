@@ -9,7 +9,7 @@ interface NavigationClientProps {
 }
 
 const linkMuted = (dark: boolean) =>
-  dark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900';
+  dark ? 'text-muted-foreground hover:text-foreground' : 'text-muted-foreground hover:text-card-foreground';
 
 export function NavigationClient({ isAuthenticated, dark = false }: NavigationClientProps) {
   return (

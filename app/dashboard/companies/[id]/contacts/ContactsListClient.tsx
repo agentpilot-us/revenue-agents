@@ -54,7 +54,7 @@ function CrmSourceBadge({ source }: { source: string | null }) {
   if (!source) return <span className="text-gray-400">—</span>;
   const label = source === 'salesforce' ? 'Salesforce' : source === 'hubspot' ? 'HubSpot' : source;
   return (
-    <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-600 text-slate-700 dark:text-zinc-300">
+    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
       {label}
     </span>
   );
@@ -81,7 +81,7 @@ function EnrichmentCell({
   if (status === 'pending' || status === 'enriching') {
     return (
       <div className="flex flex-col gap-1 min-w-[100px]">
-        <div className="h-1 w-full rounded-full bg-slate-600 overflow-hidden">
+        <div className="h-1 w-full rounded-full bg-muted-foreground overflow-hidden">
           <div className="h-full w-2/3 rounded-full bg-blue-500 animate-pulse" />
         </div>
         <div className="flex items-center gap-1.5 text-blue-400 text-xs">
@@ -497,7 +497,7 @@ export function ContactsListClient({
             <p className="text-sm text-slate-400">
               Complete Account Intelligence first to see buying groups here.
             </p>
-            <Link href={`/dashboard/companies/${companyId}/intelligence`}>
+            <Link href={`/dashboard/companies/${companyId}?tab=contacts&action=find`}>
               <Button variant="outline" size="sm">Set up Account Intelligence</Button>
             </Link>
           </div>
@@ -740,7 +740,7 @@ export function ContactsListClient({
                       <span className="text-amber-600 dark:text-amber-400">Dormant</span>
                     )}
                     {!c.isResponsive && !c.isDormant && (
-                      <span className="text-gray-500 dark:text-gray-400">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                 )}
@@ -770,7 +770,7 @@ export function ContactsListClient({
                 <Button>Discover contacts by department</Button>
               </Link>
             ) : (
-              <Link href={`/dashboard/companies/${companyId}/intelligence`}>
+              <Link href={`/dashboard/companies/${companyId}?tab=contacts&action=find`}>
                 <Button variant="outline">Set up Account Intelligence first</Button>
               </Link>
             )}

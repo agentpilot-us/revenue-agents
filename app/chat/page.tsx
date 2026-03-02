@@ -18,11 +18,11 @@ export default function ChatPage() {
         : '⭐ Referral Program';
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4 shrink-0">
+      <div className="bg-card border-b border-border px-6 py-4 shrink-0">
         <div className="flex justify-between items-center max-w-4xl mx-auto">
-          <h1 className="text-xl font-semibold text-gray-900">{playTitle}</h1>
+          <h1 className="text-xl font-semibold text-card-foreground">{playTitle}</h1>
           <Link href="/dashboard" className="text-blue-600 hover:text-blue-700">
             ← Back to Dashboard
           </Link>

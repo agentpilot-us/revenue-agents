@@ -77,12 +77,12 @@ export function SalesforceOpportunityBadge({ opportunityData, lastSyncedAt, comp
 
   return (
     <div className="space-y-1">
-      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+      <div className="text-sm font-medium text-card-foreground">
         {opportunityText}
       </div>
       <div className="flex items-center gap-2">
         {lastSyncedAt && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-muted-foreground">
             Last synced: {formatLastSynced(lastSyncedAt)}
           </p>
         )}

@@ -205,7 +205,7 @@ async function main() {
   [ ] Account Radar shows 4 groups: RevOps, IT, PeopleOps, Finance
   [ ] Activity feed says "${deptCount} buying group(s) identified"
   [ ] "Research Lattice buying groups" gone from Today's Tasks
-  [ ] Run Feature Release play → contacts sidebar populated
+  [ ] View Plan (feature release) → contacts sidebar populated
   [ ] BUYING GROUPS MAPPED counter in top bar shows 4
 ──────────────────────────────────────────────────────────────────
 `);

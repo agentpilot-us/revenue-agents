@@ -1,0 +1,214 @@
+
+SPEC 5 v2
+Unified Trigger-to-Content Architecture
+Complete Signal & Activity Catalog · Exa.ai Integration · Per-Rep Customization
+21 Signal Types · 38 Proactive Activities · 6 Content Channels · Custom Triggers
+
+Supersedes Spec 5 v1. Adds complete signal/activity catalogs from both spreadsheets, Exa.ai as the intelligence layer, custom trigger support, and per-rep action customization.
+Contents
+1. Core Architecture
+2. Complete Signal Catalog (21 Types)
+3. Complete Proactive Activity Catalog (38 Types)
+4. Exa.ai Integration Layer
+5. Data Model
+6. Content Generation Engine
+7. Customization Model
+8. Your Company Data Refactor
+9. Sales Map Configuration & Onboarding
+10. End-to-End User Flows
+11. Implementation Phases
+12. Acceptance Criteria
+1. Core Architecture
+AEs do two things: reach out proactively (company activities) and respond to signals (target account events). Both are triggers into one content engine.
+
+
+
+The content generation engine (Content tab → Email Copy by Buying Group) already exists. This spec adds: trigger context injection, expanded channels, buying group persona filtering, Exa.ai as the signal detection and enrichment layer, and a customization model for per-rep tuning.
+
+
+2. Complete Signal Catalog (21 Types)
+Signals are reactive triggers detected from target account activity. Grouped into 4 categories. Each signal ships as a template with default priority, timing, actions, and target personas. AEs can override any field.
+2A. Leadership & Organizational (6 signals)
+
+2B. Growth & Expansion (6 signals)
+
+2C. Product & Usage Signals (5 signals)
+
+2D. Relationship & Retention (4 signals)
+
+3. Complete Proactive Activity Catalog (38 Types)
+Proactive activities are things the AE’s company does that create outreach opportunities. Grouped into 7 categories. Each activity ships as a template. Not every company uses all of them.
+3A. Product & Launch Activities (7)
+
+3B. Events & Experiences (8)
+
+3C. Content & Enablement (8)
+
+3D. Gifting & Relationship (6)
+
+3E. Customer Programs (7)
+
+3F. Deal Acceleration (2)
+
+4. Exa.ai Integration Layer
+Exa provides three integration surfaces that map directly to AgentPilot’s needs. Exa is not just a search engine — it’s the intelligence backbone that detects signals, enriches contacts, and monitors target accounts continuously.
+4.1 Exa MCP — Real-Time Search & Research
+Used for on-demand searches triggered by the AE or the NBA engine.
+
+
+4.2 Exa Websets — Automated Entity Monitoring
+Used for continuous background monitoring of target accounts. This replaces/augments the firecrawl cron job with a more intelligent, criteria-aware monitoring system.
+
+Webset per Target Account
+When an AE adds a target company, AgentPilot creates an Exa Webset for that company with searches and enrichments:
+Search: “Leadership changes at [Company]” with entity_type: “people” → detects New C-Suite, VP Hire signals
+Search: “[Company] hiring surge job postings” with entity_type: “article” → detects Hiring Surge, Job Posting signals
+Search: “[Company] funding acquisition expansion” with entity_type: “news” → detects Funding, M&A, Geo Expansion signals
+Search: “[Company] layoffs restructuring” with entity_type: “news” → detects Layoffs, Exec Departure signals
+Monitor: Cron “0 6 * * *” (daily at 6 AM) re-runs all searches and flags new items as signal triggers
+
+Enrichments for Signal Context
+Each Webset item gets enriched to provide the AE with actionable context:
+Person name + title + LinkedIn URL (for leadership signals)
+Previous company + role (for background research)
+Signal category classification (text enrichment: “Classify: new_c_suite | new_vp_hire | exec_departure | other”)
+Relevance score (number enrichment: 1–10 based on signal priority and division match)
+4.3 Exa Company Research Skill — Account Intelligence
+Used to populate and refresh the Account Research section on Target Company pages. Replaces the current firecrawl-based research with richer, AI-structured output.
+
+How It Maps to Your Company Data Page
+Your Company Data page (images 1–4) already has: Value Propositions, Product Capabilities, Use Cases, Target Personas, Differentiators, etc. The Exa Company Research skill produces the equivalent intelligence for each target account:
+Company basics → employees, HQ, revenue (replaces current AI Generated basic research)
+Business overview → products, markets, strategy (feeds Overview tab)
+Recent news → feeds Signals tab with pre-classified signal types
+Tech stack → informs division-level product fit matching
+Competitors → informs competitive battlecard content generation
+
+Integration Pattern
+Exa MCP endpoint: https://mcp.exa.ai/mcp?tools=web_search_advanced_exa,company_research_exa,people_search_exa,crawling_exa
+Websets MCP endpoint: https://websetsmcp.exa.ai/mcp?exaApiKey=YOUR_KEY
+Both connect as MCP servers. The Chat Agent (bottom-right in image 2) can call Exa tools directly. The backend cron job uses the Websets API for scheduled monitoring.
+5. Data Model
+5.1 Trigger Record (unified table)
+Both signals and activities stored in one table, one pipeline:
+
+
+5.2 TriggerTemplate (catalog table)
+Stores the 59 built-in signal/activity templates plus custom ones. Each template is a blueprint that generates Trigger records when activated.
+
+
+5.3 RepTriggerPreference (per-rep customization)
+Overrides per AE. If a row exists for a given rep + template, the rep’s values take precedence over the template defaults.
+
+
+6. Content Generation Engine
+6.1 Current State
+Content tab: Division dropdown → generates Email Copy with Subject + Body. Copy, Send to Contact, Regenerate. Uses Your Company Data to personalize.
+6.2 Three Additions
+A. Trigger Context Banner
+Above the division dropdown. Shows the active trigger context injected into the AI prompt:
+Signal: “New VP of Engineering hired at GM” → Vehicle Engineering & Simulation
+Activity: “NVIDIA DRIVE v2.0 Launch” → All divisions with DRIVE use case
+Passed via URL param: ?trigger=<triggerId>. If no trigger, banner hidden, works as today.
+B. Channel Selector
+
+C. Buying Group Persona Filter
+Multi-select for seniority. Filters which contacts appear in Send list AND adjusts AI tone:
+C-Suite only: Strategic, ROI-focused, board-ready language
+VP and above: Executive but with tactical hooks
+Director and above: Implementation-focused, feature-specific
+All contacts: Practical, user-centric
+Default set by trigger’s personaLevelDefault. ‘New C-Suite Executive’ defaults to C-Suite only. ‘Workshop/Training’ defaults to All contacts.
+7. Customization Model
+7.1 Template-Level Customization
+Every built-in trigger template is a starting point. The AE customizes at three levels:
+Enable/disable: Toggle which of the 59 templates are active for them
+Priority override: Change priority (e.g. make ‘Geographic Expansion’ Critical instead of Medium)
+Action override: Edit the 5-step action sequence to match their sales motion
+7.2 Custom Triggers
+AEs can create entirely new trigger types not in the built-in catalog:
+Custom Signal: “Competitor mentioned in earnings call” — AE defines the Exa search query, priority, actions, timing
+Custom Activity: “Annual customer appreciation week” — AE defines the activity type, target segments, content template
+Custom triggers are stored as TriggerTemplate records with isBuiltIn: false. They get the same matching, content generation, and tracking as built-in triggers.
+7.3 Google Sheets Bridge
+For teams that manage campaigns in spreadsheets, a Google Sheet can feed proactive triggers:
+
+
+8. Your Company Data Refactor
+Three sections become active trigger sources with “Activate as Trigger” buttons:
+Products: Status field (Active/New Release/Updated). Change to “New Release” → creates COMPANY_ACTIVITY trigger matched to divisions by product fit.
+Events: Add date field + “Invite Target Accounts” button. Creates trigger matched to all target accounts with personalized invitation content per division.
+Feature Releases: “Activate” creates trigger matched to divisions by keyword overlap with feature description.
+
+
+9. Sales Map Configuration & Onboarding
+9.1 Sales Map New Sections
+Signal Preferences
+Card per signal type from 4 categories. ON/OFF toggle + priority selector. Expandable to see/edit the 5-step action sequence. Default state: intelligent defaults based on sales motion.
+Activity Templates
+Card per activity type from 7 categories. AE enables the ones their company actually does. Connected Google Sheet shows as a feed of upcoming activities.
+9.2 Onboarding Flow (New Steps)
+After the AE sets their objective and adds target accounts:
+
+Step 1: “What signals should we watch for?”
+System shows all 21 signal types grouped by category with recommended defaults
+AE toggles ON the relevant ones. For enterprise expansion (like NVIDIA/GM), defaults: New C-Suite, VP Hire, Hiring Surge, Job Posting, Page View, Funding, Renewal Approaching = ON
+System creates Exa Websets for each target account with searches matching enabled signals
+AE can edit action steps for any signal template right here, or do it later
+Step 2: “What does your company do to reach accounts?”
+System shows all 38 activity types grouped by category
+AE enables the ones their company actually does (events? research reports? gifts?)
+If Your Company Data has Products/Events/Feature Releases, shows them: “Activate any of these now?”
+Optional: connect a Google Sheet URL for team-managed campaigns
+Each activated item shows preview: “NVIDIA DRIVE v2.0 Launch → will generate content for 3 divisions at GM”
+Step 3: “Review your playbook”
+Summary screen: X signals monitored, Y activities enabled, Z target accounts covered
+AE can adjust priority, actions, or persona levels for any template
+System starts Exa monitoring immediately. First signals may appear within hours.
+10. End-to-End User Flows
+10.1 Signal → Content (Reactive)
+Exa Webset Monitor detects: “New VP of Engineering hired at GM” (daily 6 AM scan)
+System creates Trigger: type=SIGNAL, category=new_vp_hire, priority=HIGH, matched to Vehicle Engineering division
+Dashboard Hot Signals: Card appears with amber dot, division tag, 5-step action preview, timing countdown
+AE clicks CTA: Deep-links to GM → Content tab with ?trigger=<id>&channel=linkedin_inmail
+Content tab loads: Trigger banner + Division pre-selected + Channel = LinkedIn InMail + Persona = VP and above
+AI generates: Uses trigger context (new VP, their background from Exa) + division data + company value props
+AE copies InMail: Pastes into LinkedIn. Switches to Email, generates follow-up for Day 3. Trigger status → SENT.
+10.2 Activity → Content (Proactive)
+AE activates trigger: In Your Company Data, clicks “Announce” on NVIDIA DRIVE product (or Google Sheet row goes active)
+System matches: Exa company_research confirms which divisions have DRIVE-relevant use cases. Creates Trigger per match.
+Dashboard Recommended Plans: “NVIDIA DRIVE v2.0 → GM ADAS: Draft announcement” + “… GM Vehicle Eng: Draft announcement”
+AE clicks: Content tab with trigger pre-loaded. Selects Email → VP and above. AI generates personalized DRIVE announcement for ADAS.
+Multi-channel: AE switches to LinkedIn Post, generates a thought-leadership post about DRIVE for their own profile.
+Multi-division: Switches division to Vehicle Engineering, generates different content anchored to simulation use case.
+11. Implementation Phases
+Phase 1: Content Engine + Exa Foundation (Week 1–2)
+Add channel selector (6 channels) to Content tab
+Add persona seniority filter with AI tone adjustment
+Add trigger context banner (reads from URL param)
+Connect Exa MCP: web_search_advanced_exa + company_research_exa + people_search_exa
+Replace firecrawl account research with Exa company_research_exa
+Exa people_search_exa for “Find More Contacts” on Buying Groups tab
+
+
+Phase 2: Trigger Model + Signal Detection (Week 2–4)
+Create TriggerTemplate table, seed with 59 built-in templates from spreadsheets
+Create Trigger table and RepTriggerPreference table
+Create Exa Websets per target account with signal detection searches
+Daily monitor cron creates Trigger records from new Webset items
+Signal preferences UI in Sales Map with per-rep enable/disable and action editing
+Hot Signals card reads from Trigger table, CTA deep-links to Content tab
+Onboarding Steps 1–3 for signal and activity configuration
+
+
+Phase 3: Proactive Activities + Full Loop (Week 4–6)
+“Activate as Trigger” buttons on Products, Events, Feature Releases
+Google Sheets integration for team-managed campaigns
+Activity matching via Exa company_research (division → product fit)
+Custom trigger creation UI (both signals and activities)
+Trigger status lifecycle tracking with dashboard progress indicators
+Activity templates UI in Sales Map
+
+
+12. Acceptance Criteria
+

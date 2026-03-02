@@ -805,7 +805,7 @@ async function main() {
   console.log('Next steps:');
   console.log(' 1. Open AgentPilot as demo-saas@agentpilot.us');
   console.log(' 2. Verify: Your company data → 3 products + 2 success stories + 1 event + 1 feature release');
-  console.log(' 3. Verify: Target companies → Lattice HQ → 4 buying groups, 12 contacts, 2 sales pages');
+  console.log(' 3. Verify: Target Accounts → Lattice HQ → 4 buying groups, 12 contacts, 2 sales pages');
   console.log(' 4. Verify: Dashboard hot signals + company Activity tab show demo signals (no Exa run)');
   console.log(' 5. Optional: Dashboard → Demo setup → select Lattice HQ → Build demo → Lock as demo');
   console.log('──────────────────────────────────────────\n');

@@ -79,6 +79,55 @@ export default async function CampaignLandingPage({ params }: Props) {
   const campaign = await getCampaign(slugOrId);
   if (!campaign) notFound();
 
+  const status = (campaign as { status?: string }).status;
+  if (status === 'placeholder') {
+    const divisionName = campaign.department?.customName ?? campaign.title?.split(' at ')[0] ?? 'This division';
+    const companyName = campaign.company.name;
+    const aeName = 'Your account team';
+    const aeEmail = '';
+    const user = await prisma.user.findUnique({
+      where: { id: campaign.company.userId },
+      select: { name: true, email: true, companyName: true, companyLogoUrl: true },
+    });
+    const aeDisplayName = user?.name ?? user?.companyName ?? 'Your account team';
+    const aeDisplayEmail = user?.email ?? aeEmail;
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col items-center justify-center p-6">
+        <div className="max-w-lg w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-8 text-center">
+          {user?.companyLogoUrl && (
+            <img
+              src={user.companyLogoUrl}
+              alt={user.companyName ?? 'Company'}
+              className="h-10 w-auto mx-auto mb-4 object-contain"
+            />
+          )}
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+            {user?.companyName ?? 'We'} for {divisionName}
+          </h1>
+          <h2 className="text-lg text-zinc-600 dark:text-zinc-400 mt-1">at {companyName}</h2>
+          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            A personalized sales page for <strong>{divisionName}</strong> at{' '}
+            <strong>{companyName}</strong> is being prepared by {aeDisplayName}.
+          </p>
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">This page will include:</p>
+          <ul className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 text-left list-disc list-inside max-w-sm mx-auto">
+            <li>Division-specific value story</li>
+            <li>Relevant capabilities and proof points</li>
+            <li>Case studies and technical overview</li>
+          </ul>
+          {aeDisplayEmail && (
+            <p className="mt-4 text-xs text-zinc-500">
+              Questions? Contact {aeDisplayName} at{' '}
+              <a href={`mailto:${aeDisplayEmail}`} className="text-amber-600 dark:text-amber-400 hover:underline">
+                {aeDisplayEmail}
+              </a>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Demo: landing page auth verification commented out so /go/... pages load without sign-in
   // const authEnabled = process.env.ENABLE_LANDING_PAGE_AUTH !== 'false';
   // const companyDomain = campaign.company.domain;

@@ -198,7 +198,7 @@ export function CreateContentClient({
         <div className="mb-6 p-4 rounded-lg bg-amber-900/30 border border-amber-700 text-amber-200 text-sm">
           Complete Account Intelligence first so the agent can use research and account messaging.{' '}
           <Link
-            href={`/dashboard/companies/${companyId}/intelligence`}
+            href={`/dashboard/companies/${companyId}?tab=contacts&action=find`}
             className="underline font-medium"
           >
             Set up Account Intelligence
@@ -296,7 +296,7 @@ export function CreateContentClient({
           <div className="p-4 rounded-lg bg-amber-900/30 border border-amber-700 text-amber-200 text-sm">
             Research this company first so we can personalize the landing page.{' '}
             <Link
-              href={`/dashboard/companies/${companyId}/intelligence`}
+              href={`/dashboard/companies/${companyId}?tab=contacts&action=find`}
               className="underline font-medium"
             >
               Research target company
@@ -343,7 +343,7 @@ export function CreateContentClient({
                     </li>
                   ))}
                 </ul>
-                <Link href={`/dashboard/companies/${companyId}?tab=campaigns`}>
+                <Link href={`/dashboard/companies/${companyId}?tab=content`}>
                   <Button
                     variant="outline"
                     size="sm"

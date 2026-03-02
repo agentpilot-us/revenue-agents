@@ -56,7 +56,7 @@ export default function NewCompanyPage() {
 
       // If no background research (e.g. no EXA_API_KEY), redirect to intelligence
       if (data.status !== 'researching') {
-        router.push(`/dashboard/companies/${companyId}/intelligence`);
+        router.push(`/dashboard/companies/${companyId}?tab=overview`);
         router.refresh();
         return;
       }
@@ -97,7 +97,7 @@ export default function NewCompanyPage() {
         } else {
           // Timeout: still show account, redirect to intelligence
           setStatus('form');
-          router.push(`/dashboard/companies/${companyId}/intelligence`);
+          router.push(`/dashboard/companies/${companyId}?tab=overview`);
           router.refresh();
         }
       };
@@ -145,7 +145,7 @@ export default function NewCompanyPage() {
   return (
     <div className="max-w-lg mx-auto py-8 px-6 bg-gray-50 dark:bg-zinc-900 min-h-screen">
       <Link href="/dashboard/companies" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mb-6 inline-block">
-        ← Back to Target companies
+        ← Back to Target Accounts
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Add target company</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -195,10 +195,9 @@ export default function NewCompanyPage() {
         <div className="flex gap-3 pt-4">
           <button
             type="submit"
-            disabled={status === 'researching'}
             className="rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
           >
-            {status === 'researching' ? 'Creating…' : 'Create company'}
+            Create company
           </button>
           <Link
             href="/dashboard/companies"
