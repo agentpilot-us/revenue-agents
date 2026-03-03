@@ -4,6 +4,11 @@
  * Used by the play engine and execute-play.
  */
 
+import {
+  type AEStep,
+  getActivity,
+} from '@/lib/catalog/activity-catalog';
+
 /**
  * Shared instruction block appended to every play prompt so the AI
  * produces sections in the exact typed format the renderer expects.
@@ -82,6 +87,8 @@ export type Play = {
   icon: string;
   pageType: PlayPageType;
   condition: PlayTriggerCondition;
+  /** Links this play to a richer activity definition with AE steps. */
+  defaultActivityId?: string;
   buildPrompt: (ctx: PlayContext) => string;
 };
 
@@ -94,6 +101,7 @@ export const PLAYS: Play[] = [
     icon: '🎯',
     pageType: 'sales_page',
     condition: { hasUnenrichedBuyingGroups: true },
+    defaultActivityId: 'new_product_release',
     buildPrompt: (ctx) =>
       `
 Create a sales page and intro email for the ${ctx.segment.name} buying group at ${ctx.accountName}.
@@ -129,6 +137,7 @@ Keep messaging specific to ${ctx.segment.name} — not generic company messaging
     icon: '📅',
     pageType: 'event_invite',
     condition: { hasUpcomingEvents: true },
+    defaultActivityId: 'conference_booth',
     buildPrompt: (ctx) =>
       `
 Create an event invite sales page and email for the ${ctx.segment.name} segment at ${ctx.accountName}.
@@ -161,6 +170,7 @@ Reference the segment's specific challenges — not generic "join us at our even
     icon: '🚀',
     pageType: 'feature_announcement',
     condition: { hasRecentFeatureRelease: true },
+    defaultActivityId: 'new_feature_release',
     buildPrompt: (ctx) =>
       `
 Create a feature announcement sales page and email for the ${ctx.segment.name} segment 
@@ -197,6 +207,7 @@ ${ctx.segment.name} pain points.
     icon: '🔄',
     pageType: 'account_intro',
     condition: { daysSinceLastActivity: 21 },
+    defaultActivityId: 'renewal_expansion',
     buildPrompt: (ctx) =>
       `
 Create a re-engagement sales page and email for the ${ctx.segment.name} segment 
@@ -241,6 +252,7 @@ Build:
     icon: '🏆',
     pageType: 'account_intro',
     condition: { hasChampionNoEconomicBuyer: true },
+    defaultActivityId: 'champion_development',
     buildPrompt: (ctx) =>
       `
 Create a champion enablement sales page that ${ctx.championName ?? 'the champion'} 
@@ -284,3 +296,31 @@ export function getPlayDisplayName(
   const play = PLAYS.find((p) => p.id === playId);
   return play?.name ?? null;
 }
+
+/**
+ * Resolve the ordered AE steps for a play. Checks:
+ * 1. Custom steps override (from RoadmapPlan previewPayload)
+ * 2. The play's linked activity definition
+ * 3. Falls back to a generic set of steps
+ */
+export function getStepsForPlay(
+  playId: PlayId | null | undefined,
+  stepsOverride?: AEStep[] | null,
+): AEStep[] {
+  if (stepsOverride?.length) return stepsOverride;
+
+  const play = PLAYS.find((p) => p.id === playId);
+  if (play?.defaultActivityId) {
+    const activity = getActivity(play.defaultActivityId);
+    if (activity) return activity.aeSteps;
+  }
+
+  return [
+    { order: 1, label: 'Research account', description: 'Review account context and recent signals', channel: 'content' },
+    { order: 2, label: 'Generate outreach', description: 'Create personalized email, LinkedIn, and talking points', channel: 'email' },
+    { order: 3, label: 'Select contacts', description: 'Choose which contacts to target', channel: 'content' },
+    { order: 4, label: 'Send & track', description: 'Send outreach and monitor engagement', channel: 'email' },
+  ];
+}
+
+export type { AEStep } from '@/lib/catalog/activity-catalog';

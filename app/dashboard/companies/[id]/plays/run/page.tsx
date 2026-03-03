@@ -12,6 +12,7 @@ type SearchParams = {
   signalSummary?: string;
   segmentId?: string;
   segmentName?: string;
+  autoRun?: string;
 };
 
 export default async function PlayRunPage({
@@ -41,6 +42,7 @@ export default async function PlayRunPage({
     signalSummary: sp.signalSummary,
     segmentId: sp.segmentId,
     segmentName: sp.segmentName,
+    autoRun: sp.autoRun === 'true',
   };
 
   if (sp.signalId && !sp.signalTitle) {

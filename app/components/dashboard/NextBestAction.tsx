@@ -2,11 +2,32 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { NextBestActionItem } from '@/lib/dashboard';
 import { dash } from '@/app/dashboard/dashboard-classes';
 
 type NextBestActionProps = { actions: NextBestActionItem[] };
+
+type AEStepPreview = { order: number; label: string };
+
+function usePlaySteps(playId?: string): AEStepPreview[] {
+  const [steps, setSteps] = useState<AEStepPreview[]>([]);
+  useEffect(() => {
+    if (!playId) return;
+    fetch(`/api/plays/${playId}/steps`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.steps)) {
+          setSteps(data.steps.slice(0, 2).map((s: { order: number; label: string }) => ({
+            order: s.order,
+            label: s.label,
+          })));
+        }
+      })
+      .catch(() => {});
+  }, [playId]);
+  return steps;
+}
 
 const stageColorMap: Record<string, string> = {
   'Active Program': 'var(--ap-stage-active)',
@@ -52,6 +73,7 @@ function CreatePlaceholderButton({
 
 function NBACardFull({ action }: { action: NextBestActionItem }) {
   const accentColor = stageColorMap[action.stage ?? ''] ?? 'var(--ap-blue)';
+  const steps = usePlaySteps(action.playId ?? undefined);
 
   return (
     <div
@@ -88,10 +110,27 @@ function NBACardFull({ action }: { action: NextBestActionItem }) {
         </p>
       )}
 
+      {/* AE steps preview */}
+      {steps.length > 0 && (
+        <div className="flex items-center gap-3 mt-1.5 mb-1">
+          {steps.map((step) => (
+            <span
+              key={step.order}
+              className="text-[10px] text-[var(--ap-text-muted)] flex items-center gap-1"
+            >
+              <span className="w-3.5 h-3.5 rounded-full bg-[var(--ap-surface-hover)] flex items-center justify-center text-[8px] font-bold text-[var(--ap-text-faint)]">
+                {step.order}
+              </span>
+              {step.label}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Objective line */}
       {action.objectiveLine && (
         <p className="text-[10px] text-[var(--ap-amber)] font-medium mt-1 mb-2">
-          ↗ {action.objectiveLine}
+          {action.objectiveLine}
         </p>
       )}
 
@@ -176,7 +215,7 @@ export function NextBestAction({ actions }: NextBestActionProps) {
   return (
     <section className={dash.card}>
       <div className={dash.sectionHeader}>
-        <h2 className={dash.sectionTitle}>Recommended Plans</h2>
+        <h2 className={dash.sectionTitle}>Recommended Plays</h2>
         <span className={dash.sectionSubtitle}>Prioritized by objective</span>
       </div>
 

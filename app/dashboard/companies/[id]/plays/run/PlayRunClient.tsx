@@ -1,10 +1,14 @@
 'use client';
 
-// app/dashboard/companies/[id]/plays/run/PlayRunClient.tsx
-// The "OMG moment" — signal → 3 assets generated → review + contacts + outreach
-
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+
+type AEStep = {
+  order: number;
+  label: string;
+  description: string;
+  channel?: string;
+};
 
 type RunParams = {
   playId?: string;
@@ -13,6 +17,7 @@ type RunParams = {
   signalSummary?: string;
   segmentId?: string;
   segmentName?: string;
+  autoRun?: boolean;
 };
 
 type GeneratedContent = {
@@ -348,17 +353,208 @@ function LoadingState({ segmentName }: { segmentName?: string }) {
   );
 }
 
+// ── Channel badge ─────────────────────────────────────────────────────────────
+
+const CHANNEL_COLORS: Record<string, string> = {
+  email: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  linkedin: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+  phone: 'bg-green-500/20 text-green-300 border-green-500/30',
+  meeting: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  sales_page: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  briefing: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  video: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+  gift: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  event: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  content: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+};
+
+function ChannelBadge({ channel }: { channel?: string }) {
+  if (!channel) return null;
+  const cls = CHANNEL_COLORS[channel] ?? CHANNEL_COLORS.content;
+  return (
+    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${cls}`}>
+      {channel.replace(/_/g, ' ')}
+    </span>
+  );
+}
+
+// ── Steps list ────────────────────────────────────────────────────────────────
+
+function StepsList({
+  steps,
+  completedSteps,
+}: {
+  steps: AEStep[];
+  completedSteps?: Set<number>;
+}) {
+  return (
+    <div className="space-y-2">
+      {steps.map((step) => {
+        const done = completedSteps?.has(step.order);
+        return (
+          <div
+            key={step.order}
+            className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+              done
+                ? 'border-emerald-500/30 bg-emerald-900/10'
+                : 'border-slate-700 bg-zinc-900/50'
+            }`}
+          >
+            <div
+              className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                done
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-slate-700 text-slate-300'
+              }`}
+            >
+              {done ? (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                step.order
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className={`text-sm font-medium ${done ? 'text-emerald-300' : 'text-white'}`}>
+                  {step.label}
+                </p>
+                <ChannelBadge channel={step.channel} />
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">{step.description}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Contact picker for Phase 1 ────────────────────────────────────────────────
+
+function ContactPicker({
+  contacts,
+  selectedIds,
+  onToggle,
+  onToggleAll,
+}: {
+  contacts: Contact[];
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
+}) {
+  const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
+
+  return (
+    <div className="rounded-xl border border-slate-700 bg-zinc-900 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white">
+          Select Contacts ({selectedIds.size} of {contacts.length})
+        </h3>
+        <button
+          type="button"
+          onClick={onToggleAll}
+          className="text-xs text-blue-400 hover:text-blue-300"
+        >
+          {allSelected ? 'Deselect All' : 'Select All'}
+        </button>
+      </div>
+      <div className="max-h-72 overflow-y-auto divide-y divide-slate-700/50">
+        {contacts.map((contact) => {
+          const name = fullName(contact);
+          const checked = selectedIds.has(contact.id);
+          return (
+            <label
+              key={contact.id}
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-800/50 cursor-pointer transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onToggle(contact.id)}
+                className="w-4 h-4 rounded border-slate-600 bg-zinc-800 text-blue-500 focus:ring-blue-500/50"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white truncate">{name}</p>
+                <p className="text-xs text-slate-400 truncate">{contact.title ?? 'Unknown title'}</p>
+              </div>
+              {contact.email && (
+                <span className="text-[10px] text-slate-500 flex-shrink-0">
+                  {contact.email.split('@')[0]}@...
+                </span>
+              )}
+            </label>
+          );
+        })}
+        {contacts.length === 0 && (
+          <div className="py-6 text-center">
+            <p className="text-slate-500 text-sm">No contacts found for this segment</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClientProps) {
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [phase, setPhase] = useState<'preview' | 'loading' | 'ready' | 'error'>(
+    runParams.autoRun ? 'loading' : 'preview'
+  );
   const [generated, setGenerated] = useState<GeneratedContent | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [accountEmailsSentThisWeek, setAccountEmailsSentThisWeek] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [aeSteps, setAeSteps] = useState<AEStep[]>([]);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+
+  // Load contacts and AE steps on mount
+  useEffect(() => {
+    async function load() {
+      const [contactsRes, stepsRes] = await Promise.all([
+        fetch(`/api/companies/${companyId}/contacts/by-department?includeEmailActivity=week`),
+        runParams.playId
+          ? fetch(`/api/plays/${runParams.playId}/steps`)
+          : Promise.resolve(null),
+      ]);
+
+      if (contactsRes.ok) {
+        const data = await contactsRes.json();
+        const groups = (data.groups ?? []) as Array<{
+          department: { id: string | null };
+          contacts: Contact[];
+        }>;
+        if (typeof data.accountEmailsSentThisWeek === 'number') {
+          setAccountEmailsSentThisWeek(data.accountEmailsSentThisWeek);
+        }
+        const segId = runParams.segmentId;
+        let relevantContacts: Contact[] = [];
+        if (segId) {
+          const group = groups.find((g) => g.department.id === segId);
+          relevantContacts = group?.contacts ?? [];
+        } else {
+          const withContacts = groups.filter((g) => (g.contacts?.length ?? 0) > 0);
+          relevantContacts = (withContacts[0] ?? groups[0])?.contacts ?? [];
+        }
+        setAllContacts(relevantContacts);
+        setSelectedContactIds(new Set(relevantContacts.map((c) => c.id)));
+      }
+
+      if (stepsRes?.ok) {
+        const stepsData = await stepsRes.json();
+        if (Array.isArray(stepsData.steps)) {
+          setAeSteps(stepsData.steps);
+        }
+      }
+    }
+    load();
+  }, [companyId, runParams.segmentId, runParams.playId]);
 
   const runPlay = useCallback(async () => {
-    setStatus('loading');
+    setPhase('loading');
     setErrorMessage(null);
 
     try {
@@ -385,43 +581,39 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
       }
 
       setGenerated(data);
-      setStatus('ready');
-
-      // Load contacts for the segment (or first group with contacts if no segment), with email activity for this week
-      const segId = data.segmentId ?? runParams.segmentId;
-      const contactsRes = await fetch(
-        `/api/companies/${companyId}/contacts/by-department?includeEmailActivity=week`
-      );
-      if (contactsRes.ok) {
-        const contactsData = await contactsRes.json();
-        const groups = (contactsData.groups ?? []) as Array<{
-          department: { id: string | null };
-          contacts: Contact[];
-        }>;
-        if (typeof contactsData.accountEmailsSentThisWeek === 'number') {
-          setAccountEmailsSentThisWeek(contactsData.accountEmailsSentThisWeek);
-        }
-        if (segId) {
-          const group = groups.find((g) => g.department.id === segId);
-          if (group) setContacts(group.contacts ?? []);
-        } else {
-          // No segment (e.g. feature release): show first department that has contacts, or first group
-          const withContacts = groups.filter((g) => (g.contacts?.length ?? 0) > 0);
-          const group = withContacts[0] ?? groups[0];
-          if (group) setContacts(group.contacts ?? []);
-        }
-      }
+      setCompletedSteps(new Set([1, 2]));
+      setPhase('ready');
     } catch (e) {
       setErrorMessage(e instanceof Error ? e.message : 'Something went wrong');
-      setStatus('error');
+      setPhase('error');
     }
   }, [companyId, runParams]);
 
+  // Auto-run if URL says so
   useEffect(() => {
-    runPlay();
-  }, [runPlay]);
+    if (runParams.autoRun) runPlay();
+  }, [runParams.autoRun, runPlay]);
 
-  // Build edit links for each content type
+  const toggleContact = (id: string) => {
+    setSelectedContactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllContacts = () => {
+    if (allContacts.every((c) => selectedContactIds.has(c.id))) {
+      setSelectedContactIds(new Set());
+    } else {
+      setSelectedContactIds(new Set(allContacts.map((c) => c.id)));
+    }
+  };
+
+  const selectedContacts = allContacts.filter((c) => selectedContactIds.has(c.id));
+
+  // Build edit links
   const editBaseParams = new URLSearchParams();
   if (runParams.playId) editBaseParams.set('playId', runParams.playId);
   if (runParams.signalTitle) editBaseParams.set('signalTitle', runParams.signalTitle);
@@ -447,11 +639,11 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
             <div className="min-w-0">
               <span className="text-sm font-semibold text-white">{playLabel(playId)}</span>
               {segmentName && (
-                <span className="text-sm text-slate-400 ml-2">→ {segmentName}</span>
+                <span className="text-sm text-slate-400 ml-2">{segmentName}</span>
               )}
               {runParams.signalTitle && (
                 <span className="hidden sm:inline text-xs text-slate-500 ml-2 truncate">
-                  · {runParams.signalTitle}
+                  {runParams.signalTitle}
                 </span>
               )}
             </div>
@@ -460,17 +652,92 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
             href={`/dashboard/companies/${companyId}`}
             className="flex-shrink-0 text-sm text-slate-400 hover:text-white transition-colors"
           >
-            ← {companyName}
+            {companyName}
           </Link>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {status === 'loading' && <LoadingState segmentName={segmentName} />}
+        {/* ── Phase 1: Preview Steps + Select Contacts ──────────────────── */}
+        {phase === 'preview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-5">
+              {/* Signal context */}
+              {runParams.signalTitle && (
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-900/20 border border-blue-800/50">
+                  <span className="text-blue-400 mt-0.5 flex-shrink-0">&#x26A1;</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-blue-300">Triggered by signal</p>
+                    <p className="text-xs text-blue-400 mt-0.5">{runParams.signalTitle}</p>
+                    {runParams.signalSummary && (
+                      <p className="text-xs text-blue-400/70 mt-1 line-clamp-2">{runParams.signalSummary}</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
-        {status === 'error' && (
+              {/* AE Steps */}
+              <div>
+                <h2 className="text-base font-semibold text-white mb-3">
+                  Your Play Steps
+                </h2>
+                {aeSteps.length > 0 ? (
+                  <StepsList steps={aeSteps} />
+                ) : (
+                  <div className="space-y-2">
+                    {[
+                      { order: 1, label: 'Research account', description: 'Review account context and recent signals' },
+                      { order: 2, label: 'Generate outreach', description: 'Create personalized email, LinkedIn, and talking points' },
+                      { order: 3, label: 'Select contacts', description: 'Choose which contacts to target' },
+                      { order: 4, label: 'Send & track', description: 'Send outreach and monitor engagement' },
+                    ].map((step) => (
+                      <div key={step.order} className="flex items-start gap-3 p-3 rounded-lg border border-slate-700 bg-zinc-900/50">
+                        <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 text-xs font-bold text-slate-300">
+                          {step.order}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{step.label}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{step.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Generate button */}
+              <button
+                type="button"
+                onClick={runPlay}
+                disabled={selectedContactIds.size === 0}
+                className="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-400 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Generate Outreach for {selectedContactIds.size} Contact{selectedContactIds.size !== 1 ? 's' : ''}
+              </button>
+            </div>
+
+            {/* Contact picker sidebar */}
+            <div className="lg:col-span-1">
+              <ContactPicker
+                contacts={allContacts}
+                selectedIds={selectedContactIds}
+                onToggle={toggleContact}
+                onToggleAll={toggleAllContacts}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Loading ───────────────────────────────────────────────────── */}
+        {phase === 'loading' && <LoadingState segmentName={segmentName} />}
+
+        {/* ── Error ─────────────────────────────────────────────────────── */}
+        {phase === 'error' && (
           <div className="max-w-md mx-auto mt-16 text-center">
-            <div className="text-4xl mb-4">⚠️</div>
+            <div className="text-4xl mb-4">&#x26A0;&#xFE0F;</div>
             <p className="text-white font-semibold mb-2">Generation failed</p>
             <p className="text-slate-400 text-sm mb-6">{errorMessage}</p>
             <button
@@ -482,14 +749,15 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
           </div>
         )}
 
-        {status === 'ready' && generated && (
+        {/* ── Phase 2: Review + Send ────────────────────────────────────── */}
+        {phase === 'ready' && generated && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Content blocks — left 2/3 */}
             <div className="lg:col-span-2 space-y-4">
               {/* Signal context banner */}
               {runParams.signalTitle && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-900/20 border border-blue-800/50">
-                  <span className="text-blue-400 mt-0.5 flex-shrink-0">⚡</span>
+                  <span className="text-blue-400 mt-0.5 flex-shrink-0">&#x26A1;</span>
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-blue-300">Signal used as hook</p>
                     <p className="text-xs text-blue-400 mt-0.5 truncate">{runParams.signalTitle}</p>
@@ -497,18 +765,33 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                 </div>
               )}
 
+              {/* Steps progress (collapsed) */}
+              {aeSteps.length > 0 && (
+                <details className="rounded-xl border border-slate-700 bg-zinc-900 overflow-hidden">
+                  <summary className="px-4 py-3 cursor-pointer hover:bg-zinc-800/50 transition-colors flex items-center gap-2">
+                    <span className="text-sm font-semibold text-white">Play Steps</span>
+                    <span className="text-xs text-emerald-400 bg-emerald-900/30 border border-emerald-800 px-2 py-0.5 rounded-full">
+                      {completedSteps.size}/{aeSteps.length} done
+                    </span>
+                  </summary>
+                  <div className="px-4 pb-4">
+                    <StepsList steps={aeSteps} completedSteps={completedSteps} />
+                  </div>
+                </details>
+              )}
+
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-white">
-                  {contacts.length > 0
-                    ? `${contacts.length} contact${contacts.length !== 1 ? 's' : ''} · ${segmentName ?? 'Buying group'}`
+                  {selectedContacts.length > 0
+                    ? `${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} selected`
                     : segmentName ?? 'Generated outreach'}
                 </h2>
-                <span className="text-xs text-slate-500">All assets generated · ready to send</span>
+                <span className="text-xs text-slate-500">All assets generated</span>
               </div>
 
               {generated.email && (
                 <ContentBlock
-                  icon="📧"
+                  icon="&#x1F4E7;"
                   label="Email"
                   content={generated.email}
                   editHref={`${editBase}?${editBaseParams.toString()}&contentType=email`}
@@ -517,7 +800,7 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
 
               {generated.linkedin && (
                 <ContentBlock
-                  icon="💼"
+                  icon="&#x1F4BC;"
                   label="LinkedIn"
                   content={generated.linkedin}
                   editHref={`${editBase}?${editBaseParams.toString()}&contentType=linkedin`}
@@ -526,14 +809,13 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
 
               {generated.talking_points && (
                 <ContentBlock
-                  icon="📋"
+                  icon="&#x1F4CB;"
                   label="Talking Points"
                   content={generated.talking_points}
                   editHref={`${editBase}?${editBaseParams.toString()}&contentType=talking_points`}
                 />
               )}
 
-              {/* Partial failure notice */}
               {generated.errors && Object.keys(generated.errors).length > 0 && (
                 <div className="p-3 rounded-lg bg-yellow-900/20 border border-yellow-800/50 text-yellow-300 text-xs">
                   Some assets failed to generate:{' '}
@@ -542,7 +824,7 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
               )}
             </div>
 
-            {/* Contacts sidebar — right 1/3 */}
+            {/* Contacts sidebar — right 1/3 (only selected contacts) */}
             <div className="lg:col-span-1">
               <div className="rounded-xl border border-slate-700 bg-zinc-900 sticky top-20">
                 <div className="px-4 py-3 border-b border-slate-700">
@@ -550,9 +832,9 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                     {segmentName ?? 'Contacts'}
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {contacts.length > 0
-                      ? `${contacts.length} contacts — send or open LinkedIn`
-                      : 'No contacts found for this segment'}
+                    {selectedContacts.length > 0
+                      ? `${selectedContacts.length} contacts — send or open LinkedIn`
+                      : 'No contacts selected'}
                   </p>
                   {accountEmailsSentThisWeek != null && (
                     <p className="text-xs text-slate-500 mt-1">
@@ -561,8 +843,8 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                   )}
                 </div>
                 <div className="px-4 divide-y divide-slate-700/0">
-                  {contacts.length > 0 ? (
-                    contacts.map((contact) => (
+                  {selectedContacts.length > 0 ? (
+                    selectedContacts.map((contact) => (
                       <ContactRow
                         key={contact.id}
                         contact={contact}
@@ -573,25 +855,33 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                     ))
                   ) : (
                     <div className="py-6 text-center">
-                      <p className="text-slate-500 text-sm mb-2">No contacts yet</p>
-                      <Link
-                        href={`/dashboard/companies/${companyId}/contacts`}
+                      <p className="text-slate-500 text-sm mb-2">No contacts selected</p>
+                      <button
+                        type="button"
+                        onClick={() => setPhase('preview')}
                         className="text-xs text-blue-400 hover:text-blue-300 underline"
                       >
-                        Find contacts →
-                      </Link>
+                        Go back to select contacts
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {contacts.length > 0 && (
-                  <div className="px-4 py-3 border-t border-slate-700">
+                {selectedContacts.length > 0 && (
+                  <div className="px-4 py-3 border-t border-slate-700 flex items-center justify-between">
                     <Link
-                      href={`/dashboard/companies/${companyId}/contacts`}
+                      href={`/dashboard/companies/${companyId}`}
                       className="text-xs text-slate-400 hover:text-white transition-colors"
                     >
-                      View all contacts →
+                      View all contacts
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => setPhase('preview')}
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      Change selection
+                    </button>
                   </div>
                 )}
               </div>

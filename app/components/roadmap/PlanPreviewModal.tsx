@@ -134,10 +134,10 @@ export function PlanPreviewModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-zinc-700">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Plan Preview
+              Play Preview
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {totalPlans} plan{totalPlans !== 1 ? 's' : ''} across{' '}
+              {totalPlans} play{totalPlans !== 1 ? 's' : ''} across{' '}
               {phases.length} phase{phases.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -170,7 +170,7 @@ export function PlanPreviewModal({
                   )}
                 </div>
                 <span className="text-xs text-gray-500">
-                  {phase.plans.length} plan{phase.plans.length !== 1 ? 's' : ''}
+                  {phase.plans.length} play{phase.plans.length !== 1 ? 's' : ''}
                   {collapsedPhases.has(phase.phaseOrder) ? ' ▸' : ' ▾'}
                 </span>
               </button>
@@ -249,7 +249,7 @@ export function PlanPreviewModal({
                             type="button"
                             onClick={() => removePlan(phase.phaseOrder, idx)}
                             className="text-red-400 hover:text-red-300 text-sm shrink-0"
-                            title="Remove plan"
+                            title="Remove play"
                           >
                             x
                           </button>
@@ -259,7 +259,7 @@ export function PlanPreviewModal({
                   })}
                   {phase.plans.length === 0 && (
                     <p className="text-xs text-gray-400 italic pl-2">
-                      No plans for this phase.
+                      No plays for this phase.
                     </p>
                   )}
                 </div>
@@ -291,7 +291,7 @@ export function PlanPreviewModal({
               disabled={saving || totalPlans === 0}
               className="text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {saving ? 'Saving...' : `Save ${totalPlans} Plans to Sales Map`}
+              {saving ? 'Saving...' : `Save ${totalPlans} Plays to Sales Map`}
             </button>
           </div>
         </div>

@@ -135,10 +135,10 @@ export default async function RoadmapPage() {
           </div>
         </section>
 
-        {/* Plans section */}
+        {/* Play Queue */}
         <section className="mb-8">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Phased plans
+            Play Queue
           </h2>
 
           {primaryTarget && (
@@ -212,7 +212,7 @@ export default async function RoadmapPage() {
 
         <section className="mb-8">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Action playbook
+            Play Rules
           </h2>
           <div className="rounded-lg border border-border bg-card/80 p-4 text-sm text-foreground">
             <ActionMappingEditor roadmapId={roadmap.id} />

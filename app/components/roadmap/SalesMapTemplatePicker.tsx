@@ -67,10 +67,10 @@ export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Pro
   return (
     <div className="rounded-lg border border-gray-200 dark:border-zinc-700 p-4">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-        Generate Plans for {targetLabel}
+        Generate Plays for {targetLabel}
       </h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        Select a selling motion template. The AI will generate specific plans
+        Select a selling motion template. The AI will generate specific plays
         within each phase using account context.
       </p>
 
@@ -137,7 +137,7 @@ export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Pro
         disabled={!selectedId || generating}
         className="w-full text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
       >
-        {generating ? 'Generating Plans...' : 'Generate Plan Preview'}
+        {generating ? 'Generating Plays...' : 'Generate Play Preview'}
       </button>
 
       {/* Preview modal */}

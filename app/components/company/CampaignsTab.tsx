@@ -120,7 +120,7 @@ export function CampaignsTab({
   }, [fetchCampaigns]);
 
   const handleDelete = async (campaignId: string) => {
-    if (!confirm('Delete this campaign link?')) return;
+    if (!confirm('Delete this sales page?')) return;
     setMessage(null);
     try {
       const res = await fetch(`/api/companies/${companyId}/campaigns/${campaignId}`, { method: 'DELETE' });
@@ -129,7 +129,7 @@ export function CampaignsTab({
         throw new Error(err.error || 'Delete failed');
       }
       await fetchCampaigns();
-      setMessage({ type: 'success', text: 'Campaign deleted.' });
+      setMessage({ type: 'success', text: 'Sales page deleted.' });
     } catch (e) {
       setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Delete failed' });
     }
@@ -328,7 +328,7 @@ export function CampaignsTab({
             onSuccess={() => {
               setShowAdd(false);
               fetchCampaigns();
-              setMessage({ type: 'success', text: 'Campaign added.' });
+              setMessage({ type: 'success', text: 'Sales page added.' });
             }}
             onError={(err) => setMessage({ type: 'error', text: err })}
           />
@@ -460,10 +460,10 @@ function AddCampaignForm({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create campaign');
+      if (!res.ok) throw new Error(data.error || 'Failed to create sales page');
       onSuccess();
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Failed to create campaign');
+      onError(e instanceof Error ? e.message : 'Failed to create sales page');
     } finally {
       setSubmitting(false);
     }
@@ -585,7 +585,7 @@ function AddCampaignForm({
         />
       </div>
       <Button type="submit" disabled={submitting}>
-        {submitting ? 'Creating…' : 'Add campaign'}
+        {submitting ? 'Creating…' : 'Add sales page'}
       </Button>
     </form>
   );

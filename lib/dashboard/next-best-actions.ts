@@ -315,7 +315,7 @@ export async function getNextBestActionsFromRoadmap(
       departmentId: plan.target?.companyDepartmentId ?? null,
       departmentName: deptName,
       label: `${companyName} — ${title}`,
-      ctaLabel: plan.status === 'approved' ? 'Draft Content' : 'Review Plan',
+      ctaLabel: plan.status === 'approved' ? 'Draft Content' : 'Review Play',
       ctaHref:
         plan.status === 'approved'
           ? buildContentUrl({ companyId, divisionId, channel })

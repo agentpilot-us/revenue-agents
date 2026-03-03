@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+type AEStep = {
+  order: number;
+  label: string;
+  description: string;
+  channel?: string;
+};
 
 type PlanRow = {
   id: string;
@@ -52,14 +59,68 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   roi_deck: 'Create ROI Deck',
 };
 
+const CONTENT_TYPE_TO_PLAY: Record<string, string> = {
+  email: 're_engagement',
+  event_invite: 'event_invite',
+  presentation: 'feature_release',
+  one_pager: 'new_buying_group',
+  case_study: 'champion_enablement',
+  talking_points: 're_engagement',
+  roi_deck: 'feature_release',
+};
+
+function buildPlayRunUrl(plan: PlanRow, companyId: string) {
+  const pp = plan.previewPayload;
+  const contentType = pp?.contentType ?? 'email';
+  const playId = CONTENT_TYPE_TO_PLAY[contentType] ?? 're_engagement';
+  const params = new URLSearchParams({ playId });
+  const divisionId = plan.target?.companyDepartmentId;
+  if (divisionId) {
+    params.set('segmentId', divisionId);
+  }
+  if (pp?.targetDivisionName) {
+    params.set('segmentName', pp.targetDivisionName);
+  }
+  return `/dashboard/companies/${companyId}/plays/run?${params.toString()}`;
+}
+
+function PlayStepsPreview({ playId }: { playId: string }) {
+  const [steps, setSteps] = useState<AEStep[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/plays/${playId}/steps`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.steps)) setSteps(data.steps.slice(0, 3));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [playId]);
+
+  if (loading || steps.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1">
+      {steps.map((step) => (
+        <div key={step.order} className="flex items-center gap-2">
+          <span className="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center text-[9px] font-bold text-slate-400 flex-shrink-0">
+            {step.order}
+          </span>
+          <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
+            {step.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function PhasedPlanView({ plans, companyId }: Props) {
   const router = useRouter();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [executingId, setExecutingId] = useState<string | null>(null);
-  const [executeErrorMap, setExecuteErrorMap] = useState<Record<string, string>>({});
-  const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({});
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
 
-  // Group plans by phase
   const phaseMap = new Map<number, { name: string; weekRange: string | null; plans: PlanRow[] }>();
   for (const plan of plans) {
     const idx = plan.phaseIndex ?? 0;
@@ -75,7 +136,6 @@ export function PhasedPlanView({ plans, companyId }: Props) {
     }
   }
 
-  // Sort phases by index
   const sortedPhases = [...phaseMap.entries()].sort(([a], [b]) => a - b);
 
   const updateStatus = async (planId: string, newStatus: string) => {
@@ -92,57 +152,20 @@ export function PhasedPlanView({ plans, companyId }: Props) {
     }
   };
 
-  const buildContentUrl = (plan: PlanRow) => {
-    const pp = plan.previewPayload;
-    const divisionId = plan.target?.companyDepartmentId;
-    const contentType = pp?.contentType ?? 'email';
-
-    const channelMap: Record<string, string> = {
-      email: 'email',
-      event_invite: 'email',
-      presentation: 'presentation',
-      talking_points: 'talking_points',
-      one_pager: 'sales_page',
-      roi_deck: 'presentation',
-      case_study: 'email',
-    };
-
-    const channel = channelMap[contentType] ?? 'email';
-    const params = new URLSearchParams({ tab: 'content', type: channel });
-    if (divisionId) params.set('division', divisionId);
-    return `/dashboard/companies/${companyId}?${params.toString()}`;
-  };
-
-  const executePlan = async (planId: string) => {
-    setExecutingId(planId);
-    setExecuteErrorMap((prev) => {
-      const next = { ...prev };
-      delete next[planId];
+  const toggleSteps = (planId: string) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(planId)) next.delete(planId);
+      else next.add(planId);
       return next;
     });
-    try {
-      const res = await fetch(`/api/roadmap/plans/${planId}/execute`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: 'Execution failed' }));
-        setExecuteErrorMap((prev) => ({ ...prev, [planId]: body.error ?? 'Execution failed' }));
-        return;
-      }
-      setLocalStatuses((prev) => ({ ...prev, [planId]: 'executed' }));
-      router.refresh();
-    } catch {
-      setExecuteErrorMap((prev) => ({ ...prev, [planId]: 'Network error — please try again' }));
-    } finally {
-      setExecutingId(null);
-    }
   };
 
   if (plans.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          No plans generated yet. Use the template picker above to generate plans for a target.
+          No plays generated yet. Use the template picker above to generate plays for a target.
         </p>
       </div>
     );
@@ -164,7 +187,7 @@ export function PhasedPlanView({ plans, companyId }: Props) {
               )}
             </div>
             <span className="text-xs text-gray-400">
-              {phase.plans.length} plan{phase.plans.length !== 1 ? 's' : ''}
+              {phase.plans.length} play{phase.plans.length !== 1 ? 's' : ''}
             </span>
           </div>
 
@@ -173,11 +196,12 @@ export function PhasedPlanView({ plans, companyId }: Props) {
               .sort((a, b) => (b.urgencyScore ?? 0) - (a.urgencyScore ?? 0))
               .map((plan) => {
                 const pp = plan.previewPayload;
-                const title = pp?.title ?? 'Untitled Plan';
+                const title = pp?.title ?? 'Untitled Play';
                 const description = pp?.description ?? '';
                 const contentType = pp?.contentType ?? 'email';
-                const effectiveStatus = localStatuses[plan.id] ?? plan.status;
-                const isExecuting = executingId === plan.id;
+                const effectiveStatus = plan.status;
+                const stepsExpanded = expandedSteps.has(plan.id);
+                const playId = CONTENT_TYPE_TO_PLAY[contentType] ?? 're_engagement';
 
                 return (
                   <div
@@ -199,21 +223,14 @@ export function PhasedPlanView({ plans, companyId }: Props) {
                           </span>
                           {plan.urgencyScore != null && (
                             <span className="text-[10px] text-gray-400" title="Urgency score">
-                              ⚡ {Math.round(plan.urgencyScore)}
+                              {Math.round(plan.urgencyScore)}
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                           {description}
                         </p>
-                        {isExecuting && (
-                          <p className="text-[11px] text-blue-400 mt-1 animate-pulse">
-                            Generating content…
-                          </p>
-                        )}
-                        {executeErrorMap[plan.id] && (
-                          <p className="text-[11px] text-red-400 mt-1">{executeErrorMap[plan.id]}</p>
-                        )}
+
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {pp?.targetDivisionName && (
                             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-300">
@@ -226,6 +243,25 @@ export function PhasedPlanView({ plans, companyId }: Props) {
                             </span>
                           )}
                         </div>
+
+                        {/* Steps toggle */}
+                        <button
+                          type="button"
+                          onClick={() => toggleSteps(plan.id)}
+                          className="text-[11px] text-slate-400 hover:text-slate-300 mt-2 flex items-center gap-1"
+                        >
+                          <svg
+                            className={`w-3 h-3 transition-transform ${stepsExpanded ? 'rotate-90' : ''}`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          {stepsExpanded ? 'Hide steps' : 'View steps'}
+                        </button>
+
+                        {stepsExpanded && (
+                          <PlayStepsPreview playId={playId} />
+                        )}
                       </div>
 
                       <div className="flex flex-col gap-1 shrink-0">
@@ -239,16 +275,14 @@ export function PhasedPlanView({ plans, companyId }: Props) {
                         )}
                         {effectiveStatus === 'pending' && (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => executePlan(plan.id)}
-                              disabled={isExecuting || updatingId === plan.id}
-                              className="text-[11px] font-medium text-violet-400 hover:text-violet-300 disabled:opacity-50"
-                            >
-                              {isExecuting ? 'Executing…' : 'Execute'}
-                            </button>
                             <Link
-                              href={buildContentUrl(plan)}
+                              href={buildPlayRunUrl(plan, companyId)}
+                              className="text-[11px] font-medium text-violet-400 hover:text-violet-300"
+                            >
+                              Run Play
+                            </Link>
+                            <Link
+                              href={buildPlayRunUrl(plan, companyId)}
                               className="text-[11px] font-medium text-blue-400 hover:text-blue-300"
                             >
                               {CONTENT_TYPE_LABELS[contentType] ?? 'Draft Content'}
@@ -273,16 +307,14 @@ export function PhasedPlanView({ plans, companyId }: Props) {
                         )}
                         {effectiveStatus === 'approved' && (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => executePlan(plan.id)}
-                              disabled={isExecuting || updatingId === plan.id}
-                              className="text-[11px] font-medium text-violet-400 hover:text-violet-300 disabled:opacity-50"
-                            >
-                              {isExecuting ? 'Executing…' : 'Execute'}
-                            </button>
                             <Link
-                              href={buildContentUrl(plan)}
+                              href={buildPlayRunUrl(plan, companyId)}
+                              className="text-[11px] font-medium text-violet-400 hover:text-violet-300"
+                            >
+                              Run Play
+                            </Link>
+                            <Link
+                              href={buildPlayRunUrl(plan, companyId)}
                               className="text-[11px] font-medium text-blue-400 hover:text-blue-300"
                             >
                               {CONTENT_TYPE_LABELS[contentType] ?? 'Draft Content'}
