@@ -1945,3 +1945,34 @@ model CustomSignalConfig {
   @@index([userId])
   @@index([companyId])
 }
+
+// ============================================
+// SCHEDULED ACTIONS (delayed plan steps, follow-ups)
+// ============================================
+
+model ScheduledAction {
+  id          String   @id @default(cuid())
+  userId      String
+  companyId   String?
+  contactId   String?
+
+  type        String   // send_email, share_briefing, generate_content, advance_sequence, run_plan_step
+  status      String   @default("pending") // pending, processing, completed, failed, cancelled
+  payload     Json     // type-specific payload
+
+  scheduledAt DateTime // when to execute
+  executedAt  DateTime?
+  error       String?  @db.Text
+  attempts    Int      @default(0)
+
+  // Link back to the plan execution that created this
+  parentPlanId String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([userId])
+  @@index([companyId])
+  @@index([parentPlanId])
+}

@@ -2,7 +2,7 @@
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { sendEmail } from '@/lib/tools/resend';
+import { sendSystemEmail } from '@/lib/email';
 import { nanoid } from 'nanoid';
 import { revalidatePath } from 'next/cache';
 
@@ -91,7 +91,7 @@ export async function approveWaitlistEntry(
   });
 
   const from = process.env.RESEND_FROM ?? 'login@agentpilot.us';
-  const result = await sendEmail({
+  const result = await sendSystemEmail({
     from,
     to: entry.email,
     subject: "You're invited to AgentPilot",

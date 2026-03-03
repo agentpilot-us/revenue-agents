@@ -14,7 +14,7 @@ import {
   findRelevantContentLibraryChunks,
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
-import { sendEmail as resendSendEmail } from '@/lib/tools/resend';
+import { sendSystemEmail } from '@/lib/email';
 import { validateLandingPageSession } from '@/lib/auth/landing-page-auth';
 import { getSessionTokenFromCookies } from '@/lib/auth/landing-page-middleware';
 import { cookies, headers } from 'next/headers';
@@ -371,7 +371,7 @@ Keep responses concise and friendly.`;
           // Sanitize HTML
           html = sanitizeHTML(html);
           
-          const result = await resendSendEmail({ to, subject, html });
+          const result = await sendSystemEmail({ to, subject, html });
           if (!result.ok) {
             return `Failed to send email: ${result.error}. Ask the visitor to try again or request a follow-up from the team.`;
           }

@@ -1,4 +1,4 @@
-import { sendEmail } from '@/lib/tools/resend';
+import { sendSystemEmail } from '@/lib/email';
 
 function buildAlertHtml(title: string, message: string, data: Record<string, unknown>): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -106,7 +106,7 @@ export async function sendDigestEmail({
 }): Promise<boolean> {
   if (alerts.length === 0) return true;
   try {
-    const result = await sendEmail({
+    const result = await sendSystemEmail({
       to,
       subject: `Your alert digest: ${alerts.length} alert${alerts.length === 1 ? '' : 's'}`,
       html: buildDigestHtml(alerts),
@@ -138,7 +138,7 @@ export async function sendEmailAlert({
   alertId: string;
 }): Promise<boolean> {
   try {
-    const result = await sendEmail({
+    const result = await sendSystemEmail({
       to,
       subject: title,
       html: buildAlertHtml(title, message, data),

@@ -2,7 +2,7 @@
  * Send magic link email for landing page authentication
  */
 
-import { sendEmail as resendSendEmail } from '@/lib/tools/resend';
+import { sendSystemEmail } from '@/lib/email';
 
 export async function sendMagicLinkEmail(
   email: string,
@@ -54,7 +54,7 @@ export async function sendMagicLinkEmail(
     </html>
   `;
 
-  const result = await resendSendEmail({
+  const result = await sendSystemEmail({
     to: email,
     subject,
     html,

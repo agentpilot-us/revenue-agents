@@ -30,7 +30,7 @@ export const TOOL_TO_SERVICE: Record<string, ServiceId> = {
   enrich_contact: 'clay',
   research_company: 'perplexity',
   discover_departments: 'perplexity',
-  send_email: 'resend',
+  send_email: 'resend', // Minimum: Resend; user may also have connected Gmail/Outlook
   create_calendar_event: 'cal',
   get_calendar_rsvps: 'cal',
   import_event_attendees: 'cal',
