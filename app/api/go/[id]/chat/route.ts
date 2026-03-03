@@ -7,6 +7,8 @@ import {
   getCompanyEventsBlock,
   getProductKnowledgeBlock,
   getCaseStudiesBlock,
+  getActiveObjectionTexts,
+  getExistingProductNames,
 } from '@/lib/prompt-context';
 import {
   findRelevantContentLibraryChunks,
@@ -220,13 +222,18 @@ export async function POST(
     }
 
     const ragQuery = `${campaign.title} ${companyName} visitor questions`;
+    const [goObjTexts, goProdNames] = await Promise.all([
+      getActiveObjectionTexts(campaign.companyId, campaign.userId),
+      getExistingProductNames(campaign.companyId, campaign.userId),
+    ]);
     const [companyEventsBlock, catalogProducts, productKnowledgeBlock, caseStudiesBlock, ragChunks] =
       await Promise.all([
         getCompanyEventsBlock(
           campaign.userId,
           campaign.company.industry ?? null,
           departmentName,
-          null
+          null,
+          { activeObjections: goObjTexts, existingProducts: goProdNames }
         ),
         prisma.catalogProduct.findMany({
           where: { userId: campaign.userId },

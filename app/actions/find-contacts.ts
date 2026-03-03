@@ -132,7 +132,7 @@ export async function findContactsForDepartment(
         }
       }
       if (useZoomInfo && !email) {
-        // Placeholder: ZoomInfo stub not implemented; could add later
+        // ZoomInfo integration not available
       }
 
       let personaId: string | undefined;

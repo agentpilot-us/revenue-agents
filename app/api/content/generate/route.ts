@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { generateText } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
-import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import { getAccountMessagingPromptBlock, getActiveObjectionsBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
 import {
   getProductKnowledgeBlock,
@@ -14,11 +14,14 @@ import {
   getRelevantProductIdsForIndustry,
   getCompanyEventsBlock,
   getFeatureReleasesBlock,
+  getActiveObjectionTexts,
+  getExistingProductNames,
 } from '@/lib/prompt-context';
 import {
   findRelevantContentLibraryChunks,
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
+import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
 
 const GenerateSchema = z.object({
   companyId: z.string(),
@@ -129,16 +132,19 @@ export async function POST(req: NextRequest) {
       ? `Target seniority: ${personaLabelMap[input.persona]}.\n`
       : '';
 
-    const [researchBlock, accountBlock, messagingSection, relevantProductIds] =
+    const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds, objectionTexts, productNames] =
       await Promise.all([
         getCompanyResearchPromptBlock(companyId, session.user.id),
         getAccountMessagingPromptBlock(companyId, session.user.id),
+        getActiveObjectionsBlock(companyId, session.user.id, divisionId),
         getMessagingContextForAgent(session.user.id, company.industry ?? undefined),
         getRelevantProductIdsForIndustry(
           session.user.id,
           company.industry ?? null,
           null
         ),
+        getActiveObjectionTexts(companyId, session.user.id),
+        getExistingProductNames(companyId, session.user.id),
       ]);
 
     const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock, playbook] =
@@ -154,7 +160,10 @@ export async function POST(req: NextRequest) {
           null,
           relevantProductIds
         ),
-        getCompanyEventsBlock(session.user.id, company.industry ?? null, departmentLabel, null),
+        getCompanyEventsBlock(session.user.id, company.industry ?? null, departmentLabel, null, {
+          activeObjections: objectionTexts,
+          existingProducts: productNames,
+        }),
         getFeatureReleasesBlock(session.user.id, company.industry ?? null, 10),
         company.industry
           ? prisma.industryPlaybook.findFirst({
@@ -170,6 +179,7 @@ export async function POST(req: NextRequest) {
 
     const researchSection = researchBlock && !isShortForm ? `\n\n${researchBlock}` : '';
     const accountSection = accountBlock && !isShortForm ? `\n\n${accountBlock}` : '';
+    const activeObjectionsSection = activeObjectionsBlock ? `\n\n${activeObjectionsBlock}` : '';
     const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
     const playbookSection = industryPlaybookBlock && !isShortForm
       ? `\n\n${industryPlaybookBlock}`
@@ -220,6 +230,10 @@ export async function POST(req: NextRequest) {
     const defaultLandmines = ['use generic openers like "I hope this email finds you well"', 'lead with your product name before establishing relevance'];
     const allLandmines = landminesArr.length > 0 ? landminesArr : defaultLandmines;
     const landminesLine = `Do NOT: ${allLandmines.join('; ')}.\n`;
+
+    // Existing stack context for product-aware framing
+    const existingStackSection = await buildExistingStackBlock(companyId, session.user.id);
+    const existingStackLine = existingStackSection ? `\n${existingStackSection}\n` : '';
 
     // Division-specific context for talking points
     let divisionIntelLine = '';
@@ -282,6 +296,7 @@ Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
 2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, case studies, upcoming events, and feature releases.
 3) CONTENT LIBRARY: relevant snippets for this use case.
+${existingStackLine}${activeObjectionsSection}
 ${ragSection}
 ${productSection}
 ${playbookSection}

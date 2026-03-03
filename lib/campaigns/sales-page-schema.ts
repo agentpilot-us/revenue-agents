@@ -5,6 +5,7 @@ export const salesPageSectionSchema = z.discriminatedUnion('type', [
     type: z.literal('hero'),
     headline: z.string(),
     body: z.string(),
+    backgroundContext: z.string().optional(),
   }),
   z.object({
     type: z.literal('value_props'),
@@ -23,6 +24,29 @@ export const salesPageSectionSchema = z.discriminatedUnion('type', [
     bulletPoints: z.array(z.string()),
   }),
   z.object({
+    type: z.literal('how_it_works'),
+    steps: z.array(
+      z.object({
+        number: z.number(),
+        title: z.string(),
+        description: z.string(),
+      })
+    ),
+  }),
+  z.object({
+    type: z.literal('comparison'),
+    title: z.string().optional(),
+    withoutProduct: z.string(),
+    withProduct: z.string(),
+    rows: z.array(
+      z.object({
+        label: z.string(),
+        without: z.string(),
+        with: z.string(),
+      })
+    ).optional(),
+  }),
+  z.object({
     type: z.literal('event'),
     name: z.string(),
     date: z.string(),
@@ -38,6 +62,12 @@ export const salesPageSectionSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('social_proof'),
+    metrics: z.array(
+      z.object({
+        value: z.string(),
+        label: z.string(),
+      })
+    ).optional(),
     quotes: z.array(
       z.object({
         text: z.string(),
@@ -47,10 +77,20 @@ export const salesPageSectionSchema = z.discriminatedUnion('type', [
     ),
   }),
   z.object({
+    type: z.literal('faq'),
+    items: z.array(
+      z.object({
+        question: z.string(),
+        answer: z.string(),
+      })
+    ),
+  }),
+  z.object({
     type: z.literal('cta'),
     headline: z.string(),
     buttonLabel: z.string(),
     buttonUrl: z.string(),
+    urgencyText: z.string().optional(),
   }),
 ]);
 

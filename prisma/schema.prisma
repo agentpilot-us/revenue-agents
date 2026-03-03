@@ -93,6 +93,9 @@ model User {
   catalogProducts         CatalogProduct[]
   playbookTemplates       PlaybookTemplate[]
   adaptiveRoadmaps        AdaptiveRoadmap[]
+  salesMapTemplates       SalesMapTemplate[]
+  sharedBriefings         SharedBriefing[]
+  customSignalConfigs     CustomSignalConfig[]
 
   // My Company intelligence hub
   internalDocuments      InternalDocument[]
@@ -153,6 +156,7 @@ model Company {
   headquarters          String? // e.g., "Detroit, Michigan"
   revenue               String? // e.g., "$500M (2024)"
   businessOverview      String? @db.Text // "What they do" summary
+  dealObjective         String? @db.Text // Rep's deal objective for this account
   keyInitiatives        Json? // Array of initiative strings
   researchData          Json? // Store raw AI research response for reference
   researchGoal          String? @db.Text // Rep's targeting intent (e.g. "Target enterprise AEs across Financial Services, Healthcare")
@@ -176,11 +180,13 @@ model Company {
   lastFitCalculation DateTime? // When product fit was last calculated
   fitCalculationData Json? // Cached product fit results (opportunities array) for quick retrieval
 
-  accountMessaging AccountMessaging?
-  agentContext     Json? // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
-  segmentCampaigns SegmentCampaign[]
-  accountSignals   AccountSignal[]
-  roadmapTargets   RoadmapTarget[]
+  accountMessaging   AccountMessaging?
+  agentContext       Json? // { lastConversationSummary?, decisions?: string[], contactInteractionSummary? } for agent memory
+  activeObjections   Json? // Array<{ id, objection, severity, status, response, divisionId?, lastRaisedDate, source }> — live account concerns
+  segmentCampaigns   SegmentCampaign[]
+  accountSignals       AccountSignal[]
+  roadmapTargets       RoadmapTarget[]
+  customSignalConfigs  CustomSignalConfig[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
   workflowStep                   Int? // 1, 2, or 3
@@ -200,6 +206,10 @@ model Company {
   // Exa post-create enrichment (signals + contact discovery)
   exaEnrichmentStartedAt   DateTime?
   exaEnrichmentCompletedAt DateTime?
+  exaWebsetId              String?
+
+  // Signal caching: skip LLM classification when Exa results haven't changed
+  lastSignalHash String?
 
   // Demo mode: frozen account for demos (no API/LLM calls)
   isDemoAccount Boolean   @default(false)
@@ -960,6 +970,8 @@ model CatalogProduct {
   useCases    String[]
   contentTags String[]
 
+  relatedProducts Json? // [{ productId, productName, relationship: 'upgrade_path' | 'complementary' | 'prerequisite' | 'replacement' }]
+
   companyProducts CompanyProduct[]
   expansionPlays  ExpansionPlay[]
   productProfiles ProductProfile[]
@@ -1046,6 +1058,10 @@ model CompanyProduct {
   fitScore        Decimal? @db.Decimal(5, 2)
   fitReasoning    String?  @db.Text
   opportunitySize Decimal? @db.Decimal(18, 2)
+
+  deployedSince       DateTime?
+  contractRenewalDate DateTime?
+  usageNotes          String?  @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1750,6 +1766,14 @@ model RoadmapPlan {
   matchInfo Json?
   dismissReason String? @db.Text
 
+  // Sales Map plan engine fields
+  phaseIndex   Int?    // 1, 2, 3 — which template phase this plan belongs to
+  phaseName    String? // e.g. "Educate & Build Trust"
+  urgencyScore Float?  // computed: basePhaseOrder + signalBoost + renewalProximity + objectionSeverity
+
+  salesMapTemplateId String?
+  salesMapTemplate   SalesMapTemplate? @relation(fields: [salesMapTemplateId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1757,6 +1781,7 @@ model RoadmapPlan {
   @@index([signalId])
   @@index([targetId])
   @@index([status])
+  @@index([salesMapTemplateId])
 }
 
 // ----- Playbook: configurable account-level sequences (generalized RenewalPlay) -----
@@ -1837,4 +1862,86 @@ model PlaybookRunStep {
 
   @@unique([runId, stepOrder])
   @@index([runId])
+}
+
+// ----- Sales Map Templates: phased selling motions -----
+model SalesMapTemplate {
+  id        String  @id @default(cuid())
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String  // "Upsell/Cross-Sell", "New Logo", etc.
+  slug      String
+  isBuiltIn Boolean @default(false)
+
+  phases       SalesMapTemplatePhase[]
+  roadmapPlans RoadmapPlan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model SalesMapTemplatePhase {
+  id         String           @id @default(cuid())
+  templateId String
+  template   SalesMapTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  phaseOrder          Int      // 1, 2, 3, 4
+  name                String   // "Educate & Build Trust"
+  description         String?  @db.Text
+  weekRange           String?  // "Weeks 1-3"
+  suggestedPlanTypes  Json?    // ["product_introduction", "event_invite", "new_leader_intro"]
+  defaultContentTypes Json?    // ["email", "event_invite"]
+
+  createdAt DateTime @default(now())
+
+  @@index([templateId])
+}
+
+// ============================================
+// SHARED BRIEFINGS (token + access code gated)
+// ============================================
+
+model SharedBriefing {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String
+
+  token     String   @unique
+  codeHash  String
+  expiresAt DateTime
+
+  briefingPayload Json
+
+  viewedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ============================================
+// CUSTOM SIGNAL CONFIGS (user-defined signal sources)
+// ============================================
+
+model CustomSignalConfig {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  type      String
+  config    Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([companyId])
 }

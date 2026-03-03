@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { generateText } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
-import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import { getAccountMessagingPromptBlock, getActiveObjectionsBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
 import {
   getProductKnowledgeBlock,
@@ -85,7 +85,10 @@ export async function POST(req: NextRequest) {
 
     const messagingSection = await getMessagingContextForAgent(session.user.id, company.industry ?? undefined);
 
-    const accountContextBlock = await getAccountMessagingPromptBlock(accountId, session.user.id);
+    const [accountContextBlock, activeObjectionsBlock] = await Promise.all([
+      getAccountMessagingPromptBlock(accountId, session.user.id),
+      getActiveObjectionsBlock(accountId, session.user.id, departmentId ?? undefined),
+    ]);
 
     const contactDepartment = contact?.department ?? departmentName ?? null;
     const relevantProductIds = await getRelevantProductIdsForIndustry(
@@ -130,6 +133,7 @@ export async function POST(req: NextRequest) {
     const accountBlockSection = accountContextBlock
       ? `\n\n${accountContextBlock}\n`
       : '';
+    const activeObjectionsSection = activeObjectionsBlock ? `\n\n${activeObjectionsBlock}\n` : '';
     const researchDataBlock = await getCompanyResearchPromptBlock(accountId, session.user.id);
     const researchSection = researchDataBlock ? `\n\n${researchDataBlock}` : '';
     const productKnowledgeSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
@@ -141,6 +145,7 @@ export async function POST(req: NextRequest) {
       maxOutputTokens: 800,
       system: `You draft a single follow-up or intro email for a B2B sales context. Be concise (2-4 short paragraphs). Use the messaging framework and reference value props/case studies where relevant. Return ONLY a JSON object with "subject" (string) and "body" (string, plain text). No HTML.
 ${ragSection}
+${activeObjectionsSection}
 ${productKnowledgeSection}
 ${industryPlaybookSection}
 ${caseStudiesSection}

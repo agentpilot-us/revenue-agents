@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 function slugify(s: string): string {
@@ -10,7 +11,6 @@ function slugify(s: string): string {
     .replace(/^-|-$/g, '') || 'campaign';
 }
 
-/** Generate unique slug for user from company name + optional segment name. */
 async function ensureUniqueSlug(
   userId: string,
   baseSlug: string
@@ -30,29 +30,14 @@ async function ensureUniqueSlug(
   return slug;
 }
 
-const pageSectionEventSchema = z.object({
-  title: z.string().optional(),
-  date: z.string().optional(),
-  description: z.string().optional(),
-  url: z.string().optional(),
-});
-const pageSectionRefSchema = z.object({
-  title: z.string().optional(),
-  summary: z.string().optional(),
-  link: z.string().optional(),
-});
-const pageSectionsSchema = z.object({
-  events: z.array(pageSectionEventSchema).optional(),
-  caseStudy: pageSectionRefSchema.optional(),
-  successStory: pageSectionRefSchema.optional(),
-}).optional().nullable();
-
 const draftSchema = z.object({
   departmentId: z.string().nullable(),
   segmentName: z.string(),
   headline: z.string(),
-  body: z.string(),
-  pageSections: pageSectionsSchema.optional(),
+  subheadline: z.string().optional().nullable(),
+  sections: z.array(z.unknown()).min(1),
+  ctaLabel: z.string().optional().nullable(),
+  ctaUrl: z.string().optional().nullable(),
 });
 
 const bodySchema = z.object({
@@ -122,10 +107,12 @@ export async function POST(
           type: 'landing_page',
           url,
           headline: d.headline || null,
-          body: d.body || null,
-          ctaLabel: null,
-          ctaUrl: null,
-          pageSections: d.pageSections ?? undefined,
+          subheadline: d.subheadline ?? null,
+          body: null,
+          ctaLabel: d.ctaLabel ?? null,
+          ctaUrl: d.ctaUrl ?? null,
+          sections: d.sections as Prisma.InputJsonValue,
+          pageType: 'sales_page',
         },
         select: { id: true, slug: true, url: true },
       });

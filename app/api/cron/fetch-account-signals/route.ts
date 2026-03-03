@@ -6,8 +6,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { fetchAccountSignals } from '@/lib/signals/fetch-account-signals';
+import { fetchAccountSignals, classifyPreFetchedSignals, type CustomExaQuery } from '@/lib/signals/fetch-account-signals';
 import { TYPE_DEDUP_DAYS } from '@/lib/signals/constants';
+import { generateRenewalSignals } from '@/lib/signals/renewal-signals';
+import { fetchWebsetResults } from '@/lib/exa/websets';
 
 const BATCH_SIZE = 5;
 const DELAY_MS = 1000;
@@ -40,11 +42,12 @@ export async function POST(req: NextRequest) {
 
   const companies = await prisma.company.findMany({
     where: { isDemoAccount: false },
-    select: { id: true, name: true, domain: true, industry: true, userId: true },
+    select: { id: true, name: true, domain: true, industry: true, userId: true, lastSignalHash: true, exaWebsetId: true },
   });
 
   let processed = 0;
   let created = 0;
+  let skipped = 0;
   const errors: string[] = [];
 
   for (let i = 0; i < companies.length; i += BATCH_SIZE) {
@@ -55,14 +58,81 @@ export async function POST(req: NextRequest) {
         if (!uid) return;
         processed++;
         try {
-          const signals = await fetchAccountSignals(
-            company.name,
-            company.domain ?? '',
-            company.industry,
-            48
-          );
+          // Pass the previous hash so we can skip the LLM call when Exa results haven't changed
+          const existingSignals = company.lastSignalHash
+            ? await prisma.accountSignal.findMany({
+                where: { companyId: company.id, userId: uid },
+                orderBy: { publishedAt: 'desc' },
+                take: 20,
+              })
+            : [];
 
-          for (const signal of signals) {
+          const prevSignalsMapped = existingSignals.map((s) => ({
+            type: s.type as import('@/lib/signals/fetch-account-signals').SignalType,
+            title: s.title,
+            summary: s.summary,
+            url: s.url,
+            publishedAt: s.publishedAt.toISOString(),
+            relevanceScore: s.relevanceScore,
+            suggestedPlay: (s.suggestedPlay as import('@/lib/signals/fetch-account-signals').SuggestedPlay) ?? undefined,
+          }));
+
+          let result: import('@/lib/signals/fetch-account-signals').FetchSignalsResult;
+
+          if (company.exaWebsetId) {
+            // Persistent webset path: fetch accumulated results, then classify
+            const websetItems = await fetchWebsetResults(company.exaWebsetId);
+            result = await classifyPreFetchedSignals(
+              company.name,
+              company.domain ?? '',
+              company.industry,
+              websetItems,
+              company.lastSignalHash,
+              prevSignalsMapped
+            );
+          } else {
+            // Ad-hoc Exa search path (fallback)
+            const customConfigs = await prisma.customSignalConfig.findMany({
+              where: {
+                userId: uid,
+                type: 'exa_search',
+                isActive: true,
+                OR: [{ companyId: company.id }, { companyId: null }],
+              },
+            });
+            type ExaSearchConfig = { query: string; numResults?: number };
+            const customQueries: CustomExaQuery[] = customConfigs
+              .filter((c: { config: unknown }) => (c.config as ExaSearchConfig)?.query)
+              .map((c: { name: string; config: unknown }) => ({
+                configName: c.name,
+                query: (c.config as ExaSearchConfig).query,
+                numResults: (c.config as ExaSearchConfig).numResults,
+              }));
+
+            result = await fetchAccountSignals(
+              company.name,
+              company.domain ?? '',
+              company.industry,
+              48,
+              company.lastSignalHash,
+              prevSignalsMapped,
+              customQueries.length > 0 ? customQueries : undefined
+            );
+          }
+
+          if (result.urlHash && result.urlHash !== company.lastSignalHash) {
+            await prisma.company.update({
+              where: { id: company.id },
+              data: { lastSignalHash: result.urlHash },
+            });
+          }
+
+          if (result.skippedLlm) {
+            skipped++;
+            return;
+          }
+
+          for (const signal of result.signals) {
             const existingByUrl = await prisma.accountSignal.findFirst({
               where: { companyId: company.id, url: signal.url },
             });
@@ -92,7 +162,9 @@ export async function POST(req: NextRequest) {
                 companyId: company.id,
                 userId: uid,
                 type: signal.type,
-                title: signal.title,
+                title: signal.customSignalName
+                  ? `[${signal.customSignalName}] ${signal.title}`
+                  : signal.title,
                 summary: signal.summary,
                 url: signal.url,
                 publishedAt,
@@ -114,10 +186,27 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Generate renewal-approaching signals for all users
+  let renewalCreated = 0;
+  try {
+    const users = await prisma.user.findMany({
+      where: { accountStatus: 'active' },
+      select: { id: true },
+    });
+    for (const user of users) {
+      renewalCreated += await generateRenewalSignals(user.id);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`renewal-signals: ${msg}`);
+  }
+
   return NextResponse.json({
     ok: true,
     processed,
     created,
+    renewalCreated,
+    skippedLlm: skipped,
     errors: errors.length > 0 ? errors : undefined,
   });
 }

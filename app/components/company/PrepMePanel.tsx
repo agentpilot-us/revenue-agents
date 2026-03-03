@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { X, ChevronDown, ChevronUp, Copy, RefreshCw, ExternalLink } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Copy, RefreshCw, ExternalLink, Share2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { buildPrepMePrompt, type PrepMePromptParams } from '@/lib/prompts/prep-me';
+import { buildPrepMePrompt, type PrepMePromptParams, type EventAttendanceInfo } from '@/lib/prompts/prep-me';
 
 export type PrepMePanelParams = PrepMePromptParams & {
   companyId: string;
@@ -50,6 +50,7 @@ export function PrepMePanel({
   companyId,
   companyName,
   divisionName,
+  contactId,
   contactName,
   contactTitle,
   signalTitle,
@@ -61,6 +62,49 @@ export function PrepMePanel({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [loadingStep, setLoadingStep] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [shareResult, setShareResult] = useState<{ url: string; code: string; expiresAt: string } | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [eventAttendances, setEventAttendances] = useState<EventAttendanceInfo[]>([]);
+  const [activeObjectionsFormatted, setActiveObjectionsFormatted] = useState<string | null>(null);
+  const [objectionsFetched, setObjectionsFetched] = useState(false);
+
+  useEffect(() => {
+    if (!contactId) return;
+    fetch(`/api/companies/${companyId}/contacts/${contactId}/events`)
+      .then((res) => (res.ok ? res.json() : { attendances: [] }))
+      .then((data) => setEventAttendances(data.attendances ?? []))
+      .catch(() => {});
+  }, [companyId, contactId]);
+
+  useEffect(() => {
+    fetch(`/api/companies/${companyId}/objections?status=active`)
+      .then((res) => (res.ok ? res.json() : { objections: [] }))
+      .then((data) => {
+        const objections = data.objections ?? [];
+        if (objections.length === 0) {
+          setActiveObjectionsFormatted(null);
+        } else {
+          const lines = objections.map(
+            (o: { objection: string; severity?: string; response?: string | null }) => {
+              const severityTag = (o.severity ?? 'medium').toUpperCase();
+              const responseLine =
+                o.response && o.response.trim()
+                  ? `\n  Counter-narrative: ${o.response.trim()}`
+                  : '\n  No counter-narrative yet — acknowledge the concern and offer to discuss.';
+              return `- [${severityTag}] ${o.objection}${responseLine}`;
+            }
+          );
+          setActiveObjectionsFormatted(lines.join('\n'));
+        }
+        setObjectionsFetched(true);
+      })
+      .catch(() => {
+        setActiveObjectionsFormatted(null);
+        setObjectionsFetched(true);
+      });
+  }, [companyId]);
 
   const prompt = buildPrepMePrompt({
     companyName,
@@ -69,6 +113,8 @@ export function PrepMePanel({
     contactTitle,
     signalTitle,
     signalSummary,
+    contactEventAttendances: eventAttendances.length > 0 ? eventAttendances : undefined,
+    activeObjectionsFormatted: objectionsFetched ? activeObjectionsFormatted : undefined,
   });
 
   const fetchTalkingPoints = useCallback(async () => {
@@ -104,11 +150,44 @@ export function PrepMePanel({
   }, [companyId, prompt]);
 
   useEffect(() => {
+    if (!objectionsFetched) return;
     fetchTalkingPoints();
-  }, [fetchTalkingPoints]);
+  }, [objectionsFetched, fetchTalkingPoints]);
 
   const sections = content ? parseTalkingPointsSections(content) : [];
   const createContentUrl = `/dashboard/companies/${companyId}/create-content?contentType=talking_points&prompt=${encodeURIComponent(prompt)}`;
+
+  const handleShare = useCallback(async () => {
+    if (!content) return;
+    setSharing(true);
+    try {
+      const sections = parseTalkingPointsSections(content).map((s) => ({
+        title: s.title,
+        body: s.body,
+      }));
+      const res = await fetch(`/api/companies/${companyId}/briefing/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          briefingPayload: {
+            companyName,
+            contactName,
+            contactTitle,
+            sections,
+            eventAttendances: eventAttendances.length > 0 ? eventAttendances : undefined,
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShareResult(data);
+      }
+    } catch {
+      // no-op
+    } finally {
+      setSharing(false);
+    }
+  }, [content, companyId, companyName, contactName, contactTitle, eventAttendances]);
 
   const handleCopyAll = async () => {
     if (!content) return;
@@ -187,21 +266,77 @@ export function PrepMePanel({
         </div>
 
         {status === 'success' && (
-          <div className="p-4 border-t border-border flex flex-wrap items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-1.5">
-              <Copy className="h-4 w-4" />
-              {copied ? 'Copied' : 'Copy All'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={fetchTalkingPoints} className="gap-1.5">
-              <RefreshCw className="h-4 w-4" />
-              Regenerate
-            </Button>
-            <Button size="sm" asChild className="gap-1.5">
-              <Link href={createContentUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                Open in Create Content
-              </Link>
-            </Button>
+          <div className="p-4 border-t border-border shrink-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-1.5">
+                <Copy className="h-4 w-4" />
+                {copied ? 'Copied' : 'Copy All'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={fetchTalkingPoints} className="gap-1.5">
+                <RefreshCw className="h-4 w-4" />
+                Regenerate
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleShare} disabled={sharing} className="gap-1.5">
+                <Share2 className="h-4 w-4" />
+                {sharing ? 'Creating…' : 'Share Briefing'}
+              </Button>
+              <Button size="sm" asChild className="gap-1.5">
+                <Link href={createContentUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  Open in Create Content
+                </Link>
+              </Button>
+            </div>
+
+            {shareResult && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                  Share link created — send both the link and the code to your contact.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={shareResult.url}
+                    className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-background text-foreground font-mono truncate"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareResult.url);
+                      setCopiedUrl(true);
+                      setTimeout(() => setCopiedUrl(false), 2000);
+                    }}
+                  >
+                    {copiedUrl ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedUrl ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Access code:</span>
+                  <code className="text-sm font-mono font-bold tracking-widest text-amber-700 dark:text-amber-300">
+                    {shareResult.code}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 gap-1"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareResult.code);
+                      setCopiedCode(true);
+                      setTimeout(() => setCopiedCode(false), 2000);
+                    }}
+                  >
+                    {copiedCode ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Expires {new Date(shareResult.expiresAt).toLocaleDateString()} at{' '}
+                  {new Date(shareResult.expiresAt).toLocaleTimeString()}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

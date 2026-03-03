@@ -1,61 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateText, Output } from 'ai';
-import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
-import {
-  getCompanyEventsBlock,
-  getCaseStudiesBlock,
-  getIndustryPlaybookBlock,
-  getValuePropsForDepartment,
-} from '@/lib/prompt-context';
-import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
-import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
-import {
-  findRelevantContentLibraryChunks,
-  formatRAGChunksForPrompt,
-} from '@/lib/content-library-rag';
 import { isDemoAccount } from '@/lib/demo/is-demo-account';
+import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
+import type { PageType } from '@/lib/campaigns/build-sales-page-prompt';
 
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   scope: z.enum(['company', 'segments']),
   departmentIds: z.array(z.string()).max(5).optional().default([]),
-  options: z.object({
-    includeFutureEvents: z.boolean().default(false),
-    addCaseStudy: z.boolean().default(false),
-    showSuccessStory: z.boolean().default(false),
-  }).default({}),
-});
-
-const pageSectionEventSchema = z.object({
-  title: z.string().optional(),
-  date: z.string().optional(),
-  description: z.string().optional(),
-  url: z.string().optional(),
-});
-const pageSectionRefSchema = z.object({
-  title: z.string().optional(),
-  summary: z.string().optional(),
-  link: z.string().optional(),
-});
-const pageSectionsSchema = z.object({
-  events: z.array(pageSectionEventSchema).optional(),
-  caseStudy: pageSectionRefSchema.optional(),
-  successStory: pageSectionRefSchema.optional(),
-}).optional();
-
-const draftSchema = z.object({
-  departmentId: z.string().nullable(),
-  segmentName: z.string(),
-  headline: z.string(),
-  body: z.string(),
-  pageSections: pageSectionsSchema.optional(),
-});
-
-const outputSchema = z.object({
-  drafts: z.array(draftSchema),
+  pageType: z.enum(['feature_announcement', 'event_invite', 'account_intro', 'case_study']).optional().default('account_intro'),
 });
 
 export async function POST(
@@ -80,7 +36,17 @@ export async function POST(
     if (await isDemoAccount(companyId)) {
       const campaigns = await prisma.segmentCampaign.findMany({
         where: { companyId },
-        select: { id: true, departmentId: true, title: true, headline: true, body: true, pageSections: true, department: { select: { customName: true, type: true } } },
+        select: {
+          id: true,
+          departmentId: true,
+          title: true,
+          headline: true,
+          subheadline: true,
+          sections: true,
+          ctaLabel: true,
+          ctaUrl: true,
+          department: { select: { customName: true, type: true } },
+        },
         orderBy: { createdAt: 'asc' },
       });
       if (campaigns.length === 0) {
@@ -93,14 +59,12 @@ export async function POST(
         departmentId: c.departmentId ?? null,
         segmentName: c.department?.customName ?? c.department?.type?.replace(/_/g, ' ') ?? c.title,
         headline: c.headline ?? '',
-        body: c.body ?? '',
-        pageSections: c.pageSections ?? null,
+        subheadline: c.subheadline ?? null,
+        sections: c.sections ?? null,
+        ctaLabel: c.ctaLabel ?? null,
+        ctaUrl: c.ctaUrl ?? null,
       }));
-      return NextResponse.json({
-        companyId,
-        companyName: company.name,
-        drafts,
-      });
+      return NextResponse.json({ companyId, companyName: company.name, drafts });
     }
 
     let body: unknown;
@@ -117,13 +81,13 @@ export async function POST(
       );
     }
 
-    const { scope, departmentIds, options } = parsed.data;
+    const { scope, departmentIds, pageType } = parsed.data;
 
-    type Target = { departmentId: string | null; segmentName: string; departmentLabel: string | null };
+    type Target = { departmentId: string | null; segmentName: string };
     let targets: Target[] = [];
 
     if (scope === 'company') {
-      targets = [{ departmentId: null, segmentName: company.name, departmentLabel: null }];
+      targets = [{ departmentId: null, segmentName: company.name }];
     } else {
       if (!departmentIds.length) {
         return NextResponse.json(
@@ -144,179 +108,48 @@ export async function POST(
       targets = depts.map((d) => ({
         departmentId: d.id,
         segmentName: d.customName || d.type.replace(/_/g, ' '),
-        departmentLabel: d.customName || d.type.replace(/_/g, ' '),
       }));
     }
 
-    const [researchBlock, accountBlock, industryPlaybookBlock] = await Promise.all([
-      getCompanyResearchPromptBlock(companyId, session.user.id),
-      getAccountMessagingPromptBlock(companyId, session.user.id),
-      getIndustryPlaybookBlock(session.user.id, company.industry ?? null),
-    ]);
-
-    const researchSection = researchBlock ? `\n\nTARGET ACCOUNT RESEARCH:\n${researchBlock}` : '';
-    const accountSection = accountBlock ? `\n\nACCOUNT MESSAGING:\n${accountBlock}` : '';
-    const playbookSection = industryPlaybookBlock ? `\n\nINDUSTRY PLAYBOOK:\n${industryPlaybookBlock}` : '';
-
-    const ragQuery = `landing page value prop for ${company.name} ${targets.map((t) => t.segmentName).join(' ')}`;
-    const ragChunks = await findRelevantContentLibraryChunks(session.user.id, ragQuery, 8);
-    const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
-
-    const contextParts: string[] = [
-      `Company: ${company.name}`,
-      company.industry ? `Industry: ${company.industry}` : '',
-      ragSection,
-      researchSection,
-      accountSection,
-      playbookSection,
-    ].filter(Boolean);
-
-    const draftContexts: Array<{
-      target: Target;
-      eventsBlock: string | null;
-      caseStudiesBlock: string | null;
-      valuePropsBlock: string | null;
-    }> = [];
-
-    for (const target of targets) {
-      let valuePropsBlock: string | null = null;
-      if (target.departmentId) {
-        const dept = await prisma.companyDepartment.findFirst({
-          where: { id: target.departmentId, companyId },
-          select: { type: true, customName: true },
-        });
-        if (dept) {
-          const valueProps = await getValuePropsForDepartment(
-            session.user.id,
-            company.industry ?? null,
-            dept
-          );
-          if (valueProps && (valueProps.headline || valueProps.pitch)) {
-            valuePropsBlock = [
-              valueProps.headline ? `Headline (use or adapt): ${valueProps.headline}` : '',
-              valueProps.pitch ? `Pitch (use for body): ${valueProps.pitch}` : '',
-              valueProps.bullets?.length ? `Bullets: ${valueProps.bullets.join('; ')}` : '',
-            ].filter(Boolean).join('\n');
-          }
-        }
-      }
-
-      const [eventsBlock, caseStudiesBlock] = await Promise.all([
-        options.includeFutureEvents
-          ? getCompanyEventsBlock(
-              session.user.id,
-              company.industry ?? null,
-              target.departmentLabel ?? null,
-              null
-            )
-          : Promise.resolve(null),
-        (options.addCaseStudy || options.showSuccessStory)
-          ? getCaseStudiesBlock(
-              session.user.id,
-              company.industry ?? null,
-              target.departmentLabel ?? null
-            )
-          : Promise.resolve(null),
-      ]);
-      draftContexts.push({ target, eventsBlock, caseStudiesBlock, valuePropsBlock });
-    }
-
-    const targetsDescription = targets
-      .map(
-        (t, i) =>
-          `Target ${i + 1}: segmentName="${t.segmentName}"${t.departmentId ? `, departmentId="${t.departmentId}"` : ' (company-wide)'}`
+    const results = await Promise.all(
+      targets.map((target) =>
+        generateSalesPageSections({
+          companyId,
+          userId: session.user.id,
+          pageType: pageType as PageType,
+          departmentId: target.departmentId,
+        }).then((r) => ({ target, result: r }))
       )
-      .join('\n');
+    );
 
-    const optionsDescription = [
-      options.includeFutureEvents && 'Include an "Upcoming events" section when events context is provided.',
-      options.addCaseStudy && 'Include one case study (pick from case studies context).',
-      options.showSuccessStory && 'Include a success story (can use case study or a short testimonial).',
-    ].filter(Boolean).join(' ');
-
-    const perTargetBlocks = draftContexts
-      .map(
-        (dc, i) =>
-          `--- Target ${i + 1} (${dc.target.segmentName}) ---\n` +
-          (dc.valuePropsBlock ? `VALUE PROPS (align headline/body with this):\n${dc.valuePropsBlock}\n` : '') +
-          (dc.eventsBlock ? `EVENTS:\n${dc.eventsBlock}\n` : '') +
-          (dc.caseStudiesBlock ? `CASE STUDIES:\n${dc.caseStudiesBlock}\n` : '')
-      )
-      .join('\n');
-
-    const systemPrompt = `You are a B2B landing page copywriter. Generate hyper-personalized landing page drafts for the account "${company.name}".
-
-RULES:
-- Produce one draft per target. Each draft must have: departmentId (null for company-wide), segmentName, headline, body (HTML, 2-4 short paragraphs), and optionally pageSections.
-- Headline: one short, benefit-focused line.
-- Body: HTML with <p> tags; tone professional and specific to the segment/account.
-- Options requested: ${optionsDescription || 'None'}
-- When events are provided, set pageSections.events to an array of objects with title, date, description, url (from the EVENTS block for that target).
-- When case study/success story is requested, set pageSections.caseStudy and/or pageSections.successStory with title, summary, link from the CASE STUDIES block.
-- Use the research, account messaging, and industry playbook below to make copy relevant to this account.
-- When VALUE PROPS are provided for a target, align the headline and body with that segment's value props.`;
-
-    const userPrompt = `TARGETS:
-${targetsDescription}
-
-PER-TARGET CONTEXT (events and case studies):
-${perTargetBlocks}
-
-${contextParts.join('\n')}
-
-Output exactly one draft per target (${targets.length} total). Return valid JSON: { "drafts": [ { "departmentId": null or "id", "segmentName": "...", "headline": "...", "body": "<p>...</p>", "pageSections": { ... } or omit } ] }`;
-
-    const useLmStudioFallback = process.env.LLM_PROVIDER === 'lmstudio';
-    let drafts: z.infer<typeof draftSchema>[];
-
-    if (useLmStudioFallback) {
-      const { text } = await generateText({
-        model: getChatModel(),
-        maxOutputTokens: 8000,
-        system: systemPrompt + '\n\nRespond with only a single JSON object. No markdown, no code fences. Top-level key must be "drafts" (array).',
-        prompt: userPrompt,
-      });
-      const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed = outputSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) {
-        console.error('LM Studio draft JSON validation failed:', parsed.error.flatten());
-        return NextResponse.json(
-          { error: 'AI returned invalid draft structure. Try again.', details: parsed.error.flatten() },
-          { status: 500 }
-        );
+    const drafts = results.map(({ target, result }) => {
+      if (!result.ok) {
+        return {
+          departmentId: target.departmentId,
+          segmentName: target.segmentName,
+          headline: '',
+          subheadline: null as string | null,
+          sections: null,
+          ctaLabel: null as string | null,
+          ctaUrl: null as string | null,
+          error: result.error,
+        };
       }
-      drafts = parsed.data.drafts;
-    } else {
-      const { output } = await generateText({
-        model: getChatModel(),
-        maxOutputTokens: 8000,
-        system: systemPrompt,
-        prompt: userPrompt,
-        output: Output.object({
-          schema: outputSchema,
-          name: 'CampaignDrafts',
-          description: 'Landing page drafts per segment or company',
-        }),
-      });
-      drafts = Array.isArray(output.drafts) ? output.drafts : [];
-    }
-    if (drafts.length !== targets.length) {
-      return NextResponse.json(
-        { error: 'AI did not return the expected number of drafts', received: drafts.length, expected: targets.length },
-        { status: 500 }
-      );
-    }
+      return {
+        departmentId: target.departmentId,
+        segmentName: target.segmentName,
+        headline: result.data.headline,
+        subheadline: result.data.subheadline ?? null,
+        sections: result.data.sections,
+        ctaLabel: result.data.ctaLabel ?? null,
+        ctaUrl: result.data.ctaUrl ?? null,
+      };
+    });
 
     return NextResponse.json({
       companyId,
       companyName: company.name,
-      drafts: drafts.map((d, i) => ({
-        departmentId: d.departmentId ?? null,
-        segmentName: d.segmentName || targets[i].segmentName,
-        headline: d.headline || '',
-        body: d.body || '',
-        pageSections: d.pageSections ?? null,
-      })),
+      drafts,
     });
   } catch (e) {
     console.error('POST campaigns/generate-draft', e);

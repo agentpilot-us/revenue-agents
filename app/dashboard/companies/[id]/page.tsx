@@ -93,6 +93,7 @@ export default async function CompanyDetailPage({
       headquarters: true,
       revenue: true,
       businessOverview: true,
+      dealObjective: true,
       keyInitiatives: true,
       researchData: true,
       segmentationStrategy: true,
@@ -555,6 +556,7 @@ export default async function CompanyDetailPage({
             companyId={company.id}
             companyName={company.name}
             companyData={{
+              dealObjective: company.dealObjective,
               industry: company.industry,
               domain: company.domain,
               website: company.website,

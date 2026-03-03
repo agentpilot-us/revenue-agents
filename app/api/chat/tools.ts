@@ -71,7 +71,7 @@ export const chatTools = {
             })),
           };
         }
-        const signals = await fetchAccountSignals(
+        const result = await fetchAccountSignals(
           company.name,
           company.domain ?? '',
           company.industry,
@@ -79,7 +79,7 @@ export const chatTools = {
         );
         return {
           companyName: company.name,
-          signals: signals.map((s) => ({
+          signals: result.signals.map((s) => ({
             type: s.type,
             title: s.title,
             summary: s.summary,

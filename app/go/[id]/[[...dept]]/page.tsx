@@ -6,22 +6,12 @@ import { CampaignTrack } from '@/app/go/CampaignTrack';
 import { CeligoConnect2026Landing } from '@/app/go/CeligoConnect2026Landing';
 import { requireLandingPageAuth } from '@/lib/auth/landing-page-middleware';
 
-type PageSectionEvent = { title?: string; date?: string; description?: string; url?: string };
-type PageSectionCaseStudy = { title?: string; summary?: string; link?: string };
-type PageSectionSuccessStory = { title?: string; summary?: string; link?: string };
-type PageSections = {
-  events?: PageSectionEvent[];
-  caseStudy?: PageSectionCaseStudy;
-  successStory?: PageSectionSuccessStory;
-};
-
 type DeptConfigItem = {
   id: string;
   name: string;
   slug?: string;
   headline?: string;
-  body?: string;
-  pageSections?: PageSections | null;
+  sections?: unknown;
 };
 type DepartmentConfig = { departments?: DeptConfigItem[] };
 
@@ -152,111 +142,58 @@ export default async function CampaignLandingPage({ params }: Props) {
       : departments[0];
     const showPicker = !deptSlug || !selectedDept;
 
+    const deptPayload = selectedDept ? {
+      id: campaign.id,
+      headline: selectedDept.headline ?? campaign.headline,
+      subheadline: (campaign as { subheadline?: string | null }).subheadline ?? null,
+      sections: selectedDept.sections ?? (campaign as { sections?: unknown }).sections ?? null,
+      ctaLabel: campaign.ctaLabel,
+      ctaUrl: campaign.ctaUrl,
+      url: campaign.url,
+      company: { name: campaign.company.name, logoUrl: campaign.company.logoUrl },
+      department: campaign.department,
+    } : null;
+
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-        <div className="max-w-2xl mx-auto px-6 py-12">
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-8">
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="mb-6 flex items-center gap-4">
             {campaign.company.logoUrl && (
-              <div className="mb-3">
-                <img
-                  src={campaign.company.logoUrl}
-                  alt={campaign.company.name}
-                  className="h-8 w-auto object-contain"
-                />
-              </div>
+              <img
+                src={campaign.company.logoUrl}
+                alt={campaign.company.name}
+                className="h-8 w-auto object-contain"
+              />
             )}
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {campaign.company.name}
             </p>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
-              Select your area
-            </h1>
-            <nav className="flex flex-wrap gap-2 mb-6" aria-label="Departments">
-              {departments.map((d) => {
-                const s = d.slug ?? slugify(d.name);
-                const isActive = selectedDept?.id === d.id;
-                const href = `/go/${resolvedSlug}/${s}`;
-                return (
-                  <Link
-                    key={d.id}
-                    href={href}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-amber-500 text-zinc-900'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                    }`}
-                  >
-                    {d.name}
-                  </Link>
-                );
-              })}
-            </nav>
-            {selectedDept && !showPicker && (
-              <>
-                <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                  {selectedDept.headline || selectedDept.name}
-                </h2>
-                {selectedDept.body && (
-                  <div
-                    className="prose prose-zinc dark:prose-invert prose-sm max-w-none mb-6"
-                    dangerouslySetInnerHTML={{ __html: selectedDept.body }}
-                  />
-                )}
-                {selectedDept.pageSections?.events && selectedDept.pageSections.events.length > 0 && (
-                  <section className="mb-6">
-                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-3">Upcoming events</h3>
-                    <ul className="space-y-2">
-                      {selectedDept.pageSections.events.map((e, i) => (
-                        <li key={i} className="text-sm text-zinc-600 dark:text-zinc-300">
-                          {e.url ? (
-                            <a href={e.url} target="_blank" rel="noopener noreferrer" className="text-amber-600 dark:text-amber-400 hover:underline">
-                              {e.title || 'Event'}
-                            </a>
-                          ) : (
-                            <span className="font-medium">{e.title || 'Event'}</span>
-                          )}
-                          {e.date && <span className="text-zinc-500 dark:text-zinc-400 ml-2">{e.date}</span>}
-                          {e.description && <p className="mt-1 text-zinc-500 dark:text-zinc-400">{e.description}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-                {selectedDept.pageSections?.caseStudy && (selectedDept.pageSections.caseStudy.title || selectedDept.pageSections.caseStudy.summary) && (
-                  <section className="mb-6 p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-2">Case study</h3>
-                    <p className="font-medium text-zinc-800 dark:text-zinc-200">{selectedDept.pageSections.caseStudy.title}</p>
-                    {selectedDept.pageSections.caseStudy.summary && (
-                      <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1">{selectedDept.pageSections.caseStudy.summary}</p>
-                    )}
-                    {selectedDept.pageSections.caseStudy.link && (
-                      <a href={selectedDept.pageSections.caseStudy.link} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-600 dark:text-amber-400 hover:underline mt-2 inline-block">Read more</a>
-                    )}
-                  </section>
-                )}
-                {(campaign.ctaLabel || campaign.ctaUrl) && (
-                  <div className="pt-4">
-                    <a
-                      href={campaign.ctaUrl || campaign.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-900 font-medium px-5 py-2.5 transition-colors"
-                    >
-                      {campaign.ctaLabel || 'Learn more'}
-                    </a>
-                  </div>
-                )}
-              </>
-            )}
-            {showPicker && !selectedDept && (
-              <p className="text-zinc-600 dark:text-zinc-300">Choose an area above to see content.</p>
-            )}
           </div>
-
-          <div className="mt-6 flex items-center justify-center gap-4 text-xs text-zinc-400">
-            <CampaignTrack campaignId={campaign.id} />
-            <span>Powered by AgentPilot</span>
-          </div>
+          <nav className="flex flex-wrap gap-2 mb-6" aria-label="Departments">
+            {departments.map((d) => {
+              const s = d.slug ?? slugify(d.name);
+              const isActive = selectedDept?.id === d.id;
+              const href = `/go/${resolvedSlug}/${s}`;
+              return (
+                <Link
+                  key={d.id}
+                  href={href}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-amber-500 text-zinc-900'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                  }`}
+                >
+                  {d.name}
+                </Link>
+              );
+            })}
+          </nav>
+          {deptPayload && !showPicker ? (
+            <GoPageContent campaign={deptPayload} isMultiDept />
+          ) : (
+            <p className="text-zinc-600 dark:text-zinc-300">Choose an area above to see content.</p>
+          )}
         </div>
       </div>
     );
@@ -275,10 +212,7 @@ export default async function CampaignLandingPage({ params }: Props) {
     id: campaign.id,
     headline: campaign.headline,
     subheadline: (campaign as { subheadline?: string | null }).subheadline ?? null,
-    body: campaign.body,
-    description: campaign.description,
     sections: (campaign as { sections?: unknown }).sections ?? null,
-    pageSections: (campaign.pageSections ?? null) as PageSections | null,
     ctaLabel: campaign.ctaLabel,
     ctaUrl: campaign.ctaUrl,
     url: campaign.url,

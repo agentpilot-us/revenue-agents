@@ -60,17 +60,45 @@ function getAnthropicModel() {
   return anthropic(ANTHROPIC_MODEL);
 }
 
+export type ModelTier = 'full' | 'fast' | 'extraction';
+
+const GEMINI_FAST_MODEL = process.env.GEMINI_FAST_MODEL ?? 'gemini-2.0-flash-lite';
+const ANTHROPIC_FAST_MODEL = 'claude-3-5-haiku-20241022';
+
+function getFastModel() {
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini') {
+    return google(GEMINI_FAST_MODEL);
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    return anthropic(ANTHROPIC_FAST_MODEL);
+  }
+  return getGeminiChatModel();
+}
+
 /**
  * Returns the chat model for generateText / streamText / generateObject.
- * - USE_MOCK_LLM=true → mock
- * - LLM_PROVIDER=anthropic (and ANTHROPIC_API_KEY set) → Claude (use this to avoid Gemini quota)
+ *
+ * Tier selection:
+ * - 'full' (default): Main model for complex drafting, expansion strategy, research ingest.
+ * - 'fast': Cheaper model for simple lookups, structured extraction, signal classification.
+ * - 'extraction': Alias for 'fast' — schema-constrained tasks where Haiku-class is sufficient.
+ *
+ * Env overrides (priority order):
+ * - USE_MOCK_LLM=true → mock model (no API calls)
+ * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude
  * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
  * - else ANTHROPIC_API_KEY → Claude
  */
-export function getChatModel() {
+export function getChatModel(tier: ModelTier = 'full') {
   if (process.env.USE_MOCK_LLM === 'true') {
     return getMockChatModel();
   }
+
+  if (tier === 'fast' || tier === 'extraction') {
+    return getFastModel();
+  }
+
   if (process.env.LLM_PROVIDER === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     return getAnthropicModel();
   }

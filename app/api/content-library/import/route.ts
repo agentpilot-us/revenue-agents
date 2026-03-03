@@ -90,8 +90,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('🌐 Scraping URL:', url);
-
     // STEP 1: Scrape with Firecrawl v2
     const scrapeResponse = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
@@ -115,11 +113,7 @@ export async function POST(req: NextRequest) {
       throw new Error('No markdown content returned');
     }
 
-    console.log('✅ Scraped:', markdown.length, 'characters');
-
     // STEP 2: Extract + Infer with Claude via AI SDK
-    console.log('🤖 Extracting with LLM...');
-
     const pageContent = markdown.slice(0, 15000);
     const userPrompt = `Extract structured sales enablement content from this page. Include inference (industry, department, persona, confidence, reasoning) based on context clues.
 
@@ -139,8 +133,6 @@ ${pageContent}`;
       }),
     });
     const extracted = output as z.infer<typeof extractionSchema>;
-
-    console.log('✅ LLM response received');
 
     const result = {
       success: true,
@@ -167,12 +159,6 @@ ${pageContent}`;
       sourceUrl: url,
       scrapedLength: markdown.length,
     };
-
-    console.log('✅ Extraction complete:', {
-      confidence: result.inference.confidence,
-      industry: result.inference.industry,
-      department: result.inference.department,
-    });
 
     return NextResponse.json(result);
   } catch (error) {

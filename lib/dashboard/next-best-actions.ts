@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { getSuggestedPlays } from '@/lib/plays/engine';
 import { buildNextBestActionHref } from '@/lib/dashboard/signal-play-href';
-import { buildContentUrl } from '@/lib/urls/content';
+import { buildContentUrl, type ContentChannel } from '@/lib/urls/content';
 
 /** Build company page URL with 6-tab set (Spec 1). */
 function companyTabUrl(
@@ -258,11 +258,82 @@ export async function getNextBestActionsFromRoadmap(
   objectiveGoalText: string
 ): Promise<NextBestActionItem[]> {
   const { getDivisionCardsForRadar } = await import('@/lib/dashboard/division-radar');
-  const data = await getDivisionCardsForRadar(userId, roadmapId);
-  if (!data || data.divisions.length === 0) return [];
+  const [data, salesMapPlans] = await Promise.all([
+    getDivisionCardsForRadar(userId, roadmapId),
+    prisma.roadmapPlan.findMany({
+      where: {
+        roadmapId,
+        salesMapTemplateId: { not: null },
+        status: { in: ['pending', 'approved'] },
+      },
+      include: {
+        target: {
+          select: {
+            id: true,
+            name: true,
+            companyId: true,
+            companyDepartmentId: true,
+            company: { select: { name: true } },
+            companyDepartment: { select: { customName: true, type: true } },
+          },
+        },
+      },
+      orderBy: [{ urgencyScore: 'desc' }, { createdAt: 'desc' }],
+      take: 10,
+    }),
+  ]);
 
   const actions: NextBestActionItem[] = [];
-  let priority = 0;
+
+  // Sales Map plan-based NBA cards (sorted by urgencyScore, highest first)
+  for (const plan of salesMapPlans) {
+    const pp = plan.previewPayload as Record<string, string | undefined> | null;
+    const title = pp?.title ?? 'Untitled Plan';
+    const contentType = pp?.contentType ?? 'email';
+    const companyId = plan.target?.companyId ?? '';
+    const companyName = plan.target?.company?.name ?? '';
+    const dept = plan.target?.companyDepartment;
+    const deptName = dept?.customName ?? dept?.type?.replace(/_/g, ' ') ?? '';
+    const divisionId = plan.target?.companyDepartmentId ?? undefined;
+
+    const channelMap: Record<string, ContentChannel> = {
+      email: 'email',
+      event_invite: 'email',
+      presentation: 'presentation',
+      one_pager: 'sales_page',
+      roi_deck: 'presentation',
+      case_study: 'email',
+    };
+    const channel: ContentChannel = channelMap[contentType] ?? 'email';
+
+    const urgency = plan.urgencyScore ?? 0;
+    const priority = urgency > 80 ? -2 : urgency > 50 ? -1 : 0;
+
+    actions.push({
+      companyId,
+      companyName,
+      departmentId: plan.target?.companyDepartmentId ?? null,
+      departmentName: deptName,
+      label: `${companyName} — ${title}`,
+      ctaLabel: plan.status === 'approved' ? 'Draft Content' : 'Review Plan',
+      ctaHref:
+        plan.status === 'approved'
+          ? buildContentUrl({ companyId, divisionId, channel })
+          : '/dashboard/roadmap',
+      priority,
+      divisionTargetId: plan.target?.id,
+      situationSummary: pp?.description,
+      recommendation: title,
+      urgency: urgency > 80 ? 'high' : urgency > 50 ? 'medium' : 'low',
+    });
+  }
+
+  if (!data || data.divisions.length === 0) {
+    actions.sort((a, b) => a.priority - b.priority);
+    return actions.slice(0, 8);
+  }
+
+  let divPriority = 1;
   const isExpansion = (stage: string) =>
     stage === 'Expansion Target' || stage === 'Active Program';
 
@@ -339,7 +410,7 @@ export async function getNextBestActionsFromRoadmap(
       label: `${d.companyName} — ${d.name}: ${situationSummary}`,
       ctaLabel,
       ctaHref,
-      priority: priority++,
+      priority: divPriority++,
       divisionTargetId: d.targetId,
       stage: d.stage,
       situationSummary,
@@ -350,5 +421,6 @@ export async function getNextBestActionsFromRoadmap(
     });
   }
 
-  return actions.slice(0, 6);
+  actions.sort((a, b) => a.priority - b.priority);
+  return actions.slice(0, 8);
 }

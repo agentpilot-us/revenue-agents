@@ -4,7 +4,11 @@ import { getChatModel } from '@/lib/llm/get-model';
 import {
   getCompanyEventsBlock,
   getCaseStudiesBlock,
+  getActiveObjectionTexts,
+  getExistingProductNames,
 } from '@/lib/prompt-context';
+import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
+import { getActiveObjectionsBlock } from '@/lib/account-messaging';
 import { salesPageGenerateSchema, type SalesPageGenerateOutput } from '@/lib/campaigns/sales-page-schema';
 import { buildSalesPagePrompt, type PageType } from '@/lib/campaigns/build-sales-page-prompt';
 
@@ -50,9 +54,19 @@ export async function generateSalesPageSections(
     valueProp = dept.valueProp;
   }
 
-  const [eventsBlock, caseStudiesBlock] = await Promise.all([
-    getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null),
+  const [objectionTexts, productNames] = await Promise.all([
+    getActiveObjectionTexts(companyId, userId),
+    getExistingProductNames(companyId, userId),
+  ]);
+
+  const [eventsBlock, caseStudiesBlock, existingProductsBlock, objectionsBlock] = await Promise.all([
+    getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
+      activeObjections: objectionTexts,
+      existingProducts: productNames,
+    }),
     getCaseStudiesBlock(userId, company.industry ?? null, departmentLabel, []),
+    buildExistingStackBlock(companyId, userId),
+    getActiveObjectionsBlock(companyId, userId, departmentId ?? undefined),
   ]);
 
   const prompt = buildSalesPagePrompt({
@@ -62,6 +76,8 @@ export async function generateSalesPageSections(
     valueProp,
     eventsBlock,
     caseStudiesBlock,
+    existingProductsBlock,
+    objectionsBlock,
     userGoal: userGoal ?? undefined,
   });
 
@@ -70,7 +86,7 @@ export async function generateSalesPageSections(
       model: getChatModel(),
       schema: salesPageGenerateSchema,
       prompt,
-      maxOutputTokens: 2000,
+      maxOutputTokens: 3000,
     });
 
     const result = salesPageGenerateSchema.safeParse(object);

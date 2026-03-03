@@ -33,7 +33,7 @@ export async function POST(_req: NextRequest) {
       );
     }
 
-    const signals = await fetchAccountSignals(
+    const result = await fetchAccountSignals(
       company.name,
       company.domain ?? '',
       company.industry,
@@ -42,7 +42,7 @@ export async function POST(_req: NextRequest) {
 
     let created = 0;
 
-    for (const signal of signals) {
+    for (const signal of result.signals) {
       const existingByUrl = await prisma.accountSignal.findFirst({
         where: { companyId: company.id, url: signal.url },
       });

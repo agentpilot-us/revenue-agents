@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { getValuePropsForDepartment } from '@/lib/prompt-context';
+import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
 
 const postBodySchema = z.object({
   title: z.string().min(1),
@@ -147,14 +147,13 @@ export async function POST(
           { status: res.status }
         );
       }
-      const { drafts } = (await res.json()) as { drafts: Array<{ departmentId: string | null; segmentName: string; headline: string; body: string; pageSections?: unknown }> };
+      const { drafts } = (await res.json()) as { drafts: Array<{ departmentId: string | null; segmentName: string; headline: string; subheadline?: string | null; sections?: unknown; ctaLabel?: string | null; ctaUrl?: string | null }> };
       const departments = drafts.map((d) => ({
         id: d.departmentId ?? '',
         name: d.segmentName,
         slug: slugify(d.segmentName).slice(0, 60) || 'dept',
         headline: d.headline || d.segmentName,
-        body: d.body || null,
-        pageSections: d.pageSections ?? null,
+        sections: d.sections ?? null,
       }));
 
       let slug = parsed.data.slug || slugify(parsed.data.title);
@@ -220,22 +219,17 @@ export async function POST(
     }
 
     let prefillHeadline = parsed.data.headline ?? null;
-    let prefillBody = parsed.data.body ?? null;
-    if (parsed.data.departmentId && (prefillHeadline == null || prefillBody == null)) {
-      const department = await prisma.companyDepartment.findFirst({
-        where: { id: parsed.data.departmentId, companyId },
-        select: { type: true, customName: true },
+    let prefillSections = parsed.data.sections ?? null;
+    if (parsed.data.departmentId && !prefillSections) {
+      const genResult = await generateSalesPageSections({
+        companyId,
+        userId: session.user.id,
+        pageType: (parsed.data.pageType as 'account_intro') ?? 'account_intro',
+        departmentId: parsed.data.departmentId,
       });
-      if (department) {
-        const valueProps = await getValuePropsForDepartment(
-          session.user.id,
-          company.industry ?? null,
-          department
-        );
-        if (valueProps) {
-          if (prefillHeadline == null) prefillHeadline = valueProps.headline || null;
-          if (prefillBody == null) prefillBody = valueProps.pitch || null;
-        }
+      if (genResult.ok) {
+        if (!prefillHeadline) prefillHeadline = genResult.data.headline;
+        prefillSections = genResult.data.sections;
       }
     }
 
@@ -280,11 +274,11 @@ export async function POST(
         url,
         headline: prefillHeadline ?? parsed.data.headline ?? null,
         subheadline: parsed.data.subheadline ?? null,
-        body: prefillBody ?? parsed.data.body ?? null,
+        body: null,
         ctaLabel: parsed.data.ctaLabel ?? null,
         ctaUrl: parsed.data.ctaUrl ?? null,
         pageType: parsed.data.pageType ?? 'sales_page',
-        sections: parsed.data.sections ? (parsed.data.sections as Prisma.InputJsonValue) : Prisma.JsonNull,
+        sections: prefillSections ? (prefillSections as Prisma.InputJsonValue) : Prisma.JsonNull,
         isMultiDepartment: false,
       },
       include: {

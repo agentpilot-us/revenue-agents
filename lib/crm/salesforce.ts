@@ -1,6 +1,36 @@
 import type { CrmContact, CrmAccount, CrmPushResult } from './types';
+import { prisma } from '@/lib/db';
+import { refreshSalesforceToken } from '@/lib/integrations/salesforce-oauth';
 
-function getConfig(): { accessToken: string; instanceUrl: string } {
+async function getConfig(userId?: string): Promise<{ accessToken: string; instanceUrl: string }> {
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        salesforceAccessToken: true,
+        salesforceInstanceUrl: true,
+        salesforceTokenExpiresAt: true,
+      },
+    });
+
+    if (user?.salesforceAccessToken && user?.salesforceInstanceUrl) {
+      let accessToken = user.salesforceAccessToken;
+
+      // Refresh if expired or expiring within 5 minutes
+      if (
+        user.salesforceTokenExpiresAt &&
+        user.salesforceTokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000
+      ) {
+        accessToken = await refreshSalesforceToken(userId);
+      }
+
+      return {
+        accessToken,
+        instanceUrl: user.salesforceInstanceUrl.replace(/\/$/, ''),
+      };
+    }
+  }
+
   const accessToken = process.env.SALESFORCE_ACCESS_TOKEN;
   const instanceUrl = process.env.SALESFORCE_INSTANCE_URL ?? process.env.SALESFORCE_BASE_URL;
   if (!accessToken || !instanceUrl) {
@@ -10,8 +40,8 @@ function getConfig(): { accessToken: string; instanceUrl: string } {
   return { accessToken, instanceUrl: base };
 }
 
-function sfFetch(path: string, options?: RequestInit): Promise<Response> {
-  const { accessToken, instanceUrl } = getConfig();
+async function sfFetch(path: string, options?: RequestInit, userId?: string): Promise<Response> {
+  const { accessToken, instanceUrl } = await getConfig(userId);
   return fetch(`${instanceUrl}${path}`, {
     ...options,
     headers: {
@@ -37,6 +67,7 @@ function getSalesforceSegmentFieldNames(): { contactField?: string; accountField
 export async function salesforceFetchContacts(options?: {
   accountId?: string;
   limit?: number;
+  userId?: string;
 }): Promise<{ contacts: CrmContact[]; accounts: Map<string, CrmAccount> }> {
   const limit = Math.min(options?.limit ?? 200, 200);
   const accounts = new Map<string, CrmAccount>();
@@ -56,7 +87,7 @@ export async function salesforceFetchContacts(options?: {
     query = `SELECT ${contactSelect} FROM Contact LIMIT ${limit}`;
   }
 
-  const res = await sfFetch(`/services/data/v59.0/query?q=${encodeURIComponent(query)}`);
+  const res = await sfFetch(`/services/data/v59.0/query?q=${encodeURIComponent(query)}`, undefined, options?.userId);
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`Salesforce query: ${res.status} ${t}`);
@@ -118,8 +149,9 @@ export async function salesforcePushActivity(params: {
   body?: string;
   summary?: string;
   createdAt?: Date;
+  userId?: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  const { contactId, type, subject, body, summary, createdAt } = params;
+  const { contactId, type, subject, body, summary, createdAt, userId } = params;
   const subj = subject ?? summary ?? (type === 'email' ? 'Email' : 'Meeting');
   const desc = body ?? summary ?? '';
 
@@ -134,7 +166,7 @@ export async function salesforcePushActivity(params: {
         Status: 'Completed',
         Priority: 'Normal',
       }),
-    });
+    }, userId);
 
     if (!res.ok) {
       const t = await res.text();
@@ -154,6 +186,7 @@ export async function salesforcePushSegmentUpdates(params: {
   salesforceAccountId: string;
   accountSegmentValue: string | null;
   contacts: Array<{ salesforceId: string; segmentValue: string | null }>;
+  userId?: string;
 }): Promise<{ ok: boolean; updated: number; errors: string[] }> {
   const { contactField, accountField } = getSalesforceSegmentFieldNames();
   if (!contactField && !accountField) {
@@ -166,7 +199,8 @@ export async function salesforcePushSegmentUpdates(params: {
     try {
       const res = await sfFetch(
         `/services/data/v59.0/sobjects/Account/${params.salesforceAccountId}`,
-        { method: 'PATCH', body: JSON.stringify({ [accountField]: params.accountSegmentValue }) }
+        { method: 'PATCH', body: JSON.stringify({ [accountField]: params.accountSegmentValue }) },
+        params.userId
       );
       if (res.ok) updated++;
       else errors.push(`Account: ${res.status} ${await res.text()}`);
@@ -181,7 +215,8 @@ export async function salesforcePushSegmentUpdates(params: {
     try {
       const res = await sfFetch(
         `/services/data/v59.0/sobjects/Contact/${c.salesforceId}`,
-        { method: 'PATCH', body: JSON.stringify({ [contactField]: c.segmentValue }) }
+        { method: 'PATCH', body: JSON.stringify({ [contactField]: c.segmentValue }) },
+        params.userId
       );
       if (res.ok) updated++;
       else errors.push(`Contact ${c.salesforceId}: ${res.status} ${await res.text()}`);
@@ -193,7 +228,75 @@ export async function salesforcePushSegmentUpdates(params: {
   return { ok: errors.length === 0, updated, errors };
 }
 
-export function isSalesforceConfigured(): boolean {
+/**
+ * Search Salesforce Accounts by name. Returns up to 50 results.
+ */
+export async function salesforceFetchAccounts(search?: string, userId?: string): Promise<Array<{
+  salesforceId: string;
+  name: string;
+  website: string | null;
+  industry: string | null;
+}>> {
+  let query = 'SELECT Id, Name, Website, Industry FROM Account';
+  if (search?.trim()) {
+    const escaped = search.trim().replace(/'/g, "\\'");
+    query += ` WHERE Name LIKE '%${escaped}%'`;
+  }
+  query += ' ORDER BY Name ASC LIMIT 50';
+
+  const res = await sfFetch(`/services/data/v59.0/query?q=${encodeURIComponent(query)}`, undefined, userId);
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Salesforce query: ${res.status} ${t}`);
+  }
+
+  type AccountRecord = { Id: string; Name: string; Website?: string; Industry?: string };
+  const data = (await res.json()) as { records?: AccountRecord[] };
+  return (data.records ?? []).map((r) => ({
+    salesforceId: r.Id,
+    name: r.Name,
+    website: r.Website ?? null,
+    industry: r.Industry ?? null,
+  }));
+}
+
+/**
+ * Fetch a single Salesforce Account by Id.
+ */
+export async function salesforceFetchAccountById(accountId: string, userId?: string): Promise<{
+  salesforceId: string;
+  name: string;
+  website: string | null;
+  industry: string | null;
+} | null> {
+  const escaped = accountId.replace(/'/g, "\\'");
+  const query = `SELECT Id, Name, Website, Industry FROM Account WHERE Id = '${escaped}' LIMIT 1`;
+  const res = await sfFetch(`/services/data/v59.0/query?q=${encodeURIComponent(query)}`, undefined, userId);
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Salesforce query: ${res.status} ${t}`);
+  }
+
+  type AccountRecord = { Id: string; Name: string; Website?: string; Industry?: string };
+  const data = (await res.json()) as { records?: AccountRecord[] };
+  const record = data.records?.[0];
+  if (!record) return null;
+  return {
+    salesforceId: record.Id,
+    name: record.Name,
+    website: record.Website ?? null,
+    industry: record.Industry ?? null,
+  };
+}
+
+export async function isSalesforceConfigured(userId?: string): Promise<boolean> {
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { salesforceAccessToken: true, salesforceInstanceUrl: true },
+    });
+    if (user?.salesforceAccessToken && user?.salesforceInstanceUrl) return true;
+  }
   return !!(process.env.SALESFORCE_ACCESS_TOKEN && (process.env.SALESFORCE_INSTANCE_URL || process.env.SALESFORCE_BASE_URL));
 }
 
@@ -207,8 +310,9 @@ export async function salesforceCreateLead(params: {
   lastName?: string | null;
   company?: string | null;
   description?: string | null;
+  userId?: string;
 }): Promise<{ ok: boolean; leadId?: string; error?: string }> {
-  const { email, firstName, lastName, company, description } = params;
+  const { email, firstName, lastName, company, description, userId } = params;
   const lastNameVal = (lastName ?? firstName ?? email).trim() || 'Unknown';
   const firstNameVal = (firstName ?? '').trim() || null;
 
@@ -223,7 +327,7 @@ export async function salesforceCreateLead(params: {
     const res = await sfFetch('/services/data/v59.0/sobjects/Lead', {
       method: 'POST',
       body: JSON.stringify(body),
-    });
+    }, userId);
 
     if (!res.ok) {
       const t = await res.text();

@@ -10,8 +10,8 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      salesforce: isCrmConfigured('salesforce'),
-      hubspot: isCrmConfigured('hubspot'),
+      salesforce: await isCrmConfigured('salesforce', session.user.id),
+      hubspot: await isCrmConfigured('hubspot'),
     });
   } catch (e) {
     console.error('GET /api/crm/status', e);

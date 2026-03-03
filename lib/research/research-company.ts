@@ -313,7 +313,8 @@ export async function enrichBuyingGroup(
   seed: BuyingGroupSeed,
   userId: string,
   perplexitySummary: string,
-  userGoal?: string
+  userGoal?: string,
+  existingStackBlock?: string
 ): Promise<EnrichGroupResult> {
   const catalogProductsStruct = await prisma.catalogProduct.findMany({
     where: { userId } as { userId: string },
@@ -392,6 +393,7 @@ export async function enrichBuyingGroup(
     contentLibrary: contentLibrary ?? undefined,
     ragChunks: ragChunks.length > 0 ? ragChunks : undefined,
     userGoal: userGoal?.trim() || undefined,
+    existingStackBlock,
   });
   const userPrompt = userTemplate.replace(
     '{{PERPLEXITY_SUMMARY}}',

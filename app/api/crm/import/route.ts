@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'companyId or accountId is required' }, { status: 400 });
     }
 
-    if (!isCrmConfigured(crmSource)) {
+    if (!(await isCrmConfigured(crmSource, session.user.id))) {
       return NextResponse.json(
         { error: `${crmSource} is not configured. Set the required environment variables.` },
         { status: 503 }

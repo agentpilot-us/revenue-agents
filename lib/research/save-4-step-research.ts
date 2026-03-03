@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
 
-/** DepartmentType enum values in fixed order for 4-step flow (one segment per type to satisfy unique). */
+/** DepartmentType enum values in fixed order for fallback assignment (one segment per type to satisfy unique). */
 export const DEPARTMENT_TYPES_ORDER: DepartmentType[] = [
   DepartmentType.SALES,
   DepartmentType.MARKETING,
@@ -21,6 +21,61 @@ export const DEPARTMENT_TYPES_ORDER: DepartmentType[] = [
   DepartmentType.HR,
   DepartmentType.OTHER,
 ];
+
+/** Keywords for semantic matching of group names to DepartmentType. */
+const DEPARTMENT_TYPE_KEYWORDS: Record<DepartmentType, string[]> = {
+  [DepartmentType.SALES]: ['sales', 'revenue', 'account', 'business development', 'bdr', 'sdr', 'account executive', 'ae'],
+  [DepartmentType.MARKETING]: ['marketing', 'brand', 'advertising', 'content', 'demand gen', 'growth', 'crm'],
+  [DepartmentType.CUSTOMER_SUCCESS]: ['customer success', 'cs', 'support', 'customer experience', 'cx', 'success'],
+  [DepartmentType.REVENUE_OPERATIONS]: ['revops', 'revenue operations', 'sales ops', 'go-to-market', 'gtm'],
+  [DepartmentType.PRODUCT]: ['product', 'pd', 'product management', 'pm'],
+  [DepartmentType.ENGINEERING]: ['engineering', 'dev', 'software', 'development', 'r&d', 'rd', 'tech'],
+  [DepartmentType.AUTONOMOUS_VEHICLES]: ['autonomous', 'vehicles', 'av', 'self-driving', 'adas'],
+  [DepartmentType.MANUFACTURING_OPERATIONS]: ['manufacturing', 'operations', 'production', 'plant', 'factory'],
+  [DepartmentType.INDUSTRIAL_DESIGN]: ['industrial design', 'design', 'styling', 'design studio'],
+  [DepartmentType.IT_DATA_CENTER]: ['it', 'infrastructure', 'devops', 'data center', 'platform', 'cloud'],
+  [DepartmentType.SUPPLY_CHAIN]: ['supply chain', 'procurement', 'logistics', 'sourcing', 'purchasing'],
+  [DepartmentType.CONNECTED_SERVICES]: ['connected', 'services', 'mobility', 'telematics', 'connected services'],
+  [DepartmentType.EXECUTIVE_LEADERSHIP]: ['executive', 'leadership', 'c-level', 'c-suite', 'ceo', 'cfo', 'coo', 'cto'],
+  [DepartmentType.FINANCE]: ['finance', 'fp&a', 'accounting', 'treasury', 'controller'],
+  [DepartmentType.LEGAL]: ['legal', 'compliance', 'general counsel', 'gc'],
+  [DepartmentType.HR]: ['hr', 'human resources', 'talent', 'people', 'recruiting', 'workforce'],
+  [DepartmentType.OTHER]: [],
+};
+
+const MIN_SEMANTIC_SCORE_THRESHOLD = 1;
+
+function scoreGroupNameForDepartmentType(groupName: string, deptType: DepartmentType): number {
+  const keywords = DEPARTMENT_TYPE_KEYWORDS[deptType];
+  if (keywords.length === 0) return 0;
+  const lower = groupName.toLowerCase();
+  return keywords.filter((kw) => lower.includes(kw)).length;
+}
+
+function pickDepartmentTypeForGroup(
+  groupName: string,
+  alreadyAssigned: Set<DepartmentType>
+): DepartmentType {
+  let bestType: DepartmentType | null = null;
+  let bestScore = 0;
+
+  for (const deptType of DEPARTMENT_TYPES_ORDER) {
+    if (alreadyAssigned.has(deptType)) continue;
+    const score = scoreGroupNameForDepartmentType(groupName, deptType);
+    if (score > bestScore && score >= MIN_SEMANTIC_SCORE_THRESHOLD) {
+      bestScore = score;
+      bestType = deptType;
+    }
+  }
+
+  if (bestType) return bestType;
+
+  // No semantic match above threshold: use first available unassigned type
+  for (const deptType of DEPARTMENT_TYPES_ORDER) {
+    if (!alreadyAssigned.has(deptType)) return deptType;
+  }
+  return DepartmentType.OTHER;
+}
 
 export type EnrichedGroupForSave = {
   name: string;
@@ -102,9 +157,11 @@ export async function save4StepResearch(params: {
     },
   });
 
-  for (let i = 0; i < enrichedGroups.length; i++) {
-    const segment = enrichedGroups[i];
-    const departmentType = DEPARTMENT_TYPES_ORDER[i % DEPARTMENT_TYPES_ORDER.length];
+  const assignedTypes = new Set<DepartmentType>();
+
+  for (const segment of enrichedGroups) {
+    const departmentType = pickDepartmentTypeForGroup(segment.name, assignedTypes);
+    assignedTypes.add(departmentType);
     const existingDept = await prisma.companyDepartment.findUnique({
       where: { companyId_type: { companyId, type: departmentType } },
     });

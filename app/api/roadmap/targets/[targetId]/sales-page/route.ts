@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
+import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
+
+export const maxDuration = 60;
 
 function slugify(s: string): string {
   return s
@@ -13,9 +17,8 @@ function slugify(s: string): string {
 
 /**
  * POST /api/roadmap/targets/[targetId]/sales-page
- * Body: { action: "create_placeholder" }
- * Creates a SegmentCampaign (sales page) with status "placeholder" for this division target.
- * Reserves the URL; page renders "Coming Soon" until HTML is provided.
+ * Body: { action: "create_with_content" } — generates real typed sections and creates a live campaign
+ *        { action: "create_placeholder" } — reserves URL with "Coming Soon" shell (deprecated)
  */
 export async function POST(
   req: NextRequest,
@@ -33,9 +36,10 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
-  if (body.action !== 'create_placeholder') {
+
+  if (body.action !== 'create_with_content') {
     return NextResponse.json(
-      { error: 'Only action create_placeholder is supported' },
+      { error: 'action must be "create_with_content"' },
       { status: 400 }
     );
   }
@@ -85,7 +89,7 @@ export async function POST(
     where: { id: session.user.id },
     select: { companyName: true },
   });
-  const aeSlug = slugify((user?.companyName ?? 'nvidia').slice(0, 20));
+  const aeSlug = slugify((user?.companyName ?? 'company').slice(0, 20));
   const baseSlug = slugify(
     `${target.company.name}-${target.companyDepartment.customName ?? target.name}`
   ).slice(0, 30);
@@ -104,6 +108,22 @@ export async function POST(
   const baseUrl = process.env.NEXTAUTH_URL ?? 'https://app.agentpilot.us';
   const fullUrl = `${baseUrl}/go/${slug}`;
 
+  const result = await generateSalesPageSections({
+    companyId: target.company.id,
+    userId: session.user.id,
+    pageType: 'account_intro',
+    departmentId: target.companyDepartment.id,
+  });
+
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error },
+      { status: 500 }
+    );
+  }
+
+  const { headline, subheadline, sections, ctaLabel, ctaUrl } = result.data;
+
   const campaign = await prisma.segmentCampaign.create({
     data: {
       userId: session.user.id,
@@ -114,14 +134,19 @@ export async function POST(
       url: fullUrl,
       type: 'landing_page',
       pageType: 'sales_page',
-      status: 'placeholder',
-      headline: `A personalized sales page for ${target.name} at ${target.company.name} is being prepared.`,
+      status: 'live',
+      headline: headline ?? null,
+      subheadline: subheadline ?? null,
+      body: null,
+      sections: sections as Prisma.InputJsonValue,
+      ctaLabel: ctaLabel ?? null,
+      ctaUrl: ctaUrl ?? null,
     },
   });
 
   return NextResponse.json({
     contentId: campaign.id,
-    status: 'placeholder',
+    status: 'live',
     url: fullUrl,
     targetId: target.id,
     targetName: target.name,

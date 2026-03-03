@@ -7,6 +7,7 @@ import Exa from 'exa-js';
 import { prisma } from '@/lib/db';
 import { fetchAccountSignals } from '@/lib/signals/fetch-account-signals';
 import { TYPE_DEDUP_DAYS } from '@/lib/signals/constants';
+import { createCompanyWebset } from '@/lib/exa/websets';
 
 const exa = process.env.EXA_API_KEY ? new Exa(process.env.EXA_API_KEY) : null;
 
@@ -123,7 +124,7 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
 
   try {
     // 1. Fetch account signals (news, earnings, exec) — reuse existing fetcher (7-day lookback for initial)
-    const signals = await fetchAccountSignals(
+    const signalResult = await fetchAccountSignals(
       company.name,
       company.domain ?? '',
       company.industry,
@@ -131,7 +132,7 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
     );
 
     const publishedAtFallback = new Date();
-    for (const signal of signals) {
+    for (const signal of signalResult.signals) {
       const existingByUrl = await prisma.accountSignal.findFirst({
         where: { companyId: company.id, url: signal.url },
       });
@@ -228,9 +229,20 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
     }
   }
 
+  // Create persistent Exa Webset for ongoing signal monitoring
+  let exaWebsetId: string | null = null;
+  try {
+    exaWebsetId = await createCompanyWebset(company.name, company.industry);
+  } catch (err) {
+    console.warn('Exa Webset creation error during enrichment:', err);
+  }
+
   await prisma.company.update({
     where: { id: companyId },
-    data: { exaEnrichmentCompletedAt: new Date() },
+    data: {
+      exaEnrichmentCompletedAt: new Date(),
+      ...(exaWebsetId ? { exaWebsetId } : {}),
+    },
   });
 
   return { signalsFound, contactsFound };

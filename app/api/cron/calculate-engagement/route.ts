@@ -17,8 +17,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Starting engagement score calculation...');
-
     const companyId = req.nextUrl.searchParams.get('companyId') ?? undefined;
     const contacts = await prisma.contact.findMany({
       where: {
@@ -35,8 +33,6 @@ export async function GET(req: NextRequest) {
         lastContactedAt: true,
       },
     });
-
-    console.log(`Found ${contacts.length} contacts to process`);
 
     let updated = 0;
 
@@ -58,8 +54,6 @@ export async function GET(req: NextRequest) {
 
       updated++;
     }
-
-    console.log(`Updated ${updated} contacts`);
 
     return NextResponse.json({
       success: true,

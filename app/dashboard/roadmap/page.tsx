@@ -3,6 +3,10 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { SeedRoadmapConfigButton } from '@/app/dashboard/roadmap/SeedRoadmapConfigButton';
 import { SalesMapEditor } from '@/app/dashboard/roadmap/SalesMapEditor';
+import { SalesMapTemplatePicker } from '@/app/components/roadmap/SalesMapTemplatePicker';
+import { PhasedPlanView } from '@/app/components/roadmap/PhasedPlanView';
+import { SignalConfigPanel } from '@/app/components/roadmap/SignalConfigPanel';
+import { ActionMappingEditor } from '@/app/components/roadmap/ActionMappingEditor';
 
 /**
  * /dashboard/roadmap — Your Sales Map
@@ -22,9 +26,9 @@ export default async function RoadmapPage() {
     include: {
       targets: {
         include: {
-          company: { select: { name: true } },
+          company: { select: { id: true, name: true } },
           companyDepartment: {
-            select: { type: true, customName: true },
+            select: { id: true, type: true, customName: true },
           },
         },
         orderBy: { createdAt: 'asc' },
@@ -32,6 +36,15 @@ export default async function RoadmapPage() {
       signalRules: { orderBy: { createdAt: 'asc' } },
       actionMappings: { orderBy: { createdAt: 'asc' } },
       conditions: { orderBy: { createdAt: 'asc' } },
+      plans: {
+        where: { salesMapTemplateId: { not: null } },
+        include: {
+          target: {
+            select: { id: true, name: true, companyDepartmentId: true },
+          },
+        },
+        orderBy: [{ urgencyScore: 'desc' }, { createdAt: 'desc' }],
+      },
     },
   });
 
@@ -56,6 +69,9 @@ export default async function RoadmapPage() {
 
   const companyTargets = roadmap.targets.filter((t) => t.targetType === 'company');
   const divisionTargets = roadmap.targets.filter((t) => t.targetType === 'division');
+  const salesMapPlans = roadmap.plans ?? [];
+  const primaryCompanyId = companyTargets[0]?.companyId ?? divisionTargets[0]?.companyId ?? '';
+  const primaryTarget = divisionTargets[0] ?? companyTargets[0];
 
   const objective = roadmap.objective as Record<string, unknown> | null;
   const contentStrategy = roadmap.contentStrategy as Record<string, unknown> | null;
@@ -119,14 +135,58 @@ export default async function RoadmapPage() {
           </div>
         </section>
 
+        {/* Plans section */}
+        <section className="mb-8">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Phased plans
+          </h2>
+
+          {primaryTarget && (
+            <div className="mb-4">
+              <SalesMapTemplatePicker
+                roadmapId={roadmap.id}
+                targetId={primaryTarget.id}
+                targetLabel={
+                  primaryTarget.companyDepartment?.customName ??
+                  primaryTarget.companyDepartment?.type?.replace(/_/g, ' ') ??
+                  primaryTarget.company?.name ??
+                  primaryTarget.name
+                }
+              />
+            </div>
+          )}
+
+          <div className="rounded-lg border border-border bg-card/80 p-4">
+            <PhasedPlanView
+              plans={salesMapPlans.map((p) => ({
+                id: p.id,
+                status: p.status,
+                phaseIndex: p.phaseIndex,
+                phaseName: p.phaseName,
+                urgencyScore: p.urgencyScore,
+                previewPayload: p.previewPayload as Record<string, unknown> | null,
+                target: p.target ? {
+                  id: p.target.id,
+                  name: p.target.name,
+                  companyDepartmentId: p.target.companyDepartmentId,
+                } : null,
+              }))}
+              companyId={primaryCompanyId}
+            />
+          </div>
+        </section>
+
         <section className="mb-8">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
             Signal configuration
           </h2>
-          <div className="rounded-lg border border-border bg-card/80 p-4 text-sm text-foreground">
-            {roadmap.signalRules.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No signal rules defined yet.</p>
-            ) : (
+
+          {/* Read-only signal rules from roadmap config */}
+          {roadmap.signalRules.length > 0 && (
+            <div className="rounded-lg border border-border bg-card/80 p-4 text-sm text-foreground mb-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                Signal Rules
+              </p>
               <ul className="space-y-2 text-xs">
                 {roadmap.signalRules.map((r) => (
                   <li key={r.id}>
@@ -138,7 +198,15 @@ export default async function RoadmapPage() {
                   </li>
                 ))}
               </ul>
-            )}
+            </div>
+          )}
+
+          {/* Interactive custom signal configs */}
+          <div className="rounded-lg border border-border bg-card/80 p-4 text-sm text-foreground">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Custom Signal Sources
+            </p>
+            <SignalConfigPanel />
           </div>
         </section>
 
@@ -147,25 +215,7 @@ export default async function RoadmapPage() {
             Action playbook
           </h2>
           <div className="rounded-lg border border-border bg-card/80 p-4 text-sm text-foreground">
-            {roadmap.actionMappings.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No action mappings defined yet.</p>
-            ) : (
-              <ul className="space-y-2 text-xs">
-                {roadmap.actionMappings.map((m) => (
-                  <li key={m.id}>
-                    <span className="font-medium">{m.actionType}</span>
-                    {m.signalCategory && (
-                      <span className="text-muted-foreground"> · {m.signalCategory}</span>
-                    )}
-                    <span className="text-muted-foreground">
-                      {' '}
-                      · autonomy:{' '}
-                      <span className="text-amber-400">{m.autonomyLevel}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ActionMappingEditor roadmapId={roadmap.id} />
           </div>
         </section>
 

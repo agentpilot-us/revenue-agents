@@ -7,8 +7,8 @@ import type { PrismaClient } from '@prisma/client';
 import { hubspotFetchContacts, hubspotPushActivity, isHubSpotConfigured } from './hubspot';
 import { salesforceFetchContacts, salesforcePushActivity, salesforcePushSegmentUpdates, isSalesforceConfigured } from './salesforce';
 
-export function isCrmConfigured(source: CrmSource): boolean {
-  return source === 'hubspot' ? isHubSpotConfigured() : isSalesforceConfigured();
+export async function isCrmConfigured(source: CrmSource, userId?: string): Promise<boolean> {
+  return source === 'hubspot' ? isHubSpotConfigured() : isSalesforceConfigured(userId);
 }
 
 /**
@@ -81,7 +81,7 @@ export async function crmImportContacts(
       return existing?.id ?? null;
     };
   } else {
-    const { contacts: list, accounts } = await salesforceFetchContacts({ accountId: crmAccountId ?? undefined, limit });
+    const { contacts: list, accounts } = await salesforceFetchContacts({ accountId: crmAccountId ?? undefined, limit, userId });
     contacts = list;
     if (!defaultCompanyId && crmAccountId && list.length > 0) {
       const acc = accounts.get(crmAccountId);
@@ -232,6 +232,7 @@ export async function crmPushSegments(
     salesforceAccountId: company.salesforceId,
     accountSegmentValue,
     contacts: contactUpdates,
+    userId,
   });
   result.pushed = pushResult.updated;
   result.errors.push(...pushResult.errors);
@@ -249,9 +250,10 @@ export async function crmPush(
     contactIds?: string[];
     scope?: 'activities' | 'all';
     since?: Date;
+    userId?: string;
   }
 ): Promise<CrmPushResult> {
-  const { crmSource, companyId, contactIds, scope = 'activities', since } = params;
+  const { crmSource, companyId, contactIds, scope = 'activities', since, userId } = params;
   const result: CrmPushResult = { pushed: 0, errors: [] };
 
   const where: { companyId?: string; id?: { in: string[] }; [key: string]: unknown } = {};
@@ -308,6 +310,7 @@ export async function crmPush(
       body: a.content ?? undefined,
       summary: a.summary ?? undefined,
       createdAt: a.createdAt,
+      ...(crmSource === 'salesforce' && userId ? { userId } : {}),
     });
 
     if (res.ok) {

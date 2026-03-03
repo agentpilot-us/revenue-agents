@@ -4,6 +4,28 @@
  * Used by the play engine and execute-play.
  */
 
+/**
+ * Shared instruction block appended to every play prompt so the AI
+ * produces sections in the exact typed format the renderer expects.
+ */
+export const SECTION_TYPES_INSTRUCTION = `
+SECTION FORMAT — the page.sections array MUST use ONLY these typed section objects:
+- { type: "hero", headline: string, body: string, backgroundContext?: string }
+- { type: "value_props", items: [{ icon?: string (1 emoji), title: string, body: string }] }
+- { type: "how_it_works", steps: [{ number: number, title: string, description: string }] }
+- { type: "comparison", title?: string, withoutProduct: string, withProduct: string, rows?: [{ label: string, without: string, with: string }] }
+- { type: "feature", title: string, description: string, bulletPoints: [string] }
+- { type: "event", name: string, date: string, location: string, description: string, registerUrl: string }
+- { type: "case_study", company: string, result: string, quote?: string }
+- { type: "social_proof", metrics?: [{ value: string, label: string }], quotes: [{ text: string, author: string, title: string }] }
+- { type: "faq", items: [{ question: string, answer: string }] }
+- { type: "cta", headline: string, buttonLabel: string, buttonUrl: string, urgencyText?: string }
+
+Produce 4-7 sections in a logical order. Always start with a "hero" section and end with a "cta" section.
+Include a "value_props" section with 3-4 items. Use "comparison", "how_it_works", "faq", or "social_proof" when the context warrants it.
+Do NOT invent section types beyond the list above.
+`.trim();
+
 export type PlayId =
   | 'new_buying_group'
   | 'event_invite'
@@ -87,8 +109,12 @@ acknowledge the current moment at ${ctx.accountName}, not be evergreen.
 ` : ''}
 
 Build:
-1. A sales page with headline, 2-paragraph intro, 3 value props specific to this segment, 
-   and a "Book a Demo" CTA
+1. A sales page with structured sections:
+   - hero section with headline and intro body specific to ${ctx.segment.name}
+   - value_props with 3-4 items tailored to this segment
+   - If existing products are known, include a comparison section showing current state vs. with the new solution
+   - If objections are known, include an faq section addressing them
+   - cta section with "Book a Demo" button
 2. A short cold intro email (< 100 words) that links to the page
 
 Keep messaging specific to ${ctx.segment.name} — not generic company messaging.
@@ -116,9 +142,11 @@ Segment: ${ctx.segment.name}
 Segment value prop: ${ctx.segment.valueProp ?? ''}
 
 Build:
-1. A sales page that explains why this event is relevant to ${ctx.segment.name} teams at 
-   companies like ${ctx.accountName}, lists 2-3 sessions they should attend, 
-   and has a "Register Now" CTA
+1. A sales page with structured sections:
+   - hero section explaining why this event matters to ${ctx.segment.name} teams at ${ctx.accountName}
+   - event section with name, date, location, description, registerUrl
+   - value_props with 2-3 sessions or topics relevant to this segment
+   - cta section with "Register Now" button
 2. A short invite email (< 80 words) that feels personal, not like a mass blast
 
 Reference the segment's specific challenges — not generic "join us at our event" copy.
@@ -147,9 +175,12 @@ Segment: ${ctx.segment.name}
 Segment value prop: ${ctx.segment.valueProp ?? ''}
 
 Build:
-1. A sales page that explains what this feature does specifically for 
-   ${ctx.segment.name} teams — in their language, not product language.
-   Include one before/after scenario. CTA: "See it in action"
+1. A sales page with structured sections:
+   - hero section framing the feature in ${ctx.segment.name} language (not product language)
+   - feature section with title, description, and bullet points
+   - comparison section showing before/after (without vs. with this feature)
+   - If existing products are known, reference them in the hero backgroundContext
+   - cta section with "See it in action" button
 2. A short email (< 80 words): "thought you'd want to see what we just shipped" tone — 
    not a product announcement blast
 
@@ -190,8 +221,13 @@ ${ctx.caseStudy ? `Supporting case study: ${ctx.caseStudy.title} — ${ctx.caseS
 ${ctx.events?.[0] ? `Upcoming event to mention: ${ctx.events[0].name} on ${ctx.events[0].date}` : ''}
 
 Build:
-1. A sales page framed around what changed — the signal event is the news hook, 
-   your product is the solution. CTA: "Let's reconnect"
+1. A sales page with structured sections:
+   - hero section framed around what changed — the signal event is the news hook
+   - value_props with 3 reasons to re-engage (tied to signal or new evidence)
+   - If a case study is available, include a case_study section
+   - If objections are known, include an faq section
+   - social_proof with relevant metrics if available
+   - cta section with "Let's reconnect" button
 2. An email under 80 words. Subject line should reference the signal event directly.
    Tone: confident, not apologetic. One specific reason to talk now.
     `.trim(),
@@ -225,12 +261,13 @@ timely, not like a generic vendor pitch.
 ` : ''}
 
 Build:
-1. An executive-facing page:
-   - Lead with business outcome (revenue, cost, risk) — not features
-   - One proof point from a similar company
-   - Simple ROI framing (time saved, revenue impact)
-   - What a 30-day evaluation looks like
-   - CTA: "Schedule 20-minute executive briefing"
+1. An executive-facing sales page with structured sections:
+   - hero section leading with business outcome (revenue, cost, risk) — not features
+   - value_props with 3 outcome-focused items (time saved, revenue impact, risk reduction)
+   - If a case study is available, include a case_study section with proof point
+   - how_it_works section showing what a 30-day evaluation looks like (3-4 steps)
+   - If existing products are known, include a comparison section (current state vs. with the new solution)
+   - cta section with "Schedule 20-minute executive briefing" button
 2. A short email the champion can use to forward it: 
    "I've been working with [vendor] — thought you should see this before our next planning meeting."
    

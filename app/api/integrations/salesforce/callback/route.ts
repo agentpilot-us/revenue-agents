@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { exchangeCodeForTokens } from '@/lib/integrations/salesforce-oauth';
 import { prisma } from '@/lib/db';
-import { redirect } from 'next/navigation';
+
+function settingsRedirect(req: NextRequest, path: string): NextResponse {
+  const url = new URL(path, req.url);
+  const response = NextResponse.redirect(url);
+  response.cookies.delete('sfOauthState');
+  return response;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,21 +22,24 @@ export async function GET(req: NextRequest) {
     const error = searchParams.get('error');
     const state = searchParams.get('state');
 
+    const storedState = req.cookies.get('sfOauthState')?.value;
+    if (!state || state !== storedState) {
+      return settingsRedirect(req, '/dashboard/settings?error=invalid_state');
+    }
+
     if (error) {
-      return redirect(`/dashboard/settings?error=${encodeURIComponent(error)}`);
+      return settingsRedirect(req, `/dashboard/settings?error=${encodeURIComponent(error)}`);
     }
 
     if (!code) {
-      return redirect('/dashboard/settings?error=missing_code');
+      return settingsRedirect(req, '/dashboard/settings?error=missing_code');
     }
 
-    // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code);
 
     const expiresAt = new Date();
     expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
 
-    // Store tokens in user record
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -41,13 +50,10 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return redirect('/dashboard/settings?salesforce_connected=true');
+    return settingsRedirect(req, '/dashboard/settings?salesforce_connected=true');
   } catch (error) {
     console.error('Salesforce callback error:', error);
-    return redirect(
-      `/dashboard/settings?error=${encodeURIComponent(
-        error instanceof Error ? error.message : 'Failed to connect Salesforce'
-      )}`
-    );
+    const msg = error instanceof Error ? error.message : 'Failed to connect Salesforce';
+    return settingsRedirect(req, `/dashboard/settings?error=${encodeURIComponent(msg)}`);
   }
 }

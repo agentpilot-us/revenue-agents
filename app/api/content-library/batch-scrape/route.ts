@@ -191,8 +191,7 @@ async function scrapeAndExtract({
   try {
     ({ extraction, contentPayload, suggestedType } = await enrichScrapedContent(
       url,
-      markdown,
-      getChatModel()
+      markdown
     ));
   } catch (e) {
     return {

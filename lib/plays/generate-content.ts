@@ -5,10 +5,11 @@
  * playbook, case studies, messaging framework, then calls generateText.
  */
 
-import { generateText } from 'ai';
+import { generateText, generateObject } from 'ai';
+import { z } from 'zod';
 import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
-import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import { getAccountMessagingPromptBlock, getActiveObjectionsBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
 import {
   getProductKnowledgeBlock,
@@ -17,12 +18,15 @@ import {
   getRelevantProductIdsForIndustry,
   getCompanyEventsBlock,
   getFeatureReleasesBlock,
+  getActiveObjectionTexts,
+  getExistingProductNames,
 } from '@/lib/prompt-context';
 import {
   findRelevantContentLibraryChunks,
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
 import { prisma } from '@/lib/db';
+import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
 
 export type GenerateContentType = 'email' | 'linkedin' | 'custom_url' | 'talking_points' | 'presentation';
 
@@ -71,18 +75,24 @@ export async function generateOneContent(params: {
     }
   }
 
-  const [researchBlock, accountBlock, messagingSection, relevantProductIds] = await Promise.all([
+  const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds, objectionTexts, productNames] = await Promise.all([
     getCompanyResearchPromptBlock(companyId, userId),
     getAccountMessagingPromptBlock(companyId, userId),
+    getActiveObjectionsBlock(companyId, userId, divisionId),
     getMessagingContextForAgent(userId, company.industry ?? undefined),
     getRelevantProductIdsForIndustry(userId, company.industry ?? null, null),
+    getActiveObjectionTexts(companyId, userId),
+    getExistingProductNames(companyId, userId),
   ]);
 
   const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
     getProductKnowledgeBlock(userId, relevantProductIds.length > 0 ? relevantProductIds : undefined),
     getIndustryPlaybookBlock(userId, company.industry ?? null),
     getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds),
-    getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null),
+    getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
+      activeObjections: objectionTexts,
+      existingProducts: productNames,
+    }),
     getFeatureReleasesBlock(userId, company.industry ?? null, 10),
   ]);
 
@@ -96,12 +106,16 @@ export async function generateOneContent(params: {
 
   const researchSection = researchBlock ? `\n\n${researchBlock}` : '';
   const accountSection = accountBlock ? `\n\n${accountBlock}` : '';
+  const activeObjectionsSection = activeObjectionsBlock ? `\n\n${activeObjectionsBlock}` : '';
   const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
   const playbookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
   const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
   const eventsSection = eventsBlock ? `\n\n${eventsBlock}` : '';
   const featureReleasesSection = featureReleasesBlock ? `\n\n${featureReleasesBlock}` : '';
   const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
+
+  const existingStackSection = await buildExistingStackBlock(companyId, userId);
+  const existingStackLine = existingStackSection ? `\n${existingStackSection}\n` : '';
 
   const contentTypeInstruction = getContentTypeInstruction(contentType, company.name);
 
@@ -118,6 +132,7 @@ ${contentTypeInstruction}
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
 2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, case studies, upcoming events, and feature releases. Use these for value props and tone.
+${existingStackLine}${activeObjectionsSection}
 ${ragSection}
 ${productSection}
 ${playbookSection}
@@ -160,7 +175,8 @@ VALUE PROPS FOR THIS MEETING (3 max):
 - Specific to this buyer's role and what they care about — not generic company messaging
 
 LIKELY OBJECTIONS:
-- 2-3 objections this buyer is likely to raise, with a one-sentence response to each
+- If the context below includes ACTIVE OBJECTIONS for this account, list those first with their counter-narrative, then add 1-2 inferred objections. Prioritize known objections over inferred ones.
+- Otherwise list 2-3 objections this buyer is likely to raise, with a one-sentence response to each.
 
 PROOF POINT TO DROP:
 - One case study or customer reference most relevant to this company/industry
@@ -187,4 +203,147 @@ Slide 5: Suggested next step
 
 Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`;
   }
+}
+
+const combinedPlaySchema = z.object({
+  email: z.object({
+    subject: z.string().describe('Email subject line'),
+    body: z.string().describe('Email body text, 2-4 short paragraphs'),
+  }).optional(),
+  linkedin: z.object({
+    body: z.string().describe('LinkedIn InMail or connection request, under 200 words'),
+  }).optional(),
+  talking_points: z.object({
+    content: z.string().describe('Pre-meeting talking points sheet with sections: OPENING, KEY PAIN, VALUE PROPS, OBJECTIONS, PROOF POINT, NEXT STEP'),
+  }).optional(),
+});
+
+/**
+ * Single LLM call that produces all requested play content types at once,
+ * sharing the same context (research, messaging, RAG) instead of paying
+ * for it 3 separate times.
+ */
+export async function generateCombinedPlayContent(params: {
+  companyId: string;
+  userId: string;
+  prompt: string;
+  outputs?: Array<'email' | 'linkedin' | 'talking_points'>;
+  divisionId?: string;
+}): Promise<{ email: string; linkedin: string; talking_points: string }> {
+  const { companyId, userId, prompt, outputs = ['email', 'linkedin', 'talking_points'], divisionId } = params;
+
+  const [company, userRecord] = await Promise.all([
+    prisma.company.findFirst({
+      where: { id: companyId, userId },
+      select: { id: true, name: true, industry: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, companyName: true },
+    }),
+  ]);
+  if (!company) throw new Error('Company not found');
+
+  const aeName = userRecord?.name || 'the sales rep';
+  const aeCompany = userRecord?.companyName || '';
+
+  let divisionIntelLine = '';
+  let departmentLabel: string | null = null;
+  if (divisionId) {
+    const dept = await prisma.companyDepartment.findFirst({
+      where: { id: divisionId, companyId },
+      select: { valueProp: true, useCase: true, objectionHandlers: true, customName: true, type: true },
+    });
+    if (dept) {
+      departmentLabel = dept.customName || dept.type.replace(/_/g, ' ');
+      const parts: string[] = [];
+      if (dept.useCase) parts.push(`The buyer's division cares about: ${dept.useCase}.`);
+      if (dept.valueProp) parts.push(`Our value prop to them: ${dept.valueProp}.`);
+      const oh = dept.objectionHandlers;
+      if (Array.isArray(oh) && oh.length > 0) {
+        parts.push(`Known objections: ${(oh as Array<{ objection: string; response: string }>).map((o) => `"${o.objection}" → ${o.response}`).join('; ')}.`);
+      }
+      if (parts.length > 0) divisionIntelLine = parts.join(' ') + '\n';
+    }
+  }
+
+  const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds, objectionTexts2, productNames2] = await Promise.all([
+    getCompanyResearchPromptBlock(companyId, userId),
+    getAccountMessagingPromptBlock(companyId, userId),
+    getActiveObjectionsBlock(companyId, userId, divisionId),
+    getMessagingContextForAgent(userId, company.industry ?? undefined),
+    getRelevantProductIdsForIndustry(userId, company.industry ?? null, null),
+    getActiveObjectionTexts(companyId, userId),
+    getExistingProductNames(companyId, userId),
+  ]);
+
+  const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
+    getProductKnowledgeBlock(userId, relevantProductIds.length > 0 ? relevantProductIds : undefined),
+    getIndustryPlaybookBlock(userId, company.industry ?? null),
+    getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds),
+    getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
+      activeObjections: objectionTexts2,
+      existingProducts: productNames2,
+    }),
+    getFeatureReleasesBlock(userId, company.industry ?? null, 10),
+  ]);
+
+  const ragQueryParts = [company.name, company.industry ?? ''];
+  if (departmentLabel) ragQueryParts.push(departmentLabel);
+  ragQueryParts.push('value proposition');
+  const ragQuery = ragQueryParts.filter(Boolean).join(' ');
+  const ragChunkCount = departmentLabel ? 4 : 8;
+  const ragChunks = await findRelevantContentLibraryChunks(userId, ragQuery, ragChunkCount);
+
+  const researchSection = researchBlock ? `\n\n${researchBlock}` : '';
+  const accountSection = accountBlock ? `\n\n${accountBlock}` : '';
+  const activeObjectionsSection = activeObjectionsBlock ? `\n\n${activeObjectionsBlock}` : '';
+  const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
+  const playbookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
+  const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
+  const eventsSection = eventsBlock ? `\n\n${eventsBlock}` : '';
+  const featureReleasesSection = featureReleasesBlock ? `\n\n${featureReleasesBlock}` : '';
+  const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
+
+  const existingStackSection2 = await buildExistingStackBlock(companyId, userId);
+  const existingStackLine2 = existingStackSection2 ? `\n${existingStackSection2}\n` : '';
+
+  const aeIdentityLine = aeCompany
+    ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
+    : `You are writing on behalf of ${aeName}.\n`;
+
+  const outputInstructions = outputs.map((t) => {
+    switch (t) {
+      case 'email': return '- EMAIL: subject line + body (2-4 short paragraphs, plain text)';
+      case 'linkedin': return '- LINKEDIN: InMail or connection request (under 200 words, reference something specific about the account)';
+      case 'talking_points': return '- TALKING_POINTS: Pre-meeting sheet with OPENING, KEY PAIN, VALUE PROPS, OBJECTIONS, PROOF POINT, NEXT STEP';
+    }
+  }).join('\n');
+
+  const systemPrompt = `You are a B2B sales content writer.
+${aeIdentityLine}${divisionIntelLine}
+Generate ALL of the following for the target account "${company.name}" in a single response:
+${outputInstructions}
+${existingStackLine2}${activeObjectionsSection}
+${ragSection}
+${productSection}
+${playbookSection}
+${caseStudiesSection}
+${eventsSection}
+${featureReleasesSection}
+${messagingSection}${accountSection}${researchSection}`;
+
+  const { object } = await generateObject({
+    model: getChatModel(),
+    schema: combinedPlaySchema,
+    maxOutputTokens: 3000,
+    system: systemPrompt,
+    prompt: `User prompt: ${prompt}\n\nGenerate all requested content types. Be specific to this account.`,
+  });
+
+  return {
+    email: object.email ? `Subject: ${object.email.subject}\n\n${object.email.body}` : '',
+    linkedin: object.linkedin?.body ?? '',
+    talking_points: object.talking_points?.content ?? '',
+  };
 }

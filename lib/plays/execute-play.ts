@@ -3,19 +3,17 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { getChatModel } from '@/lib/llm/get-model';
 import { prisma } from '@/lib/db';
+import { salesPageSectionSchema } from '@/lib/campaigns/sales-page-schema';
+import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
+import { getActiveObjectionsBlock } from '@/lib/account-messaging';
 import type { PlayContext, PlayId } from './plays-config';
-import { PLAYS } from './plays-config';
+import { PLAYS, SECTION_TYPES_INSTRUCTION } from './plays-config';
 
 const PlayOutputSchema = z.object({
   page: z.object({
     headline: z.string(),
     subheadline: z.string(),
-    sections: z.array(
-      z.object({
-        type: z.string(),
-        content: z.record(z.unknown()),
-      })
-    ),
+    sections: z.array(salesPageSectionSchema),
     ctaLabel: z.string(),
     ctaUrl: z.string().optional(),
   }),
@@ -47,13 +45,27 @@ export async function executePlay(params: ExecutePlayParams): Promise<ExecutePla
   const play = PLAYS.find((p) => p.id === playId);
   if (!play) throw new Error(`Play not found: ${playId}`);
 
-  const prompt = play.buildPrompt(context);
+  const [existingStackBlock, objectionsBlock] = await Promise.all([
+    buildExistingStackBlock(companyId, userId),
+    getActiveObjectionsBlock(companyId, userId, context.segment.id),
+  ]);
+
+  let prompt = play.buildPrompt(context);
+
+  if (existingStackBlock) {
+    prompt += `\n\n${existingStackBlock}\nUse the existing stack to tailor the hero and comparison sections. Reference products they already own as a foundation for the new solution.`;
+  }
+  if (objectionsBlock) {
+    prompt += `\n\n${objectionsBlock}\nWeave counter-narratives into value_props or include an faq section to proactively address these concerns.`;
+  }
+
+  prompt += `\n\n${SECTION_TYPES_INSTRUCTION}`;
 
   const { object } = await generateObject({
     model: getChatModel(),
     schema: PlayOutputSchema,
     prompt,
-    maxOutputTokens: 2000,
+    maxOutputTokens: 3000,
   });
 
   const parsed = PlayOutputSchema.safeParse(object);

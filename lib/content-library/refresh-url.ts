@@ -1,11 +1,13 @@
 /**
  * Refresh a single Content Library item by re-fetching its sourceUrl.
- * Updates content and RAG chunks. Used by schedule cron and optional "Refresh now" UI.
+ * Skips extraction (LLM call) when page content hasn't changed since last scrape.
+ * Updates content, RAG chunks, and extraction only when needed.
  */
 import { prisma } from '@/lib/db';
 import { scrapeUrl } from '@/lib/tools/firecrawl';
 import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
 import { calculateContentHash } from './content-hash';
+import { enrichScrapedContent } from './structured-extraction';
 
 export type RefreshResult = { ok: true; title: string; changed: boolean } | { ok: false; error: string };
 
@@ -38,23 +40,38 @@ export async function refreshContentLibraryItem(
   }
 
   const markdown = scrapeResult.markdown.slice(0, 100_000);
-  const existingContent = (item.content as { markdown?: string; description?: string; suggestedType?: string }) ?? {};
+  const existingContent = (item.content as { markdown?: string; description?: string; suggestedType?: string; extraction?: Record<string, unknown> }) ?? {};
   const newContent = {
     ...existingContent,
     markdown,
   };
 
-  // Calculate hash of new content
   const newHash = calculateContentHash(newContent);
   const hasChanged = item.contentHash !== newHash;
 
-  // Increment version if content changed
+  // Skip extraction and RAG re-ingest when content hasn't changed
+  if (!hasChanged) {
+    await prisma.contentLibrary.update({
+      where: { id: contentLibraryId },
+      data: { scrapedAt: new Date() },
+    });
+    return { ok: true, title: item.title, changed: false };
+  }
+
+  // Content changed — run extraction on the new markdown
+  let finalContent: object = newContent;
+  try {
+    const enriched = await enrichScrapedContent(item.sourceUrl, markdown);
+    finalContent = enriched.contentPayload as object;
+  } catch (e) {
+    console.error('Re-extraction failed on refresh, keeping raw markdown', contentLibraryId, e);
+  }
+
   let newVersion = item.version;
   let previousContent = item.previousContent;
-  if (hasChanged && item.contentHash) {
+  if (item.contentHash) {
     const currentVersion = item.version ? parseFloat(item.version) : 1;
     newVersion = String((currentVersion + 0.1).toFixed(1));
-    // Store previous content for diff comparison
     previousContent = item.content as object;
   } else if (!item.version) {
     newVersion = '1.0';
@@ -63,7 +80,7 @@ export async function refreshContentLibraryItem(
   await prisma.contentLibrary.update({
     where: { id: contentLibraryId },
     data: {
-      content: newContent,
+      content: finalContent,
       contentHash: newHash,
       previousContent: previousContent ?? undefined,
       version: newVersion,
@@ -76,8 +93,7 @@ export async function refreshContentLibraryItem(
     await ingestContentLibraryChunks(contentLibraryId, markdown);
   } catch (e) {
     console.error('RAG ingest failed on refresh', contentLibraryId, e);
-    // Still return ok – content was updated
   }
 
-  return { ok: true, title: item.title, changed: hasChanged };
+  return { ok: true, title: item.title, changed: true };
 }

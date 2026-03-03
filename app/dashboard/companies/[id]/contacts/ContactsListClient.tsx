@@ -36,8 +36,6 @@ type ContactRow = {
   enrichmentStatus: string | null;
   enrichedAt: string | null;
   crmSource: string | null;
-  /** @deprecated Sequences removed; outbound handled by Salesforce/HubSpot. Kept for API compatibility. */
-  activeEnrollments?: Array<{ id: string; sequenceId: string; sequenceName: string }>;
 };
 
 type DepartmentOption = { id: string; name: string; contactCount?: number };

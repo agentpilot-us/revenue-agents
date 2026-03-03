@@ -37,11 +37,8 @@ export async function POST(req: NextRequest) {
     const data = payload.data;
 
     if (!data?.email_id) {
-      console.log('Resend webhook missing data.email_id');
       return NextResponse.json({ received: true });
     }
-
-    console.log('Resend webhook received:', eventType);
 
     const activity = await prisma.activity.findFirst({
       where: { resendEmailId: data.email_id as string },
@@ -49,7 +46,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (!activity || !activity.contact) {
-      console.log('Activity or contact not found for email:', data.email_id);
       return NextResponse.json({ received: true });
     }
 
@@ -129,7 +125,7 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        console.log('Unhandled webhook type:', eventType);
+        break;
     }
 
     return NextResponse.json({ received: true, type: eventType });

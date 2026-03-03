@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { crmSource, companyId, contactIds, scope, sinceDays } = parsed.data;
 
-    if (!isCrmConfigured(crmSource)) {
+    if (!(await isCrmConfigured(crmSource, session.user.id))) {
       return NextResponse.json(
         { error: `${crmSource} is not configured. Set the required environment variables.` },
         { status: 503 }
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       contactIds,
       scope: scopeChoice,
       since,
+      userId: session.user.id,
     });
 
     return NextResponse.json({

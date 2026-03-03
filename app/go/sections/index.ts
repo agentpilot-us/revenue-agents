@@ -1,0 +1,10 @@
+export { HeroSection } from './HeroSection';
+export { ValuePropsGrid } from './ValuePropsGrid';
+export { HowItWorksSection } from './HowItWorksSection';
+export { ComparisonTable } from './ComparisonTable';
+export { SocialProofBanner } from './SocialProofBanner';
+export { CaseStudyCard } from './CaseStudyCard';
+export { FAQAccordion } from './FAQAccordion';
+export { CTASection } from './CTASection';
+export { FeatureSection } from './FeatureSection';
+export { EventSection } from './EventSection';

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { generateText } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
-import { getAccountMessagingPromptBlock } from '@/lib/account-messaging';
+import { getAccountMessagingPromptBlock, getActiveObjectionsBlock } from '@/lib/account-messaging';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
 import {
   getProductKnowledgeBlock,
@@ -64,9 +64,10 @@ export async function POST(
       }
     }
 
-    const [researchBlock, accountBlock, messagingSection, relevantProductIds] = await Promise.all([
+    const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds] = await Promise.all([
       getCompanyResearchPromptBlock(companyId, session.user.id),
       getAccountMessagingPromptBlock(companyId, session.user.id),
+      getActiveObjectionsBlock(companyId, session.user.id, departmentId),
       getMessagingContextForAgent(session.user.id, company.industry ?? undefined),
       getRelevantProductIdsForIndustry(session.user.id, company.industry ?? null, null),
     ]);
@@ -82,6 +83,7 @@ export async function POST(
 
     const researchSection = researchBlock ? `\n\n${researchBlock}` : '';
     const accountSection = accountBlock ? `\n\n${accountBlock}` : '';
+    const activeObjectionsSection = activeObjectionsBlock ? `\n\n${activeObjectionsBlock}` : '';
     const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
     const playbookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
     const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
@@ -106,6 +108,7 @@ ${contentTypeInstruction}
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
 2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, and case studies. Use these for value props and tone.
+${activeObjectionsSection}
 ${ragSection}
 ${productSection}
 ${playbookSection}

@@ -211,14 +211,53 @@ export function inferPageTypeHintFromUrl(url: string): PageType | null {
 
 export type ChatModel = Parameters<typeof generateObject>[0]['model'];
 
+const SKIP_PATH_PATTERNS = [
+  /\/(blog|blogs|articles?|news|press-releases?)(?:\/|$)/i,
+  /\/(legal|privacy|terms|tos|cookie|gdpr|compliance|dmca)(?:\/|$)/i,
+  /\/(careers?|jobs|openings|hiring|work-with-us)(?:\/|$)/i,
+  /\/(login|signup|register|auth|sso|password)(?:\/|$)/i,
+  /\/(404|500|error|not-found)(?:\/|$)/i,
+  /\/(sitemap|robots|rss|feed|atom)(?:\/|$)/i,
+];
+
+/**
+ * Returns true if the page should be skipped entirely (low value for extraction).
+ */
+export function shouldSkipExtraction(url: string, markdown: string): boolean {
+  for (const pattern of SKIP_PATH_PATTERNS) {
+    if (pattern.test(url)) return true;
+  }
+  if (markdown.length < 500) return true;
+  return false;
+}
+
+const LOW_CONFIDENCE_EXTRACTION: StructuredPageExtraction = {
+  pageType: 'other',
+  valuePropositions: [],
+  capabilities: [],
+  proofPoints: [],
+  differentiators: [],
+  targetPersonas: [],
+  pricingStance: 'Not applicable — skipped page.',
+  offBrandTopics: [],
+  keyMessages: [],
+  confidence: 'low',
+  missingSignals: ['Page skipped by pre-filter (blog/legal/careers/thin content).'],
+};
+
 /**
  * Run structured extraction on scraped markdown. Use 60k chars when URL suggests case_study.
+ * Defaults to fast model tier since this is a schema-constrained task.
  */
 export async function runStructuredExtraction(
   url: string,
   markdown: string,
-  model: ChatModel = getChatModel()
+  model: ChatModel = getChatModel('extraction')
 ): Promise<StructuredPageExtraction> {
+  if (shouldSkipExtraction(url, markdown)) {
+    return LOW_CONFIDENCE_EXTRACTION;
+  }
+
   const urlHint = inferPageTypeHintFromUrl(url);
   const maxChars = urlHint === 'case_study' ? 60_000 : 40_000;
   const content = markdown.slice(0, maxChars);
@@ -242,16 +281,30 @@ Extract all available sales signal from this page.
     prompt: userPrompt,
   });
 
-  return result.object as StructuredPageExtraction;
+  const extraction = result.object as StructuredPageExtraction;
+
+  // If the fast model produced low confidence, retry with the full model
+  if (extraction.confidence === 'low' && model !== getChatModel('full')) {
+    const retryResult = await generateObject({
+      model: getChatModel('full'),
+      schema: extractionSchema,
+      system: EXTRACTION_SYSTEM_PROMPT,
+      prompt: userPrompt,
+    });
+    return retryResult.object as StructuredPageExtraction;
+  }
+
+  return extraction;
 }
 
 /**
  * Drop-in replacement for categorizePage: scrape → this → store contentPayload with extraction.
+ * Uses fast model by default; retries with full model on low confidence.
  */
 export async function enrichScrapedContent(
   url: string,
   markdown: string,
-  model: ChatModel = getChatModel()
+  model: ChatModel = getChatModel('extraction')
 ): Promise<{
   extraction: StructuredPageExtraction;
   contentPayload: Record<string, unknown>;

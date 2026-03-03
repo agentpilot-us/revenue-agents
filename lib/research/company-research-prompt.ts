@@ -357,6 +357,7 @@ export type EnrichGroupPromptInput = {
   contentLibrary?: ContentLibraryContext;
   ragChunks?: string[];
   userGoal?: string;
+  existingStackBlock?: string;
 };
 
 /**
@@ -379,11 +380,13 @@ export function buildEnrichGroupPrompt(input: EnrichGroupPromptInput): {
     contentLibrary,
     ragChunks,
     userGoal,
+    existingStackBlock,
   } = input;
 
   const productBlock = buildProductBlock(catalogProducts);
   const contentBlock = contentLibrary ? buildContentLibraryBlock(contentLibrary) : '';
   const ragBlock = ragChunks?.length ? buildRAGBlock(ragChunks) : '';
+  const existingStackSection = existingStackBlock ? `\n\n${existingStackBlock}` : '';
 
   const keywordInstruction =
     segmentType === 'USE_CASE' || segmentType === 'DIVISIONAL'
@@ -396,7 +399,7 @@ For searchKeywords: leave empty or minimal — titles are sufficient for FUNCTIO
 
 ${productBlock}
 ${contentBlock}
-${ragBlock ? `\n${ragBlock}\n` : ''}
+${ragBlock ? `\n${ragBlock}\n` : ''}${existingStackSection}
 
 OUTPUT SHAPE: One buying group detail with:
 - name, segmentType, orgDepartment (Apollo-friendly department label, e.g. "Engineering")

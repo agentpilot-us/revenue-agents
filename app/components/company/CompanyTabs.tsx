@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { Target } from 'lucide-react';
 import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
 import { PrepMePanel, type PrepMePanelParams } from '@/app/components/company/PrepMePanel';
 import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
@@ -14,6 +15,8 @@ import { NextStepBar } from '@/app/components/company/NextStepBar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SignalDigest } from '@/app/components/company/SignalDigest';
+import { ExistingStackEditor } from '@/app/components/company/ExistingStackEditor';
+import { ActiveObjectionsPanel } from '@/app/components/company/ActiveObjectionsPanel';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 /** 6-tab set per Spec 2 (Tab Consolidation). No departments, campaigns, activity, messaging, map, expansion. */
@@ -36,6 +39,7 @@ type CompanyTabsProps = {
   companyId: string;
   companyName: string;
   companyData?: {
+    dealObjective: string | null;
     industry: string | null;
     domain: string | null;
     website: string | null;
@@ -118,6 +122,93 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'signals', label: 'Signals' },
 ];
 
+function DealObjectiveBar({
+  companyId,
+  initialValue,
+}: {
+  companyId: string;
+  initialValue: string | null;
+}) {
+  const [value, setValue] = useState(initialValue ?? '');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(initialValue ?? '');
+  }, [initialValue]);
+
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus();
+  }, [isEditing]);
+
+  const save = async () => {
+    if (isSaving) return;
+    setIsEditing(false);
+    const toSave = value.trim();
+    if (toSave === (initialValue ?? '')) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealObjective: toSave || null }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
+    } catch {
+      setValue(initialValue ?? '');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const displayText = value.trim() || null;
+  const placeholder = 'Set deal objective...';
+
+  return (
+    <div
+      className="flex items-center gap-2 text-sm text-muted-foreground py-1"
+      onClick={() => !isEditing && setIsEditing(true)}
+    >
+      <Target className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              save();
+            }
+            if (e.key === 'Escape') {
+              setValue(initialValue ?? '');
+              setIsEditing(false);
+              inputRef.current?.blur();
+            }
+          }}
+          placeholder={placeholder}
+          className="flex-1 min-w-0 bg-transparent border-b border-gray-300 dark:border-zinc-600 focus:outline-none focus:border-blue-500 py-0.5 text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+        />
+      ) : (
+        <span
+          className={cn(
+            'flex-1 min-w-0 cursor-text hover:text-gray-600 dark:hover:text-gray-400 transition-colors',
+            !displayText && 'italic'
+          )}
+        >
+          {displayText ?? placeholder}
+        </span>
+      )}
+      {isSaving && (
+        <span className="text-xs text-muted-foreground animate-pulse">Saving…</span>
+      )}
+    </div>
+  );
+}
+
 export function CompanyTabs({
   companyId,
   companyName,
@@ -197,6 +288,10 @@ export function CompanyTabs({
 
   return (
     <div className="space-y-4">
+      <DealObjectiveBar
+        companyId={companyId}
+        initialValue={companyData?.dealObjective ?? null}
+      />
       {nextStepBar && (
         <NextStepBar
           companyId={companyId}
@@ -346,6 +441,25 @@ export function CompanyTabs({
                   hasSalesforceAccess={companyData.hasSalesforceAccess}
                 />
               )}
+
+              {/* Existing Stack */}
+              <ExistingStackEditor
+                companyId={companyId}
+                catalogProducts={(catalogProducts as Array<{ id: string; name: string }>).map((p) => ({ id: p.id, name: p.name }))}
+                departments={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
+                  id: d.id,
+                  name: d.customName ?? d.type.replace(/_/g, ' '),
+                }))}
+              />
+
+              {/* Active Objections */}
+              <ActiveObjectionsPanel
+                companyId={companyId}
+                divisions={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
+                  id: d.id,
+                  name: d.customName ?? d.type.replace(/_/g, ' '),
+                }))}
+              />
             </>
           )}
         </div>

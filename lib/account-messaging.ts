@@ -106,3 +106,63 @@ export async function getAccountMessagingPromptBlock(
 
   return lines.join('\n');
 }
+
+export type ActiveObjectionEntry = {
+  id: string;
+  objection: string;
+  severity: string;
+  status: string;
+  response: string | null;
+  divisionId: string | null;
+  lastRaisedDate: string;
+  source: string;
+};
+
+function parseActiveObjections(raw: unknown): ActiveObjectionEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (item): item is ActiveObjectionEntry =>
+      item != null &&
+      typeof item === 'object' &&
+      typeof (item as ActiveObjectionEntry).objection === 'string' &&
+      ['active', 'addressed', 'resolved'].includes((item as ActiveObjectionEntry).status)
+  );
+}
+
+/**
+ * Build the ACTIVE OBJECTIONS prompt block from Company.activeObjections.
+ * Used by content generation and chat so every piece of content addresses live account concerns.
+ */
+export async function getActiveObjectionsBlock(
+  companyId: string,
+  userId: string,
+  divisionId?: string
+): Promise<string | null> {
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, userId },
+    select: { activeObjections: true },
+  });
+  if (!company?.activeObjections) return null;
+
+  const all = parseActiveObjections(company.activeObjections);
+  let list = all.filter((o) => o.status === 'active');
+  if (divisionId) {
+    list = list.filter((o) => !o.divisionId || o.divisionId === divisionId);
+  }
+  if (list.length === 0) return null;
+
+  const lines: string[] = [
+    'ACTIVE OBJECTIONS (this account has raised these concerns — address proactively):',
+    ...list.map((o) => {
+      const severityTag = (o.severity ?? 'medium').toUpperCase();
+      const responseLine =
+        o.response && o.response.trim()
+          ? `\n  Counter-narrative: ${o.response.trim()}`
+          : '\n  No counter-narrative yet — acknowledge the concern and offer to discuss.';
+      return `- [${severityTag}] ${o.objection}${responseLine}`;
+    }),
+    '',
+    'INSTRUCTION: Do not avoid these topics. Acknowledge the concern and weave the counter-narrative into your content naturally.',
+  ];
+  return lines.join('\n');
+}

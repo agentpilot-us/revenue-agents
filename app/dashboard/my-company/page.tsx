@@ -8,6 +8,9 @@ import { MyCompanyDocumentsEditor } from '@/app/dashboard/my-company/MyCompanyDo
 import { MyCompanySheetsConfig } from '@/app/dashboard/my-company/MyCompanySheetsConfig';
 import { MyCompanySheetsExportPreview } from '@/app/dashboard/my-company/MyCompanySheetsExportPreview';
 import { MyCompanySignalsRefresh } from '@/app/dashboard/my-company/MyCompanySignalsRefresh';
+import { ProductRelationshipEditor } from '@/app/components/products/ProductRelationshipEditor';
+import { ProductProfileEditor } from '@/app/components/products/ProductProfileEditor';
+import { CatalogProductForm } from '@/app/dashboard/my-company/CatalogProductForm';
 
 export default async function MyCompanyPage() {
   const session = await auth();
@@ -41,6 +44,7 @@ export default async function MyCompanyPage() {
     products,
     events,
     recentSignals,
+    catalogProducts,
   ] =
     await Promise.all([
       prisma.user.findUnique({
@@ -111,6 +115,11 @@ export default async function MyCompanyPage() {
           publishedAt: true,
           relevanceScore: true,
         },
+      }),
+      prisma.catalogProduct.findMany({
+        where: { userId },
+        select: { id: true, name: true, slug: true, relatedProducts: true },
+        orderBy: { name: 'asc' },
       }),
     ]);
 
@@ -220,6 +229,40 @@ export default async function MyCompanyPage() {
               </div>
             </dl>
             <MyCompanySignalsRefresh />
+          </section>
+
+          <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-foreground mb-3">
+              Product catalog &amp; relationships
+            </h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              Define how your products relate to each other. These relationships
+              are used by the AI to adjust positioning per account.
+            </p>
+            {catalogProducts.length > 0 && (
+              <div className="space-y-4 mb-4">
+                {catalogProducts.map((cp) => {
+                  type Rel = { productId: string; productName: string; relationship: 'upgrade_path' | 'complementary' | 'prerequisite' | 'replacement' };
+                  const rels = (Array.isArray(cp.relatedProducts) ? cp.relatedProducts : []) as Rel[];
+                  return (
+                    <div key={cp.id} className="border border-border/40 rounded-lg p-3">
+                      <p className="text-sm font-medium text-foreground">{cp.name}</p>
+                      <ProductRelationshipEditor
+                        productId={cp.id}
+                        productName={cp.name}
+                        initialRelationships={rels}
+                        catalogProducts={catalogProducts.map((p) => ({ id: p.id, name: p.name }))}
+                      />
+                      <ProductProfileEditor
+                        catalogProductId={cp.id}
+                        productName={cp.name}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <CatalogProductForm />
           </section>
         </div>
 

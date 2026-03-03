@@ -436,15 +436,45 @@ type CompanyEventContent = {
   industries?: string[];
 };
 
+export type EventMatchingContext = {
+  activeObjections?: string[];
+  existingProducts?: string[];
+};
+
 /**
- * Build COMPANY EVENTS prompt block from ContentLibrary CompanyEvent, filtered by industry/department/role.
- * Useful for recommending sessions/events to contacts.
+ * Tokenise a phrase into lowercase keywords (>=3 chars) for fuzzy matching.
+ * Strips common filler words to improve signal.
+ */
+function extractKeywords(text: string): string[] {
+  const stopWords = new Set(['the', 'and', 'for', 'are', 'with', 'this', 'that', 'from', 'our', 'their', 'they', 'too', 'not', 'about', 'into', 'how']);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !stopWords.has(w));
+}
+
+/**
+ * Score how well an event's searchable text matches a set of keywords.
+ * Returns the number of distinct keyword hits.
+ */
+function scoreTextMatch(eventText: string, keywords: string[]): number {
+  if (keywords.length === 0) return 0;
+  const lower = eventText.toLowerCase();
+  return keywords.filter((kw) => lower.includes(kw)).length;
+}
+
+/**
+ * Build COMPANY EVENTS prompt block from ContentLibrary CompanyEvent.
+ * Filters by industry/department/role and ranks by relevance to the account's
+ * active objections and existing products when provided.
  */
 export async function getCompanyEventsBlock(
   userId: string,
   industry?: string | null,
   department?: string | null,
-  role?: string | null
+  role?: string | null,
+  matchingContext?: EventMatchingContext
 ): Promise<string | null> {
   const where: { userId: string; type: typeof ContentType.CompanyEvent; isActive: boolean } = {
     userId,
@@ -458,7 +488,6 @@ export async function getCompanyEventsBlock(
   }
   if (department) {
     orConditions.push({ department });
-    // Also match by persona field (which stores primaryTopic for GTC sessions)
     orConditions.push({ persona: department });
   }
   if (orConditions.length > 0) {
@@ -468,27 +497,24 @@ export async function getCompanyEventsBlock(
   const events = await prisma.contentLibrary.findMany({
     where: { ...where, archivedAt: null },
     orderBy: [
-      { persona: 'desc' }, // Primary topic first
+      { persona: 'desc' },
       { industry: 'desc' },
       { department: 'desc' },
       { createdAt: 'desc' },
     ],
-    take: 50, // Get more events since we'll filter by topic/role
+    take: 50,
   });
 
   if (events.length === 0) return null;
 
-  // Filter events by primary topic (persona field) and role/targetAudience
+  // --- Phase 1: tag-based filtering (department + role) ---
   let filteredEvents = events;
   if (department) {
-    // Match by primary topic (stored in persona field) or department
     const deptLower = department.toLowerCase();
     filteredEvents = events.filter((event) => {
       const content = (event.content as CompanyEventContent | null) ?? {};
       const primaryTopic = content.primaryTopic || event.persona || '';
       const topics = content.topics || [];
-      
-      // Check if department matches primary topic or any topic
       return (
         primaryTopic.toLowerCase().includes(deptLower) ||
         deptLower.includes(primaryTopic.toLowerCase()) ||
@@ -498,23 +524,23 @@ export async function getCompanyEventsBlock(
     });
     if (filteredEvents.length === 0) filteredEvents = events;
   }
-  
+
   if (role) {
     const roleLower = role.toLowerCase();
-    filteredEvents = filteredEvents.filter((event) => {
+    const roleFiltered = filteredEvents.filter((event) => {
       const content = (event.content as CompanyEventContent | null) ?? {};
       const targetAudience = content.targetAudience || [];
       return targetAudience.some(
         (audience) => audience.toLowerCase().includes(roleLower) || roleLower.includes(audience.toLowerCase())
       );
     });
-    // If no matches, keep the topic-filtered events
-    if (filteredEvents.length === 0 && department) {
-      // Revert to topic-filtered only
+    if (roleFiltered.length > 0) {
+      filteredEvents = roleFiltered;
+    } else if (department) {
+      const deptLower = department.toLowerCase();
       filteredEvents = events.filter((event) => {
         const content = (event.content as CompanyEventContent | null) ?? {};
         const primaryTopic = content.primaryTopic || event.persona || '';
-        const deptLower = department.toLowerCase();
         return (
           primaryTopic.toLowerCase().includes(deptLower) ||
           deptLower.includes(primaryTopic.toLowerCase())
@@ -523,22 +549,69 @@ export async function getCompanyEventsBlock(
     }
   }
 
-  const lines: string[] = ['COMPANY EVENTS & SESSIONS (for invitations and recommendations):'];
+  // --- Phase 2: objection & product relevance scoring ---
+  const objectionKeywords = (matchingContext?.activeObjections ?? []).flatMap(extractKeywords);
+  const productKeywords = (matchingContext?.existingProducts ?? []).flatMap(extractKeywords);
+  const hasContextScoring = objectionKeywords.length > 0 || productKeywords.length > 0;
 
-  for (const event of filteredEvents.slice(0, 15)) {
+  type ScoredEvent = { event: typeof filteredEvents[number]; score: number; matchReasons: string[] };
+
+  const scored: ScoredEvent[] = filteredEvents.map((event) => {
+    const content = (event.content as CompanyEventContent | null) ?? {};
+    const searchableText = [
+      event.title,
+      content.primaryTopic || event.persona || '',
+      content.description || '',
+      ...(content.topics || []),
+    ].join(' ');
+
+    let score = 0;
+    const matchReasons: string[] = [];
+
+    if (hasContextScoring) {
+      const objScore = scoreTextMatch(searchableText, objectionKeywords);
+      const prodScore = scoreTextMatch(searchableText, productKeywords);
+
+      if (objScore > 0) {
+        score += objScore * 3;
+        matchReasons.push('addresses account objections');
+      }
+      if (prodScore > 0) {
+        score += prodScore * 2;
+        matchReasons.push('relates to existing stack');
+      }
+    }
+
+    return { event, score, matchReasons };
+  });
+
+  if (hasContextScoring) {
+    scored.sort((a, b) => b.score - a.score);
+  }
+
+  // --- Phase 3: format output ---
+  const lines: string[] = ['COMPANY EVENTS & SESSIONS (for invitations and recommendations):'];
+  if (hasContextScoring) {
+    lines.push('Events are ranked by relevance to this account\'s objections and existing products.');
+  }
+
+  for (const { event, matchReasons } of scored.slice(0, 15)) {
     const content = (event.content as CompanyEventContent | null) ?? {};
     const eventDate = content.eventDate || '';
     const eventType = content.eventType || 'event';
     const description = content.description || event.title;
     const registrationUrl = content.registrationUrl || '';
     const location = content.location || '';
-    const primaryTopic = content.primaryTopic || event.persona || ''; // Use primaryTopic or persona field
+    const primaryTopic = content.primaryTopic || event.persona || '';
     const topics = content.topics || [];
     const speakers = content.speakers || [];
     const industries = content.industries || [];
 
     lines.push('');
     lines.push(`--- ${event.title} ---`);
+    if (matchReasons.length > 0) {
+      lines.push(`Account Relevance: ${matchReasons.join('; ')}`);
+    }
     if (primaryTopic) lines.push(`Primary Topic/Interest: ${primaryTopic}`);
     if (eventDate) lines.push(`Date: ${eventDate}`);
     if (eventType) lines.push(`Type: ${eventType}`);
@@ -554,6 +627,37 @@ export async function getCompanyEventsBlock(
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Load active objection texts for an account (lightweight, for event matching).
+ */
+export async function getActiveObjectionTexts(
+  companyId: string,
+  userId: string
+): Promise<string[]> {
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, userId },
+  });
+  const raw = (company as Record<string, unknown> | null)?.activeObjections;
+  if (!Array.isArray(raw)) return [];
+  return (raw as Array<{ objection?: string; status?: string }>)
+    .filter((o) => o.status === 'active' && o.objection)
+    .map((o) => o.objection as string);
+}
+
+/**
+ * Load existing product names for an account (lightweight, for event matching).
+ */
+export async function getExistingProductNames(
+  companyId: string,
+  userId: string
+): Promise<string[]> {
+  const products = await prisma.companyProduct.findMany({
+    where: { companyId, company: { userId }, status: { in: ['ACTIVE', 'TRIAL'] } },
+    select: { product: { select: { name: true } } },
+  });
+  return products.map((p) => p.product.name);
 }
 
 /** FeatureRelease content shape */

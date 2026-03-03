@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateOneContent } from '@/lib/plays/generate-content';
+import { generateCombinedPlayContent } from '@/lib/plays/generate-content';
 import { buildPlayPromptFromSignal } from '@/lib/plays/play-prompt-from-signal';
 
 export const maxDuration = 60;
@@ -135,43 +135,19 @@ export async function POST(
       prompt = `${prompt}\n\nInclude this event landing page link in the email and LinkedIn message as the primary CTA: ${eventUrl}. Use it as the main call-to-action (e.g. "Register here" or "Get your spot").`;
     }
 
-    const [emailResult, linkedinResult, talkingPointsResult] = await Promise.allSettled([
-      generateOneContent({
-        companyId,
-        userId: session.user.id,
-        contentType: 'email',
-        prompt,
-      }),
-      generateOneContent({
-        companyId,
-        userId: session.user.id,
-        contentType: 'linkedin',
-        prompt,
-      }),
-      generateOneContent({
-        companyId,
-        userId: session.user.id,
-        contentType: 'talking_points',
-        prompt,
-      }),
-    ]);
-
-    const email = emailResult.status === 'fulfilled' ? emailResult.value.content : null;
-    const linkedin = linkedinResult.status === 'fulfilled' ? linkedinResult.value.content : null;
-    const talking_points = talkingPointsResult.status === 'fulfilled' ? talkingPointsResult.value.content : null;
-
-    const errors: { email?: string; linkedin?: string; talking_points?: string } = {};
-    if (emailResult.status === 'rejected') errors.email = emailResult.reason?.message ?? 'Generation failed';
-    if (linkedinResult.status === 'rejected') errors.linkedin = linkedinResult.reason?.message ?? 'Generation failed';
-    if (talkingPointsResult.status === 'rejected') errors.talking_points = talkingPointsResult.reason?.message ?? 'Generation failed';
+    const combined = await generateCombinedPlayContent({
+      companyId,
+      userId: session.user.id,
+      prompt,
+      outputs: ['email', 'linkedin', 'talking_points'],
+    });
 
     return NextResponse.json({
-      email: email ?? '',
-      linkedin: linkedin ?? '',
-      talking_points: talking_points ?? '',
+      email: combined.email ?? '',
+      linkedin: combined.linkedin ?? '',
+      talking_points: combined.talking_points ?? '',
       segmentId: runParams.segmentId ?? undefined,
       segmentName: runParams.segmentName ?? undefined,
-      ...(Object.keys(errors).length > 0 ? { errors } : {}),
     });
   } catch (error: unknown) {
     console.error('Run content API error:', error);

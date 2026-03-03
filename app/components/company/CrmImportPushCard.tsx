@@ -88,16 +88,10 @@ export function CrmImportPushCard({ companyId, companyName, companyCrm }: Props)
     }
   }, [companyId, pushSource]);
 
-  if (!status || (!status.salesforce && !status.hubspot)) {
-    return (
-      <div className="rounded-lg border border-gray-200 dark:border-zinc-600 p-4 bg-gray-50 dark:bg-zinc-800/50">
-        <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">CRM sync</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Configure HubSpot or Salesforce in environment variables to import contacts and push activities.
-        </p>
-      </div>
-    );
-  }
+  if (!status) return null;
+
+  const sfConnected = status.salesforce;
+  const hsConnected = status.hubspot;
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-zinc-600 p-4 bg-gray-50 dark:bg-zinc-800/50 space-y-4">
@@ -111,19 +105,27 @@ export function CrmImportPushCard({ companyId, companyName, companyCrm }: Props)
           onChange={(e) => setImportSource(e.target.value as 'salesforce' | 'hubspot')}
           className="rounded border border-gray-300 dark:border-zinc-500 px-2 py-1.5 text-sm bg-white dark:bg-zinc-800"
         >
-          {status.salesforce && <option value="salesforce">Salesforce</option>}
-          {status.hubspot && <option value="hubspot">HubSpot</option>}
+          <option value="salesforce">Salesforce</option>
+          {hsConnected && <option value="hubspot">HubSpot</option>}
         </select>
-        <input
-          type="text"
-          placeholder={importSource === 'salesforce' ? 'Salesforce Account Id' : 'HubSpot Company Id'}
-          value={importAccountId}
-          onChange={(e) => setImportAccountId(e.target.value)}
-          className="rounded border border-gray-300 dark:border-zinc-500 px-2 py-1.5 text-sm w-56 bg-white dark:bg-zinc-800 placeholder:text-gray-500"
-        />
-        <Button size="sm" onClick={handleImport} disabled={importing}>
-          {importing ? 'Importing…' : 'Import contacts'}
-        </Button>
+        {importSource === 'salesforce' && !sfConnected ? (
+          <a href="/dashboard/settings">
+            <Button size="sm" variant="outline">Connect Salesforce</Button>
+          </a>
+        ) : (
+          <>
+            <input
+              type="text"
+              placeholder={importSource === 'salesforce' ? 'Salesforce Account Id' : 'HubSpot Company Id'}
+              value={importAccountId}
+              onChange={(e) => setImportAccountId(e.target.value)}
+              className="rounded border border-gray-300 dark:border-zinc-500 px-2 py-1.5 text-sm w-56 bg-white dark:bg-zinc-800 placeholder:text-gray-500"
+            />
+            <Button size="sm" onClick={handleImport} disabled={importing}>
+              {importing ? 'Importing…' : 'Import contacts'}
+            </Button>
+          </>
+        )}
       </div>
       {importResult && (
         <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -143,12 +145,18 @@ export function CrmImportPushCard({ companyId, companyName, companyCrm }: Props)
             onChange={(e) => setPushSource(e.target.value as 'salesforce' | 'hubspot')}
             className="rounded border border-gray-300 dark:border-zinc-500 px-2 py-1.5 text-sm bg-white dark:bg-zinc-800"
           >
-            {status.salesforce && <option value="salesforce">Salesforce</option>}
-            {status.hubspot && <option value="hubspot">HubSpot</option>}
+            <option value="salesforce">Salesforce</option>
+            {hsConnected && <option value="hubspot">HubSpot</option>}
           </select>
-          <Button size="sm" variant="outline" onClick={handlePush} disabled={pushing}>
-            {pushing ? 'Pushing…' : 'Push activities'}
-          </Button>
+          {pushSource === 'salesforce' && !sfConnected ? (
+            <a href="/dashboard/settings">
+              <Button size="sm" variant="outline">Connect Salesforce</Button>
+            </a>
+          ) : (
+            <Button size="sm" variant="outline" onClick={handlePush} disabled={pushing}>
+              {pushing ? 'Pushing…' : 'Push activities'}
+            </Button>
+          )}
         </div>
         {pushResult && (
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">

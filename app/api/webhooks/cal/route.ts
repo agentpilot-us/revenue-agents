@@ -37,7 +37,6 @@ export async function POST(req: NextRequest) {
     const booking = payload.payload;
 
     if (!booking?.uid) {
-      console.log('Cal.com webhook missing payload.uid');
       return NextResponse.json({ received: true });
     }
 
@@ -45,15 +44,12 @@ export async function POST(req: NextRequest) {
     const eventTitle = (booking.title as string) || 'Calendar event';
     const startTime = booking.startTime as string | undefined;
 
-    console.log('Cal.com webhook received:', triggerEvent);
-
     const activities = await prisma.activity.findMany({
       where: { calEventId: bookingUid },
       include: { contact: true },
     });
 
     if (activities.length === 0) {
-      console.log('No activities found for booking:', bookingUid);
       return NextResponse.json({ received: true });
     }
 
@@ -171,7 +167,7 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        console.log('Unhandled webhook type:', triggerEvent);
+        break;
     }
 
     return NextResponse.json({ received: true, event: triggerEvent });

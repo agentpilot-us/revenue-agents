@@ -105,10 +105,14 @@ type SlideItem = { slideNumber: number; title: string; bullets: string[]; speake
 function PresentationSlidesOutput({
   slides,
   onCopyAll,
+  onDownloadPptx,
+  isDownloading,
   t: tokens,
 }: {
   slides: SlideItem[];
   onCopyAll: () => void;
+  onDownloadPptx: () => void;
+  isDownloading: boolean;
   t: typeof t;
 }) {
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
@@ -118,7 +122,25 @@ function PresentationSlidesOutput({
   };
   return (
     <div style={{ padding: '16px 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={onDownloadPptx}
+          disabled={isDownloading}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            background: isDownloading ? 'transparent' : tokens.blueBg,
+            border: `1px solid ${tokens.blueBorder}`,
+            color: isDownloading ? tokens.text3 : tokens.blueLight,
+            cursor: isDownloading ? 'default' : 'pointer',
+            opacity: isDownloading ? 0.7 : 1,
+          }}
+        >
+          {isDownloading ? 'Generating…' : '⤓ Download as PowerPoint'}
+        </button>
         <button
           type="button"
           onClick={onCopyAll}
@@ -350,6 +372,7 @@ export function ContentTabV2({
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [findingContacts, setFindingContacts] = useState(false);
   const [findError, setFindError] = useState<string | null>(null);
+  const [downloadingPptx, setDownloadingPptx] = useState(false);
 
   useEffect(() => {
     if (!selectedDivisionId) {
@@ -618,6 +641,43 @@ export function ContentTabV2({
       );
     } finally {
       setFindingContacts(false);
+    }
+  };
+
+  const handleDownloadPptx = async () => {
+    if (!generated?.slides || generated.slides.length === 0) return;
+    setDownloadingPptx(true);
+    try {
+      const res = await fetch('/api/export/presentation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${companyName} – Sales Presentation`,
+          companyName,
+          slides: generated.slides.map((s) => ({
+            title: s.title,
+            bullets: s.bullets,
+            speakerNotes: s.speakerNotes || undefined,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? 'Export failed');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${companyName.replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '_')}_presentation.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('PPTX download failed:', e);
+    } finally {
+      setDownloadingPptx(false);
     }
   };
 
@@ -1487,6 +1547,8 @@ export function ContentTabV2({
                         .join('\n\n');
                       void navigator.clipboard.writeText(text);
                     }}
+                    onDownloadPptx={handleDownloadPptx}
+                    isDownloading={downloadingPptx}
                     t={t}
                   />
                 )}

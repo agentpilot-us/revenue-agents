@@ -15,6 +15,7 @@ import {
   enrichBuyingGroup,
 } from './research-company';
 import { save4StepResearch } from './save-4-step-research';
+import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
 import type { BuyingGroupSeed, BuyingGroupDetail } from './company-research-schema';
 
 export type PipelineProgress =
@@ -83,6 +84,9 @@ export async function runResearchPipeline(params: PipelineParams): Promise<Pipel
 
   emit({ step: 'discover_done', groupCount: groups.length });
 
+  // Fetch existing stack for enrichment context
+  const existingStackBlock = await buildExistingStackBlock(companyId, userId);
+
   // Step 2: Enrich all groups in parallel (1 LLM call each)
   const enrichResults = await Promise.all(
     groups.map(async (seed: BuyingGroupSeed, index: number) => {
@@ -94,7 +98,8 @@ export async function runResearchPipeline(params: PipelineParams): Promise<Pipel
           seed,
           userId,
           perplexitySummary,
-          userGoal ?? undefined
+          userGoal ?? undefined,
+          existingStackBlock ?? undefined
         );
         if (result.ok) {
           emit({ step: 'enrich_done', index, total: groups.length, groupName: seed.name });

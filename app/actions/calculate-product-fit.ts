@@ -6,6 +6,7 @@ import { researchCompany } from '@/lib/tools/perplexity';
 import { generateObject } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { ProductOwnershipStatus } from '@prisma/client';
+import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
 import { z } from 'zod';
 
 const fitScoringSchema = z.object({
@@ -51,11 +52,8 @@ export async function calculateProductFit(
     Date.now() - new Date(companyCache.lastFitCalculation).getTime() < CACHE_TTL_MS;
 
   if (!forceRecalculate && cacheValid && companyCache.fitCalculationData != null) {
-    console.log('[calculateProductFit] Using cached fit calculation');
     return companyCache.fitCalculationData as FitOpportunity[];
   }
-
-  console.log('[calculateProductFit] Calculating fresh product fit scores...');
 
   const company = await prisma.company.findFirst({
     where: { id: companyId, userId: session.user.id },
@@ -125,12 +123,14 @@ Focus on signals that indicate product fit for:
     )
     .join('\n');
 
+  const existingStackSection = await buildExistingStackBlock(companyId, session.user.id);
+
   const { object } = await generateObject({
     model: getChatModel(),
     schema: fitScoringSchema,
     prompt: `
 You are an expert at identifying product expansion opportunities.
-
+${existingStackSection ? `\n${existingStackSection}\n` : ''}
 COMPANY CONTEXT:
 Name: ${company.name}
 Industry: ${company.industry ?? 'Unknown'}

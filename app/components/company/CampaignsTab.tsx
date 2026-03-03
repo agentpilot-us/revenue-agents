@@ -3,8 +3,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { CampaignPagePreview, type PageSections } from '@/app/components/company/CampaignPagePreview';
 import { CampaignEngagementPreview } from '@/app/components/company/CampaignEngagementPreview';
+import { StaticSalesPage } from '@/app/go/StaticSalesPage';
+import { isSalesPageSections } from '@/types/sales-page';
+import type { SalesPageSection } from '@/types/sales-page';
 
 export type CampaignItem = {
   id: string;
@@ -28,8 +30,10 @@ export type LandingPageDraft = {
   departmentId: string | null;
   segmentName: string;
   headline: string;
-  body: string;
-  pageSections: PageSections | null;
+  subheadline?: string | null;
+  sections: unknown;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
 };
 
 /** Result item from approve-draft API. */
@@ -671,8 +675,10 @@ export function CreateLandingPageFlow({
               departmentId: d.departmentId,
               segmentName: d.segmentName,
               headline: d.headline,
-              body: d.body,
-              pageSections: d.pageSections ?? undefined,
+              subheadline: d.subheadline ?? undefined,
+              sections: d.sections,
+              ctaLabel: d.ctaLabel ?? undefined,
+              ctaUrl: d.ctaUrl ?? undefined,
             })),
           }),
         });
@@ -710,8 +716,10 @@ export function CreateLandingPageFlow({
             departmentId: d.departmentId,
             segmentName: d.segmentName,
             headline: d.headline,
-            body: d.body,
-            pageSections: d.pageSections ?? undefined,
+            subheadline: d.subheadline ?? undefined,
+            sections: d.sections,
+            ctaLabel: d.ctaLabel ?? undefined,
+            ctaUrl: d.ctaUrl ?? undefined,
           })),
         }),
       });
@@ -923,16 +931,15 @@ export function CreateLandingPageFlow({
                     </Button>
                   </div>
                 </div>
-                <div className="max-h-[60vh] overflow-y-auto">
-                  <CampaignPagePreview
+                <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
+                  <StaticSalesPage
                     companyName={companyName}
-                    segmentName={draft.segmentName || null}
                     headline={draft.headline}
-                    body={draft.body}
-                    pageSections={draft.pageSections}
-                    isPreview
-                    companyWebsite={companyData?.website || null}
-                    keyInitiative={companyData?.keyInitiatives?.[0] || null}
+                    subheadline={draft.subheadline ?? null}
+                    sections={isSalesPageSections(draft.sections) ? (draft.sections as SalesPageSection[]) : []}
+                    ctaLabel={draft.ctaLabel ?? null}
+                    ctaUrl={draft.ctaUrl ?? null}
+                    campaignId="preview"
                   />
                 </div>
               </div>

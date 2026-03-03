@@ -31,7 +31,7 @@ function CreatePlaceholderButton({
       const res = await fetch(`/api/roadmap/targets/${targetId}/sales-page`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create_placeholder' }),
+        body: JSON.stringify({ action: 'create_with_content' }),
       });
       if (res.ok) router.refresh();
     } finally {

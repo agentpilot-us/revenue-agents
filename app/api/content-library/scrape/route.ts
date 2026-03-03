@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     const existingSet = new Set(existing.map((r) => r.sourceUrl));
 
     const reviewMode = body.reviewMode === true;
-    const model = getChatModel();
+    const model = getChatModel('extraction');
     const created: { id: string; title: string; type: string; sourceUrl: string | null; extraction?: StructuredPageExtraction }[] = [];
     const reviewItems: {
       url: string;
