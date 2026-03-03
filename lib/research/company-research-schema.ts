@@ -261,12 +261,6 @@ export const discoverGroupsResultSchema = z.object({
 
 export type DiscoverGroupsResult = z.infer<typeof discoverGroupsResultSchema>;
 
-export const productFitScoreSchema = productFitSchema.extend({
-  groupName: z.string().describe('Name of the buying group this score applies to.'),
-});
-
-export type ProductFitScore = z.infer<typeof productFitScoreSchema>;
-
 // ─────────────────────────────────────────────────────────────
 // Full company research schema (new flat + segmentation shape)
 // ─────────────────────────────────────────────────────────────

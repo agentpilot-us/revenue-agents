@@ -28,7 +28,7 @@ export async function POST(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    let body: { contentType?: string; prompt?: string };
+    let body: { contentType?: string; prompt?: string; divisionId?: string };
     try {
       body = await req.json();
     } catch {
@@ -46,6 +46,7 @@ export async function POST(
       userId: session.user.id,
       contentType,
       prompt,
+      divisionId: typeof body.divisionId === 'string' ? body.divisionId : undefined,
     });
 
     return NextResponse.json({ content });

@@ -15,6 +15,8 @@ import {
   getIndustryPlaybookBlock,
   getCaseStudiesBlock,
   getRelevantProductIdsForIndustry,
+  getCompanyEventsBlock,
+  getFeatureReleasesBlock,
 } from '@/lib/prompt-context';
 import {
   findRelevantContentLibraryChunks,
@@ -29,14 +31,45 @@ export async function generateOneContent(params: {
   userId: string;
   contentType: GenerateContentType;
   prompt: string;
+  divisionId?: string;
 }): Promise<{ content: string }> {
-  const { companyId, userId, contentType, prompt } = params;
+  const { companyId, userId, contentType, prompt, divisionId } = params;
 
-  const company = await prisma.company.findFirst({
-    where: { id: companyId, userId },
-    select: { id: true, name: true, industry: true },
-  });
+  const [company, userRecord] = await Promise.all([
+    prisma.company.findFirst({
+      where: { id: companyId, userId },
+      select: { id: true, name: true, industry: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, companyName: true },
+    }),
+  ]);
   if (!company) throw new Error('Company not found');
+
+  const aeName = userRecord?.name || 'the sales rep';
+  const aeCompany = userRecord?.companyName || '';
+
+  // Division context for talking_points enrichment
+  let divisionIntelLine = '';
+  let departmentLabel: string | null = null;
+  if (divisionId) {
+    const dept = await prisma.companyDepartment.findFirst({
+      where: { id: divisionId, companyId },
+      select: { valueProp: true, useCase: true, objectionHandlers: true, customName: true, type: true },
+    });
+    if (dept) {
+      departmentLabel = dept.customName || dept.type.replace(/_/g, ' ');
+      const parts: string[] = [];
+      if (dept.useCase) parts.push(`The buyer's division cares about: ${dept.useCase}.`);
+      if (dept.valueProp) parts.push(`Our value prop to them: ${dept.valueProp}.`);
+      const oh = dept.objectionHandlers;
+      if (Array.isArray(oh) && oh.length > 0) {
+        parts.push(`Known objections: ${(oh as Array<{ objection: string; response: string }>).map((o) => `"${o.objection}" → ${o.response}`).join('; ')}.`);
+      }
+      if (parts.length > 0) divisionIntelLine = parts.join(' ') + '\n';
+    }
+  }
 
   const [researchBlock, accountBlock, messagingSection, relevantProductIds] = await Promise.all([
     getCompanyResearchPromptBlock(companyId, userId),
@@ -45,35 +78,52 @@ export async function generateOneContent(params: {
     getRelevantProductIdsForIndustry(userId, company.industry ?? null, null),
   ]);
 
-  const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock] = await Promise.all([
+  const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
     getProductKnowledgeBlock(userId, relevantProductIds.length > 0 ? relevantProductIds : undefined),
     getIndustryPlaybookBlock(userId, company.industry ?? null),
     getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds),
+    getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null),
+    getFeatureReleasesBlock(userId, company.industry ?? null, 10),
   ]);
 
-  const ragQuery = `value proposition for ${company.name} ${company.industry ?? ''} for ${contentType}`;
-  const ragChunks = await findRelevantContentLibraryChunks(userId, ragQuery, 8);
+  // Targeted RAG query — use division when available
+  const ragQueryParts = [company.name, company.industry ?? ''];
+  if (departmentLabel) ragQueryParts.push(departmentLabel);
+  ragQueryParts.push('value proposition');
+  const ragQuery = ragQueryParts.filter(Boolean).join(' ');
+  const ragChunkCount = departmentLabel ? 4 : 8;
+  const ragChunks = await findRelevantContentLibraryChunks(userId, ragQuery, ragChunkCount);
 
   const researchSection = researchBlock ? `\n\n${researchBlock}` : '';
   const accountSection = accountBlock ? `\n\n${accountBlock}` : '';
   const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
   const playbookSection = industryPlaybookBlock ? `\n\n${industryPlaybookBlock}` : '';
   const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
+  const eventsSection = eventsBlock ? `\n\n${eventsBlock}` : '';
+  const featureReleasesSection = featureReleasesBlock ? `\n\n${featureReleasesBlock}` : '';
   const ragSection = ragChunks.length > 0 ? `\n\n${formatRAGChunksForPrompt(ragChunks)}` : '';
 
   const contentTypeInstruction = getContentTypeInstruction(contentType, company.name);
 
-  const systemPrompt = `You are a B2B content writer. The user is creating ${contentType.replace(/_/g, ' ')} content for the target account "${company.name}".
+  const aeIdentityLine = aeCompany
+    ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
+    : `You are writing on behalf of ${aeName}.\n`;
+
+  const systemPrompt = `You are a B2B content writer.
+${aeIdentityLine}${divisionIntelLine}
+The user is creating ${contentType.replace(/_/g, ' ')} content for the target account "${company.name}".
 
 ${contentTypeInstruction}
 
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
-2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, and case studies. Use these for value props and tone.
+2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, case studies, upcoming events, and feature releases. Use these for value props and tone.
 ${ragSection}
 ${productSection}
 ${playbookSection}
 ${caseStudiesSection}
+${eventsSection}
+${featureReleasesSection}
 ${messagingSection}${accountSection}${researchSection}`;
 
   const { text } = await generateText({

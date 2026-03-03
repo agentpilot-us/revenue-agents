@@ -407,7 +407,7 @@ OUTPUT SHAPE: One buying group detail with:
 - roles: economicBuyer, technicalEvaluator, champion, influencer — each array at least one searchable LinkedIn title.
 - searchKeywords: array of strings for Apollo/LinkedIn search.${keywordInstruction}
 - seniorityByRole: for each role type, list Apollo seniority levels used (e.g. ["c_suite", "vp", "director"] for economicBuyer; ["manager", "director"] for technicalEvaluator; ["individual_contributor", "manager"] for champion and influencer).
-- products: leave empty (populated in a later step).
+- products: for EACH catalog product listed above, provide { productName (exact name from our list), productSlug (if available), relevance (0–100 integer — how relevant this product is to this buying group), talkingPoint (one sentence: why this product matters to this group) }. Score every product; use relevance 0 if not applicable.
 - estimatedOpportunity: optional, e.g. "$500K – $2M".
 
 Keep output concise so the response stays within token limits.`;

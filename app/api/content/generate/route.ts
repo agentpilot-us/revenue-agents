@@ -12,6 +12,8 @@ import {
   getIndustryPlaybookBlock,
   getCaseStudiesBlock,
   getRelevantProductIdsForIndustry,
+  getCompanyEventsBlock,
+  getFeatureReleasesBlock,
 } from '@/lib/prompt-context';
 import {
   findRelevantContentLibraryChunks,
@@ -47,16 +49,29 @@ export async function POST(req: NextRequest) {
     const input = GenerateSchema.parse(json);
     const { companyId, divisionId, channel } = input;
 
-    const company = await prisma.company.findFirst({
-      where: { id: companyId, userId: session.user.id },
-      select: { id: true, name: true, industry: true },
-    });
+    const [company, user] = await Promise.all([
+      prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+        select: { id: true, name: true, industry: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true, companyName: true },
+      }),
+    ]);
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
+    const aeName = user?.name || 'the sales rep';
+    const aeCompany = user?.companyName || '';
+
     // Buying group / division context (maps to CompanyDepartment)
     let departmentContext = '';
+    let departmentLabel: string | null = null;
+    let divisionValuProp: string | null = null;
+    let divisionUseCase: string | null = null;
+    let divisionObjectionHandlers: Array<{ objection: string; response: string }> | null = null;
     if (divisionId) {
       const department = await prisma.companyDepartment.findFirst({
         where: { id: divisionId, companyId },
@@ -66,12 +81,19 @@ export async function POST(req: NextRequest) {
           targetRoles: true,
           customName: true,
           type: true,
+          objectionHandlers: true,
         },
       });
       if (department) {
-        const deptName = department.customName || department.type.replace(/_/g, ' ');
+        departmentLabel = department.customName || department.type.replace(/_/g, ' ');
+        divisionValuProp = department.valueProp;
+        divisionUseCase = department.useCase;
+        const rawOH = department.objectionHandlers;
+        if (Array.isArray(rawOH) && rawOH.length > 0) {
+          divisionObjectionHandlers = rawOH as Array<{ objection: string; response: string }>;
+        }
         departmentContext = `\n\nBUYING GROUP CONTEXT:
-- Name: ${deptName}
+- Name: ${departmentLabel}
 - Value Proposition: ${department.valueProp || 'Not specified'}
 - Use Case: ${department.useCase || 'Not specified'}
 - Target Roles: ${JSON.stringify(department.targetRoles || {})}
@@ -119,7 +141,7 @@ export async function POST(req: NextRequest) {
         ),
       ]);
 
-    const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock] =
+    const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock, playbook] =
       await Promise.all([
         getProductKnowledgeBlock(
           session.user.id,
@@ -132,28 +154,84 @@ export async function POST(req: NextRequest) {
           null,
           relevantProductIds
         ),
+        getCompanyEventsBlock(session.user.id, company.industry ?? null, departmentLabel, null),
+        getFeatureReleasesBlock(session.user.id, company.industry ?? null, 10),
+        company.industry
+          ? prisma.industryPlaybook.findFirst({
+              where: { userId: session.user.id },
+              select: { landmines: true },
+            })
+          : Promise.resolve(null),
       ]);
 
-    const researchSection = researchBlock ? `\n\n${researchBlock}` : '';
-    const accountSection = accountBlock ? `\n\n${accountBlock}` : '';
+    // Phase 4: Channel-based context tiering
+    const isShortForm = ['sms', 'slack'].includes(channel);
+    const isMediumForm = ['linkedin_post'].includes(channel);
+
+    const researchSection = researchBlock && !isShortForm ? `\n\n${researchBlock}` : '';
+    const accountSection = accountBlock && !isShortForm ? `\n\n${accountBlock}` : '';
     const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
-    const playbookSection = industryPlaybookBlock
+    const playbookSection = industryPlaybookBlock && !isShortForm
       ? `\n\n${industryPlaybookBlock}`
       : '';
-    const caseStudiesSection = caseStudiesBlock ? `\n\n${caseStudiesBlock}` : '';
+    const caseStudiesSection = caseStudiesBlock && !isShortForm && !isMediumForm
+      ? `\n\n${caseStudiesBlock}`
+      : '';
+    const eventsSection = eventsBlock && !isShortForm ? `\n\n${eventsBlock}` : '';
+    const featureReleasesSection = featureReleasesBlock && !isShortForm
+      ? `\n\n${featureReleasesBlock}`
+      : '';
 
-    const ragQuery = `value proposition for ${company.name} ${
-      company.industry ?? ''
-    } for ${channel}`;
-    const ragChunks = await findRelevantContentLibraryChunks(
-      session.user.id,
-      ragQuery,
-      8
-    );
+    // Phase 4: Targeted RAG query — use division + product when available
+    const ragQueryParts = [company.name, company.industry ?? ''];
+    if (departmentLabel) ragQueryParts.push(departmentLabel);
+    ragQueryParts.push('value proposition');
+    const ragQuery = ragQueryParts.filter(Boolean).join(' ');
+    const ragChunkCount = departmentLabel ? 4 : 8;
+    const ragChunks = isShortForm
+      ? []
+      : await findRelevantContentLibraryChunks(session.user.id, ragQuery, ragChunkCount);
     const ragSection =
       ragChunks.length > 0
         ? `\n\n${formatRAGChunksForPrompt(ragChunks)}`
         : '';
+
+    // AE identity line
+    const aeIdentityLine = aeCompany
+      ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
+      : `You are writing on behalf of ${aeName}.\n`;
+
+    // Active action context (from trigger-based CTA)
+    let actionLine = '';
+    if (input.activeActionIndex != null) {
+      const actionLabels = [
+        'Introduce relevant capabilities',
+        'Reference the triggering event or signal',
+        'Propose a brief introductory meeting',
+        'Share a relevant case study or proof point',
+        'Invite to an upcoming event or session',
+      ];
+      const actionText = actionLabels[input.activeActionIndex] ?? `action #${input.activeActionIndex + 1}`;
+      actionLine = `Frame this outreach around the following chosen action: "${actionText}".\n`;
+    }
+
+    // Explicit landmines (Do NOT)
+    const landminesArr = Array.isArray(playbook?.landmines) ? (playbook.landmines as string[]) : [];
+    const defaultLandmines = ['use generic openers like "I hope this email finds you well"', 'lead with your product name before establishing relevance'];
+    const allLandmines = landminesArr.length > 0 ? landminesArr : defaultLandmines;
+    const landminesLine = `Do NOT: ${allLandmines.join('; ')}.\n`;
+
+    // Division-specific context for talking points
+    let divisionIntelLine = '';
+    if (divisionValuProp || divisionUseCase || divisionObjectionHandlers) {
+      const parts: string[] = [];
+      if (divisionUseCase) parts.push(`The buyer's division cares about: ${divisionUseCase}.`);
+      if (divisionValuProp) parts.push(`Our value prop to them: ${divisionValuProp}.`);
+      if (divisionObjectionHandlers && divisionObjectionHandlers.length > 0) {
+        parts.push(`Known objections: ${divisionObjectionHandlers.map((o) => `"${o.objection}" → ${o.response}`).join('; ')}.`);
+      }
+      divisionIntelLine = parts.join(' ') + '\n';
+    }
 
     let contentInstruction: string;
     if (channel === 'email') {
@@ -193,27 +271,41 @@ Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`;
         'Generate a short outline for a division-specific sales page: include a headline, 3–5 bullet points of value props, and one suggested CTA label. Output as plain text with clear line breaks.';
     }
 
-    const systemPrompt = `You are a B2B sales content writer. The user is creating ${channel.replace(
-      '_',
-      ' '
-    )} for the target account "${company.name}".
-${personaLine}${departmentContext}${recipientsSection}
+    const systemPrompt = `You are a B2B sales content writer.
+${aeIdentityLine}${actionLine}${personaLine}${landminesLine}${divisionIntelLine}
+The user is creating ${channel.replace('_', ' ')} for the target account "${company.name}".
+${departmentContext}${recipientsSection}
 
 ${contentInstruction}
 
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
-2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, and case studies.
+2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, case studies, upcoming events, and feature releases.
 3) CONTENT LIBRARY: relevant snippets for this use case.
 ${ragSection}
 ${productSection}
 ${playbookSection}
 ${caseStudiesSection}
+${eventsSection}
+${featureReleasesSection}
 ${messagingSection}${accountSection}${researchSection}`;
+
+    // Phase 4: Per-channel maxOutputTokens
+    const maxOutputTokensByChannel: Record<string, number> = {
+      sms: 100,
+      slack: 200,
+      linkedin_post: 400,
+      linkedin_inmail: 800,
+      email: 1000,
+      talking_points: 1500,
+      presentation: 2500,
+      sales_page: 1500,
+    };
+    const maxOutputTokens = maxOutputTokensByChannel[channel] ?? 1500;
 
     const { text } = await generateText({
       model: getChatModel(),
-      maxOutputTokens: channel === 'presentation' ? 2500 : 1500,
+      maxOutputTokens,
       system: systemPrompt,
       prompt:
         channel === 'email'

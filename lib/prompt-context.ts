@@ -184,7 +184,11 @@ export async function getIndustryPlaybookBlock(
 
 /**
  * Build a short prompt block from the user's Content Library Products (Product model).
- * Used so the agent can reference products added via "Your company data" → Products.
+ * Used by the chat agent for referencing products added via "Your company data" → Products.
+ *
+ * NOTE: This is distinct from getProductKnowledgeBlock which uses ProductProfile
+ * (catalog product detailed profiles). Content generation uses getProductKnowledgeBlock;
+ * this function is used by the chat agent as a lightweight fallback/supplement.
  */
 export async function getContentLibraryProductsBlock(userId: string): Promise<string | null> {
   const products = await prisma.product.findMany({
