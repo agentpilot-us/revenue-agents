@@ -47,11 +47,12 @@ export async function POST(
   const plan = await prisma.roadmapPlan.findFirst({
     where: { id: planId },
     include: {
-      roadmap: { select: { userId: true, companyId: true } },
+      roadmap: { select: { userId: true } },
       target: {
         select: {
           id: true,
           name: true,
+          companyId: true,
           companyDepartmentId: true,
         },
       },
@@ -73,8 +74,12 @@ export async function POST(
   const pp = (plan.previewPayload ?? {}) as PreviewPayload;
   const contentType = pp.contentType ?? 'email';
   const prompt = pp.description || pp.title || 'Generate content for this account';
-  const companyId = plan.roadmap.companyId;
+  const companyId = plan.target?.companyId;
   const divisionId = plan.target?.companyDepartmentId ?? undefined;
+
+  if (!companyId) {
+    return NextResponse.json({ error: 'Plan has no linked company' }, { status: 400 });
+  }
 
   try {
     let generatedContent: unknown;
