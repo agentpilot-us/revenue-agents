@@ -6,8 +6,7 @@
 const SERVICE_ENV_KEYS: Record<string, string[]> = {
   resend: ['RESEND_API_KEY'],
   cal: ['CAL_API_KEY'],
-  clay: ['CLAY_API_KEY'],
-  phantombuster: ['PHANTOMBUSTER_API_KEY'],
+  apollo: ['APOLLO_API_KEY'],
   perplexity: ['PERPLEXITY_API_KEY'],
   firecrawl: ['FIRECRAWL_API_KEY'],
   exa: ['EXA_API_KEY'],
@@ -26,11 +25,11 @@ export function isServiceConfigured(serviceId: ServiceId): boolean {
 
 /** Map chat tool id -> service id. Tools with no entry are always available (e.g. get_contacts_by_engagement). */
 export const TOOL_TO_SERVICE: Record<string, ServiceId> = {
-  search_linkedin_contacts: 'phantombuster',
-  enrich_contact: 'clay',
+  search_linkedin_contacts: 'apollo',
+  enrich_contact: 'apollo',
   research_company: 'perplexity',
   discover_departments: 'perplexity',
-  send_email: 'resend', // Minimum: Resend; user may also have connected Gmail/Outlook
+  send_email: 'resend',
   create_calendar_event: 'cal',
   get_calendar_rsvps: 'cal',
   import_event_attendees: 'cal',

@@ -114,7 +114,7 @@ export async function searchApolloContacts(
   }
 }
 
-/** Same shape as Clay enrichContact for use in enrichment router. */
+/** Result type used by the enrichment router. */
 export type EnrichContactResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; error: string };

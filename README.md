@@ -90,7 +90,7 @@ Visit `http://localhost:3000`
 │       └── messaging-frameworks/
 ├── lib/
 │   ├── db.ts               # Prisma client
-│   ├── tools/              # Resend, Clay, PhantomBuster, Cal, Perplexity, Firecrawl
+│   ├── tools/              # Resend, Apollo, Cal, Perplexity, Firecrawl
 │   ├── plays/              # Expansion, Partner, Referral configs
 │   └── engagement/         # Engagement scoring
 ├── docs/                   # All setup and reference docs (see below)

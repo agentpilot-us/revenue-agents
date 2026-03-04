@@ -11,7 +11,7 @@ import { resolveSearchContext } from '@/lib/contacts/resolve-search-context';
 import { matchPersona } from '@/app/actions/match-persona';
 import { DepartmentType } from '@prisma/client';
 
-export type SearchScopeOption = 'apollo' | 'linkedin' | 'clay' | 'zoominfo';
+export type SearchScopeOption = 'apollo' | 'linkedin';
 
 export type FoundContact = {
   id: string;
@@ -44,7 +44,7 @@ export async function findContactsForDepartment(
   companyId: string,
   departmentId: string,
   seniorityLevels: SeniorityLevel[],
-  scope: { apollo?: boolean; linkedin?: boolean; clay?: boolean; zoominfo?: boolean }
+  scope: { apollo?: boolean; linkedin?: boolean }
 ): Promise<FindContactsResult> {
   const company = await prisma.company.findFirst({
     where: { id: companyId },
@@ -60,8 +60,6 @@ export async function findContactsForDepartment(
 
   const steps: Array<{ step: string; detail: string }> = [];
   const useFinder = scope.apollo === true || scope.linkedin !== false;
-  const useClay = scope.clay === true;
-  const useZoomInfo = scope.zoominfo === true;
 
   if (useFinder) {
     const rawDomain =
@@ -116,7 +114,7 @@ export async function findContactsForDepartment(
       let phone: string | undefined;
       let emailVerified = false;
 
-      if (useClay && c.linkedinUrl) {
+      if (c.linkedinUrl) {
         const enrichResult = await enrichContact({
           linkedinUrl: c.linkedinUrl,
           domain: company.domain ?? undefined,
@@ -130,9 +128,6 @@ export async function findContactsForDepartment(
           phone = (enrichResult.data.phone as string) ?? undefined;
           emailVerified = (enrichResult.data.verified as boolean) ?? !!email;
         }
-      }
-      if (useZoomInfo && !email) {
-        // ZoomInfo integration not available
       }
 
       let personaId: string | undefined;
@@ -171,10 +166,10 @@ export async function findContactsForDepartment(
       });
     }
 
-    if (useClay && results.length > 0) {
+    if (enriched > 0) {
       steps.push({
-        step: 'clay',
-        detail: `Enriched with Clay (${enriched} of ${results.length})`,
+        step: 'enrich',
+        detail: `Enriched with Apollo (${enriched} of ${results.length})`,
       });
     }
 
@@ -309,7 +304,7 @@ export type FindAndEnrichProgress =
 export type FindAndEnrichOptions = {
   departmentIds?: string[];
   maxPerDept?: number;
-  scope?: { linkedin?: boolean; clay?: boolean };
+  scope?: { linkedin?: boolean };
   /** If provided, progress events are sent here (e.g. for SSE). */
   onProgress?: (event: FindAndEnrichProgress) => void;
 };
@@ -344,7 +339,7 @@ export async function findAndEnrichContactsForCompany(
   });
 
   const maxPerDept = options.maxPerDept ?? DEFAULT_MAX_PER_DEPT;
-  const scope = options.scope ?? { linkedin: true, clay: true };
+  const scope = options.scope ?? { linkedin: true };
   const send = options.onProgress ?? (() => {});
 
   send({ type: 'started', departmentCount: departments.length });

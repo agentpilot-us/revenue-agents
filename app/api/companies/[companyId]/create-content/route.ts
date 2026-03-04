@@ -62,7 +62,7 @@ export async function POST(
       return NextResponse.json(
         {
           error: 'Embedding quota exceeded',
-          details: 'Your OpenAI (or embedding provider) quota or billing limit was exceeded.',
+          details: 'Your embedding provider quota or billing limit was exceeded.',
         },
         { status: 503 }
       );

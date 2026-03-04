@@ -83,16 +83,10 @@ export default async function SettingsPage() {
       category: 'Contact Data',
       items: [
         {
-          name: 'Clay',
+          name: 'Apollo',
           icon: '🔍',
-          description: 'Enrich contacts with emails, phones, and data',
-          ...serviceStatus('clay'),
-        },
-        {
-          name: 'PhantomBuster',
-          icon: '💼',
-          description: 'Search and discover contacts on LinkedIn',
-          ...serviceStatus('phantombuster'),
+          description: 'Discover and enrich contacts with emails, phones, and titles',
+          ...serviceStatus('apollo'),
         },
       ],
     },
@@ -172,7 +166,7 @@ export default async function SettingsPage() {
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
-              <strong>Connected tools:</strong> Resend (email), Cal.com (meetings), Clay (enrichment), PhantomBuster (LinkedIn), Perplexity (research), Firecrawl (scraping). Configure via environment variables — no setup required on your part if already set.
+              <strong>Connected tools:</strong> Resend (email), Cal.com (meetings), Apollo (contacts), Perplexity (research), Firecrawl (scraping). Configure via environment variables — no setup required on your part if already set.
             </p>
           </div>
 
@@ -207,10 +201,8 @@ export default async function SettingsPage() {
                         )}
                       </div>
                     </div>
-                    {/* Test connection button for Resend, Cal.com, PhantomBuster */}
                     {(service.name === 'Resend' ||
-                      service.name === 'Cal.com' ||
-                      service.name === 'PhantomBuster') && (
+                      service.name === 'Cal.com') && (
                       <TestConnectionButton
                         serviceName={service.name}
                         testEndpoint={`/api/integrations/${service.name.toLowerCase().replace('.', '')}/test`}

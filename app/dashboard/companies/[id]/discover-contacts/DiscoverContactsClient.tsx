@@ -35,7 +35,7 @@ export function DiscoverContactsClient({
 }: Props) {
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? '');
   const [seniority, setSeniority] = useState<SeniorityLevel[]>(['vp', 'manager_director']);
-  const [scope, setScope] = useState<SearchScopeOption[]>(['apollo', 'clay']);
+  const [scope, setScope] = useState<SearchScopeOption[]>(['apollo']);
   const [step, setStep] = useState<'config' | 'running' | 'results' | 'error'>('config');
   const [steps, setSteps] = useState<Array<{ step: string; detail: string }>>([]);
   const [results, setResults] = useState<FoundContact[]>([]);
@@ -66,8 +66,6 @@ export function DiscoverContactsClient({
     const scopeObj = {
       apollo: scope.includes('apollo'),
       linkedin: scope.includes('linkedin'),
-      clay: scope.includes('clay'),
-      zoominfo: scope.includes('zoominfo'),
     };
     try {
       const res = await findContactsForDepartment(
@@ -195,7 +193,7 @@ export function DiscoverContactsClient({
               Data sources
             </label>
             <div className="flex flex-wrap gap-4">
-              {(['apollo', 'clay', 'zoominfo', 'linkedin'] as const).map((id) => (
+              {(['apollo', 'linkedin'] as const).map((id) => (
                 <label key={id} className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
                   <input
                     type="checkbox"
@@ -205,9 +203,7 @@ export function DiscoverContactsClient({
                   />
                   <span className="text-sm">
                     {id === 'apollo' && 'Apollo (search & enrichment)'}
-                    {id === 'clay' && 'Clay (enrich email/phone)'}
-                    {id === 'zoominfo' && 'ZoomInfo'}
-                    {id === 'linkedin' && 'Apollo (search)'}
+                    {id === 'linkedin' && 'Apollo (search only)'}
                   </span>
                 </label>
               ))}

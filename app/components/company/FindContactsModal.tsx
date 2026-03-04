@@ -27,9 +27,7 @@ const SENIORITY_OPTIONS: { id: SeniorityLevel; label: string; sub: string }[] = 
 
 const SCOPE_OPTIONS: { id: SearchScopeOption; label: string }[] = [
   { id: 'apollo', label: 'Apollo (search & enrichment)' },
-  { id: 'clay', label: 'Clay enrichment (emails, phones)' },
-  { id: 'zoominfo', label: 'ZoomInfo (if available)' },
-  { id: 'linkedin', label: 'Apollo (search)' },
+  { id: 'linkedin', label: 'Apollo (search only)' },
 ];
 
 type Step = 'config' | 'searching' | 'results' | 'added';
@@ -63,7 +61,7 @@ export function FindContactsModal({
 }: Props) {
   const [step, setStep] = useState<Step>('config');
   const [seniority, setSeniority] = useState<SeniorityLevel[]>(['vp', 'manager_director']);
-  const [scope, setScope] = useState<SearchScopeOption[]>(['apollo', 'clay']);
+  const [scope, setScope] = useState<SearchScopeOption[]>(['apollo']);
   const [steps, setSteps] = useState<Array<{ step: string; detail: string }>>([]);
   const [results, setResults] = useState<FoundContact[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -89,8 +87,6 @@ export function FindContactsModal({
     const scopeObj = {
       apollo: scope.includes('apollo'),
       linkedin: scope.includes('linkedin'),
-      clay: scope.includes('clay'),
-      zoominfo: scope.includes('zoominfo'),
     };
     const res = await findContactsForDepartment(
       companyId,

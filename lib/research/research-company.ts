@@ -37,19 +37,7 @@ export type PerplexityOnlyResult =
   | { ok: true; summary: string }
   | { ok: false; error: string };
 
-const OPENAI_QUOTA_HINT =
-  'Research uses Perplexity for web search. To avoid OpenAI quota, set GOOGLE_GENERATIVE_AI_API_KEY in .env.local so chat and embeddings use Google (Gemini). Or set LLM_PROVIDER=anthropic and ANTHROPIC_API_KEY for chat; embeddings still need GOOGLE_GENERATIVE_AI_API_KEY.';
-
-function isOpenAIQuotaError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return (
-    (/quota|billing|exceeded/i.test(msg) && /openai|platform\.openai\.com/i.test(msg)) ||
-    msg.includes('You exceeded your current quota')
-  );
-}
-
 function getFriendlyResearchError(err: unknown): string {
-  if (isOpenAIQuotaError(err)) return OPENAI_QUOTA_HINT;
   if (err instanceof Error) return err.message;
   return 'Research failed unexpectedly.';
 }

@@ -1,8 +1,3 @@
-/**
- * Contact finder – provider abstraction for finding contacts by segment.
- * Swap provider via CONTACT_FINDER_PROVIDER (apollo | clay). Default: apollo.
- */
-
 import { searchApolloContacts } from './apollo';
 
 export type ContactFinderResult = {
@@ -26,32 +21,9 @@ export type FindContactsForSegmentParams = {
   /** Apollo seniority filter (from resolveSearchContext). */
   seniorityLevels?: string[];
   maxResults?: number;
-  provider?: 'apollo' | 'clay';
 };
 
-/**
- * Find contacts for a segment (buying group). Uses Apollo by default; provider
- * can be overridden via param or CONTACT_FINDER_PROVIDER env.
- */
 export async function findContactsForSegment(
-  params: FindContactsForSegmentParams
-): Promise<ContactFinderResult[]> {
-  const provider =
-    params.provider ??
-    (process.env.CONTACT_FINDER_PROVIDER as 'apollo' | 'clay' | undefined) ??
-    'apollo';
-
-  switch (provider) {
-    case 'apollo':
-      return findViaApollo(params);
-    case 'clay':
-      return findViaApollo(params); // Clay as finder not implemented; use Apollo path
-    default:
-      return findViaApollo(params);
-  }
-}
-
-async function findViaApollo(
   params: FindContactsForSegmentParams
 ): Promise<ContactFinderResult[]> {
   const domain =

@@ -710,7 +710,7 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
       enrich_contact: toolWithSchema({
-        description: 'Enrich contact with email, phone, and other data (e.g. from Clay)',
+        description: 'Enrich contact with email, phone, and other data via Apollo',
         inputSchema: z.object({
           firstName: z.string().optional(),
           lastName: z.string().optional(),
