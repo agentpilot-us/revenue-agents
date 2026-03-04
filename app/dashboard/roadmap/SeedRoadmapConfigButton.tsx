@@ -7,9 +7,10 @@ type Props = {
   hasNoSignalRules: boolean;
   /** When true (e.g. no roadmap yet), show a create-first label */
   emptyState?: boolean;
+  companyId?: string;
 };
 
-export function SeedRoadmapConfigButton({ hasNoSignalRules, emptyState }: Props) {
+export function SeedRoadmapConfigButton({ hasNoSignalRules, emptyState, companyId }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +19,7 @@ export function SeedRoadmapConfigButton({ hasNoSignalRules, emptyState }: Props)
   const handleSeed = async () => {
     setLoading(true);
     setError(null);
-    const result = await seedRoadmapConfigForCurrentUser();
+    const result = await seedRoadmapConfigForCurrentUser(companyId);
     setLoading(false);
     if (!result.ok) {
       setError(result.error);
@@ -39,7 +40,7 @@ export function SeedRoadmapConfigButton({ hasNoSignalRules, emptyState }: Props)
         disabled={loading}
         className="rounded-lg border border-amber-500/60 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
       >
-        {loading ? 'Loading…' : label}
+        {loading ? 'Loading\u2026' : label}
       </button>
       {error && (
         <span className="text-sm text-red-400">{error}</span>

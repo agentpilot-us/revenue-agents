@@ -75,10 +75,18 @@ export default async function DashboardPage({
   }
 
   // For demo users, make sure a persona-specific AdaptiveRoadmap exists.
-  await ensureDemoRoadmap(
-    session.user.id,
-    (session.user as { email?: string | null }).email ?? null
-  );
+  const primaryCompanyForDemo = await prisma.company.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true },
+  });
+  if (primaryCompanyForDemo) {
+    await ensureDemoRoadmap(
+      session.user.id,
+      (session.user as { email?: string | null }).email ?? null,
+      primaryCompanyForDemo.id
+    );
+  }
 
   const params = await searchParams;
   const [contentLibraryCounts, catalogProductCount, industryPlaybookCount] =
@@ -122,8 +130,10 @@ export default async function DashboardPage({
     eventCampaign,
   ] = await Promise.all([
     prisma.adaptiveRoadmap.findFirst({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, companyId: { not: null } },
+      orderBy: { updatedAt: 'desc' },
       include: {
+        company: { select: { id: true, name: true } },
         targets: {
           include: {
             company: { select: { name: true } },

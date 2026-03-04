@@ -78,13 +78,14 @@ async function main() {
 
   // —— Ensure AdaptiveRoadmap (enterprise_expansion for nvidia_gm) ——
   let roadmap = await prisma.adaptiveRoadmap.findFirst({
-    where: { userId: user.id },
+    where: { userId: user.id, companyId: company.id },
     select: { id: true },
   });
   if (!roadmap) {
     roadmap = await prisma.adaptiveRoadmap.create({
       data: {
         userId: user.id,
+        companyId: company.id,
         roadmapType: 'enterprise_expansion',
         objective: {
           goalText: 'Land 2 new divisional NVIDIA use cases at General Motors this year.',

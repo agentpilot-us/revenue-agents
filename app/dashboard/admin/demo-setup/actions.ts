@@ -259,10 +259,10 @@ export async function seedDemoRoadmapForCompany(
     return { ok: false, error: 'Current user is not a recognized demo persona' };
   }
 
-  // Ensure base roadmap exists
-  await ensureDemoRoadmap(session.user.id, email);
+  // Ensure base roadmap exists (company-scoped)
+  await ensureDemoRoadmap(session.user.id, email, company.id);
   const roadmap = await prisma.adaptiveRoadmap.findFirst({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, companyId: company.id },
     select: { id: true, roadmapType: true },
   });
   if (!roadmap) return { ok: false, error: 'Failed to create or load AdaptiveRoadmap' };

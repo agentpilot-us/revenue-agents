@@ -8,12 +8,13 @@ import { seedDefaultRoadmapConfig } from './seed-roadmap-config';
  * When a roadmap is created (or already exists with no signal rules), seeds
  * default signal rules, action mappings, and conditions so the org shows config.
  */
-export async function ensureDemoRoadmap(userId: string, email: string | null | undefined) {
+export async function ensureDemoRoadmap(userId: string, email: string | null | undefined, companyId?: string) {
   const config = getDemoRoadmapConfigForEmail(email);
   if (!config) return;
+  if (!companyId) return;
 
-  const existing = await prisma.adaptiveRoadmap.findFirst({
-    where: { userId },
+  const existing = await prisma.adaptiveRoadmap.findUnique({
+    where: { userId_companyId: { userId, companyId } },
     select: { id: true, _count: { select: { signalRules: true } } },
   });
 
@@ -27,6 +28,7 @@ export async function ensureDemoRoadmap(userId: string, email: string | null | u
   const roadmap = await prisma.adaptiveRoadmap.create({
     data: {
       userId,
+      companyId,
       roadmapType: config.roadmapType,
       objective: config.objective ?? undefined,
       contentStrategy: config.contentStrategy ?? undefined,
@@ -34,4 +36,3 @@ export async function ensureDemoRoadmap(userId: string, email: string | null | u
   });
   await seedDefaultRoadmapConfig(roadmap.id);
 }
-

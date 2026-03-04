@@ -164,8 +164,11 @@ export function PhasedPlanView({ plans, companyId }: Props) {
   if (plans.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          No plays generated yet. Use the template picker above to generate plays for a target.
+        <p className="text-sm text-muted-foreground mb-1">
+          No plays in the queue yet.
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          Select a template above to generate phased plays for your target accounts.
         </p>
       </div>
     );

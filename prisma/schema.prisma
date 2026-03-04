@@ -186,6 +186,7 @@ model Company {
   segmentCampaigns   SegmentCampaign[]
   accountSignals       AccountSignal[]
   roadmapTargets       RoadmapTarget[]
+  adaptiveRoadmaps     AdaptiveRoadmap[]
   customSignalConfigs  CustomSignalConfig[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
@@ -1574,6 +1575,9 @@ model AdaptiveRoadmap {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // e.g. enterprise_expansion | channel_influence | value_of_data
   roadmapType String
 
@@ -1592,6 +1596,7 @@ model AdaptiveRoadmap {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([userId, companyId])
   @@index([userId])
 }
 

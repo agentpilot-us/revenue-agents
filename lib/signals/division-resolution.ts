@@ -65,7 +65,7 @@ export async function resolveDivisionForSignal(params: {
   const { userId, companyId, contactEmail, companyDepartmentId, signalTitle, signalSummary } = params;
 
   const roadmap = await prisma.adaptiveRoadmap.findFirst({
-    where: { userId, roadmapType: 'enterprise_expansion' },
+    where: { userId, companyId },
     select: {
       targets: {
         where: { targetType: 'division' },
