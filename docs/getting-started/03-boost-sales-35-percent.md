@@ -18,7 +18,7 @@ Open the **Dashboard**. The **Next Best Actions** card is front and center.
 
 This card scans your accounts and surfaces what needs attention:
 
-- Accounts with buying groups that don't have a campaign yet → "Open new buying group"
+- Accounts with buying groups that don't have a sales page yet → "Open new buying group"
 - Departments with no contacts → "Find contacts"
 - Accounts with upcoming events → "Send event invite"
 - Accounts with stale engagement → "Re-engage"
@@ -26,13 +26,13 @@ This card scans your accounts and surfaces what needs attention:
 
 Think of it as a prioritized to-do list that updates itself. The recommendations come from your roadmap targets, signal data, and engagement history.
 
-[Screenshot: Dashboard showing Next Best Actions card with recommended plans]
+[Screenshot: Dashboard showing Next Best Actions card with Recommended Plays]
 
 ---
 
 ## Step 2: Open your Sales Map
 
-Click **Sales Map** in the left sidebar. This is your strategic planning view.
+Click **Your Sales Map** in the left sidebar. This is your strategic planning view.
 
 ### What you see:
 
@@ -202,13 +202,15 @@ The 35% isn't a mystery anymore. It's a list of specific buying groups, specific
 
 Terms introduced in this chapter:
 
-- **Sales Map** — Your strategic territory plan: which accounts to target, which products to push, and what actions to take — organized into phases
-- **Roadmap target** — An account added to your Sales Map for strategic tracking
-- **Phased plans** — AI-generated action sequences grouped by priority: quick wins first, then pipeline building, then long-term plays
-- **Deal objective** — A specific, written goal for an account (e.g., "Close MC Next for Marketing Ops by Q2")
+- **Sales Map** — Your strategic command center (**Your Sales Map** in the sidebar). Defines which accounts to target, which products to push, and what actions to take — organized into phased plans with urgency scoring. Also houses signal configuration and action mappings.
+- **Roadmap target** — An account added to your Sales Map for strategic tracking, with stage (Active Program, Expansion Target, Emerging, etc.) and associated contacts
+- **Phased plans** — AI-generated action sequences grouped by priority: quick wins first, then pipeline building, then long-term plays. Each plan has an urgency score, content type, and status.
+- **Deal objective** — A specific, written goal for an account (e.g., "Close MC Next for Marketing Ops by Q2"). Anchors all AI-generated content for the account.
 - **Product fit** — How well a product matches a buying group's needs, scored by the AI using product profiles, account research, and existing stack data
-- **Buying groups** — Departments or teams within an account that make purchasing decisions together (e.g., "Marketing Ops at Target")
+- **Buying groups** — Departments or teams within an account that make purchasing decisions together (e.g., "Marketing Ops at Target"). Visible on the Buying Groups tab with value propositions, use cases, and key initiative tags.
+- **Contacts** — People within buying groups, organized on the Contacts tab. Each contact has a buying role (economic buyer, technical evaluator, champion, influencer), enrichment status, and engagement status. Discovered via **Find Contacts** or imported from Salesforce.
 - **AI research** — Automated company research using Exa: business overview, initiatives, org structure, technology stack, and recent signals
+- **Content tab** — The hub for generating outreach. Select a channel (Email, LinkedIn InMail, LinkedIn Post, Slack DM, SMS, Sales Page, or Presentation), pick a buying group, and the AI generates personalized content using full account context.
 
 ---
 

@@ -108,7 +108,7 @@ You didn't have to configure this. It happened because you set up the product re
 
 Go to the **Content** tab on the Kohl's company page.
 
-Click **Create Content** → select content type **Email** → select **Feature Release** as the play type.
+Select the **Email** channel → choose the **Marketing** buying group → select **Feature Release** as the play type.
 
 The AI generates an email that:
 - References Kohl's existing MCE usage
@@ -125,9 +125,9 @@ Review the draft. Edit anything that needs your voice. Save it.
 
 ## Step 7: Create a sales page
 
-Go to the **Campaigns** tab on the Kohl's company page.
+Go to the **Content** tab on the Kohl's company page.
 
-Click **Create Landing Page**. You'll see options:
+Select the **Sales Page** channel. You'll see options:
 
 - **Scope:** Company-wide or per buying group (department)
 - **Page type:** Account intro, feature announcement, event invite, or case study
@@ -149,7 +149,7 @@ Click **Generate**. The system builds a full sales page with typed sections:
 
 The page auto-approves after a 30-second undo window. A `SegmentCampaign` record is created with a unique slug.
 
-[Screenshot: Campaigns tab showing generated sales page sections in preview]
+[Screenshot: Content tab showing generated sales page sections in preview]
 
 ---
 
@@ -196,9 +196,9 @@ Terms introduced in this chapter:
 - **ProductProfile** — The deep context layer for a product: elevator pitch, value props, objection handlers, competitive positioning
 - **Product framing** — How the system positions a product relative to the account's existing stack: expansion, upgrade, prerequisite_met, or net_new
 - **Existing stack** — The products an account already owns, with status (Active, Trial, Churned) and deployment details
-- **Sales page** — A personalized landing page generated for a specific account, hosted at `/go/{slug}`
+- **Content tab** — The hub for generating outreach on a target account. Supports seven channels: Email, LinkedIn InMail, LinkedIn Post, Slack DM, Text / SMS, Sales Page, and Presentation. All content is generated using the account's full context — research, signals, product fit, existing stack, active objections, and your messaging framework.
+- **Sales page** — A personalized landing page generated for a specific account, hosted at `/go/{slug}`. Created from the Content tab by selecting the Sales Page channel. Includes typed sections (hero, value props, comparison, case study, FAQ, CTA) and an embedded AI chat.
 - **SegmentCampaign** — The database record for a sales page: headline, sections, CTA, slug, and tracking data
-- **Campaigns tab** — The company tab where you generate and manage sales pages
 
 ---
 

@@ -176,9 +176,11 @@ Terms introduced in this chapter:
 - **Signal** — A detected event at a target account: executive hire, earnings call, product announcement, funding round, acquisition, or industry news
 - **Signal types** — Categories of signals the system monitors: `executive_hire`, `executive_departure`, `earnings_call`, `product_announcement`, `funding_round`, `acquisition`, `industry_news`, `job_posting_signal`
 - **Relevance score** — How relevant a signal is to your products and territory (1-10 scale)
-- **Play** — A templated outreach motion triggered by a signal or account condition: new_buying_group, event_invite, feature_release, re_engagement, or champion_enablement
-- **Play engine** — The system that loads account context, selects the right play, and generates multi-channel content (email + LinkedIn + talking points)
-- **Next Best Action** — The prioritized recommendation card on your dashboard that surfaces signals, plays, and actions across your territory
+- **Play** — A tactical outreach motion triggered by a signal or account condition. Five play types: Open New Buying Group, Event Invite, Feature Release, Re-Engagement, and Champion Enablement. Each generates a sales page + email using full account context.
+- **Activity catalog** — A broader library of ~50 structured sales activities (product launches, executive dinners, competitive battlecards, ROI tools, champion development, etc.) that define ordered AE steps for each play. Activities power the Recommended Plays cards on the dashboard.
+- **AE steps** — The ordered actions you follow when running a play (e.g., "Build target list → Send product brief → Offer briefing → Follow up with ROI"). Shown on play execution screens and Recommended Plays cards.
+- **Play engine** — The system that loads account context, selects the right play and linked activity, and generates multi-channel content (email + LinkedIn + talking points)
+- **Next Best Action** — The prioritized recommendation card on your dashboard that surfaces signals, plays, and actions across your territory. Includes AE step previews so you know exactly what to do next.
 
 ---
 

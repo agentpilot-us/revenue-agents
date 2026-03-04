@@ -159,7 +159,7 @@ Terms introduced in this chapter:
 - **Event matching** — The system scores your events against each account's objections, existing products, and buying group needs to determine relevance
 - **Event invite play** — A play type that generates an event-themed sales page and personalized invite email for a specific buying group and event
 - **CompanyEvent** — An event record in the content library: title, description, date, URL, and relevance metadata
-- **Segment** — A buying group (department) within an account targeted for outreach. Event invites and campaigns can be sent to a full segment with per-contact personalization.
+- **Segment** — A buying group (department) within an account targeted for outreach. Event invites and sales pages can be sent to a full segment with per-contact personalization.
 
 ---
 

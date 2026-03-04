@@ -159,17 +159,19 @@ One sentence in the chat. Seven steps executed. Full context used.
 
 ---
 
-## Step 4: Available plan types
+## Step 4: Available play types
 
-The chat supports five plan types:
+The chat supports five tactical play types. Each play is backed by the **activity catalog** — a library of ~50 structured activities across six categories (Product & Platform, Events & Experiences, Content & Assets, Gifts & Personal Touches, Customer Programs, Deal Plays & Motions). When a play runs, it loads the linked activity definition to determine the AE steps, target segment, and expected outcomes.
 
-| Plan type | When to use | What it generates |
+| Play type | When to use | What it generates |
 |---|---|---|
-| **expand_existing** | Account uses your product; expand to more teams or deepen usage | Sales page + email + briefing |
-| **new_buying_group** | New department identified as a potential buyer | Sales page + email |
-| **event_invite** | Upcoming event relevant to the account | Event sales page + invite email |
-| **re_engagement** | Deal went quiet; use a fresh signal as a hook | Sales page + email + briefing |
-| **champion_enablement** | Champion needs executive-ready content to sell internally | Executive-framed page + email + briefing |
+| **Open New Buying Group** | New department identified as a potential buyer | Sales page + email |
+| **Event Invite** | Upcoming event relevant to the account | Event sales page + invite email |
+| **Feature Release** | New product or feature to share with high-fit buying groups | Feature announcement page + email |
+| **Re-Engagement** | Deal went quiet; use a fresh signal as a hook | Sales page + email + briefing |
+| **Champion Enablement** | Champion needs executive-ready content to sell internally | Executive-framed page + email + briefing |
+
+Each play generates content across multiple channels. From the Content tab you can also generate output in any of the seven channels independently: **Email**, **LinkedIn InMail**, **LinkedIn Post**, **Slack DM**, **Text / SMS**, **Sales Page**, or **Presentation**.
 
 Examples:
 
@@ -177,6 +179,19 @@ Examples:
 - *"Run an event invite plan for Macy's Marketing for Dreamforce"*
 - *"Run a re-engagement plan for Kohl's Marketing with MC Next"*
 - *"Run a champion enablement plan for Kohl's Marketing with MC Next"*
+
+### Activity catalog examples
+
+The activity catalog provides the step-by-step playbook for each play. Some examples:
+
+| Category | Activity | AE steps |
+|---|---|---|
+| Product | New Product Release | Build target list → Send product brief → Offer briefing/demo → Host launch webinar → Follow up with ROI |
+| Event | Executive Dinner (Intimate) | Identify 8-12 strategic accounts → Personalized CEO invite → Plan discussion topic → Seat mapping → Follow up within 48h |
+| Content | ROI/Business Case Tool | Offer personalized ROI assessment → Walk through calculator → Deliver custom report → Use in proposal → Arm champion |
+| Gift | Personalized Research/Insight | Research challenges → Create custom insight doc → Deliver pure value (no pitch) → Offer deeper conversation |
+| Customer | Champion Development Program | Identify champions → Provide enablement tools → Arm with business case → Connect champions cross-account → Reward contributions |
+| Deal | Competitive Displacement | Identify competitor accounts → Research weaknesses → Build differentiation → Offer migration help → Risk-reversal guarantee |
 
 ---
 
@@ -255,6 +270,8 @@ Terms introduced in this chapter:
 
 - **Action mapping** — A rule connecting a signal type to an automatic response: which play to run and at what autonomy level (notify, queue, or fully autonomous)
 - **Autonomy level** — How much control you keep over auto-generated actions: notify only, queue for approval, or fully autonomous
+- **Activity catalog** — The library of ~50 structured sales activities across six categories (Product & Platform, Events & Experiences, Content & Assets, Gifts & Personal Touches, Customer Programs, Deal Plays & Motions). Each activity defines AE steps, target segments, expected outcomes, and timing. Activities are linked to plays and power the dashboard's Recommended Plays.
+- **Content channels** — The seven output formats available from the Content tab: Email, LinkedIn InMail, LinkedIn Post, Slack DM, Text / SMS, Sales Page, and Presentation. Plays auto-select the appropriate channels; you can also generate any channel independently.
 - **`execute_expansion_plan`** — The chat command that runs a complete plan: context loading, page generation, publishing, email generation, briefing creation, and activity logging — all in one step
 - **Plan Execution Card** — The real-time UI in chat that shows each step of an autonomous plan as it executes
 - **Scheduled actions** — Deferred tasks (email sends, sequence advances) stored in the database and processed by a cron job every 15 minutes
@@ -269,10 +286,10 @@ You've completed the full arc:
 
 | Phase | Chapters | What you learned |
 |---|---|---|
-| **Foundation** | [1](./01-setting-up-your-command-center.md) | Set up your company, products, content, and messaging |
-| **Territory** | [2](./02-new-product-launch.md), [3](./03-boost-sales-35-percent.md) | Add accounts, research companies, build your Sales Map |
-| **Craft** | [4](./04-new-vp-at-target-account.md), [5](./05-prep-for-tomorrows-meeting.md), [6](./06-event-season.md), [7](./07-deal-is-stalling.md) | Respond to signals, prep for meetings, run events, re-engage deals |
-| **Scale** | [8](./08-going-autonomous.md) | Automate signal detection, plan execution, sequences, and approvals |
+| **Foundation** | [1](./01-setting-up-your-command-center.md) | Set up your company, products, content library, and messaging |
+| **Territory** | [2](./02-new-product-launch.md), [3](./03-boost-sales-35-percent.md) | Add accounts, research companies, build your Sales Map, understand product framing |
+| **Craft** | [4](./04-new-vp-at-target-account.md), [5](./05-prep-for-tomorrows-meeting.md), [6](./06-event-season.md), [7](./07-deal-is-stalling.md) | Respond to signals, generate multi-channel content, run plays with AE steps, prep for meetings, manage contacts, re-engage deals |
+| **Scale** | [8](./08-going-autonomous.md) | Automate signal detection, play execution via activity catalog, sequences, approval queues, and scheduled actions |
 
 The system gets smarter as you use it. Every objection you log, every product profile you refine, every messaging framework you update — it all feeds into the AI's context. The more you teach it, the less you have to review.
 
