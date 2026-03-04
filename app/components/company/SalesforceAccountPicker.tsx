@@ -20,7 +20,7 @@ export function SalesforceAccountPicker({ onImported }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importingId, setImportingId] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const fetchAccounts = useCallback(async (term: string) => {
     setLoading(true);
