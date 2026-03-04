@@ -23,7 +23,6 @@ Every third-party service Revenue-Agents depends on, what it powers, how to conf
 | [HubSpot](#hubspot) | CRM | Optional | Account/contact sync, activity push |
 | [Vercel](#vercel-platform) | Hosting | **Yes** | Hosting, cron jobs, sales page deployment |
 | [Vercel Blob](#vercel-blob) | Storage | Optional | File uploads (content library, logos) |
-| [GitHub](#github) | Access mgmt | Optional | Org invites after purchase |
 | [Slack](#slack) | Alerts | Optional | Webhook-based alert notifications |
 | [ActivePieces](#activepieces) | Automation | Optional | MCP-based flow automation (Cursor only) |
 
@@ -459,36 +458,6 @@ BLOB_READ_WRITE_TOKEN="vercel_blob_rw_..."
 **Key files:** `app/api/content-library/upload/route.ts`, `app/api/user/logo/route.ts`
 
 ---
-
-## Access Management
-
-### GitHub
-
-Invites users to a GitHub organization and product-specific teams after purchase.
-
-**Env vars:**
-
-```
-GITHUB_TOKEN="ghp_..."
-GITHUB_ORG="your-org"
-GITHUB_TEAM_ID="123456"
-
-# Per-product team slugs
-GITHUB_TEAM_NEW_LOGO="new-logo-subscribers"
-GITHUB_TEAM_EXPANSION="expansion-subscribers"
-GITHUB_TEAM_PARTNER="partner-subscribers"
-GITHUB_TEAM_SALES_VELOCITY="velocity-subscribers"
-GITHUB_TEAM_COMPLETE="complete-subscribers"
-```
-
-**Setup:**
-
-1. Create a GitHub organization
-2. Create teams for each product tier
-3. Generate a personal access token with `admin:org` scope
-4. Get team IDs via `curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/orgs/YOUR_ORG/teams`
-
-**Key files:** `lib/github.ts`
 
 ---
 
