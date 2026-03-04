@@ -6,14 +6,9 @@ async function seedTestAccounts() {
   console.log('🌱 Seeding test accounts...')
   
   // Get your user (assuming you have one)
-  let user = await prisma.user.findFirst()
+  const user = await prisma.user.findFirst()
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: 'michelle@stradexai.com',
-        name: 'Michelle',
-      },
-    })
+    throw new Error('No user found. Sign in first, then run this seed script.')
   }
   
   // Get catalog products (these are global, not user-scoped)

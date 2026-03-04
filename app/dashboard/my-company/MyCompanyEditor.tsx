@@ -13,6 +13,7 @@ type Props = {
 };
 
 export function MyCompanyEditor({ initial }: Props) {
+  const [editing, setEditing] = useState(false);
   const [companyName, setCompanyName] = useState(initial.companyName ?? '');
   const [companyWebsite, setCompanyWebsite] = useState(initial.companyWebsite ?? '');
   const [companyIndustry, setCompanyIndustry] = useState(
@@ -26,7 +27,6 @@ export function MyCompanyEditor({ initial }: Props) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const handleSave = async () => {
     setSaving(true);
@@ -39,9 +39,7 @@ export function MyCompanyEditor({ initial }: Props) {
 
       const res = await fetch('/api/my-company/intelligence', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyName: companyName || null,
           companyWebsite: companyWebsite || null,
@@ -55,13 +53,26 @@ export function MyCompanyEditor({ initial }: Props) {
         setError(data?.error ?? 'Failed to save company profile.');
         return;
       }
-      setSavedAt(new Date());
+      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save company profile.');
     } finally {
       setSaving(false);
     }
   };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        Edit profile
+      </button>
+    );
+  }
 
   return (
     <div className="mt-4 rounded-lg border border-border/60 bg-background/40 p-4 space-y-3">
@@ -125,11 +136,13 @@ export function MyCompanyEditor({ initial }: Props) {
         >
           {saving ? 'Saving…' : 'Save profile'}
         </button>
-        {savedAt && (
-          <span className="text-[11px] text-muted-foreground">
-            Saved at {savedAt.toLocaleTimeString()}
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Cancel
+        </button>
         {error && (
           <span className="text-[11px] text-amber-500 truncate max-w-[220px]">
             {error}
@@ -139,4 +152,3 @@ export function MyCompanyEditor({ initial }: Props) {
     </div>
   );
 }
-
