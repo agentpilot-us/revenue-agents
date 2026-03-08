@@ -23,6 +23,7 @@
     "@ai-sdk/anthropic": "^2.0.59",
     "@ai-sdk/google": "^3.0.29",
     "@ai-sdk/mcp": "^1.0.23",
+    "@ai-sdk/openai": "^3.0.41",
     "@ai-sdk/react": "^3.0.79",
     "@anthropic-ai/sdk": "^0.32.1",
     "@auth/prisma-adapter": "^2.11.1",

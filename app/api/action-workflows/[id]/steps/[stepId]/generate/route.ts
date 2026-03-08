@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { generateStepContent } from '@/lib/action-workflows/generate-step-content';
 
+export const maxDuration = 120;
+
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; stepId: string }> },

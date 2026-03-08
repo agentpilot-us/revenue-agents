@@ -5,11 +5,13 @@
  *
  * Env (priority order):
  * - USE_MOCK_LLM=true → mock model (no API calls)
+ * - LLM_PROVIDER=lmstudio → Local LM Studio (OpenAI-compatible)
  * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude
  * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
  * - else ANTHROPIC_API_KEY → Claude
  */
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 import { simulateReadableStream } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
@@ -60,12 +62,23 @@ function getAnthropicModel() {
   return anthropic(ANTHROPIC_MODEL);
 }
 
+function getLmStudioModel() {
+  const lmstudio = createOpenAI({
+    baseURL: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
+    apiKey: process.env.LMSTUDIO_API_KEY || 'lm-studio',
+  });
+  return lmstudio(process.env.LMSTUDIO_MODEL || 'qwen2.5-coder-32b-instruct');
+}
+
 export type ModelTier = 'full' | 'fast' | 'extraction';
 
 const GEMINI_FAST_MODEL = process.env.GEMINI_FAST_MODEL ?? 'gemini-2.0-flash-lite';
 const ANTHROPIC_FAST_MODEL = 'claude-3-5-haiku-20241022';
 
 function getFastModel() {
+  if (process.env.LLM_PROVIDER === 'lmstudio') {
+    return getLmStudioModel();
+  }
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini') {
     return google(GEMINI_FAST_MODEL);
   }
@@ -86,6 +99,7 @@ function getFastModel() {
  *
  * Env overrides (priority order):
  * - USE_MOCK_LLM=true → mock model (no API calls)
+ * - LLM_PROVIDER=lmstudio → Local LM Studio (OpenAI-compatible)
  * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude
  * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
  * - else ANTHROPIC_API_KEY → Claude
@@ -99,6 +113,9 @@ export function getChatModel(tier: ModelTier = 'full') {
     return getFastModel();
   }
 
+  if (process.env.LLM_PROVIDER === 'lmstudio') {
+    return getLmStudioModel();
+  }
   if (process.env.LLM_PROVIDER === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     return getAnthropicModel();
   }
