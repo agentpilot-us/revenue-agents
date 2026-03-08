@@ -107,7 +107,7 @@ export default function AccountWorkspacePage({ companyId }: Props) {
         <ActionWorkspace
           companyId={companyId}
           activeWorkflowId={workflowParam}
-          workflows={(data.workflows as Array<Record<string, unknown>>) || []}
+          workflows={(data.workflows as never[]) || []}
           onRefresh={fetchData}
         />
 
