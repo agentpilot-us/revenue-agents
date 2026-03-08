@@ -114,7 +114,7 @@ export default function ChatDrawer({ accountId, companyName }: Props) {
 
           {/* Chat body */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <ChatUI accountId={accountId} embedded />
+            <ChatUI playId="chat" accountId={accountId} compact />
           </div>
         </div>
       )}
