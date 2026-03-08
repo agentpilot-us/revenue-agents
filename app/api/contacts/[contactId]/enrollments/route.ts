@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
     const session = await auth();
@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id: contactId } = await params;
+    const { contactId } = await params;
 
     const contact = await prisma.contact.findFirst({
       where: { id: contactId },
@@ -58,7 +58,7 @@ export async function GET(
       })),
     });
   } catch (e) {
-    console.error('GET /api/contacts/[id]/enrollments', e);
+    console.error('GET /api/contacts/[contactId]/enrollments', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { sendEmailAlert } from './channels/email';
 import { sendSlackAlert } from './channels/slack';
 import { sendWebhookAlert } from './channels/webhook';
+import { createEngagementWorkflow } from '@/lib/action-workflows/engagement-trigger';
 
 type VisitForAlerts = {
   id: string;
@@ -59,6 +60,36 @@ export async function checkAndTriggerAlerts(visit: VisitForAlerts): Promise<void
       alertSettings: settings,
       slackWebhookUrl: user.slackWebhookUrl,
     });
+  }
+
+  // Create ActionWorkflows for high-value engagement alerts
+  const workflowAlertTypes = new Set([
+    'HIGH_VALUE_VISITOR',
+    'EXECUTIVE_VISIT',
+    'FORM_SUBMISSION',
+    'CTA_CLICKED',
+    'MULTIPLE_CHAT_MESSAGES',
+    'RETURNING_VISITOR',
+  ]);
+  const campaignTitle = (campaign as { title?: string }).title ?? 'Landing page';
+
+  for (const alert of conditions) {
+    if (!workflowAlertTypes.has(alert.type)) continue;
+    try {
+      await createEngagementWorkflow({
+        userId: user.id,
+        companyId: campaign.company.id,
+        visitId: visit.id,
+        alertType: alert.type,
+        visitorName: visit.visitorName,
+        visitorEmail: visit.visitorEmail,
+        visitorTitle: visit.visitorJobTitle,
+        campaignName: campaignTitle,
+        departmentId: (visit as { departmentId?: string }).departmentId,
+      });
+    } catch (err) {
+      console.error(`[Alerts] Failed to create engagement workflow for ${alert.type}:`, err);
+    }
   }
 }
 

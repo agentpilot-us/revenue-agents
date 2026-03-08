@@ -1,6 +1,7 @@
 import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { PLAYS, type Play, type PlayContext } from './plays-config';
+import { PLAYS, type Play } from './play-definitions';
+import type { PlayContext } from './constants';
 
 export type SuggestedPlay = {
   play: Play;

@@ -19,7 +19,7 @@ import { getOutboundProvider } from '@/lib/email';
 import { executePlay, type ExecutePlayResult } from '@/lib/plays/execute-play';
 import { generateOneContent } from '@/lib/plays/generate-content';
 import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
-import { SECTION_TYPES_INSTRUCTION } from '@/lib/plays/plays-config';
+import { SECTION_TYPES_INSTRUCTION } from '@/lib/plays/constants';
 import { salesPageSectionSchema } from '@/lib/campaigns/sales-page-schema';
 import type { PlanContext } from './plan-context';
 import { nanoid } from 'nanoid';

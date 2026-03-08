@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+type TemplateOption = {
+  id: string;
+  name: string;
+  triggerType: string | null;
+};
+
 type ActionMapping = {
   id: string;
   signalCategory: string | null;
@@ -10,6 +16,8 @@ type ActionMapping = {
   promptHint: string | null;
   signalRuleId: string | null;
   signalRule: { id: string; name: string; category: string } | null;
+  templateId: string | null;
+  template: { id: string; name: string; triggerType: string | null } | null;
   createdAt: string;
 };
 
@@ -18,15 +26,77 @@ type Props = {
 };
 
 const SIGNAL_CATEGORIES = [
-  { value: 'earnings_call', label: 'Earnings Call' },
-  { value: 'product_announcement', label: 'Product Announcement' },
-  { value: 'executive_hire', label: 'Executive Hire' },
-  { value: 'executive_departure', label: 'Executive Departure' },
-  { value: 'funding_round', label: 'Funding Round' },
-  { value: 'acquisition', label: 'Acquisition' },
-  { value: 'industry_news', label: 'Industry News' },
-  { value: 'job_posting_signal', label: 'Job Posting Signal' },
-  { value: 'renewal_approaching', label: 'Renewal Approaching' },
+  // Leadership & Organization
+  { value: 'new_csuite_executive', label: 'New C-Suite Executive', group: 'Leadership & Organization' },
+  { value: 'new_vp_hire', label: 'New VP-Level Hire', group: 'Leadership & Organization' },
+  { value: 'multiple_dept_heads_hired', label: 'Multiple Department Heads Hired', group: 'Leadership & Organization' },
+  { value: 'executive_departure', label: 'Executive Departure', group: 'Leadership & Organization' },
+  { value: 'founder_stepping_down', label: 'Founder Stepping Down', group: 'Leadership & Organization' },
+  { value: 'layoffs_headcount_reduction', label: 'Layoffs/Headcount Reduction', group: 'Leadership & Organization' },
+  { value: 'rapid_hiring_surge', label: 'Rapid Hiring Surge', group: 'Leadership & Organization' },
+  { value: 'engineering_team_expansion', label: 'Engineering Team Expansion', group: 'Leadership & Organization' },
+  { value: 'sales_team_expansion', label: 'Sales Team Expansion', group: 'Leadership & Organization' },
+  { value: 'geographic_expansion', label: 'Geographic Expansion', group: 'Leadership & Organization' },
+  { value: 'job_posting_your_category', label: 'Job Posting for Your Category', group: 'Leadership & Organization' },
+  // Financial & Funding
+  { value: 'series_a_seed', label: 'Series A/Seed Funding', group: 'Financial & Funding' },
+  { value: 'series_b', label: 'Series B Funding', group: 'Financial & Funding' },
+  { value: 'series_c_late_stage', label: 'Series C+ / Late-Stage Funding', group: 'Financial & Funding' },
+  { value: 'earnings_beat', label: 'Quarterly Earnings Beat', group: 'Financial & Funding' },
+  { value: 'earnings_miss', label: 'Quarterly Earnings Miss', group: 'Financial & Funding' },
+  { value: 'raised_guidance', label: 'Raised Guidance/Forecast', group: 'Financial & Funding' },
+  { value: 'ipo_announcement', label: 'IPO Announcement/S-1 Filing', group: 'Financial & Funding' },
+  { value: 'post_ipo_first_quarter', label: 'Post-IPO (First Quarter)', group: 'Financial & Funding' },
+  // M&A & Partnerships
+  { value: 'acquisition_they_acquired', label: 'Acquisition (They Acquired)', group: 'M&A & Partnerships' },
+  { value: 'acquisition_they_were_acquired', label: 'Acquisition (They Were Acquired)', group: 'M&A & Partnerships' },
+  { value: 'merger_announcement', label: 'Merger Announcement', group: 'M&A & Partnerships' },
+  { value: 'divestiture_spinoff', label: 'Divestiture/Spin-off', group: 'M&A & Partnerships' },
+  { value: 'strategic_partnership', label: 'Strategic Partnership Announcement', group: 'M&A & Partnerships' },
+  { value: 'technology_partnership', label: 'Technology Partnership/Integration', group: 'M&A & Partnerships' },
+  // Technology & Product
+  { value: 'new_technology_adoption', label: 'New Technology Adoption', group: 'Technology & Product' },
+  { value: 'platform_migration', label: 'Platform Migration', group: 'Technology & Product' },
+  { value: 'legacy_system_sunset', label: 'Legacy System Sunset', group: 'Technology & Product' },
+  { value: 'product_launch_announcement', label: 'Product Launch Announcement', group: 'Technology & Product' },
+  { value: 'security_breach', label: 'Security Breach/Incident', group: 'Technology & Product' },
+  { value: 'compliance_certification', label: 'Compliance Certification Pursued', group: 'Technology & Product' },
+  { value: 'tech_stack_changes', label: 'Tech Stack Changes Detected', group: 'Technology & Product' },
+  // Market & Competitive
+  { value: 'analyst_recognition', label: 'Analyst Recognition', group: 'Market & Competitive' },
+  { value: 'regulatory_change', label: 'Regulatory Changes', group: 'Market & Competitive' },
+  { value: 'competitor_displacement', label: 'Competitor Displacement', group: 'Market & Competitive' },
+  { value: 'contract_renewal_window', label: 'Contract Renewal Window', group: 'Market & Competitive' },
+  { value: 'public_vendor_complaints', label: 'Public Vendor Complaints', group: 'Market & Competitive' },
+  { value: 'competitor_acquisition', label: 'Competitor Acquisition', group: 'Market & Competitive' },
+  // Digital & Intent Signals
+  { value: 'pricing_page_visits', label: 'Pricing Page Visits', group: 'Digital & Intent Signals' },
+  { value: 'demo_request_trial', label: 'Demo Request/Trial Signup', group: 'Digital & Intent Signals' },
+  { value: 'case_study_downloads', label: 'Case Study Downloads', group: 'Digital & Intent Signals' },
+  { value: 'content_consumption_spike', label: 'Content Consumption Spike', group: 'Digital & Intent Signals' },
+  { value: 'competitor_comparison_views', label: 'Competitor Comparison Views', group: 'Digital & Intent Signals' },
+  { value: 'review_site_research', label: 'Review Site Research', group: 'Digital & Intent Signals' },
+  { value: 'event_webinar_registration', label: 'Event/Webinar Registration', group: 'Digital & Intent Signals' },
+  { value: 'social_media_complaint', label: 'Social Media Complaint', group: 'Digital & Intent Signals' },
+  // Customer Expansion Signals
+  { value: 'usage_spike_seat_growth', label: 'Usage Spike/Seat Growth', group: 'Customer Expansion' },
+  { value: 'premium_feature_request', label: 'Premium Feature Request', group: 'Customer Expansion' },
+  { value: 'new_department_interest', label: 'New Department Interest', group: 'Customer Expansion' },
+  { value: 'customer_raised_funding', label: 'Customer Raised Funding', group: 'Customer Expansion' },
+  { value: 'customer_ma_activity', label: 'Customer M&A Activity', group: 'Customer Expansion' },
+  { value: 'contract_renewal_approaching', label: 'Contract Renewal Approaching', group: 'Customer Expansion' },
+  { value: 'champion_promoted', label: 'Champion Promoted', group: 'Customer Expansion' },
+  { value: 'low_nps_negative_feedback', label: 'Low NPS/Negative Feedback', group: 'Customer Expansion' },
+  { value: 'customer_case_study_participation', label: 'Customer Case Study Participation', group: 'Customer Expansion' },
+  // Legacy types for backward compatibility
+  { value: 'executive_hire', label: 'Executive Hire (Legacy)', group: 'Legacy' },
+  { value: 'earnings_call', label: 'Earnings Call (Legacy)', group: 'Legacy' },
+  { value: 'product_announcement', label: 'Product Announcement (Legacy)', group: 'Legacy' },
+  { value: 'funding_round', label: 'Funding Round (Legacy)', group: 'Legacy' },
+  { value: 'acquisition', label: 'Acquisition (Legacy)', group: 'Legacy' },
+  { value: 'industry_news', label: 'Industry News (Legacy)', group: 'Legacy' },
+  { value: 'job_posting_signal', label: 'Job Posting Signal (Legacy)', group: 'Legacy' },
+  { value: 'renewal_approaching', label: 'Renewal Approaching (Legacy)', group: 'Legacy' },
 ] as const;
 
 const AUTONOMY_LEVELS = [
@@ -37,14 +107,16 @@ const AUTONOMY_LEVELS = [
 
 export function ActionMappingEditor({ roadmapId }: Props) {
   const [mappings, setMappings] = useState<ActionMapping[]>([]);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [formCategory, setFormCategory] = useState('earnings_call');
+  const [formCategory, setFormCategory] = useState('new_csuite_executive');
   const [formActionType, setFormActionType] = useState('');
   const [formAutonomy, setFormAutonomy] = useState('draft_review');
+  const [formTemplateId, setFormTemplateId] = useState('');
 
   const fetchMappings = useCallback(async () => {
     try {
@@ -60,12 +132,19 @@ export function ActionMappingEditor({ roadmapId }: Props) {
 
   useEffect(() => {
     fetchMappings();
+    fetch('/api/playbooks/templates')
+      .then((r) => r.json())
+      .then((data) => {
+        setTemplates(data.templates || data || []);
+      })
+      .catch(() => {});
   }, [fetchMappings]);
 
   const resetForm = () => {
-    setFormCategory('earnings_call');
+    setFormCategory('new_csuite_executive');
     setFormActionType('');
     setFormAutonomy('draft_review');
+    setFormTemplateId('');
     setEditingId(null);
     setShowForm(false);
   };
@@ -82,6 +161,7 @@ export function ActionMappingEditor({ roadmapId }: Props) {
             signalCategory: formCategory,
             actionType: formActionType,
             autonomyLevel: formAutonomy,
+            templateId: formTemplateId || null,
           }),
         });
       } else {
@@ -93,6 +173,7 @@ export function ActionMappingEditor({ roadmapId }: Props) {
             signalCategory: formCategory,
             actionType: formActionType,
             autonomyLevel: formAutonomy,
+            templateId: formTemplateId || null,
           }),
         });
       }
@@ -108,6 +189,7 @@ export function ActionMappingEditor({ roadmapId }: Props) {
     setFormCategory(m.signalCategory ?? 'earnings_call');
     setFormActionType(m.actionType);
     setFormAutonomy(m.autonomyLevel);
+    setFormTemplateId(m.templateId ?? '');
     setShowForm(true);
   };
 
@@ -148,6 +230,11 @@ export function ActionMappingEditor({ roadmapId }: Props) {
                   </span>
                 )}
               </div>
+              {m.template && (
+                <div className="text-[10px] text-blue-400">
+                  Play: {m.template.name}
+                </div>
+              )}
               <div className="text-[10px] text-muted-foreground">
                 autonomy:{' '}
                 <span className={al?.color ?? 'text-amber-400'}>
@@ -184,10 +271,12 @@ export function ActionMappingEditor({ roadmapId }: Props) {
               onChange={(e) => setFormCategory(e.target.value)}
               className="w-full text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              {SIGNAL_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
+              {Array.from(new Set(SIGNAL_CATEGORIES.map((c) => c.group))).map((group) => (
+                <optgroup key={group} label={group}>
+                  {SIGNAL_CATEGORIES.filter((c) => c.group === group).map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -201,6 +290,25 @@ export function ActionMappingEditor({ roadmapId }: Props) {
               placeholder="e.g. New Leader Introduction, Contract Expansion"
               className="w-full text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1">Playbook Template</label>
+            <select
+              value={formTemplateId}
+              onChange={(e) => setFormTemplateId(e.target.value)}
+              className="w-full text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">Auto-resolve (based on signal type)</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Select a specific play template, or leave as auto-resolve to let the system pick based on signal type.
+            </p>
           </div>
 
           <div>

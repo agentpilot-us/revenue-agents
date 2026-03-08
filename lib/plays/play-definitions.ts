@@ -1,35 +1,12 @@
 /**
- * Tactical plays: single source of truth for the 5 plays (new buying group,
- * event invite, feature release, re-engagement, champion enablement).
- * Used by the play engine and execute-play.
+ * The 5 legacy sales-page plays.
+ *
+ * These power the execute-play.ts (sales page generation) and engine.ts
+ * (legacy suggestion engine). They are separate from PlaybookTemplate
+ * (the modern play system) and will eventually be migrated to templates.
  */
 
-import {
-  type AEStep,
-  getActivity,
-} from '@/lib/catalog/activity-catalog';
-
-/**
- * Shared instruction block appended to every play prompt so the AI
- * produces sections in the exact typed format the renderer expects.
- */
-export const SECTION_TYPES_INSTRUCTION = `
-SECTION FORMAT — the page.sections array MUST use ONLY these typed section objects:
-- { type: "hero", headline: string, body: string, backgroundContext?: string }
-- { type: "value_props", items: [{ icon?: string (1 emoji), title: string, body: string }] }
-- { type: "how_it_works", steps: [{ number: number, title: string, description: string }] }
-- { type: "comparison", title?: string, withoutProduct: string, withProduct: string, rows?: [{ label: string, without: string, with: string }] }
-- { type: "feature", title: string, description: string, bulletPoints: [string] }
-- { type: "event", name: string, date: string, location: string, description: string, registerUrl: string }
-- { type: "case_study", company: string, result: string, quote?: string }
-- { type: "social_proof", metrics?: [{ value: string, label: string }], quotes: [{ text: string, author: string, title: string }] }
-- { type: "faq", items: [{ question: string, answer: string }] }
-- { type: "cta", headline: string, buttonLabel: string, buttonUrl: string, urgencyText?: string }
-
-Produce 4-7 sections in a logical order. Always start with a "hero" section and end with a "cta" section.
-Include a "value_props" section with 3-4 items. Use "comparison", "how_it_works", "faq", or "social_proof" when the context warrants it.
-Do NOT invent section types beyond the list above.
-`.trim();
+import type { PlayContext } from './constants';
 
 export type PlayId =
   | 'new_buying_group'
@@ -55,30 +32,6 @@ export type PlayPageType =
   | 're_engagement'
   | 'champion_enablement';
 
-export type PlayContext = {
-  accountName: string;
-  accountDomain: string;
-  accountIndustry: string | null;
-  segment: {
-    id: string;
-    name: string;
-    valueProp: string | null;
-    contactCount: number;
-    lastActivityDays: number | null;
-  };
-  events?: { name: string; date: string; description: string }[];
-  featureRelease?: { title: string; date: string; description: string };
-  caseStudy?: { title: string; outcome: string };
-  championName?: string;
-  /** When a play is triggered by an external signal, carry it here */
-  triggerSignal?: {
-    type: string;
-    title: string;
-    summary: string;
-    publishedAt: string;
-  };
-};
-
 export type Play = {
   id: PlayId;
   name: string;
@@ -87,8 +40,6 @@ export type Play = {
   icon: string;
   pageType: PlayPageType;
   condition: PlayTriggerCondition;
-  /** Links this play to a richer activity definition with AE steps. */
-  defaultActivityId?: string;
   buildPrompt: (ctx: PlayContext) => string;
 };
 
@@ -98,10 +49,9 @@ export const PLAYS: Play[] = [
     name: 'Open New Buying Group',
     description: 'Build a sales page and intro email for a buying group with no outreach yet.',
     triggerLabel: 'buying groups with no sales page',
-    icon: '🎯',
+    icon: '\u{1F3AF}',
     pageType: 'sales_page',
     condition: { hasUnenrichedBuyingGroups: true },
-    defaultActivityId: 'new_product_release',
     buildPrompt: (ctx) =>
       `
 Create a sales page and intro email for the ${ctx.segment.name} buying group at ${ctx.accountName}.
@@ -112,7 +62,7 @@ Value proposition for this segment: ${ctx.segment.valueProp ?? 'Not set'}
 ${ctx.triggerSignal ? `
 TRIGGER: ${ctx.triggerSignal.title}
 Context: ${ctx.triggerSignal.summary}
-This signal suggests a new budget owner or stakeholder shift — the page should 
+This signal suggests a new budget owner or stakeholder shift — the page should
 acknowledge the current moment at ${ctx.accountName}, not be evergreen.
 ` : ''}
 
@@ -128,16 +78,14 @@ Build:
 Keep messaging specific to ${ctx.segment.name} — not generic company messaging.
     `.trim(),
   },
-
   {
     id: 'event_invite',
     name: 'Event Invite',
     description: 'Send a personalized event invite to a buying group based on upcoming events.',
     triggerLabel: 'upcoming events match this segment',
-    icon: '📅',
+    icon: '\u{1F4C5}',
     pageType: 'event_invite',
     condition: { hasUpcomingEvents: true },
-    defaultActivityId: 'conference_booth',
     buildPrompt: (ctx) =>
       `
 Create an event invite sales page and email for the ${ctx.segment.name} segment at ${ctx.accountName}.
@@ -161,19 +109,17 @@ Build:
 Reference the segment's specific challenges — not generic "join us at our event" copy.
     `.trim(),
   },
-
   {
     id: 'feature_release',
     name: 'Feature Release',
     description: 'Share a relevant new feature with buying groups that have high product fit.',
     triggerLabel: 'new feature matches this segment',
-    icon: '🚀',
+    icon: '\u{1F680}',
     pageType: 'feature_announcement',
     condition: { hasRecentFeatureRelease: true },
-    defaultActivityId: 'new_feature_release',
     buildPrompt: (ctx) =>
       `
-Create a feature announcement sales page and email for the ${ctx.segment.name} segment 
+Create a feature announcement sales page and email for the ${ctx.segment.name} segment
 at ${ctx.accountName}.
 
 New feature: ${ctx.featureRelease?.title ?? 'New feature'}
@@ -191,26 +137,24 @@ Build:
    - comparison section showing before/after (without vs. with this feature)
    - If existing products are known, reference them in the hero backgroundContext
    - cta section with "See it in action" button
-2. A short email (< 80 words): "thought you'd want to see what we just shipped" tone — 
+2. A short email (< 80 words): "thought you'd want to see what we just shipped" tone —
    not a product announcement blast
 
-Do not use generic feature release language. Connect the feature directly to 
+Do not use generic feature release language. Connect the feature directly to
 ${ctx.segment.name} pain points.
     `.trim(),
   },
-
   {
     id: 're_engagement',
     name: 'Re-Engagement',
     description: 'Re-open a stalled buying group with new evidence and a fresh reason to talk.',
     triggerLabel: 'days since last activity — account may be stalling',
-    icon: '🔄',
+    icon: '\u{1F504}',
     pageType: 'account_intro',
     condition: { daysSinceLastActivity: 21 },
-    defaultActivityId: 'renewal_expansion',
     buildPrompt: (ctx) =>
       `
-Create a re-engagement sales page and email for the ${ctx.segment.name} segment 
+Create a re-engagement sales page and email for the ${ctx.segment.name} segment
 at ${ctx.accountName}.
 
 ${ctx.triggerSignal ? `
@@ -243,19 +187,17 @@ Build:
    Tone: confident, not apologetic. One specific reason to talk now.
     `.trim(),
   },
-
   {
     id: 'champion_enablement',
     name: 'Champion Enablement',
     description: 'Build an executive-facing page your champion can share internally to get deal approved.',
     triggerLabel: 'champion engaged but no economic buyer contact yet',
-    icon: '🏆',
+    icon: '\u{1F3C6}',
     pageType: 'account_intro',
     condition: { hasChampionNoEconomicBuyer: true },
-    defaultActivityId: 'champion_development',
     buildPrompt: (ctx) =>
       `
-Create a champion enablement sales page that ${ctx.championName ?? 'the champion'} 
+Create a champion enablement sales page that ${ctx.championName ?? 'the champion'}
 can share with their executive/economic buyer at ${ctx.accountName}.
 
 This page is NOT for the champion — it's for the executive who will approve the deal.
@@ -268,7 +210,7 @@ ${ctx.caseStudy ? `Proof point: ${ctx.caseStudy.title} — ${ctx.caseStudy.outco
 ${ctx.triggerSignal ? `
 CURRENT CONTEXT AT ACCOUNT:
 ${ctx.triggerSignal.title} — ${ctx.triggerSignal.summary}
-The executive reading this page is likely aware of this. The page should feel 
+The executive reading this page is likely aware of this. The page should feel
 timely, not like a generic vendor pitch.
 ` : ''}
 
@@ -280,47 +222,20 @@ Build:
    - how_it_works section showing what a 30-day evaluation looks like (3-4 steps)
    - If existing products are known, include a comparison section (current state vs. with the new solution)
    - cta section with "Schedule 20-minute executive briefing" button
-2. A short email the champion can use to forward it: 
+2. A short email the champion can use to forward it:
    "I've been working with [vendor] — thought you should see this before our next planning meeting."
-   
+
 No jargon. No feature lists. Executives buy outcomes.
     `.trim(),
   },
 ];
 
-/** Display name for a PlayId (e.g. "Open New Buying Group"). Use for signals and UI labels. */
 export function getPlayDisplayName(
-  playId: PlayId | null | undefined
+  playId: string | null | undefined,
 ): string | null {
   if (!playId) return null;
   const play = PLAYS.find((p) => p.id === playId);
   return play?.name ?? null;
 }
 
-/**
- * Resolve the ordered AE steps for a play. Checks:
- * 1. Custom steps override (from RoadmapPlan previewPayload)
- * 2. The play's linked activity definition
- * 3. Falls back to a generic set of steps
- */
-export function getStepsForPlay(
-  playId: PlayId | null | undefined,
-  stepsOverride?: AEStep[] | null,
-): AEStep[] {
-  if (stepsOverride?.length) return stepsOverride;
-
-  const play = PLAYS.find((p) => p.id === playId);
-  if (play?.defaultActivityId) {
-    const activity = getActivity(play.defaultActivityId);
-    if (activity) return activity.aeSteps;
-  }
-
-  return [
-    { order: 1, label: 'Research account', description: 'Review account context and recent signals', channel: 'content' },
-    { order: 2, label: 'Generate outreach', description: 'Create personalized email, LinkedIn, and talking points', channel: 'email' },
-    { order: 3, label: 'Select contacts', description: 'Choose which contacts to target', channel: 'content' },
-    { order: 4, label: 'Send & track', description: 'Send outreach and monitor engagement', channel: 'email' },
-  ];
-}
-
-export type { AEStep } from '@/lib/catalog/activity-catalog';
+export { type PlayContext } from './constants';

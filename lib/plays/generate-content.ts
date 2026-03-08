@@ -26,7 +26,7 @@ import {
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
 import { prisma } from '@/lib/db';
-import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
+import { buildExistingStackBlock, resolveProductFraming } from '@/lib/products/resolve-product-framing';
 
 export type GenerateContentType = 'email' | 'linkedin' | 'custom_url' | 'talking_points' | 'presentation';
 
@@ -42,7 +42,7 @@ export async function generateOneContent(params: {
   const [company, userRecord] = await Promise.all([
     prisma.company.findFirst({
       where: { id: companyId, userId },
-      select: { id: true, name: true, industry: true },
+      select: { id: true, name: true, industry: true, dealObjective: true, dealContext: true },
     }),
     prisma.user.findUnique({
       where: { id: userId },
@@ -117,6 +117,36 @@ export async function generateOneContent(params: {
   const existingStackSection = await buildExistingStackBlock(companyId, userId);
   const existingStackLine = existingStackSection ? `\n${existingStackSection}\n` : '';
 
+  // Strategic account plan context
+  let dealContextLine = '';
+  if (company.dealObjective) {
+    dealContextLine += `\nDEAL OBJECTIVE: ${company.dealObjective}\n`;
+  }
+  if (company.dealContext && typeof company.dealContext === 'object') {
+    const dc = company.dealContext as Record<string, unknown>;
+    const parts: string[] = [];
+    if (dc.dealShape) parts.push(`Deal shape: ${dc.dealShape}`);
+    if (dc.buyingMotion) parts.push(`Buying motion: ${dc.buyingMotion}`);
+    if (dc.accountStatus) parts.push(`Account status: ${dc.accountStatus}`);
+    if (dc.dealGoal) parts.push(`Deal goal: ${dc.dealGoal}`);
+    if (Array.isArray(dc.targetDivisions) && dc.targetDivisions.length > 0) {
+      parts.push(`Target divisions: ${dc.targetDivisions.join(', ')}`);
+    }
+    if (parts.length > 0) {
+      dealContextLine += `\nSTRATEGIC ACCOUNT PLAN:\n${parts.join('\n')}\n`;
+    }
+  }
+
+  // Product framing (expansion/upgrade/net_new)
+  let productFramingLine = '';
+  const relevantProductIdForFraming = relevantProductIds[0];
+  if (relevantProductIdForFraming) {
+    try {
+      const framing = await resolveProductFraming(companyId, relevantProductIdForFraming);
+      productFramingLine = `\nPRODUCT FRAMING (${framing.framing}): ${framing.context}\n`;
+    } catch { /* non-critical */ }
+  }
+
   const contentTypeInstruction = getContentTypeInstruction(contentType, company.name);
 
   const aeIdentityLine = aeCompany
@@ -132,7 +162,7 @@ ${contentTypeInstruction}
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
 2) YOUR COMPANY: messaging framework, product knowledge, industry playbook, case studies, upcoming events, and feature releases. Use these for value props and tone.
-${existingStackLine}${activeObjectionsSection}
+${dealContextLine}${productFramingLine}${existingStackLine}${activeObjectionsSection}
 ${ragSection}
 ${productSection}
 ${playbookSection}
@@ -235,7 +265,7 @@ export async function generateCombinedPlayContent(params: {
   const [company, userRecord] = await Promise.all([
     prisma.company.findFirst({
       where: { id: companyId, userId },
-      select: { id: true, name: true, industry: true },
+      select: { id: true, name: true, industry: true, dealObjective: true, dealContext: true },
     }),
     prisma.user.findUnique({
       where: { id: userId },
@@ -267,7 +297,7 @@ export async function generateCombinedPlayContent(params: {
     }
   }
 
-  const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds, objectionTexts2, productNames2] = await Promise.all([
+  const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds2, objectionTexts2, productNames2] = await Promise.all([
     getCompanyResearchPromptBlock(companyId, userId),
     getAccountMessagingPromptBlock(companyId, userId),
     getActiveObjectionsBlock(companyId, userId, divisionId),
@@ -278,9 +308,9 @@ export async function generateCombinedPlayContent(params: {
   ]);
 
   const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
-    getProductKnowledgeBlock(userId, relevantProductIds.length > 0 ? relevantProductIds : undefined),
+    getProductKnowledgeBlock(userId, relevantProductIds2.length > 0 ? relevantProductIds2 : undefined),
     getIndustryPlaybookBlock(userId, company.industry ?? null),
-    getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds),
+    getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds2),
     getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
       activeObjections: objectionTexts2,
       existingProducts: productNames2,
@@ -308,6 +338,36 @@ export async function generateCombinedPlayContent(params: {
   const existingStackSection2 = await buildExistingStackBlock(companyId, userId);
   const existingStackLine2 = existingStackSection2 ? `\n${existingStackSection2}\n` : '';
 
+  // Strategic account plan context
+  let dealContextLine2 = '';
+  if (company.dealObjective) {
+    dealContextLine2 += `\nDEAL OBJECTIVE: ${company.dealObjective}\n`;
+  }
+  if (company.dealContext && typeof company.dealContext === 'object') {
+    const dc = company.dealContext as Record<string, unknown>;
+    const parts: string[] = [];
+    if (dc.dealShape) parts.push(`Deal shape: ${dc.dealShape}`);
+    if (dc.buyingMotion) parts.push(`Buying motion: ${dc.buyingMotion}`);
+    if (dc.accountStatus) parts.push(`Account status: ${dc.accountStatus}`);
+    if (dc.dealGoal) parts.push(`Deal goal: ${dc.dealGoal}`);
+    if (Array.isArray(dc.targetDivisions) && dc.targetDivisions.length > 0) {
+      parts.push(`Target divisions: ${dc.targetDivisions.join(', ')}`);
+    }
+    if (parts.length > 0) {
+      dealContextLine2 += `\nSTRATEGIC ACCOUNT PLAN:\n${parts.join('\n')}\n`;
+    }
+  }
+
+  // Product framing
+  let productFramingLine2 = '';
+  const relevantProductIdForFraming2 = relevantProductIds2[0];
+  if (relevantProductIdForFraming2) {
+    try {
+      const framing = await resolveProductFraming(companyId, relevantProductIdForFraming2);
+      productFramingLine2 = `\nPRODUCT FRAMING (${framing.framing}): ${framing.context}\n`;
+    } catch { /* non-critical */ }
+  }
+
   const aeIdentityLine = aeCompany
     ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
     : `You are writing on behalf of ${aeName}.\n`;
@@ -324,7 +384,7 @@ export async function generateCombinedPlayContent(params: {
 ${aeIdentityLine}${divisionIntelLine}
 Generate ALL of the following for the target account "${company.name}" in a single response:
 ${outputInstructions}
-${existingStackLine2}${activeObjectionsSection}
+${dealContextLine2}${productFramingLine2}${existingStackLine2}${activeObjectionsSection}
 ${ragSection}
 ${productSection}
 ${playbookSection}

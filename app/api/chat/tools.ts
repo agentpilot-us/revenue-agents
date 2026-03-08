@@ -6,6 +6,11 @@ import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
 import { discoverDepartments } from '@/app/actions/discover-departments';
 import { isDemoAccount } from '@/lib/demo/is-demo-account';
 import { fetchAccountSignals } from '@/lib/signals/fetch-account-signals';
+import {
+  getContactPulse,
+  findContactsMissingAction,
+  findContactsWithResponse,
+} from '@/lib/contacts/contact-pulse';
 
 /**
  * Chat tools for department discovery and lookup.
@@ -978,6 +983,139 @@ export const chatTools = {
         const message = err instanceof Error ? err.message : 'Failed to create campaign';
         return { error: message };
       }
+    },
+  }),
+
+  get_contact_activity: tool({
+    description:
+      'Get activity pulse for a specific contact — emails sent, opens, clicks, replies, pending follow-ups, event invitations, and recent activity timeline. Use when the user asks "How many emails did I send to [name]?", "Did [name] open my email?", "What\'s the status with [contact]?", or "Who responded?"',
+    inputSchema: z.object({
+      companyId: z
+        .string()
+        .describe('The company ID (current account from context)'),
+      contactName: z
+        .string()
+        .optional()
+        .describe('Contact name to search for (first, last, or full)'),
+      contactId: z.string().optional().describe('Contact ID if known'),
+    }),
+    execute: async ({ companyId, contactName: name, contactId }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+
+      let resolvedId = contactId;
+      if (!resolvedId && name) {
+        const q = name.trim().toLowerCase();
+        const contacts = await prisma.contact.findMany({
+          where: { companyId, company: { userId: session.user.id } },
+          select: { id: true, firstName: true, lastName: true },
+        });
+        const match = contacts.find((c) => {
+          const full = [c.firstName, c.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return (
+            full.includes(q) ||
+            c.firstName?.toLowerCase() === q ||
+            c.lastName?.toLowerCase() === q
+          );
+        });
+        if (!match) return { error: `No contact found matching "${name}" at this account.` };
+        resolvedId = match.id;
+      }
+
+      if (!resolvedId) return { error: 'Provide contactName or contactId.' };
+
+      const pulse = await getContactPulse(resolvedId, session.user.id);
+      if (!pulse) return { error: 'Contact not found or not accessible.' };
+      return pulse;
+    },
+  }),
+
+  find_contacts_missing_action: tool({
+    description:
+      'Find contacts at a company who have NOT received a specific action — event invite, email, or meeting. Use when the user asks "Who hasn\'t gotten a GTC invite?", "Which VPs haven\'t been emailed?", "Who haven\'t I contacted in 30 days?", or "Who responded to my outreach?"',
+    inputSchema: z.object({
+      companyId: z
+        .string()
+        .describe('The company ID (current account from context)'),
+      actionType: z
+        .enum(['event_invite', 'email', 'meeting', 'any_touch', 'responded_opened', 'responded_clicked', 'responded_replied'])
+        .describe(
+          'Type of action to check. Use event_invite for event invitations, email for emails sent, meeting for meetings, any_touch for any activity. Use responded_* to find contacts who DID respond.',
+        ),
+      eventName: z
+        .string()
+        .optional()
+        .describe(
+          'Event name to filter by (for event_invite), e.g. "GTC", "AWS re:Invent"',
+        ),
+      sinceDays: z
+        .number()
+        .optional()
+        .describe(
+          'Only look at actions in the last N days (default: all time for missing, 30 for responded)',
+        ),
+      minSeniorityLevel: z
+        .number()
+        .optional()
+        .describe(
+          'Minimum seniority level: 1=IC, 2=Manager, 3=Director, 4=VP, 5=SVP, 6=C-Suite',
+        ),
+    }),
+    execute: async ({
+      companyId,
+      actionType,
+      eventName,
+      sinceDays,
+      minSeniorityLevel,
+    }) => {
+      const session = await auth();
+      if (!session?.user?.id) return { error: 'Unauthorized' };
+
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+        select: { name: true },
+      });
+      if (!company) return { error: 'Company not found' };
+
+      if (actionType.startsWith('responded_')) {
+        const responseType = actionType.replace('responded_', '') as
+          | 'opened'
+          | 'clicked'
+          | 'replied';
+        const results = await findContactsWithResponse({
+          companyId,
+          userId: session.user.id,
+          responseType,
+          sinceDays,
+        });
+        return {
+          companyName: company.name,
+          responseType,
+          count: results.length,
+          contacts: results,
+        };
+      }
+
+      const results = await findContactsMissingAction({
+        companyId,
+        userId: session.user.id,
+        actionType: actionType as 'event_invite' | 'email' | 'meeting' | 'any_touch',
+        eventName,
+        sinceDays,
+        minSeniorityLevel,
+      });
+
+      return {
+        companyName: company.name,
+        actionType,
+        eventName: eventName ?? undefined,
+        sinceDays: sinceDays ?? 'all time',
+        missingCount: results.length,
+        contacts: results,
+      };
     },
   }),
 };

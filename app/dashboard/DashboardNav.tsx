@@ -14,6 +14,7 @@ import {
   Presentation,
   Users,
   Map,
+  Play,
 } from 'lucide-react';
 import { dash, PRIMARY_NAV_KEYS, UTILITY_NAV_KEYS } from '@/app/dashboard/dashboard-classes';
 
@@ -22,9 +23,10 @@ const navigation: Array<{
   href: string;
   icon: typeof Home;
 }> = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Your Sales Map', href: '/dashboard/roadmap', icon: Map },
+  { name: 'My Day', href: '/dashboard', icon: Home },
+  { name: 'Strategic Account Plan', href: '/dashboard/roadmap', icon: Map },
   { name: 'Target Accounts', href: '/dashboard/companies', icon: Building2 },
+  { name: 'Plays', href: '/dashboard/plays', icon: Play },
   { name: 'My Company', href: '/dashboard/my-company', icon: BookOpen },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Webhooks', href: '/dashboard/webhooks', icon: Bolt },

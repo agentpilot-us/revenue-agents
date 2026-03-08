@@ -33,11 +33,36 @@ export async function POST(_req: NextRequest) {
       );
     }
 
+    const customConfigs = await prisma.customSignalConfig.findMany({
+      where: {
+        userId,
+        type: 'exa_search',
+        isActive: true,
+        OR: [{ companyId: null }, { companyId: company.id }],
+      },
+      select: { name: true, config: true },
+    });
+
+    const customQueries = customConfigs
+      .map((c) => {
+        const cfg = c.config as Record<string, unknown> | null;
+        if (!cfg || typeof cfg.query !== 'string') return null;
+        return {
+          configName: c.name,
+          query: cfg.query,
+          numResults: typeof cfg.numResults === 'number' ? cfg.numResults : 5,
+        };
+      })
+      .filter(Boolean) as { configName: string; query: string; numResults: number }[];
+
     const result = await fetchAccountSignals(
       company.name,
       company.domain ?? '',
       company.industry,
-      48
+      48,
+      undefined,
+      undefined,
+      customQueries.length > 0 ? customQueries : undefined,
     );
 
     let created = 0;

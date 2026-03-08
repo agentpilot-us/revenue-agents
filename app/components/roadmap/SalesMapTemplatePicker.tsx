@@ -18,18 +18,31 @@ type Template = {
   }>;
 };
 
-type Props = {
-  roadmapId: string;
-  targetId: string;
-  targetLabel: string;
+type DivisionTarget = {
+  id: string;
+  label: string;
 };
 
-export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Props) {
+type Props = {
+  roadmapId: string;
+  targetId?: string;
+  targetLabel?: string;
+  targets?: DivisionTarget[];
+};
+
+export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel, targets }: Props) {
+  const allTargets: DivisionTarget[] = targets && targets.length > 0
+    ? targets
+    : targetId ? [{ id: targetId, label: targetLabel ?? 'Division' }] : [];
+
+  const [activeTargetId, setActiveTargetId] = useState(allTargets[0]?.id ?? '');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ phases: unknown[] } | null>(null);
+  const activeLabel = allTargets.find((t) => t.id === activeTargetId)?.label ?? '';
 
   useEffect(() => {
     fetch('/api/roadmap/templates')
@@ -37,22 +50,32 @@ export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Pro
       .then((data) => {
         if (data.templates) setTemplates(data.templates);
       })
+      .catch(() => setError('Failed to load templates'))
       .finally(() => setLoading(false));
   }, []);
 
   const handleGenerate = async () => {
-    if (!selectedId) return;
+    if (!selectedId || !activeTargetId) return;
     setGenerating(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/roadmap/targets/${targetId}/generate-plans`, {
+      const res = await fetch(`/api/roadmap/targets/${activeTargetId}/generate-plans`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: selectedId, roadmapId }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPreview(data.preview);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? `Generation failed (${res.status})`);
+        return;
       }
+      if (data.preview) {
+        setPreview(data.preview);
+      } else {
+        setError('No preview returned from the generator');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error during generation');
     } finally {
       setGenerating(false);
     }
@@ -64,15 +87,42 @@ export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Pro
     return <p className="text-sm text-gray-500">Loading templates...</p>;
   }
 
+  if (allTargets.length === 0) return null;
+
   return (
     <div className="rounded-lg border border-gray-200 dark:border-zinc-700 p-4">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-        Generate Plays for {targetLabel}
+        Generate Plays
       </h3>
+
+      {allTargets.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {allTargets.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => { setActiveTargetId(t.id); setPreview(null); setError(null); }}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                activeTargetId === t.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-700/50 text-gray-400 hover:text-gray-200 hover:bg-zinc-600/50'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        Select a selling motion template. The AI will generate specific plays
-        within each phase using account context.
+        Select a selling motion template for <span className="font-medium text-gray-300">{activeLabel}</span>. The AI will generate specific plays within each phase using account context.
       </p>
+
+      {templates.length === 0 && (
+        <p className="text-xs text-amber-400 mb-3">
+          No Sales Map templates found. Run <code className="bg-zinc-700 px-1 rounded text-[10px]">npm run seed:sales-map-templates</code> to seed the built-in templates.
+        </p>
+      )}
 
       {/* Template grid */}
       <div className="grid grid-cols-2 gap-2 mb-3">
@@ -131,6 +181,12 @@ export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Pro
         </div>
       )}
 
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {error}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={handleGenerate}
@@ -145,7 +201,7 @@ export function SalesMapTemplatePicker({ roadmapId, targetId, targetLabel }: Pro
         <PlanPreviewModal
           preview={preview as { phases: Array<{ phaseOrder: number; phaseName: string; weekRange: string | null; plans: Array<{ title: string; description: string; phaseOrder: number; phaseName: string; weekRange: string | null; contentType: string; targetDivisionName?: string; targetContactRole?: string; triggerSignalType?: string; productFraming?: string; existingProductReference?: string; objectionAddressed?: string }> }> }}
           roadmapId={roadmapId}
-          targetId={targetId}
+          targetId={activeTargetId}
           templateId={selectedId}
           onClose={() => setPreview(null)}
           onRegenerate={handleGenerate}

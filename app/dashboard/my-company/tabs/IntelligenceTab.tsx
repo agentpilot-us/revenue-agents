@@ -3,6 +3,7 @@
 import { MyCompanySignalsRefresh } from '@/app/dashboard/my-company/MyCompanySignalsRefresh';
 import { ProductActivateButton } from '@/app/dashboard/my-company/ProductActivateButton';
 import { EventActivateButton } from '@/app/dashboard/my-company/EventActivateButton';
+import { SignalConfigPanel } from '@/app/components/roadmap/SignalConfigPanel';
 import type { Signal, CompanyProduct, EventSummary } from '@/app/dashboard/my-company/MyCompanyClient';
 
 type Props = {
@@ -48,6 +49,16 @@ export function IntelligenceTab({ signals, companyProducts, eventSummaries }: Pr
       </div>
 
       <div className="space-y-6">
+        <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-foreground mb-3">
+            Signal Sources
+          </h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Configure custom Exa search queries to monitor specific topics across all your accounts.
+          </p>
+          <SignalConfigPanel />
+        </section>
+
         <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground mb-3">
             Products &amp; Events

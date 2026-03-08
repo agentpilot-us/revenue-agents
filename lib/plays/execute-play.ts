@@ -6,8 +6,9 @@ import { prisma } from '@/lib/db';
 import { salesPageSectionSchema } from '@/lib/campaigns/sales-page-schema';
 import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
 import { getActiveObjectionsBlock } from '@/lib/account-messaging';
-import type { PlayContext, PlayId } from './plays-config';
-import { PLAYS, SECTION_TYPES_INSTRUCTION } from './plays-config';
+import type { PlayContext } from './constants';
+import { SECTION_TYPES_INSTRUCTION } from './constants';
+import { PLAYS, type PlayId } from './play-definitions';
 
 const PlayOutputSchema = z.object({
   page: z.object({

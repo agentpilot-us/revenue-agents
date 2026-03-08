@@ -15,11 +15,103 @@ import { RELEVANCE_PERSIST_MIN } from './constants';
 
 const exa = process.env.EXA_API_KEY ? new Exa(process.env.EXA_API_KEY) : null;
 
+const SIGNAL_TYPE_ENUM = [
+  // Leadership & Organization
+  'new_csuite_executive', 'new_vp_hire', 'multiple_dept_heads_hired', 'executive_departure',
+  'founder_stepping_down', 'layoffs_headcount_reduction', 'rapid_hiring_surge',
+  'engineering_team_expansion', 'sales_team_expansion', 'geographic_expansion', 'job_posting_your_category',
+  // Financial & Funding
+  'series_a_seed', 'series_b', 'series_c_late_stage', 'earnings_beat', 'earnings_miss',
+  'raised_guidance', 'ipo_announcement', 'post_ipo_first_quarter',
+  // M&A & Partnerships
+  'acquisition_they_acquired', 'acquisition_they_were_acquired', 'merger_announcement',
+  'divestiture_spinoff', 'strategic_partnership', 'technology_partnership',
+  // Technology & Product
+  'new_technology_adoption', 'platform_migration', 'legacy_system_sunset',
+  'product_launch_announcement', 'security_breach', 'compliance_certification', 'tech_stack_changes',
+  // Market & Competitive
+  'analyst_recognition', 'regulatory_change', 'competitor_displacement',
+  'contract_renewal_window', 'public_vendor_complaints', 'competitor_acquisition',
+  // Digital & Intent Signals
+  'pricing_page_visits', 'demo_request_trial', 'case_study_downloads',
+  'content_consumption_spike', 'competitor_comparison_views', 'review_site_research',
+  'event_webinar_registration', 'social_media_complaint',
+  // Customer Expansion
+  'usage_spike_seat_growth', 'premium_feature_request', 'new_department_interest',
+  'customer_raised_funding', 'customer_ma_activity', 'contract_renewal_approaching',
+  'champion_promoted', 'low_nps_negative_feedback', 'customer_case_study_participation',
+  // Legacy (backward compat)
+  'earnings_call', 'product_announcement', 'executive_hire', 'funding_round',
+  'acquisition', 'industry_news', 'job_posting_signal',
+] as const;
+
 export type SignalType =
+  // Leadership & Organization
+  | 'new_csuite_executive'
+  | 'new_vp_hire'
+  | 'multiple_dept_heads_hired'
+  | 'executive_departure'
+  | 'founder_stepping_down'
+  | 'layoffs_headcount_reduction'
+  | 'rapid_hiring_surge'
+  | 'engineering_team_expansion'
+  | 'sales_team_expansion'
+  | 'geographic_expansion'
+  | 'job_posting_your_category'
+  // Financial & Funding
+  | 'series_a_seed'
+  | 'series_b'
+  | 'series_c_late_stage'
+  | 'earnings_beat'
+  | 'earnings_miss'
+  | 'raised_guidance'
+  | 'ipo_announcement'
+  | 'post_ipo_first_quarter'
+  // M&A & Partnerships
+  | 'acquisition_they_acquired'
+  | 'acquisition_they_were_acquired'
+  | 'merger_announcement'
+  | 'divestiture_spinoff'
+  | 'strategic_partnership'
+  | 'technology_partnership'
+  // Technology & Product
+  | 'new_technology_adoption'
+  | 'platform_migration'
+  | 'legacy_system_sunset'
+  | 'product_launch_announcement'
+  | 'security_breach'
+  | 'compliance_certification'
+  | 'tech_stack_changes'
+  // Market & Competitive
+  | 'analyst_recognition'
+  | 'regulatory_change'
+  | 'competitor_displacement'
+  | 'contract_renewal_window'
+  | 'public_vendor_complaints'
+  | 'competitor_acquisition'
+  // Digital & Intent Signals
+  | 'pricing_page_visits'
+  | 'demo_request_trial'
+  | 'case_study_downloads'
+  | 'content_consumption_spike'
+  | 'competitor_comparison_views'
+  | 'review_site_research'
+  | 'event_webinar_registration'
+  | 'social_media_complaint'
+  // Customer Expansion Signals
+  | 'usage_spike_seat_growth'
+  | 'premium_feature_request'
+  | 'new_department_interest'
+  | 'customer_raised_funding'
+  | 'customer_ma_activity'
+  | 'contract_renewal_approaching'
+  | 'champion_promoted'
+  | 'low_nps_negative_feedback'
+  | 'customer_case_study_participation'
+  // Legacy (backward compat)
   | 'earnings_call'
   | 'product_announcement'
   | 'executive_hire'
-  | 'executive_departure'
   | 'funding_round'
   | 'acquisition'
   | 'industry_news'
@@ -184,16 +276,7 @@ export async function fetchAccountSignals(
   }
 
   const signalSchema = z.object({
-    type: z.enum([
-      'earnings_call',
-      'product_announcement',
-      'executive_hire',
-      'executive_departure',
-      'funding_round',
-      'acquisition',
-      'industry_news',
-      'job_posting_signal',
-    ]),
+    type: z.enum(SIGNAL_TYPE_ENUM),
     title: z.string(),
     summary: z.string().max(300),
     url: z.string(),
@@ -231,16 +314,20 @@ Summary: ${typeof r.summary === 'object' && r.summary?.content ? r.summary.conte
   )
   .join('\n---\n')}
 
-For each relevant result:
-1. Classify the signal type.
+For each relevant result, classify the signal type using one of these categories:
+LEADERSHIP: new_csuite_executive, new_vp_hire, multiple_dept_heads_hired, executive_departure, founder_stepping_down, layoffs_headcount_reduction, rapid_hiring_surge, engineering_team_expansion, sales_team_expansion, geographic_expansion, job_posting_your_category
+FINANCIAL: series_a_seed, series_b, series_c_late_stage, earnings_beat, earnings_miss, raised_guidance, ipo_announcement, post_ipo_first_quarter
+M&A: acquisition_they_acquired, acquisition_they_were_acquired, merger_announcement, divestiture_spinoff, strategic_partnership, technology_partnership
+TECHNOLOGY: new_technology_adoption, platform_migration, legacy_system_sunset, product_launch_announcement, security_breach, compliance_certification, tech_stack_changes
+MARKET: analyst_recognition, regulatory_change, competitor_displacement, contract_renewal_window, public_vendor_complaints, competitor_acquisition
+DIGITAL INTENT: pricing_page_visits, demo_request_trial, case_study_downloads, content_consumption_spike, competitor_comparison_views, review_site_research, event_webinar_registration, social_media_complaint
+CUSTOMER EXPANSION: usage_spike_seat_growth, premium_feature_request, new_department_interest, customer_raised_funding, customer_ma_activity, contract_renewal_approaching, champion_promoted, low_nps_negative_feedback, customer_case_study_participation
+
+For each:
+1. Use the most specific signal type from the list above.
 2. Write a 1-2 sentence summary a sales rep can act on (max 300 chars).
 3. Score relevance 1-10 (10 = immediate sales opportunity, 1 = background noise).
 4. Suggest which play this should trigger: new_buying_group, event_invite, feature_release, re_engagement, champion_enablement, or none.
-   - executive_hire/departure → re_engagement or new_buying_group
-   - earnings_call → re_engagement
-   - product_announcement → feature_release or new_buying_group
-   - funding_round → new_buying_group
-   - acquisition → re_engagement
 
 Only include signals with relevanceScore >= ${RELEVANCE_PERSIST_MIN}. Deduplicate: if multiple results are about the same event, keep only the best one.
 Use the exact URL from the raw results for each signal. For publishedAt use the Published date from the result if present, otherwise use today's date in ISO format (YYYY-MM-DD).
@@ -290,16 +377,7 @@ export async function classifyPreFetchedSignals(
   }
 
   const signalSchema = z.object({
-    type: z.enum([
-      'earnings_call',
-      'product_announcement',
-      'executive_hire',
-      'executive_departure',
-      'funding_round',
-      'acquisition',
-      'industry_news',
-      'job_posting_signal',
-    ]),
+    type: z.enum(SIGNAL_TYPE_ENUM),
     title: z.string(),
     summary: z.string().max(300),
     url: z.string(),
@@ -337,14 +415,23 @@ Summary: ${r.text?.slice(0, 300) ?? 'No content'}
   )
   .join('\n---\n')}
 
-For each relevant result:
-1. Classify the signal type.
+Classify each result using one of these signal types:
+LEADERSHIP: new_csuite_executive, new_vp_hire, multiple_dept_heads_hired, executive_departure, founder_stepping_down, layoffs_headcount_reduction, rapid_hiring_surge, engineering_team_expansion, sales_team_expansion, geographic_expansion, job_posting_your_category
+FINANCIAL: series_a_seed, series_b, series_c_late_stage, earnings_beat, earnings_miss, raised_guidance, ipo_announcement, post_ipo_first_quarter
+M&A: acquisition_they_acquired, acquisition_they_were_acquired, merger_announcement, divestiture_spinoff, strategic_partnership, technology_partnership
+TECHNOLOGY: new_technology_adoption, platform_migration, legacy_system_sunset, product_launch_announcement, security_breach, compliance_certification, tech_stack_changes
+MARKET: analyst_recognition, regulatory_change, competitor_displacement, contract_renewal_window, public_vendor_complaints, competitor_acquisition
+DIGITAL INTENT: pricing_page_visits, demo_request_trial, case_study_downloads, content_consumption_spike, competitor_comparison_views, review_site_research, event_webinar_registration, social_media_complaint
+CUSTOMER EXPANSION: usage_spike_seat_growth, premium_feature_request, new_department_interest, customer_raised_funding, customer_ma_activity, contract_renewal_approaching, champion_promoted, low_nps_negative_feedback, customer_case_study_participation
+
+For each:
+1. Use the most specific signal type from the list above.
 2. Write a 1-2 sentence summary a sales rep can act on (max 300 chars).
 3. Score relevance 1-10 (10 = immediate sales opportunity, 1 = background noise).
 4. Suggest which play this should trigger: new_buying_group, event_invite, feature_release, re_engagement, champion_enablement, or none.
 
-Only include signals with relevanceScore >= ${RELEVANCE_PERSIST_MIN}. Deduplicate: if multiple results are about the same event, keep only the best one.
-Use the exact URL from the raw results for each signal. For publishedAt use the Published date from the result if present, otherwise use today's date in ISO format (YYYY-MM-DD).
+Only include signals with relevanceScore >= ${RELEVANCE_PERSIST_MIN}. Deduplicate.
+Use the exact URL from the raw results. For publishedAt use the Published date if present, otherwise today's date (YYYY-MM-DD).
 `.trim(),
   });
 

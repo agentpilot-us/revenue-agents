@@ -14,6 +14,9 @@
     "seed:demo": "dotenv -e .env.local -- tsx prisma/seed-demo-agentpilot.ts",
     "seed:demo:celigo": "dotenv -e .env.local -- tsx prisma/seed-demo-celigo.ts",
     "seed:demo:gm": "dotenv -e .env.local -- tsx prisma/seed-demo-gm.ts",
+    "seed:demo:nvidia-gm": "dotenv -e .env.local -- tsx prisma/seed-demo-nvidia-gm.ts",
+    "seed:demo:playbook-templates": "dotenv -e .env.local -- tsx prisma/seed-demo-playbook-templates.ts",
+    "seed:sales-map-templates": "dotenv -e .env.local -- tsx prisma/seed-sales-map-templates.ts",
     "cleanup:demo": "dotenv -e .env.local -- tsx prisma/cleanup-demo.ts"
   },
   "dependencies": {

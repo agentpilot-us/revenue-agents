@@ -7,6 +7,7 @@ import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
 import { PrepMePanel, type PrepMePanelParams } from '@/app/components/company/PrepMePanel';
 import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
 import type { EngagementRow } from '@/app/components/company/EngagementByBuyingGroup';
+import { EventCoverageCard } from '@/app/components/company/EventCoverageCard';
 import type { CampaignItem } from '@/app/components/company/CampaignsTab';
 import { SalesforceBlock } from '@/app/components/company/SalesforceBlock';
 import { ContactsByBuyingGroup } from '@/app/components/company/ContactsByBuyingGroup';
@@ -18,8 +19,6 @@ import { SignalDigest } from '@/app/components/company/SignalDigest';
 import { ExistingStackEditor } from '@/app/components/company/ExistingStackEditor';
 import { ActiveObjectionsPanel } from '@/app/components/company/ActiveObjectionsPanel';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-
-/** 6-tab set per Spec 2 (Tab Consolidation). No departments, campaigns, activity, messaging, map, expansion. */
 type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
 
 type AccountMessagingData = {
@@ -497,12 +496,13 @@ export function CompanyTabs({
       )}
 
       {activeTab === 'engagement' && (
-        <div id="engagement">
+        <div id="engagement" className="space-y-6">
           <EngagementByBuyingGroup
             companyId={companyId}
             companyName={companyName}
             rows={engagementByDept}
           />
+          <EventCoverageCard companyId={companyId} />
         </div>
       )}
 

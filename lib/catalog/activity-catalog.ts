@@ -20,7 +20,8 @@ export type ActivityChannel =
   | 'video'
   | 'gift'
   | 'event'
-  | 'content';
+  | 'content'
+  | 'ad_brief';
 
 export type AEStep = {
   order: number;

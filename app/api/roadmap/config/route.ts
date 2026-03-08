@@ -46,6 +46,7 @@ type PutBody = {
   roadmapType?: string;
   objective?: Prisma.InputJsonValue;
   contentStrategy?: Prisma.InputJsonValue;
+  operationalLimits?: Prisma.InputJsonValue;
 };
 
 export async function PUT(req: NextRequest) {
@@ -75,6 +76,9 @@ export async function PUT(req: NextRequest) {
   }
   if (body.contentStrategy !== undefined) {
     data.contentStrategy = body.contentStrategy;
+  }
+  if (body.operationalLimits !== undefined) {
+    data.operationalLimits = body.operationalLimits;
   }
 
   if (Object.keys(data).length === 0) {

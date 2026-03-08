@@ -1,6 +1,6 @@
 import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import type { PlayContext } from '@/lib/plays/plays-config';
+import type { PlayContext } from '@/lib/plays/constants';
 import type { AccountSignal } from '@prisma/client';
 
 /**

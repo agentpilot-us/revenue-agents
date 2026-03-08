@@ -1,6 +1,12 @@
 import { ContentType } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { getPlayDisplayName, type PlayId } from '@/lib/plays/plays-config';
+/** Format a suggestedPlay string into a human-readable label */
+function formatPlayLabel(suggestedPlay: string | null | undefined): string | null {
+  if (!suggestedPlay) return null;
+  return suggestedPlay
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 import { RELEVANCE_HOT_SIGNALS_MIN, RELEVANCE_TIER_1_MIN, RELEVANCE_TIER_2_MIN } from '@/lib/signals/constants';
 import { buildNextBestActionHref } from '@/lib/dashboard/signal-play-href';
 import { resolveDivisionForSignal } from '@/lib/signals/division-resolution';
@@ -307,7 +313,7 @@ export async function getHotSignals(
         : s.relevanceScore >= RELEVANCE_TIER_2_MIN
           ? 'amber'
           : 'green';
-    const playLabel = getPlayDisplayName((s.suggestedPlay ?? undefined) as PlayId | undefined);
+    const playLabel = formatPlayLabel(s.suggestedPlay);
     const useRoadmapCta = isRoadmapDriven;
     const resolved =
       useRoadmapCta

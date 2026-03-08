@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
 
     const mappings = await prisma.roadmapActionMapping.findMany({
       where: { roadmapId },
-      include: { signalRule: { select: { id: true, name: true, category: true } } },
+      include: {
+        signalRule: { select: { id: true, name: true, category: true } },
+        template: { select: { id: true, name: true, triggerType: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { roadmapId, signalCategory, actionType, autonomyLevel, promptHint, signalRuleId } = body;
+    const { roadmapId, signalCategory, actionType, autonomyLevel, promptHint, signalRuleId, templateId } = body;
 
     if (!roadmapId || !actionType) {
       return NextResponse.json(
@@ -71,6 +74,7 @@ export async function POST(req: NextRequest) {
         autonomyLevel: autonomyLevel ?? 'draft_review',
         promptHint: promptHint ?? null,
         signalRuleId: signalRuleId ?? null,
+        templateId: templateId ?? null,
       },
     });
 

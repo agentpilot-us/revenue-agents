@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { buildContextFromSignal } from '@/lib/signals/signal-to-play-context';
 import { executePlay } from '@/lib/plays/execute-play';
-import type { PlayId } from '@/lib/plays/plays-config';
+import type { PlayId } from '@/lib/plays/play-definitions';
 
 export async function POST(
   req: NextRequest,

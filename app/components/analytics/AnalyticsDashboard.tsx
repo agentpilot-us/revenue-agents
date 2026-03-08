@@ -9,6 +9,8 @@ import { LandingPagePerformance } from './LandingPagePerformance';
 import { EmailEngagement } from './EmailEngagement';
 import { BuyingGroupCoverage } from './BuyingGroupCoverage';
 import { WarmContacts } from './WarmContacts';
+import { PlayActivitySummary } from './PlayActivitySummary';
+import { ContactEngagementTable } from './ContactEngagementTable';
 
 interface Company {
   id: string;
@@ -82,12 +84,41 @@ interface AnalyticsData {
   };
 }
 
+interface ActivitySummaryData {
+  playSummary: {
+    playsStarted: number;
+    playsInProgress: number;
+    playsCompleted: number;
+    totalSteps: number;
+    completedSteps: number;
+    completionRate: number;
+    byChannel: Array<{ channel: string; count: number }>;
+  };
+  contactEngagement: Array<{
+    contactId: string;
+    contactName: string;
+    title: string | null;
+    companyId: string;
+    companyName: string;
+    lastTouchDate: string | null;
+    daysSinceLastTouch: number | null;
+    emailsSent: number;
+    emailsOpened: number;
+    emailsClicked: number;
+    emailsReplied: number;
+    isResponsive: boolean;
+    isDormant: boolean;
+    flags: string[];
+  }>;
+}
+
 export function AnalyticsDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [activityData, setActivityData] = useState<ActivitySummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,13 +159,22 @@ export function AnalyticsDashboard() {
         params.append('companyId', selectedCompanyId);
       }
 
-      const response = await fetch(`/api/analytics/engagement?${params.toString()}`);
-      if (!response.ok) {
+      const [engagementRes, activityRes] = await Promise.all([
+        fetch(`/api/analytics/engagement?${params.toString()}`),
+        fetch(`/api/analytics/activity-summary?${params.toString()}`),
+      ]);
+
+      if (!engagementRes.ok) {
         throw new Error('Failed to fetch analytics data');
       }
 
-      const result = await response.json();
+      const result = await engagementRes.json();
       setData(result);
+
+      if (activityRes.ok) {
+        const actResult = await activityRes.json();
+        setActivityData(actResult);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
       console.error('Analytics fetch error:', err);
@@ -233,11 +273,17 @@ export function AnalyticsDashboard() {
 
       {/* Metrics */}
       <div className="space-y-6">
+        {activityData && (
+          <PlayActivitySummary data={activityData.playSummary} />
+        )}
         <NewContactsMetric data={data.newContacts} />
         <LandingPagePerformance data={data.landingPagePerformance} />
         <EmailEngagement data={data.emailEngagement} />
         <BuyingGroupCoverage data={data.buyingGroupCoverage} />
         <WarmContacts data={data.warmContacts} />
+        {activityData && activityData.contactEngagement.length > 0 && (
+          <ContactEngagementTable data={activityData.contactEngagement} />
+        )}
       </div>
     </div>
   );

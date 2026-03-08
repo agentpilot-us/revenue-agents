@@ -14,6 +14,8 @@ export type WeekMetrics = {
   emailsSent: number;
   pageViews: number;
   replies: number;
+  meetingsBooked: number;
+  signalsThisWeek: number;
 };
 
 export type MomentumWeekComparison = {
@@ -21,10 +23,6 @@ export type MomentumWeekComparison = {
   lastWeek: WeekMetrics;
 };
 
-/**
- * Returns this week vs last week counts for contacts found, emails sent,
- * page views, and replies. Uses "Contact Added" and "ContactDiscovered" for contacts found.
- */
 export async function getMomentumWeekComparison(
   userId: string
 ): Promise<MomentumWeekComparison> {
@@ -38,6 +36,8 @@ export async function getMomentumWeekComparison(
     lastWeekActivities,
     thisWeekVisits,
     lastWeekVisits,
+    thisWeekSignals,
+    lastWeekSignals,
   ] = await Promise.all([
     prisma.activity.findMany({
       where: {
@@ -65,6 +65,18 @@ export async function getMomentumWeekComparison(
         visitedAt: { gte: lastWeekStart, lt: thisWeekStart },
       },
     }),
+    prisma.accountSignal.count({
+      where: {
+        userId,
+        createdAt: { gte: thisWeekStart },
+      },
+    }),
+    prisma.accountSignal.count({
+      where: {
+        userId,
+        createdAt: { gte: lastWeekStart, lt: thisWeekStart },
+      },
+    }),
   ]);
 
   const countByType = (list: { type: string }[]) => {
@@ -77,16 +89,21 @@ export async function getMomentumWeekComparison(
     const replies = list.filter((a) =>
       ['EmailReply', 'EMAIL_REPLY'].includes(a.type)
     ).length;
-    return { contactsFound, emailsSent, replies };
+    const meetingsBooked = list.filter((a) =>
+      ['MEETING_SCHEDULED', 'Meeting'].includes(a.type)
+    ).length;
+    return { contactsFound, emailsSent, replies, meetingsBooked };
   };
 
   const thisWeek = {
     ...countByType(thisWeekActivities),
     pageViews: thisWeekVisits,
+    signalsThisWeek: thisWeekSignals,
   };
   const lastWeek = {
     ...countByType(lastWeekActivities),
     pageViews: lastWeekVisits,
+    signalsThisWeek: lastWeekSignals,
   };
 
   return { thisWeek, lastWeek };

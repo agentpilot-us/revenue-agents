@@ -6,6 +6,7 @@ import { getCaseStudiesForUI } from '@/lib/prompt-context';
 import { CompanyTabs } from '@/app/components/company/CompanyTabs';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
+import AccountWorkspacePage from './workspace/AccountWorkspacePage';
 import { DepartmentStatus, ContentType } from '@prisma/client';
 
 /** Parse estimatedOpportunity string (e.g. "$50K-$150K", "$500K – $2M") to a number. Uses midpoint for ranges. */
@@ -50,6 +51,8 @@ export default async function CompanyDetailPage({
     signalTitle?: string;
     signalSummary?: string;
     divisionName?: string;
+    workflow?: string;
+    workspace?: string;
   }>;
 }) {
   const session = await auth();
@@ -57,6 +60,11 @@ export default async function CompanyDetailPage({
 
   const { id } = await params;
   const search = await searchParams;
+
+  if (search.workflow || search.workspace) {
+    return <AccountWorkspacePage companyId={id} />;
+  }
+
   const tabParam = search.tab;
   /** 6-tab set per Spec 2. Legacy tab params map to new tab so old links still work. */
   const validTabs = ['overview', 'buying-groups', 'contacts', 'content', 'engagement', 'signals'] as const;

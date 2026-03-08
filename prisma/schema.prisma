@@ -96,6 +96,8 @@ model User {
   salesMapTemplates       SalesMapTemplate[]
   sharedBriefings         SharedBriefing[]
   customSignalConfigs     CustomSignalConfig[]
+  actionWorkflows         ActionWorkflow[]
+  accountCampaigns        AccountCampaign[]
 
   // My Company intelligence hub
   internalDocuments      InternalDocument[]
@@ -188,6 +190,8 @@ model Company {
   roadmapTargets       RoadmapTarget[]
   adaptiveRoadmaps     AdaptiveRoadmap[]
   customSignalConfigs  CustomSignalConfig[]
+  actionWorkflows      ActionWorkflow[]
+  accountCampaigns     AccountCampaign[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
   workflowStep                   Int? // 1, 2, or 3
@@ -245,7 +249,8 @@ model AccountSignal {
 
   createdAt DateTime @default(now())
 
-  roadmapPlans RoadmapPlan[]
+  roadmapPlans    RoadmapPlan[]
+  actionWorkflows ActionWorkflow[]
 
   @@index([companyId, publishedAt])
   @@index([userId, status, relevanceScore])
@@ -330,6 +335,8 @@ model Contact {
   stakeholderEngagementPlays StakeholderEngagementPlay[]
   contactSequenceEnrollments ContactSequenceEnrollment[]
   roadmapContacts            RoadmapContact[]
+  actionWorkflows            ActionWorkflow[]
+  actionWorkflowSteps        ActionWorkflowStep[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -378,7 +385,8 @@ model Activity {
 
   createdAt DateTime @default(now())
 
-  sequenceTouches SequenceTouch[]
+  sequenceTouches    SequenceTouch[]
+  actionWorkflowStep ActionWorkflowStep? @relation("StepActivity")
 
   @@index([companyId])
   @@index([companyDepartmentId])
@@ -657,6 +665,8 @@ model CompanyDepartment {
   campaignVisits          CampaignVisit[]
   content                 CompanyDepartmentContent[]
   roadmapTargets          RoadmapTarget[]
+  actionWorkflows         ActionWorkflow[]
+  actionWorkflowSteps     ActionWorkflowStep[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1587,11 +1597,15 @@ model AdaptiveRoadmap {
   // { tone, personalizationDepth, primaryChannels, contentTypes, ... }
   contentStrategy Json?
 
-  targets        RoadmapTarget[]
-  signalRules    RoadmapSignalRule[]
-  actionMappings RoadmapActionMapping[]
-  conditions     RoadmapCondition[]
-  plans          RoadmapPlan[]
+  // { maxEmailsPerDay, maxEmailsPerWeek, maxLinkedInPerDay, quietHoursEnabled, quietHoursStart, quietHoursEnd }
+  operationalLimits Json?
+
+  targets             RoadmapTarget[]
+  signalRules         RoadmapSignalRule[]
+  actionMappings      RoadmapActionMapping[]
+  conditions          RoadmapCondition[]
+  plans               RoadmapPlan[]
+  playbookActivations PlaybookActivation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1716,6 +1730,9 @@ model RoadmapActionMapping {
 
   promptHint String? @db.Text
 
+  templateId String?
+  template   PlaybookTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
   plans RoadmapPlan[]
 
   createdAt DateTime @default(now())
@@ -1724,6 +1741,7 @@ model RoadmapActionMapping {
   @@index([roadmapId])
   @@index([signalRuleId])
   @@index([signalCategory])
+  @@index([templateId])
 }
 
 model RoadmapCondition {
@@ -1782,6 +1800,8 @@ model RoadmapPlan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  actionWorkflows ActionWorkflow[]
+
   @@index([roadmapId])
   @@index([signalId])
   @@index([targetId])
@@ -1797,16 +1817,46 @@ model PlaybookTemplate {
   name        String   // e.g. "90-Day Renewal", "New Logo 60-Day Pursuit"
   description String?  @db.Text
   isBuiltIn   Boolean  @default(false) // true for seed templates; user templates are false
-  triggerType String?  // renewal | new_logo | event | manual
+  triggerType String?  // renewal | new_logo | event | manual | signal | feature_release | ...
   isDefault   Boolean  @default(false)
 
-  steps   PlaybookTemplateStep[]
-  runs    PlaybookRun[]
+  // Layer 1 targeting: which accounts/departments/personas this playbook applies to
+  targetDepartmentTypes Json?   // e.g. ["ENGINEERING", "AUTONOMOUS_VEHICLES"]
+  targetIndustries      Json?   // e.g. ["Automotive", "Manufacturing"]
+  targetPersonas        Json?   // e.g. ["VP", "Director", "C-Suite"]
+  timingConfig          Json?   // { triggerDaysBefore?, validWindowDays?, urgencyDecay? }
+  expectedOutcome       String? @db.Text
+  priority              Int     @default(0) // higher = preferred when multiple match
+
+  steps            PlaybookTemplateStep[]
+  runs             PlaybookRun[]
+  actionWorkflows  ActionWorkflow[]
+  actionMappings   RoadmapActionMapping[]
+  activations      PlaybookActivation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// Tracks which company playbooks (Layer 1) are active for a specific account (Layer 2).
+model PlaybookActivation {
+  id          String @id @default(cuid())
+  roadmapId   String
+  roadmap     AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    PlaybookTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  isActive    Boolean @default(true)
+  customConfig Json?  // account-specific overrides: timing, contacts, notes
+
+  activatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([roadmapId, templateId])
+  @@index([roadmapId])
+  @@index([templateId])
 }
 
 model PlaybookTemplateStep {
@@ -1820,9 +1870,11 @@ model PlaybookTemplateStep {
   description String? @db.Text
   playId     String?  // play key for content generation
   assetTypes Json?    // e.g. ["email", "linkedin", "talking_points"]
-  channel    String?  // email | linkedin | meeting | task | internal | call
+  channel    String?  // email | linkedin | meeting | task | internal | call | ad_brief | event | crm | ...
   promptHint String?  @db.Text // Injected into play buildPrompt for context-aware generation
-  assignedRole String? // e.g. "csm", "ae"
+  phase      String?  // signal | prep | activate | engage | convert | advocacy
+  targetPersona String? // who the step targets: Champion, Economic Buyer, End Users, etc.
+  assignedRole String? // who executes: ae, csm, marketing, revops
   requiresApproval Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -1903,6 +1955,122 @@ model SalesMapTemplatePhase {
   createdAt DateTime @default(now())
 
   @@index([templateId])
+}
+
+// ============================================
+// ACCOUNT CAMPAIGNS (coordinates multiple workflows against one account)
+// ============================================
+
+model AccountCampaign {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?  @db.Text
+  motion      String   @default("acquisition") // acquisition | expansion | retention | event
+  status      String   @default("active")      // active | paused | completed
+  phase       String   @default("prep")        // prep | activate | engage | convert | advocacy
+
+  workflows   ActionWorkflow[]
+
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([companyId])
+}
+
+// ============================================
+// ACTION WORKFLOWS (See → Decide → Act → Track)
+// ============================================
+
+model ActionWorkflow {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  campaignId        String?
+  campaign          AccountCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  roadmapPlanId     String?
+  roadmapPlan       RoadmapPlan?      @relation(fields: [roadmapPlanId], references: [id], onDelete: SetNull)
+  accountSignalId   String?
+  accountSignal     AccountSignal?    @relation(fields: [accountSignalId], references: [id], onDelete: SetNull)
+  templateId        String?
+  template          PlaybookTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  targetDivisionId  String?
+  targetDivision    CompanyDepartment? @relation(fields: [targetDivisionId], references: [id], onDelete: SetNull)
+  targetContactId   String?
+  targetContact     Contact?          @relation(fields: [targetContactId], references: [id], onDelete: SetNull)
+
+  title          String
+  description    String?  @db.Text
+  status         String   @default("pending") // pending | in_progress | completed | dismissed | snoozed
+  urgencyScore   Float?
+  snoozeUntil    DateTime?
+  dismissReason  String?  @db.Text
+  signalContext  Json?
+  accountContext Json?
+
+  steps ActionWorkflowStep[]
+
+  outcome       String?    // meeting_booked | reply_received | no_response | pipeline_created | not_interested | deferred
+  outcomeNote   String?    @db.Text
+  outcomeAt     DateTime?
+
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([companyId])
+  @@index([campaignId])
+  @@index([urgencyScore])
+  @@index([status])
+  @@index([roadmapPlanId])
+  @@index([accountSignalId])
+}
+
+model ActionWorkflowStep {
+  id         String         @id @default(cuid())
+  workflowId String
+  workflow   ActionWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepOrder  Int
+
+  stepType    String  // generate_content | send_content | add_contact | create_meeting | manual_task
+  contentType String? // email | linkedin_inmail | linkedin_post | talking_points | presentation | sms
+  channel     String? // email | linkedin | meeting | task
+  status      String  @default("pending") // pending | generating | ready | sent | skipped | failed
+
+  contactId   String?
+  contact     Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  divisionId  String?
+  division    CompanyDepartment? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+
+  promptHint       String? @db.Text
+  generatedContent Json?
+  editedContent    Json?
+
+  activityId String?  @unique
+  activity   Activity? @relation("StepActivity", fields: [activityId], references: [id], onDelete: SetNull)
+
+  dueAt         DateTime?
+  completedAt   DateTime?
+  failureReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workflowId, stepOrder])
+  @@index([workflowId])
+  @@index([status])
+  @@index([contactId])
+  @@index([dueAt])
 }
 
 // ============================================

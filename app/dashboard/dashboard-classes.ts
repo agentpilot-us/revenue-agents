@@ -146,13 +146,14 @@ export type DashboardClasses = typeof DASHBOARD;
 
 /** Primary nav items (top group): Dashboard through Analytics; include demo items when used */
 export const PRIMARY_NAV_KEYS: string[] = [
-  'Dashboard',
-  'Your Sales Map',
-  'Demo setup',
-  'Waitlist',
+  'My Day',
+  'Strategic Account Plan',
   'Target Accounts',
+  'Plays',
   'My Company',
   'Analytics',
+  'Demo setup',
+  'Waitlist',
 ];
 
 /** Utility nav items (bottom group): Webhooks, Settings, Billing */

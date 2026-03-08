@@ -23,9 +23,18 @@ type Props = {
   initialContactId?: string;
 };
 
-// Temporary mock data and tokens for the v2 shell. These will be replaced by
-// real Trigger + division + contact data and /api/content/generate results.
-const MOCK_TRIGGER = {
+type TriggerData = {
+  id: string;
+  type: string;
+  category: string;
+  title: string;
+  description: string;
+  priority: string;
+  timingWindow: string;
+  suggestedActions: string[];
+};
+
+const MOCK_TRIGGER: TriggerData = {
   id: 'trg_001',
   type: 'SIGNAL',
   category: 'new_vp_hire',
@@ -33,7 +42,7 @@ const MOCK_TRIGGER = {
   description:
     'David Chen joined GM as VP of Vehicle Software Engineering. Previously VP Platform at Rivian. Background in autonomous systems and ADAS.',
   priority: 'HIGH',
-  timingWindow: 'Week 1–6',
+  timingWindow: 'Week 1\u20136',
   suggestedActions: [
     'Send personalized video message congratulating them',
     'Share relevant industry benchmark report they can use immediately',
@@ -41,7 +50,7 @@ const MOCK_TRIGGER = {
     "Reference their department's likely priorities based on role",
     'Position as fast path to early departmental success',
   ],
-} as const;
+};
 
 const CHANNELS = [
   { id: 'email', label: 'Email', icon: '✉', desc: 'Subject + 3–5 paragraph body' },
@@ -268,7 +277,39 @@ export function ContentTabV2({
   initialContactId,
 }: Props) {
   const router = useRouter();
-  const [trigger] = useState(MOCK_TRIGGER);
+  const [trigger, setTrigger] = useState<TriggerData>(MOCK_TRIGGER);
+
+  useEffect(() => {
+    if (!signalId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/signals/${signalId}/preview-play`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.matched && data.template && data.signal) {
+          const pri = data.template.priority;
+          const priorityLabel = pri >= 8 ? 'HIGH' : pri >= 5 ? 'MEDIUM' : 'LOW';
+          setTrigger({
+            id: data.signal.id,
+            type: 'SIGNAL',
+            category: data.signal.type,
+            title: data.signal.title,
+            description: data.signal.summary ?? '',
+            priority: priorityLabel,
+            timingWindow: data.template.timingWindow ?? '',
+            suggestedActions: data.template.steps.map(
+              (s: { name: string }) => s.name,
+            ),
+          });
+        }
+      } catch {
+        // keep MOCK_TRIGGER as fallback
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [signalId]);
 
   const initialDivisions = useMemo(
     () =>

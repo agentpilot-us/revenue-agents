@@ -291,11 +291,223 @@ export async function seedDefaultPlaybookTemplates(userId: string) {
   return { renewal, newLogo, eventAccel };
 }
 
+/**
+ * Seeds additional ActionWorkflow-era templates: new_exec_intro, feature_release, re_engagement.
+ * Idempotent — checks by name before creating.
+ */
+export async function seedActionWorkflowTemplates(userId: string) {
+  const templates: Array<{
+    name: string;
+    description: string;
+    triggerType: string;
+    steps: Array<{
+      order: number;
+      dayOffset: number;
+      label: string;
+      name: string;
+      description: string;
+      playId: string;
+      assetTypes: string[];
+      channel: string;
+      promptHint: string;
+      assignedRole: string;
+      requiresApproval?: boolean;
+    }>;
+  }> = [
+    {
+      name: 'New Executive Introduction',
+      description:
+        'Structured multi-channel outreach to a new executive contact. Research, personalized intro email, LinkedIn InMail, and meeting scheduling.',
+      triggerType: 'new_exec_intro',
+      steps: [
+        {
+          order: 1,
+          dayOffset: 0,
+          label: 'Research Contact Background',
+          name: 'Research Contact Background',
+          description: 'Review the executive background, recent announcements, and mutual connections before outreach.',
+          playId: 'new_buying_group',
+          assetTypes: ['talking_points'],
+          channel: 'internal',
+          promptHint:
+            'Internal research step. Generate a brief on this executive: their background, recent public statements, what they care about based on their role and company initiatives. Include conversation hooks and potential mutual connections. This is prep — not outreach.',
+          assignedRole: 'ae',
+        },
+        {
+          order: 2,
+          dayOffset: 1,
+          label: 'Intro Email',
+          name: 'Generate Intro Email',
+          description: 'Personalized first-touch email referencing their specific initiatives and how we can help.',
+          playId: 'new_buying_group',
+          assetTypes: ['email'],
+          channel: 'email',
+          promptHint:
+            'First-touch email to a senior executive. Lead with a specific insight about their company or role — not a product pitch. Reference a recent initiative, signal, or industry trend they care about. Under 120 words. Clear, low-pressure CTA (15-min call or intro to the right person on our team).',
+          assignedRole: 'ae',
+        },
+        {
+          order: 3,
+          dayOffset: 2,
+          label: 'LinkedIn InMail',
+          name: 'Generate LinkedIn InMail',
+          description: 'Parallel touch via LinkedIn — different angle than the email.',
+          playId: 'new_buying_group',
+          assetTypes: ['linkedin'],
+          channel: 'linkedin',
+          promptHint:
+            'LinkedIn InMail to the same executive. Different angle than the email — reference a shared connection, event, or their recent LinkedIn activity. Under 150 words. Professional but not stiff.',
+          assignedRole: 'ae',
+        },
+        {
+          order: 4,
+          dayOffset: 7,
+          label: 'Schedule Follow-Up',
+          name: 'Schedule Follow-Up Meeting',
+          description: 'If engaged, schedule a discovery or intro call.',
+          playId: 'new_buying_group',
+          assetTypes: ['email'],
+          channel: 'meeting',
+          promptHint:
+            'Follow-up email to schedule a call. Reference the previous outreach and offer 2-3 specific time slots. If they have not responded, add one new insight or reason to meet. Keep it under 80 words.',
+          assignedRole: 'ae',
+        },
+      ],
+    },
+    {
+      name: 'Feature Release Outreach',
+      description:
+        'Share a new product release or feature update as a reason to re-engage an existing or prospective account.',
+      triggerType: 'feature_release',
+      steps: [
+        {
+          order: 1,
+          dayOffset: 0,
+          label: 'Feature Announcement Email',
+          name: 'Feature Announcement Email',
+          description: 'Share the feature release with a personalized angle for this account.',
+          playId: 'feature_release',
+          assetTypes: ['email'],
+          channel: 'email',
+          promptHint:
+            'Feature release email. Lead with what this feature means for the recipient — not what it does technically. Connect the release to their specific use case or pain point. Include a link to learn more. Under 150 words.',
+          assignedRole: 'ae',
+        },
+        {
+          order: 2,
+          dayOffset: 3,
+          label: 'LinkedIn Share',
+          name: 'LinkedIn Post or Message',
+          description: 'Amplify the release via LinkedIn with a personal take.',
+          playId: 'feature_release',
+          assetTypes: ['linkedin'],
+          channel: 'linkedin',
+          promptHint:
+            'LinkedIn message or post about the feature release. Personal take on why this matters for their industry. Tag the release or announcement. Under 100 words.',
+          assignedRole: 'ae',
+        },
+        {
+          order: 3,
+          dayOffset: 7,
+          label: 'Follow-Up with Demo Offer',
+          name: 'Follow-Up with Demo Offer',
+          description: 'Offer a quick demo of the new capability tailored to their environment.',
+          playId: 'feature_release',
+          assetTypes: ['email', 'talking_points'],
+          channel: 'email',
+          promptHint:
+            'Follow-up email one week after the feature announcement. Offer a 15-minute demo tailored to their specific environment. Include talking points for the demo call: key screens to show, questions to ask, how to transition to a broader conversation.',
+          assignedRole: 'ae',
+        },
+      ],
+    },
+    {
+      name: 'Re-Engagement Campaign',
+      description:
+        'Warm up a dormant account or contact with a value-first multi-touch sequence.',
+      triggerType: 're_engagement',
+      steps: [
+        {
+          order: 1,
+          dayOffset: 0,
+          label: 'Value-First Re-Engagement',
+          name: 'Value-First Re-Engagement Email',
+          description: 'Break the silence with something valuable — not a check-in email.',
+          playId: 're_engagement',
+          assetTypes: ['email'],
+          channel: 'email',
+          promptHint:
+            'Re-engagement email for a dormant contact. Do NOT open with "just checking in." Lead with a specific insight, case study, or industry trend relevant to their role. One clear CTA. Under 120 words.',
+          assignedRole: 'ae',
+        },
+        {
+          order: 2,
+          dayOffset: 5,
+          label: 'Case Study Share',
+          name: 'Share Relevant Case Study',
+          description: 'Share a case study from their industry or a peer company.',
+          playId: 'champion_enablement',
+          assetTypes: ['email', 'linkedin'],
+          channel: 'email',
+          promptHint:
+            'Share a case study relevant to this account. The email should explain why this specific case study matters to them — not just forward a PDF. Reference metrics from the case study. LinkedIn message is a shorter version with a personal note.',
+          assignedRole: 'ae',
+        },
+        {
+          order: 3,
+          dayOffset: 12,
+          label: 'Final Touch or Breakup',
+          name: 'Final Touch or Breakup Email',
+          description: 'Last attempt — either a strong hook or a polite close.',
+          playId: 're_engagement',
+          assetTypes: ['email'],
+          channel: 'email',
+          promptHint:
+            'Final email in the re-engagement sequence. Two versions: (1) a strong hook if there is a new signal or reason to respond, or (2) a polite breakup that leaves the door open. The rep will choose which to send. Under 100 words each.',
+          assignedRole: 'ae',
+        },
+      ],
+    },
+  ];
+
+  const created: string[] = [];
+
+  for (const tmpl of templates) {
+    const exists = await prisma.playbookTemplate.findFirst({
+      where: { userId, name: tmpl.name },
+    });
+    if (exists) {
+      console.log(`Template "${tmpl.name}" already exists — skipping.`);
+      continue;
+    }
+
+    const record = await prisma.playbookTemplate.create({
+      data: {
+        userId,
+        name: tmpl.name,
+        description: tmpl.description,
+        triggerType: tmpl.triggerType,
+        isBuiltIn: true,
+        isDefault: false,
+        steps: { create: tmpl.steps },
+      },
+    });
+    created.push(record.name);
+  }
+
+  if (created.length > 0) {
+    console.log(`✅ Seeded ${created.length} ActionWorkflow templates: ${created.join(', ')}`);
+  } else {
+    console.log('All ActionWorkflow templates already exist.');
+  }
+}
+
 // Direct execution
 async function main() {
   const user = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
   if (!user) throw new Error('No users found — sign in first');
   await seedDefaultPlaybookTemplates(user.id);
+  await seedActionWorkflowTemplates(user.id);
   await prisma.$disconnect();
 }
 

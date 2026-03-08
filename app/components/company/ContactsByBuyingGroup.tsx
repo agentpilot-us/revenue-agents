@@ -22,6 +22,11 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
+type EventAttendanceInfo = {
+  eventName: string;
+  rsvpStatus: string | null;
+};
+
 type Contact = {
   id: string;
   firstName: string | null;
@@ -35,6 +40,7 @@ type Contact = {
   buyingRole: string | null;
   whyRelevant: string | null;
   engagementStatus?: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged';
+  eventAttendances?: EventAttendanceInfo[];
 };
 
 type DepartmentGroup = {
@@ -503,6 +509,7 @@ function ContactRow({ contact, onPrepMe }: { contact: Contact; onPrepMe?: () => 
               );
             })()}
           </div>
+          <TouchpointPills eventAttendances={contact.eventAttendances} isWarm={contact.isWarm} />
           {contact.whyRelevant && (
             <p className="text-xs text-muted-foreground mt-1 italic">
               {contact.whyRelevant}
@@ -542,6 +549,54 @@ function ContactRow({ contact, onPrepMe }: { contact: Contact; onPrepMe?: () => 
           <FileText className="h-4 w-4" />
           <span className="sr-only">Prep</span>
         </Button>
+      )}
+    </div>
+  );
+}
+
+const RSVP_STYLES: Record<string, { bg: string; text: string }> = {
+  attended: { bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
+  registered: { bg: 'bg-green-500/10', text: 'text-green-400' },
+  invited: { bg: 'bg-blue-500/10', text: 'text-blue-400' },
+};
+
+function shortenEventName(name: string): string {
+  if (name.includes('GTC')) return 'GTC';
+  if (name.includes('CES')) return 'CES';
+  if (name.includes('Digital Twin')) return 'DT Summit';
+  const words = name.split(/\s+/);
+  return words.length > 3 ? words.slice(0, 3).join(' ') : name;
+}
+
+function TouchpointPills({
+  eventAttendances,
+  isWarm,
+}: {
+  eventAttendances?: EventAttendanceInfo[];
+  isWarm: boolean;
+}) {
+  const hasEvents = eventAttendances && eventAttendances.length > 0;
+  if (!hasEvents && !isWarm) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 mt-1">
+      {eventAttendances?.map((ea) => {
+        const status = (ea.rsvpStatus ?? 'invited').toLowerCase();
+        const style = RSVP_STYLES[status] ?? RSVP_STYLES.invited;
+        const label = status.charAt(0).toUpperCase() + status.slice(1);
+        return (
+          <span
+            key={ea.eventName}
+            className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium', style.bg, style.text)}
+          >
+            {shortenEventName(ea.eventName)}: {label}
+          </span>
+        );
+      })}
+      {isWarm && (
+        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-400">
+          Visited Page
+        </span>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { SECTION_TYPES_INSTRUCTION } from '@/lib/plays/plays-config';
+import { SECTION_TYPES_INSTRUCTION } from '@/lib/plays/constants';
 
 /**
  * Build prompt for generating sales page sections (no chatbot).

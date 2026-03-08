@@ -1,5 +1,12 @@
 'use client';
 
+/**
+ * @deprecated Use the new execute page at /plays/execute/[workflowId] instead.
+ * This component is kept as a fallback when workflow assembly from the activity
+ * catalog fails. New plays should flow through assembleWorkflowFromPlay →
+ * PlayExecuteClient.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 

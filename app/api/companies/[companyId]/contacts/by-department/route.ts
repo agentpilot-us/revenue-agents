@@ -42,6 +42,8 @@ export async function GET(
         personaId: true,
         enrichmentStatus: true,
         enrichedData: true,
+        seniority: true,
+        seniorityLevel: true,
         persona: {
           select: {
             name: true,
@@ -94,6 +96,17 @@ export async function GET(
       distinct: ['contactId'],
     });
     const contactedContactIds = new Set(activitiesByContact.map((a) => a.contactId).filter(Boolean));
+
+    // Event attendance per contact (GTC invites, executive meetings, etc.)
+    const eventAttendances = await prisma.eventAttendance.findMany({
+      where: { contactId: { in: contactIds } },
+      select: { contactId: true, eventName: true, rsvpStatus: true },
+    });
+    const eventsByContact: Record<string, { eventName: string; rsvpStatus: string | null }[]> = {};
+    for (const ea of eventAttendances) {
+      if (!eventsByContact[ea.contactId]) eventsByContact[ea.contactId] = [];
+      eventsByContact[ea.contactId].push({ eventName: ea.eventName, rsvpStatus: ea.rsvpStatus });
+    }
 
     // Optional: email activity in last 7 days (per contact + account total)
     let emailsSentByContact: Record<string, number> = {};
@@ -172,7 +185,10 @@ export async function GET(
         buyingRole: string | null;
         whyRelevant: string | null;
         engagementStatus: 'Not enriched' | 'Enriched' | 'Contacted' | 'Engaged';
+        seniority: string | null;
+        seniorityLevel: number | null;
         emailsSentThisWeek?: number;
+        eventAttendances: { eventName: string; rsvpStatus: string | null }[];
       }>;
     };
 
@@ -208,6 +224,9 @@ export async function GET(
           buyingRole: c.persona?.name ?? null,
           whyRelevant: enriched?.whyRelevant ?? null,
           engagementStatus,
+          seniority: c.seniority,
+          seniorityLevel: c.seniorityLevel,
+          eventAttendances: eventsByContact[c.id] ?? [],
           ...(includeEmailActivity && {
             emailsSentThisWeek: emailsSentByContact[c.id] ?? 0,
           }),
@@ -249,6 +268,9 @@ export async function GET(
             buyingRole: c.persona?.name ?? null,
             whyRelevant: enriched?.whyRelevant ?? null,
             engagementStatus,
+            seniority: c.seniority,
+            seniorityLevel: c.seniorityLevel,
+            eventAttendances: eventsByContact[c.id] ?? [],
             ...(includeEmailActivity && {
               emailsSentThisWeek: emailsSentByContact[c.id] ?? 0,
             }),

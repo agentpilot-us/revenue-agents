@@ -10,6 +10,7 @@ import { fetchAccountSignals, classifyPreFetchedSignals, type CustomExaQuery } f
 import { TYPE_DEDUP_DAYS } from '@/lib/signals/constants';
 import { generateRenewalSignals } from '@/lib/signals/renewal-signals';
 import { fetchWebsetResults } from '@/lib/exa/websets';
+import { matchSignalToRoadmapRules } from '@/lib/action-workflows/match-signal';
 
 const BATCH_SIZE = 5;
 const DELAY_MS = 1000;
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
               publishedAt.setTime(Date.now());
             }
 
-            await prisma.accountSignal.create({
+            const newSignal = await prisma.accountSignal.create({
               data: {
                 companyId: company.id,
                 userId: uid,
@@ -174,6 +175,21 @@ export async function POST(req: NextRequest) {
               },
             });
             created++;
+
+            try {
+              await matchSignalToRoadmapRules({
+                id: newSignal.id,
+                companyId: company.id,
+                userId: uid,
+                type: newSignal.type,
+                title: newSignal.title,
+                summary: newSignal.summary,
+                relevanceScore: newSignal.relevanceScore,
+                suggestedPlay: newSignal.suggestedPlay,
+              });
+            } catch (matchErr) {
+              console.error(`Signal matching failed for ${newSignal.id}:`, matchErr);
+            }
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

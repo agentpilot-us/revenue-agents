@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Copy, BarChart3 } from 'lucide-react';
 
-/** 6-tab set per Spec 2 (Tab Consolidation). */
 type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
 
 type Props = {
