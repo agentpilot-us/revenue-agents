@@ -18,6 +18,7 @@ type Department = {
   useCase: string | null;
   objectionHandlers: Array<{ objection: string; response: string }> | null;
   targetRoles: TargetRoles;
+  searchKeywords: string[] | null;
   estimatedOpportunity: string | null;
   _count?: { contacts: number };
 };
