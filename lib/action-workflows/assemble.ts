@@ -161,7 +161,7 @@ export async function assembleWorkflow(input: AssembleWorkflowInput) {
       status: 'pending',
       urgencyScore,
       signalContext: signalContext ?? undefined,
-      accountContext,
+      accountContext: accountContext as import('@prisma/client').Prisma.InputJsonValue,
       steps: {
         create: template.steps.map((step) => ({
           stepOrder: step.order,
