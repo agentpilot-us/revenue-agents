@@ -360,7 +360,7 @@ export async function seedDemoRoadmapForCompany(
           targetDepartments: [
             DepartmentType.ENGINEERING,
             DepartmentType.OPERATIONS,
-            DepartmentType.CONNECTED_SERVICES,
+            DepartmentType.PRODUCT,
           ] as DepartmentType[],
           targetPersonas: ['VP Vehicle Engineering', 'AV/ADAS Director', 'Software-Defined Vehicle Lead'],
           useCases: ['AV development', 'Simulation', 'In-vehicle compute'],
@@ -374,7 +374,6 @@ export async function seedDemoRoadmapForCompany(
           targetDepartments: [
             DepartmentType.ENGINEERING,
             DepartmentType.OPERATIONS,
-            DepartmentType.INDUSTRIAL_DESIGN,
           ] as DepartmentType[],
           targetPersonas: ['VP Manufacturing', 'Digital Twin Lead', 'Simulation Director'],
           useCases: ['Digital twin', 'Design collaboration', 'Factory simulation'],
@@ -509,7 +508,7 @@ export async function seedDemoRoadmapForCompany(
       },
       {
         label: 'Software-Defined Vehicle & Connected Services',
-        type: DepartmentType.CONNECTED_SERVICES,
+        type: DepartmentType.PRODUCT,
         stage: 'Emerging',
         notes:
           'Ultifi software-defined vehicle platform and connected services; in-vehicle AI and OTA feature roadmap.',
