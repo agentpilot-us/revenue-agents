@@ -183,12 +183,12 @@ function DealObjectiveBar({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 min-w-0 bg-transparent border-b border-gray-300 dark:border-zinc-600 focus:outline-none focus:border-blue-500 py-0.5 text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+          className="flex-1 min-w-0 bg-transparent border-b border-border focus:outline-none focus:border-blue-500 py-0.5 text-card-foreground placeholder:text-muted-foreground"
         />
       ) : (
         <span
           className={cn(
-            'flex-1 min-w-0 cursor-text hover:text-gray-600 dark:hover:text-gray-400 transition-colors',
+            'flex-1 min-w-0 cursor-text hover:text-muted-foreground transition-colors',
             !displayText && 'italic'
           )}
         >
@@ -299,7 +299,7 @@ export function CompanyTabs({
           campaignUrl={nextStepBar.campaignUrl}
         />
       )}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-border">
         <nav className="flex gap-1" aria-label="Tabs">
           {(setupIncomplete ? TABS.filter((t) => t.id === 'overview') : TABS).map((tab) => (
             <button
@@ -309,8 +309,8 @@ export function CompanyTabs({
               className={cn(
                 'px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600 bg-white dark:bg-zinc-800 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                  ? 'border-blue-600 text-blue-600 bg-card dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-card-foreground hover:border-border'
               )}
             >
               {tab.label}
@@ -346,36 +346,36 @@ export function CompanyTabs({
             <>
               {/* State 2: Company Snapshot */}
               {companyData && (
-                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Company Snapshot</h2>
+                <div className="bg-card rounded-lg shadow p-6 border border-border">
+                  <h2 className="text-xl font-semibold text-card-foreground mb-4">Company Snapshot</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     {companyData.industry && (
                       <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Industry:</span>{' '}
-                        <span className="text-gray-600 dark:text-gray-400">{companyData.industry}</span>
+                        <span className="font-medium text-card-foreground">Industry:</span>{' '}
+                        <span className="text-muted-foreground">{companyData.industry}</span>
                       </div>
                     )}
                     {companyData.revenue && (
                       <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Revenue:</span>{' '}
-                        <span className="text-gray-600 dark:text-gray-400">{companyData.revenue}</span>
+                        <span className="font-medium text-card-foreground">Revenue:</span>{' '}
+                        <span className="text-muted-foreground">{companyData.revenue}</span>
                       </div>
                     )}
                     {companyData.employees && (
                       <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Employees:</span>{' '}
-                        <span className="text-gray-600 dark:text-gray-400">{companyData.employees}</span>
+                        <span className="font-medium text-card-foreground">Employees:</span>{' '}
+                        <span className="text-muted-foreground">{companyData.employees}</span>
                       </div>
                     )}
                     {companyData.headquarters && (
                       <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">HQ:</span>{' '}
-                        <span className="text-gray-600 dark:text-gray-400">{companyData.headquarters}</span>
+                        <span className="font-medium text-card-foreground">HQ:</span>{' '}
+                        <span className="text-muted-foreground">{companyData.headquarters}</span>
                       </div>
                     )}
                     {companyData.website && (
                       <div className="md:col-span-2">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Website:</span>{' '}
+                        <span className="font-medium text-card-foreground">Website:</span>{' '}
                         <a
                           href={companyData.website.startsWith('http') ? companyData.website : `https://${companyData.website}`}
                           target="_blank"
@@ -392,7 +392,7 @@ export function CompanyTabs({
 
               {/* Research updated */}
               {companyData?.accountIntelligenceCompletedAt && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Research updated {new Date(companyData.accountIntelligenceCompletedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
                 </p>
               )}
@@ -402,17 +402,17 @@ export function CompanyTabs({
 
               {/* Business Overview and Key Initiatives */}
               {companyData && (companyData.businessOverview || (companyData.keyInitiatives && companyData.keyInitiatives.length > 0)) && (
-                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Business Overview & Key Initiatives</h2>
+                <div className="bg-card rounded-lg shadow p-6 border border-border">
+                  <h2 className="text-xl font-semibold text-card-foreground mb-4">Business Overview & Key Initiatives</h2>
                   {companyData.businessOverview && (
                     <div className="mb-4">
-                      <p className="text-gray-600 dark:text-gray-300">{companyData.businessOverview}</p>
+                      <p className="text-muted-foreground">{companyData.businessOverview}</p>
                     </div>
                   )}
                   {companyData.keyInitiatives && companyData.keyInitiatives.length > 0 && (
                     <div>
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Key Initiatives</h3>
-                      <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
+                      <h3 className="font-medium text-card-foreground mb-2">Key Initiatives</h3>
+                      <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                         {companyData.keyInitiatives.map((initiative, i) => (
                           <li key={i}>{initiative}</li>
                         ))}
@@ -670,9 +670,9 @@ function BuyingGroupCoverageCard({
   const withLivePages = deptIdsWithCampaigns.size;
   if (total === 0) return null;
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Buying group coverage</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400">
+    <div className="bg-card rounded-lg shadow p-6 border border-border">
+      <h2 className="text-xl font-semibold text-card-foreground mb-2">Buying group coverage</h2>
+      <p className="text-sm text-muted-foreground">
         {withContacts} of {total} groups have contacts; {withLivePages} have live pages.
       </p>
     </div>
@@ -685,15 +685,15 @@ function EngagementSummaryCard({ rows }: { rows: EngagementRow[] }) {
   const totalMeetings = rows.reduce((s, r) => s + r.meetings, 0);
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Engagement Summary</h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+    <div className="bg-card rounded-lg shadow p-6 border border-border">
+      <h2 className="text-lg font-semibold text-card-foreground mb-1">Engagement Summary</h2>
+      <p className="text-xs text-muted-foreground mb-4">
         {totalEmails} emails sent &middot; {totalReplies} replies &middot; {totalMeetings} meetings
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-zinc-700">
+            <tr className="text-left text-xs text-muted-foreground border-b border-border">
               <th className="pb-2 font-medium">Buying Group</th>
               <th className="pb-2 font-medium text-right">Contacts</th>
               <th className="pb-2 font-medium text-right">Emails</th>
@@ -703,12 +703,12 @@ function EngagementSummaryCard({ rows }: { rows: EngagementRow[] }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100 dark:border-zinc-700/50 last:border-0">
-                <td className="py-2 text-gray-900 dark:text-gray-100 font-medium">{row.name}</td>
-                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.contactCount}</td>
-                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.emailsSent}</td>
-                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.replies}</td>
-                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.meetings}</td>
+              <tr key={row.id} className="border-b border-border/50 last:border-0">
+                <td className="py-2 text-card-foreground font-medium">{row.name}</td>
+                <td className="py-2 text-right text-muted-foreground">{row.contactCount}</td>
+                <td className="py-2 text-right text-muted-foreground">{row.emailsSent}</td>
+                <td className="py-2 text-right text-muted-foreground">{row.replies}</td>
+                <td className="py-2 text-right text-muted-foreground">{row.meetings}</td>
               </tr>
             ))}
           </tbody>
@@ -766,18 +766,18 @@ function RecentSignalsCard({ companyId, companyName }: { companyId: string; comp
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Signals</h2>
+    <div className="bg-card rounded-lg shadow p-6 border border-border">
+      <h2 className="text-lg font-semibold text-card-foreground mb-4">Recent Signals</h2>
       <div className="space-y-2">
         {signals.map((sig, i) => (
           <div key={i} className="flex items-center gap-3 text-sm">
             <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded', tierBadge(sig.tier))}>
               {tierName(sig.tier)}
             </span>
-            <span className="flex-1 min-w-0 truncate text-gray-900 dark:text-gray-100">
+            <span className="flex-1 min-w-0 truncate text-card-foreground">
               {sig.headline}
             </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {formatDate(sig.date)}
             </span>
           </div>

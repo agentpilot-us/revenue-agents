@@ -172,8 +172,9 @@ export default function ActionQueueList({
   onDismissRecommendedPlay,
   onCreateAction,
 }: Props) {
-  const { continueItems, queued, campaigns } = useMemo(() => {
+  const { continueItems, yourPlays, queued, campaigns } = useMemo(() => {
     const cont: NextStepItem[] = [];
+    const plays: ActionCardWorkflow[] = [];
     const q: ActionCardWorkflow[] = [];
     const campMap = new Map<string, CampaignCardData>();
 
@@ -181,7 +182,6 @@ export default function ActionQueueList({
       const wfAny = wf as ActionCardWorkflow & {
         campaign?: { id: string; name: string; motion: string; status: string; phase: string } | null;
       };
-      // Group into campaign if present
       if (wfAny.campaign) {
         const cid = wfAny.campaign.id;
         if (!campMap.has(cid)) {
@@ -220,11 +220,13 @@ export default function ActionQueueList({
       if (isInProgress(wf)) {
         const next = deriveNextStep(wf);
         if (next) cont.push(next);
+      } else if (!wf.accountSignal) {
+        plays.push(wf);
       } else {
         q.push(wf);
       }
     }
-    return { continueItems: cont, queued: q, campaigns: Array.from(campMap.values()) };
+    return { continueItems: cont, yourPlays: plays, queued: q, campaigns: Array.from(campMap.values()) };
   }, [workflows]);
 
   const followUpItems: NextStepItem[] = useMemo(
@@ -257,6 +259,7 @@ export default function ActionQueueList({
     continueItems.length > 0 ||
     followUpItems.length > 0 ||
     recommendedPlays.length > 0 ||
+    yourPlays.length > 0 ||
     queued.length > 0;
 
   return (
@@ -340,6 +343,31 @@ export default function ActionQueueList({
           </div>
         )}
       </div>
+
+      {/* Your Plays — user-created plays, not yet started */}
+      {yourPlays.length > 0 && (
+        <div>
+          <SectionHeader
+            title="Your Plays"
+            count={yourPlays.length}
+            countColor={t.blue}
+            countBg={t.blueBg}
+            countBorder={t.blueBorder}
+            subtitle="Plays you created. Pick one to start working."
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {yourPlays.map((wf) => (
+              <ActionCard
+                key={wf.id}
+                workflow={wf}
+                onDismiss={onDismiss}
+                onSnooze={onSnooze}
+                onWorkThis={onWorkThis}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Section 3: Follow Up — timed steps that are now due */}
       {followUpItems.length > 0 && (

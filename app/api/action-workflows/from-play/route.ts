@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
           companyId,
           title: title || 'Custom Play',
           description: description || null,
-          status: 'active',
+          status: 'pending',
           urgencyScore: 50,
           ...(targetDivisionId && { targetDivisionId }),
           steps: {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
               contentType: channelToContentType[step.channel || 'email'] || 'email',
               channel: step.channel || 'email',
               promptHint: step.description || step.label,
-              status: idx === 0 ? 'ready' : 'pending',
+              status: 'pending',
               ...(targetDivisionId && { divisionId: targetDivisionId }),
             })),
           },

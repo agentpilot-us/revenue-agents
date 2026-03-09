@@ -21,14 +21,14 @@ import SAPTabs from '@/app/components/roadmap/SAPTabs';
 export default async function RoadmapPage({
   searchParams,
 }: {
-  searchParams: Promise<{ companyId?: string }>;
+  searchParams: Promise<{ companyId?: string; play?: string; division?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) {
     redirect('/login?callbackUrl=/dashboard/roadmap');
   }
 
-  const { companyId } = await searchParams;
+  const { companyId, play, division } = await searchParams;
 
   // ---- No company selected → show company picker ----
   if (!companyId) {
@@ -342,6 +342,7 @@ export default async function RoadmapPage({
 
         {/* ═══ Three-Tab Layout ═══ */}
         <SAPTabs
+          initialTab={play === 'custom' ? 'plays' : undefined}
           intelligenceContent={
             <BuyingGroupIntelligence
               companyId={companyId}
@@ -352,7 +353,7 @@ export default async function RoadmapPage({
             />
           }
           playsContent={
-            <ActivePlaybooksPanel roadmapId={roadmap.id} companyId={companyId} companyName={company.name} />
+            <ActivePlaybooksPanel roadmapId={roadmap.id} companyId={companyId} companyName={company.name} initialPlayMode={play === 'custom' ? 'custom' : undefined} initialDivisionId={division} />
           }
           configContent={
             <ConfigurationPanel

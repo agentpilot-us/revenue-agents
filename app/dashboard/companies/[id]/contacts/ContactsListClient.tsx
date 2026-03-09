@@ -49,7 +49,7 @@ type Props = {
 };
 
 function CrmSourceBadge({ source }: { source: string | null }) {
-  if (!source) return <span className="text-gray-400">—</span>;
+  if (!source) return <span className="text-muted-foreground">—</span>;
   const label = source === 'salesforce' ? 'Salesforce' : source === 'hubspot' ? 'HubSpot' : source;
   return (
     <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
@@ -73,7 +73,7 @@ function EnrichmentCell({
         Enrich now
       </Button>
     ) : (
-      <span className="text-slate-500">—</span>
+      <span className="text-muted-foreground">—</span>
     );
   }
   if (status === 'pending' || status === 'enriching') {
@@ -87,7 +87,7 @@ function EnrichmentCell({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3.5 w-3.5 text-slate-400 cursor-help" />
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent>Finding email, phone, LinkedIn profile</TooltipContent>
             </Tooltip>
@@ -109,14 +109,14 @@ function EnrichmentCell({
       <div className="flex items-center gap-2">
         <span className="text-red-500 text-sm">Failed</span>
         {onEnrichNow && (
-          <Button variant="ghost" size="sm" className="h-6 text-xs text-slate-400" onClick={onEnrichNow} disabled={enriching}>
+          <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={onEnrichNow} disabled={enriching}>
             Retry
           </Button>
         )}
       </div>
     );
   }
-  return <span className="text-slate-500">{status}</span>;
+  return <span className="text-muted-foreground">{status}</span>;
 }
 
 export function ContactsListClient({
@@ -352,7 +352,7 @@ export function ContactsListClient({
       {showOnboardingBanner && (
         <div
           id="onboarding-banner"
-          className="flex items-center justify-between gap-4 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-slate-200"
+          className="flex items-center justify-between gap-4 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-card-foreground"
           role="status"
         >
           <span>
@@ -361,7 +361,7 @@ export function ContactsListClient({
           <button
             type="button"
             onClick={handleDismissOnboardingBanner}
-            className="shrink-0 p-1 rounded hover:bg-green-500/20 text-slate-400 hover:text-white"
+            className="shrink-0 p-1 rounded hover:bg-green-500/20 text-muted-foreground hover:text-card-foreground"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -370,10 +370,10 @@ export function ContactsListClient({
       )}
 
       {/* Step 3 sub-progress */}
-      <div className="rounded-lg border border-zinc-600 bg-zinc-800/50 p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h4 className="font-medium text-slate-100">Step 3: Find Contacts</h4>
-          <span className="text-xs text-slate-400">
+          <h4 className="font-medium text-card-foreground">Step 3: Find Contacts</h4>
+          <span className="text-xs text-muted-foreground">
             {deptsWithContacts} of {departments.length || 1} departments with contacts
           </span>
         </div>
@@ -383,9 +383,9 @@ export function ContactsListClient({
               {(dept.contactCount ?? 0) > 0 ? (
                 <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
               ) : (
-                <Circle className="h-4 w-4 text-slate-500 shrink-0" />
+                <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
-              <span className={dept.contactCount ? 'text-slate-200' : 'text-slate-500'}>
+              <span className={dept.contactCount ? 'text-card-foreground' : 'text-muted-foreground'}>
                 {dept.name} ({(dept.contactCount ?? 0)} contact{(dept.contactCount ?? 0) !== 1 ? 's' : ''})
               </span>
             </div>
@@ -396,17 +396,17 @@ export function ContactsListClient({
                 {deptsWithContacts >= Math.min(3, departments.length) ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                 ) : (
-                  <Circle className="h-4 w-4 text-slate-500 shrink-0" />
+                  <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
                 )}
-                <span className="text-slate-400">Add 3+ contacts per department</span>
+                <span className="text-muted-foreground">Add 3+ contacts per department</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 {allEnriched ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                 ) : (
-                  <Circle className="h-4 w-4 text-slate-500 shrink-0" />
+                  <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
                 )}
-                <span className="text-slate-400">Enrich all contacts</span>
+                <span className="text-muted-foreground">Enrich all contacts</span>
               </div>
             </>
           )}
@@ -419,16 +419,16 @@ export function ContactsListClient({
       </div>
 
       {/* Find contacts by buying group — single clean section */}
-      <div id="buying-groups" className="rounded-lg border border-zinc-600 bg-zinc-800/80 overflow-hidden">
-        <div className="px-4 py-3 border-b border-zinc-600/80">
-          <h3 className="font-medium text-slate-100 text-sm">Find contacts by buying group</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <div id="buying-groups" className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h3 className="font-medium text-card-foreground text-sm">Find contacts by buying group</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Departments from Account Intelligence. Find or view contacts per group.
           </p>
         </div>
         {departments.length > 0 ? (
           <>
-            <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-zinc-600/50 bg-zinc-800/50">
+            <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-border bg-muted/50">
               <Button
                 onClick={handleFindAndEnrichAll}
                 disabled={findAndEnrichRunning}
@@ -444,21 +444,21 @@ export function ContactsListClient({
                 )}
               </Button>
               {findAndEnrichResult && !findAndEnrichRunning && (
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-muted-foreground">
                   {findAndEnrichResult.contactsAdded} added, {findAndEnrichResult.enriched} enriched
                 </span>
               )}
             </div>
-            <ul className="divide-y divide-zinc-600/50">
+            <ul className="divide-y divide-border">
               {departments.map((dept) => (
                 <li
                   key={dept.id}
                   id={`dept-${dept.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-zinc-700/30 transition-colors"
+                  className="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-muted transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <span className="font-medium text-slate-100 text-sm">{dept.name}</span>
-                    <span className="ml-2 text-xs text-slate-500">
+                    <span className="font-medium text-card-foreground text-sm">{dept.name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
                       {(dept.contactCount ?? 0) > 0
                         ? `${dept.contactCount} contact${dept.contactCount === 1 ? '' : 's'}`
                         : 'No contacts yet'}
@@ -474,7 +474,7 @@ export function ContactsListClient({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 text-xs text-slate-400 hover:text-white"
+                        className="h-8 text-xs text-muted-foreground hover:text-card-foreground"
                         onClick={() => {
                           setDepartmentFilter(dept.id);
                           setTimeout(() => {
@@ -492,7 +492,7 @@ export function ContactsListClient({
           </>
         ) : (
           <div className="flex items-center justify-between gap-4 px-4 py-4">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground">
               Complete Account Intelligence first to see buying groups here.
             </p>
             <Link href={`/dashboard/companies/${companyId}?tab=contacts&action=find`}>
@@ -502,33 +502,33 @@ export function ContactsListClient({
         )}
       </div>
 
-      <div className="rounded-lg border border-zinc-600 p-4 bg-zinc-800/80">
-        <h3 className="font-medium text-slate-100 text-sm mb-1">Add manually</h3>
-        <p className="text-xs text-slate-400 mb-4">Paste from LinkedIn, import CSV, or add one at a time.</p>
+      <div className="rounded-lg border border-border p-4 bg-card">
+        <h3 className="font-medium text-card-foreground text-sm mb-1">Add manually</h3>
+        <p className="text-xs text-muted-foreground mb-4">Paste from LinkedIn, import CSV, or add one at a time.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <Link
             href={`/dashboard/companies/${companyId}/add-contacts#paste`}
-            className="flex flex-col items-start gap-2 rounded-lg border border-zinc-600 bg-zinc-800/50 p-4 hover:bg-zinc-700/50 transition-colors text-left"
+            className="flex flex-col items-start gap-2 rounded-lg border border-border bg-muted/50 p-4 hover:bg-muted transition-colors text-left"
           >
-            <Linkedin className="h-6 w-6 text-slate-400" />
-            <span className="font-medium text-slate-100">Paste from LinkedIn</span>
-            <span className="text-xs text-slate-400">Copy profiles and paste here</span>
+            <Linkedin className="h-6 w-6 text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Paste from LinkedIn</span>
+            <span className="text-xs text-muted-foreground">Copy profiles and paste here</span>
           </Link>
           <Link
             href={`/dashboard/companies/${companyId}/add-contacts#csv`}
-            className="flex flex-col items-start gap-2 rounded-lg border border-zinc-600 bg-zinc-800/50 p-4 hover:bg-zinc-700/50 transition-colors text-left"
+            className="flex flex-col items-start gap-2 rounded-lg border border-border bg-muted/50 p-4 hover:bg-muted transition-colors text-left"
           >
-            <Upload className="h-6 w-6 text-slate-400" />
-            <span className="font-medium text-slate-100">Import CSV</span>
-            <span className="text-xs text-slate-400">Bulk upload contact list</span>
+            <Upload className="h-6 w-6 text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Import CSV</span>
+            <span className="text-xs text-muted-foreground">Bulk upload contact list</span>
           </Link>
           <Link
             href={`/dashboard/companies/${companyId}/add-contacts#manual`}
-            className="flex flex-col items-start gap-2 rounded-lg border border-zinc-600 bg-zinc-800/50 p-4 hover:bg-zinc-700/50 transition-colors text-left"
+            className="flex flex-col items-start gap-2 rounded-lg border border-border bg-muted/50 p-4 hover:bg-muted transition-colors text-left"
           >
-            <UserPlus className="h-6 w-6 text-slate-400" />
-            <span className="font-medium text-slate-100">Add individual</span>
-            <span className="text-xs text-slate-400">Enter contact details manually</span>
+            <UserPlus className="h-6 w-6 text-muted-foreground" />
+            <span className="font-medium text-card-foreground">Add individual</span>
+            <span className="text-xs text-muted-foreground">Enter contact details manually</span>
           </Link>
         </div>
         <CrmImportPushCard companyId={companyId} companyName={companyName} companyCrm={companyCrm} />
@@ -575,12 +575,12 @@ export function ContactsListClient({
           placeholder="Search by name, email, title…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded border border-zinc-500 px-3 py-2 text-sm w-64 bg-zinc-800 text-slate-100 placeholder:text-slate-500"
+          className="rounded border border-border px-3 py-2 text-sm w-64 bg-background text-card-foreground placeholder:text-muted-foreground"
         />
         <select
           value={departmentFilter}
           onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="rounded border border-zinc-500 px-3 py-2 text-sm bg-zinc-800 text-slate-100"
+          className="rounded border border-border px-3 py-2 text-sm bg-background text-card-foreground"
         >
           <option value="">All departments</option>
           {departments.map((d) => (
@@ -592,7 +592,7 @@ export function ContactsListClient({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as 'all' | 'responsive' | 'dormant')}
-          className="rounded border border-zinc-500 px-3 py-2 text-sm bg-zinc-800 text-slate-100"
+          className="rounded border border-border px-3 py-2 text-sm bg-background text-card-foreground"
         >
           <option value="all">All statuses</option>
           <option value="responsive">Responsive</option>
@@ -624,15 +624,15 @@ export function ContactsListClient({
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-sm:static max-sm:translate-x-0 max-sm:mt-4 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-zinc-600 bg-zinc-800 shadow-lg min-w-0 max-w-[calc(100vw-2rem)]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-sm:static max-sm:translate-x-0 max-sm:mt-4 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card shadow-lg min-w-0 max-w-[calc(100vw-2rem)]">
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
               checked={filtered.length > 0 && selectedIds.size === filtered.length}
               onChange={toggleAll}
-              className="rounded border-zinc-500 bg-zinc-700"
+              className="rounded border-border bg-muted"
             />
-            <span className="text-sm font-medium text-slate-100">
+            <span className="text-sm font-medium text-card-foreground">
               {selectedIds.size} contact{selectedIds.size !== 1 ? 's' : ''} selected
             </span>
           </div>
@@ -647,81 +647,81 @@ export function ContactsListClient({
               <Button size="sm" variant="outline">Invite to Event</Button>
             </Link>
           </div>
-          <Button size="sm" variant="ghost" className="text-slate-400" onClick={() => setSelectedIds(new Set())}>
+          <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setSelectedIds(new Set())}>
             Clear selection
           </Button>
         </div>
       )}
 
-      <div id="contacts-table" className="contacts-table-wrapper border border-zinc-600 rounded-lg overflow-x-auto overflow-y-hidden bg-zinc-800/50 scroll-mt-4">
-        <table className="min-w-full divide-y divide-zinc-600 md:table w-full">
-          <thead className="bg-zinc-800 hidden md:table-header-group">
+      <div id="contacts-table" className="contacts-table-wrapper border border-border rounded-lg overflow-x-auto overflow-y-hidden bg-card scroll-mt-4">
+        <table className="min-w-full divide-y divide-border md:table w-full">
+          <thead className="bg-muted hidden md:table-header-group">
             <tr>
               <th className="px-4 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={filtered.length > 0 && selectedIds.size === filtered.length}
                   onChange={toggleAll}
-                  className="rounded border-zinc-500 bg-zinc-700"
+                  className="rounded border-border bg-muted"
                 />
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Title
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+              <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Department
               </th>
               {showColumn('role') && (
-                <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Role
                 </th>
               )}
               {showColumn('enrichment') && (
-                <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Enrichment
                 </th>
               )}
               {showColumn('status') && (
-                <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Status
                 </th>
               )}
               {showColumn('crm') && (
-                <th className="px-4 py-2 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   CRM
                 </th>
               )}
             </tr>
           </thead>
-          <tbody className="bg-zinc-800/30 divide-y divide-zinc-600 md:table-row-group">
+          <tbody className="bg-card divide-y divide-border md:table-row-group">
             {filtered.map((c) => (
-              <tr key={c.id} className="hover:bg-zinc-700/50 block md:table-row border-b border-zinc-600 md:border-b-0 last:border-b-0 md:last:border-b md:rounded-lg md:rounded-none mb-3 md:mb-0 p-4 md:p-0 md:py-0">
+              <tr key={c.id} className="hover:bg-muted block md:table-row border-b border-border md:border-b-0 last:border-b-0 md:last:border-b md:rounded-lg md:rounded-none mb-3 md:mb-0 p-4 md:p-0 md:py-0">
                 <td className="px-4 py-2 block md:table-cell md:py-2 md:align-middle" data-label="">
                   <input
                     type="checkbox"
                     checked={selectedIds.has(c.id)}
                     onChange={() => toggle(c.id)}
-                    className="rounded border-zinc-500 bg-zinc-700"
+                    className="rounded border-border bg-muted"
                   />
                 </td>
-                <td className="px-4 py-2 block md:table-cell md:py-2 md:align-middle before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none md:before:mb-0 md:before:font-normal" data-label="Name">
-                  <span className="font-medium text-slate-100">
+                <td className="px-4 py-2 block md:table-cell md:py-2 md:align-middle before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none md:before:mb-0 md:before:font-normal" data-label="Name">
+                  <span className="font-medium text-card-foreground">
                     {[c.firstName, c.lastName].filter(Boolean).join(' ').trim() || '—'}
                   </span>
                   {c.email && (
-                    <div className="text-xs text-slate-400">{c.email}</div>
+                    <div className="text-xs text-muted-foreground">{c.email}</div>
                   )}
                 </td>
-                <td className="px-4 py-2 text-sm text-slate-300 block md:table-cell md:py-2 md:align-middle before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none" data-label="Title">{c.title ?? '—'}</td>
-                <td className="px-4 py-2 text-sm text-slate-400 block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none" data-label="Department">{c.departmentName ?? '—'}</td>
+                <td className="px-4 py-2 text-sm text-card-foreground block md:table-cell md:py-2 md:align-middle before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Title">{c.title ?? '—'}</td>
+                <td className="px-4 py-2 text-sm text-muted-foreground block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Department">{c.departmentName ?? '—'}</td>
                 {showColumn('role') && (
-                  <td className="px-4 py-2 text-sm text-slate-400 block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none" data-label="Role">{c.personaName ?? '—'}</td>
+                  <td className="px-4 py-2 text-sm text-muted-foreground block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Role">{c.personaName ?? '—'}</td>
                 )}
                 {showColumn('enrichment') && (
-                  <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none" data-label="Enrichment">
+                  <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Enrichment">
                     <EnrichmentCell
                       status={c.enrichmentStatus}
                       onEnrichNow={handleEnrichPending}
@@ -730,7 +730,7 @@ export function ContactsListClient({
                   </td>
                 )}
                 {showColumn('status') && (
-                  <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none" data-label="Status">
+                  <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Status">
                     {c.isResponsive && (
                       <span className="text-green-600 dark:text-green-400">Responsive</span>
                     )}
@@ -743,7 +743,7 @@ export function ContactsListClient({
                   </td>
                 )}
                 {showColumn('crm') && (
-                  <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-slate-500 before:block before:mb-1 md:before:content-none" data-label="CRM">
+                  <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="CRM">
                     <CrmSourceBadge source={c.crmSource} />
                   </td>
                 )}
@@ -756,10 +756,10 @@ export function ContactsListClient({
       )}
 
       {initialContacts.length === 0 ? (
-        <div className="rounded-lg border border-zinc-600 bg-zinc-800/50 p-12 text-center">
-          <Users className="mx-auto h-12 w-12 text-slate-500 mb-4" />
-          <h3 className="text-lg font-semibold text-slate-100 mb-2">Time to assemble your crew</h3>
-          <p className="text-sm text-slate-400 mb-6 max-w-md mx-auto">
+        <div className="rounded-lg border border-border bg-card p-12 text-center">
+          <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-card-foreground mb-2">Time to assemble your crew</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
             Let the agent discover stakeholders in this account.
           </p>
           <div className="flex flex-wrap justify-center gap-3 mb-6">
@@ -779,13 +779,13 @@ export function ContactsListClient({
               <Button variant="outline">Import from CSV</Button>
             </Link>
           </div>
-          <p className="text-xs text-slate-500 flex items-center justify-center gap-1.5">
+          <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
             <span className="inline-block w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">?</span>
             Tip: Contacts are automatically enriched with email, phone, and LinkedIn when possible.
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-slate-400">
+        <div className="text-center py-12 text-muted-foreground">
           No contacts match your filters.
         </div>
       ) : null}

@@ -46,9 +46,11 @@ type Props = {
   roadmapId: string;
   companyId?: string;
   companyName?: string;
+  initialPlayMode?: 'custom';
+  initialDivisionId?: string;
 };
 
-export function ActivePlaybooksPanel({ roadmapId, companyId, companyName }: Props) {
+export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initialPlayMode, initialDivisionId }: Props) {
   const [activations, setActivations] = useState<Activation[]>([]);
   const [allTemplates, setAllTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,7 +269,7 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName }: Prop
       {companyId && companyName && (
         <div className="mt-8 pt-6 border-t border-border/40">
           <h3 className="text-sm font-semibold text-foreground mb-4">Play Execution</h3>
-          <AccountPlaysTab companyId={companyId} companyName={companyName} />
+          <AccountPlaysTab companyId={companyId} companyName={companyName} initialSubTab={initialPlayMode} initialDivisionId={initialDivisionId} />
         </div>
       )}
     </div>

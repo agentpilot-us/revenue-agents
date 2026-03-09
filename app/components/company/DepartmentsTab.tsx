@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { DepartmentStatus } from '@prisma/client';
 import { discoverDepartments, type DiscoveredDepartment } from '@/app/actions/discover-departments';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ type CompanyDepartmentWithRelations = {
   objectionHandlers: Array<{ objection: string; response: string }> | null;
   proofPoints: string[] | null;
   targetRoles: TargetRoles;
+  searchKeywords: string[] | null;
   _count: { contacts: number; activities: number };
   contacts: Array<{
     id: string;
@@ -96,6 +98,11 @@ export function DepartmentsTab({
   caseStudies?: CaseStudyForUI[];
   onPrepMeOpen?: (params: PrepMePanelParams) => void;
 }) {
+  const searchParams = useSearchParams();
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(
+    searchParams.get('onboarding') === '1'
+  );
+
   const [departments, setDepartments] = useState(initialDepartments);
   useEffect(() => {
     setDepartments(initialDepartments);
@@ -274,6 +281,30 @@ export function DepartmentsTab({
         </div>
       )}
 
+      {showOnboardingBanner && (
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              Buying groups saved. Review target roles and keywords for each group, then find contacts per group for the most relevant results.
+            </p>
+            <div className="flex gap-2 mt-2">
+              <Button size="sm" variant="outline" asChild>
+                <Link href={`/dashboard/companies/${companyId}/contacts`}>
+                  Find Contacts
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOnboardingBanner(false)}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold">Divisions</h2>
@@ -283,15 +314,14 @@ export function DepartmentsTab({
         </div>
         <div className="flex items-center gap-2">
           {departments.length > 0 && (
-            <Button asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href={`/dashboard/companies/${companyId}/contacts`}>
-                Find & enrich all segments
+                Find Contacts
               </Link>
             </Button>
           )}
           <Button
             onClick={() => setShowAddForm((v) => !v)}
-            variant="outline"
             size="sm"
           >
             <Plus className="h-4 w-4 mr-1" />
@@ -300,7 +330,8 @@ export function DepartmentsTab({
           <Button
             onClick={handleDiscover}
             disabled={discovering}
-            variant="outline"
+            variant="ghost"
+            size="sm"
           >
             {discovering ? 'Discovering…' : 'Discover More'}
           </Button>
@@ -536,7 +567,6 @@ export function DepartmentsTab({
                 relevance: cp.fitScore != null ? Number(cp.fitScore) : 0,
                 talkingPoint: cp.fitReasoning ?? null,
               }));
-              const divisionName = dept.customName || dept.type.replace(/_/g, ' ');
               return (
                 <DivisionIntelligenceCard
                   key={dept.id}
@@ -548,22 +578,20 @@ export function DepartmentsTab({
                     useCase: dept.useCase,
                     objectionHandlers: dept.objectionHandlers,
                     targetRoles: dept.targetRoles,
+                    searchKeywords: dept.searchKeywords,
                     estimatedOpportunity: dept.estimatedOpportunity,
                     _count: dept._count,
                   }}
                   products={products}
                   caseStudies={caseStudies}
                   companyId={companyId}
-                  onPrepMe={
-                    onPrepMeOpen && companyName
-                      ? () =>
-                          onPrepMeOpen({
-                            companyId,
-                            companyName,
-                            divisionName,
-                          })
-                      : undefined
-                  }
+                  onUpdate={async () => {
+                    const listRes = await fetch(`/api/companies/${companyId}/departments`);
+                    if (listRes.ok) {
+                      const list = await listRes.json();
+                      setDepartments(list);
+                    }
+                  }}
                 />
               );
             }

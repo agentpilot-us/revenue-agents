@@ -204,6 +204,14 @@ export default function ContactSelector({
   }
 
   if (groups.length === 0 || groups.every((g) => g.contacts.length === 0)) {
+    const divisionForLink = selectedDivisionId
+      ? groups.find((g) => g.department.id === selectedDivisionId)
+      : groups[0];
+    const divisionName = divisionForLink?.department.name ?? 'this buying group';
+    const findUrl = selectedDivisionId
+      ? `/dashboard/companies/${companyId}?tab=contacts&division=${selectedDivisionId}&action=find`
+      : `/dashboard/companies/${companyId}?tab=contacts&action=find`;
+
     return (
       <div
         style={{
@@ -217,9 +225,26 @@ export default function ContactSelector({
         <p style={{ color: t.text2, fontSize: 14, fontWeight: 600, margin: 0 }}>
           No contacts found
         </p>
-        <p style={{ color: t.text3, fontSize: 12, margin: '4px 0 0' }}>
-          Add contacts to this account to target your outreach.
+        <p style={{ color: t.text3, fontSize: 12, margin: '4px 0 0 0' }}>
+          Find contacts for this buying group to target your outreach.
         </p>
+        <a
+          href={findUrl}
+          style={{
+            display: 'inline-block',
+            marginTop: 12,
+            padding: '8px 20px',
+            borderRadius: 8,
+            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+            boxShadow: '0 4px 16px rgba(59,130,246,0.3)',
+          }}
+        >
+          Find Contacts for {divisionName}
+        </a>
       </div>
     );
   }

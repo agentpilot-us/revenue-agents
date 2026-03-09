@@ -198,22 +198,41 @@ export default function MyDayDashboard() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: t.text1, margin: 0 }}>
           My Day
         </h1>
-        <button
-          type="button"
-          onClick={() => setCampaignModalOpen(true)}
-          style={{
-            padding: '8px 18px',
-            borderRadius: 8,
-            background: 'rgba(167,139,250,0.08)',
-            border: '1px solid rgba(167,139,250,0.25)',
-            color: '#a78bfa',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          + Start Campaign
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/roadmap?play=custom')}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 8,
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+              border: 'none',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(59,130,246,0.3)',
+            }}
+          >
+            + New Play
+          </button>
+          <button
+            type="button"
+            onClick={() => setCampaignModalOpen(true)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#64748b',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Start Campaign
+          </button>
+        </div>
       </div>
 
       {/* Section 1: Weekly Stats */}

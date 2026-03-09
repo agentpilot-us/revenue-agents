@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { WarmIndicator } from './WarmIndicator';
-import { FileText, Trash2 } from 'lucide-react';
+import { FileText, Trash2, Upload, Users, ArrowRight } from 'lucide-react';
 import { FindContactsModal } from './FindContactsModal';
 import {
   Select,
@@ -222,14 +222,25 @@ export function ContactsByBuyingGroup({
             {totalContacts} total contact{totalContacts !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" asChild>
-            <Link href={`/dashboard/companies/${companyId}/contacts`}>
-              Manage Contacts
-            </Link>
-          </Button>
-        </div>
       </div>
+
+      <Link
+        href={`/dashboard/companies/${companyId}/contacts`}
+        className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 hover:bg-muted transition-colors group"
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10 text-primary shrink-0">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-medium text-card-foreground">Manage & Import Contacts</p>
+            <p className="text-sm text-muted-foreground">
+              Import from LinkedIn, CSV, or CRM. Bulk enrich and assign contacts.
+            </p>
+          </div>
+        </div>
+        <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-card-foreground transition-colors shrink-0" />
+      </Link>
 
       {groups.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg border-border">

@@ -94,14 +94,14 @@ export default async function CompanyContactsPage({
   }));
 
   return (
-    <div className="min-h-screen bg-zinc-900 max-w-5xl mx-auto py-8 px-4">
+    <div className="min-h-screen bg-background max-w-5xl mx-auto py-8 px-4">
       <div className="flex items-center gap-4 mb-6">
-        <Link href={`/dashboard/companies/${id}`} className="text-slate-300 hover:text-white transition-colors">← Back to company</Link>
+        <Link href={`/dashboard/companies/${id}`} className="text-muted-foreground hover:text-card-foreground transition-colors">← Back to company</Link>
       </div>
-      <h1 className="text-2xl font-bold text-white mb-2">
+      <h1 className="text-2xl font-bold text-foreground mb-2">
         Build Contact List · {company.name}
       </h1>
-      <p className="text-slate-300 mb-6">
+      <p className="text-muted-foreground mb-6">
         Find by department, add manually or import. New contacts are auto-enriched when possible.
       </p>
       <ContactsListClient

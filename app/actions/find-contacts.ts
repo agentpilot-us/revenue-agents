@@ -357,6 +357,19 @@ export async function findAndEnrichContactsForCompany(
 
   for (const dept of departments) {
     try {
+      const existingCount = await prisma.contact.count({
+        where: { companyId, companyDepartmentId: dept.id },
+      });
+      if (existingCount >= maxPerDept) {
+        send({
+          type: 'department',
+          departmentId: dept.id,
+          departmentName: dept.customName || dept.type,
+          contactsAdded: 0,
+        });
+        continue;
+      }
+
       const searchContext = resolveSearchContext(
         {
           customName: dept.customName,
@@ -374,6 +387,7 @@ export async function findAndEnrichContactsForCompany(
         company.segmentationStrategy,
         DEFAULT_SENIORITY
       );
+      const remaining = maxPerDept - existingCount;
       const segmentResults = await limit(() =>
         findContactsForSegment({
           companyDomain,
@@ -381,7 +395,7 @@ export async function findAndEnrichContactsForCompany(
           targetRoles: searchContext.titles.length > 0 ? searchContext.titles : undefined,
           keywords: searchContext.keywords.length > 0 ? searchContext.keywords : undefined,
           seniorityLevels: searchContext.seniorityLevels.length > 0 ? searchContext.seniorityLevels : undefined,
-          maxResults: maxPerDept,
+          maxResults: remaining,
         })
       );
 

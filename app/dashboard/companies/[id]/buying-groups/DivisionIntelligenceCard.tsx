@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronUp, FileText, Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Pencil, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildContentUrl } from '@/lib/urls/content';
 
@@ -21,6 +21,7 @@ type Department = {
   useCase: string | null;
   objectionHandlers: Array<{ objection: string; response: string }> | null;
   targetRoles: TargetRoles;
+  searchKeywords: string[] | null;
   estimatedOpportunity: string | null;
   _count?: { contacts: number };
 };
@@ -43,8 +44,7 @@ type DivisionIntelligenceCardProps = {
   products: ProductFit[];
   caseStudies: CaseStudy[];
   companyId: string;
-  /** Called when Prep Me is clicked (Ticket 2 will wire this). */
-  onPrepMe?: () => void;
+  onUpdate?: () => void;
 };
 
 function CollapsibleSection({
@@ -98,10 +98,58 @@ export function DivisionIntelligenceCard({
   products,
   caseStudies,
   companyId,
-  onPrepMe,
+  onUpdate,
 }: DivisionIntelligenceCardProps) {
   const divisionName = department.customName || department.type.replace(/_/g, ' ');
   const contactCount = department._count?.contacts ?? 0;
+  const [editingRoles, setEditingRoles] = useState(false);
+  const [savingRoles, setSavingRoles] = useState(false);
+  const [draftRoles, setDraftRoles] = useState({
+    economicBuyer: '',
+    technicalEvaluator: '',
+    champion: '',
+    influencer: '',
+  });
+  const [draftKeywords, setDraftKeywords] = useState('');
+
+  const startEditingRoles = () => {
+    const r = department.targetRoles;
+    setDraftRoles({
+      economicBuyer: r?.economicBuyer?.join(', ') ?? '',
+      technicalEvaluator: r?.technicalEvaluator?.join(', ') ?? '',
+      champion: r?.champion?.join(', ') ?? '',
+      influencer: r?.influencer?.join(', ') ?? '',
+    });
+    setDraftKeywords(department.searchKeywords?.join(', ') ?? '');
+    setEditingRoles(true);
+  };
+
+  const saveRoles = async () => {
+    setSavingRoles(true);
+    try {
+      const split = (v: string) => v.split(',').map((s) => s.trim()).filter(Boolean);
+      const targetRoles = {
+        economicBuyer: split(draftRoles.economicBuyer),
+        technicalEvaluator: split(draftRoles.technicalEvaluator),
+        champion: split(draftRoles.champion),
+        influencer: split(draftRoles.influencer),
+      };
+      const searchKeywords = split(draftKeywords);
+      const res = await fetch(`/api/companies/${companyId}/departments/${department.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetRoles, searchKeywords }),
+      });
+      if (res.ok) {
+        setEditingRoles(false);
+        onUpdate?.();
+      }
+    } catch (e) {
+      console.error('Failed to save roles:', e);
+    } finally {
+      setSavingRoles(false);
+    }
+  };
 
   const productsWithRelevance = products
     .filter((p) => p.relevance > 0)
@@ -116,6 +164,22 @@ export function DivisionIntelligenceCard({
     (department.targetRoles.influencer?.length ?? 0) > 0
   );
 
+  const filledRoleCategories = department.targetRoles
+    ? [
+        department.targetRoles.economicBuyer,
+        department.targetRoles.technicalEvaluator,
+        department.targetRoles.champion,
+        department.targetRoles.influencer,
+      ].filter((arr) => arr && arr.length > 0).length
+    : 0;
+  const hasKeywords = (department.searchKeywords?.length ?? 0) > 0;
+
+  const searchReadiness: { label: string; color: string } = !hasTargetRoles
+    ? { label: 'Not enriched', color: 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30' }
+    : filledRoleCategories < 2 || !hasKeywords
+      ? { label: 'Limited', color: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30' }
+      : { label: 'Ready', color: 'bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30' };
+
   return (
     <div className="border border-border rounded-lg bg-card overflow-hidden">
       {/* Header: always visible */}
@@ -124,6 +188,9 @@ export function DivisionIntelligenceCard({
           <h3 className="text-lg font-semibold text-card-foreground">
             {divisionName}
           </h3>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded border ${searchReadiness.color}`}>
+            {searchReadiness.label}
+          </span>
           {department.estimatedOpportunity && (
             <span className="text-xs font-medium px-2 py-0.5 rounded bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30">
               {department.estimatedOpportunity}
@@ -135,11 +202,13 @@ export function DivisionIntelligenceCard({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {onPrepMe && (
-            <Button size="sm" variant="outline" onClick={onPrepMe}>
-              Prep Me
-            </Button>
-          )}
+          <Button size="sm" variant="outline" asChild>
+            <Link
+              href={`/dashboard/roadmap?companyId=${companyId}&play=custom&division=${department.id}`}
+            >
+              Start Play
+            </Link>
+          </Button>
           <Button size="sm" asChild>
             <Link
               href={buildContentUrl({
@@ -148,7 +217,7 @@ export function DivisionIntelligenceCard({
                 channel: 'email',
               })}
             >
-              Create Content
+              Quick Message
             </Link>
           </Button>
         </div>
@@ -303,64 +372,111 @@ export function DivisionIntelligenceCard({
           title="Who to Engage"
           defaultExpanded={false}
           emptyMessage={
-            !hasTargetRoles ? 'No target roles mapped yet.' : undefined
+            !hasTargetRoles ? 'No target roles mapped yet. Click Edit to add roles.' : undefined
+          }
+          emptyAction={
+            !hasTargetRoles ? (
+              <Button size="sm" variant="outline" className="mt-2" onClick={startEditingRoles}>
+                <Pencil className="h-3 w-3 mr-1" /> Add Roles
+              </Button>
+            ) : undefined
           }
         >
-          {hasTargetRoles && department.targetRoles && (
-            <div className="space-y-2 text-sm">
-              {department.targetRoles.economicBuyer &&
-                department.targetRoles.economicBuyer.length > 0 && (
-                  <div>
-                    <span className="font-medium text-muted-foreground">
-                      Economic Buyer:{' '}
-                    </span>
-                    <span className="text-card-foreground">
-                      {department.targetRoles.economicBuyer.join(', ')}
-                    </span>
-                  </div>
-                )}
-              {department.targetRoles.technicalEvaluator &&
-                department.targetRoles.technicalEvaluator.length > 0 && (
-                  <div>
-                    <span className="font-medium text-muted-foreground">
-                      Technical Evaluator:{' '}
-                    </span>
-                    <span className="text-card-foreground">
-                      {department.targetRoles.technicalEvaluator.join(', ')}
-                    </span>
-                  </div>
-                )}
-              {department.targetRoles.champion &&
-                department.targetRoles.champion.length > 0 && (
-                  <div>
-                    <span className="font-medium text-muted-foreground">
-                      Champion:{' '}
-                    </span>
-                    <span className="text-card-foreground">
-                      {department.targetRoles.champion.join(', ')}
-                    </span>
-                  </div>
-                )}
-              {department.targetRoles.influencer &&
-                department.targetRoles.influencer.length > 0 && (
-                  <div>
-                    <span className="font-medium text-muted-foreground">
-                      Influencer:{' '}
-                    </span>
-                    <span className="text-card-foreground">
-                      {department.targetRoles.influencer.join(', ')}
-                    </span>
-                  </div>
-                )}
-              <Button size="sm" variant="outline" className="mt-2" asChild>
-                <Link
-                  href={`/dashboard/companies/${companyId}?tab=contacts&division=${department.id}`}
-                >
-                  View contacts in this division →
-                </Link>
-              </Button>
+          {editingRoles ? (
+            <div className="space-y-3 text-sm">
+              {([
+                { key: 'economicBuyer' as const, label: 'Economic Buyer' },
+                { key: 'technicalEvaluator' as const, label: 'Technical Evaluator' },
+                { key: 'champion' as const, label: 'Champion' },
+                { key: 'influencer' as const, label: 'Influencer' },
+              ]).map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
+                  <input
+                    value={draftRoles[key]}
+                    onChange={(e) => setDraftRoles((p) => ({ ...p, [key]: e.target.value }))}
+                    placeholder="Comma-separated titles"
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+              ))}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Search Keywords</label>
+                <input
+                  value={draftKeywords}
+                  onChange={(e) => setDraftKeywords(e.target.value)}
+                  placeholder="Comma-separated keywords for Apollo search"
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">Used to scope contact search results to the right domain</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={saveRoles} disabled={savingRoles}>
+                  {savingRoles ? 'Saving…' : 'Save'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditingRoles(false)} disabled={savingRoles}>
+                  Cancel
+                </Button>
+              </div>
             </div>
-          )}
+          ) : (hasTargetRoles || (department.searchKeywords && department.searchKeywords.length > 0)) ? (
+            <div className="space-y-2 text-sm">
+              {department.targetRoles && (
+                <>
+                  {department.targetRoles.economicBuyer &&
+                    department.targetRoles.economicBuyer.length > 0 && (
+                      <div>
+                        <span className="font-medium text-muted-foreground">Economic Buyer: </span>
+                        <span className="text-card-foreground">{department.targetRoles.economicBuyer.join(', ')}</span>
+                      </div>
+                    )}
+                  {department.targetRoles.technicalEvaluator &&
+                    department.targetRoles.technicalEvaluator.length > 0 && (
+                      <div>
+                        <span className="font-medium text-muted-foreground">Technical Evaluator: </span>
+                        <span className="text-card-foreground">{department.targetRoles.technicalEvaluator.join(', ')}</span>
+                      </div>
+                    )}
+                  {department.targetRoles.champion &&
+                    department.targetRoles.champion.length > 0 && (
+                      <div>
+                        <span className="font-medium text-muted-foreground">Champion: </span>
+                        <span className="text-card-foreground">{department.targetRoles.champion.join(', ')}</span>
+                      </div>
+                    )}
+                  {department.targetRoles.influencer &&
+                    department.targetRoles.influencer.length > 0 && (
+                      <div>
+                        <span className="font-medium text-muted-foreground">Influencer: </span>
+                        <span className="text-card-foreground">{department.targetRoles.influencer.join(', ')}</span>
+                      </div>
+                    )}
+                </>
+              )}
+              {department.searchKeywords && department.searchKeywords.length > 0 && (
+                <div className="pt-1">
+                  <span className="font-medium text-muted-foreground">Search Keywords: </span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {department.searchKeywords.map((k) => (
+                      <span key={k} className="inline-block px-2 py-0.5 bg-muted border border-border rounded text-xs">
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="ghost" onClick={startEditingRoles}>
+                  <Pencil className="h-3 w-3 mr-1" /> Edit
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={`/dashboard/companies/${companyId}?tab=contacts&division=${department.id}`}>
+                    View contacts in this division →
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CollapsibleSection>
       </div>
     </div>

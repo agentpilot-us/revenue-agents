@@ -46,6 +46,8 @@ export default function PlayExecuteClient({ companyId, companyName, workflowId }
   const [contactsAssigned, setContactsAssigned] = useState(false);
   const [suggestion, setSuggestion] = useState<TargetingSuggestionData | null>(null);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
 
   const fetchWorkflow = useCallback(async () => {
     try {
@@ -499,6 +501,78 @@ export default function PlayExecuteClient({ companyId, companyName, workflowId }
                 </Link>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Save as reusable template — shown when all content steps are done */}
+        {allContentReady && (
+          <div
+            style={{
+              marginTop: 32,
+              padding: '20px 24px',
+              borderRadius: 12,
+              background: t.greenBg,
+              border: `1px solid ${t.greenBorder}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: t.text1, margin: 0 }}>
+                This play worked well?
+              </p>
+              <p style={{ fontSize: 12, color: t.text3, margin: '4px 0 0' }}>
+                Save it as a reusable template in your Play Library so you can run it again for other accounts.
+              </p>
+            </div>
+            {templateSaved ? (
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: t.green,
+                  flexShrink: 0,
+                  padding: '8px 20px',
+                }}
+              >
+                Saved to Library
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  setSavingTemplate(true);
+                  try {
+                    const res = await fetch('/api/playbooks/templates/from-workflow', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ workflowId }),
+                    });
+                    if (res.ok) setTemplateSaved(true);
+                  } catch { /* retry manually */ }
+                  setSavingTemplate(false);
+                }}
+                disabled={savingTemplate}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: 10,
+                  background: savingTemplate
+                    ? 'rgba(34,197,94,0.15)'
+                    : 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: savingTemplate ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
+                  boxShadow: savingTemplate ? 'none' : '0 4px 16px rgba(34,197,94,0.3)',
+                }}
+              >
+                {savingTemplate ? 'Saving...' : 'Save as Play Template'}
+              </button>
+            )}
           </div>
         )}
       </div>

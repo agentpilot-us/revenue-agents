@@ -23,6 +23,7 @@ const updateDepartmentSchema = z.object({
     champion: z.array(z.string()).optional(),
     influencer: z.array(z.string()).optional(),
   }).optional().nullable(),
+  searchKeywords: z.array(z.string()).optional().nullable(),
 });
 
 export async function PATCH(
@@ -63,6 +64,7 @@ export async function PATCH(
         ...(validated.objectionHandlers !== undefined && { objectionHandlers: toJsonValue(validated.objectionHandlers) }),
         ...(validated.proofPoints !== undefined && { proofPoints: toJsonValue(validated.proofPoints) }),
         ...(validated.targetRoles !== undefined && { targetRoles: toJsonValue(validated.targetRoles) }),
+        ...(validated.searchKeywords !== undefined && { searchKeywords: toJsonValue(validated.searchKeywords) }),
       },
     });
 

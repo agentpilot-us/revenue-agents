@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 
 const TABS = [
+  { id: 'plays', label: 'Plays' },
   { id: 'intelligence', label: 'Account Intelligence' },
-  { id: 'plays', label: 'Approved Plays' },
   { id: 'config', label: 'Configuration' },
 ] as const;
 
@@ -14,10 +14,15 @@ type Props = {
   intelligenceContent: ReactNode;
   playsContent: ReactNode;
   configContent: ReactNode;
+  initialTab?: TabId;
 };
 
-export default function SAPTabs({ intelligenceContent, playsContent, configContent }: Props) {
-  const [active, setActive] = useState<TabId>('intelligence');
+export default function SAPTabs({ intelligenceContent, playsContent, configContent, initialTab }: Props) {
+  const [active, setActive] = useState<TabId>(initialTab ?? 'plays');
+
+  useEffect(() => {
+    if (initialTab) setActive(initialTab);
+  }, [initialTab]);
 
   return (
     <div>

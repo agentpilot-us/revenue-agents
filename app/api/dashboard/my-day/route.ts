@@ -23,7 +23,7 @@ export async function GET() {
         prisma.actionWorkflow.findMany({
           where: {
             userId,
-            status: { in: ['pending', 'in_progress', 'snoozed'] },
+            status: { in: ['pending', 'in_progress', 'snoozed', 'active'] },
             OR: [
               { snoozeUntil: null },
               { snoozeUntil: { lte: new Date() } },

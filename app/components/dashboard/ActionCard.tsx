@@ -116,6 +116,17 @@ export default function ActionCard({
     ? `${workflow.targetContact.firstName ?? ''} ${workflow.targetContact.lastName ?? ''}`.trim()
     : null;
 
+  const hasAnyContact = workflow.targetContact || workflow.steps.some((s) => s.contact);
+  const hasReadySteps = workflow.steps.some((s) => s.status === 'ready');
+  const allPending = workflow.steps.every((s) => s.status === 'pending');
+  const nextAction = !hasAnyContact
+    ? { label: 'Next: Find & assign contacts', color: t.amber, bg: t.amberBg }
+    : hasReadySteps
+      ? { label: 'Next: Review & send', color: t.green, bg: t.greenBg }
+      : allPending
+        ? { label: 'Next: Generate content', color: t.blue, bg: t.blueBg }
+        : null;
+
   return (
     <div
       style={{
@@ -280,6 +291,24 @@ export default function ActionCard({
             />
           </div>
           <span style={{ fontSize: 10, color: t.text4 }}>{Math.round(progress)}%</span>
+        </div>
+      )}
+
+      {/* Guided next action badge */}
+      {nextAction && (
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            padding: '4px 10px',
+            borderRadius: 6,
+            background: nextAction.bg,
+            color: nextAction.color,
+            display: 'inline-block',
+            alignSelf: 'flex-start',
+          }}
+        >
+          {nextAction.label}
         </div>
       )}
 

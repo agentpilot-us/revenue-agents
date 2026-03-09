@@ -317,7 +317,7 @@ export function AccountIntelligenceClient({
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Save failed');
-        router.push(`/dashboard/companies/${companyId}/contacts?onboarding=1`);
+        router.push(`/dashboard/companies/${companyId}?tab=buying-groups&onboarding=1`);
         router.refresh();
       } catch (e) {
         setGenerateError(e instanceof Error ? e.message : 'Save failed');

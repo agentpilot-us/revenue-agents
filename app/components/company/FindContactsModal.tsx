@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   findContactsForDepartment,
@@ -67,6 +67,30 @@ export function FindContactsModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addedSummary, setAddedSummary] = useState<{ added: number; contacts: AddedContact[]; byPersona: Array<{ role: string; names: string[] }> } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ titles: string[]; keywords: string[]; seniorityLevels: string[] } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const fetchPreview = useCallback(async (levels: SeniorityLevel[]) => {
+    if (!open || !departmentId) return;
+    setPreviewLoading(true);
+    try {
+      const qs = levels.length > 0 ? `?seniority=${levels.join(',')}` : '';
+      const res = await fetch(`/api/companies/${companyId}/departments/${departmentId}/search-preview${qs}`);
+      if (res.ok) {
+        setPreview(await res.json());
+      }
+    } catch {
+      // preview is best-effort
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [open, companyId, departmentId]);
+
+  useEffect(() => {
+    if (open && step === 'config') {
+      fetchPreview(seniority);
+    }
+  }, [open, step, seniority, fetchPreview]);
 
   const toggleSeniority = (id: SeniorityLevel) => {
     setSeniority((prev) =>
@@ -165,6 +189,7 @@ export function FindContactsModal({
       setError(null);
       setResults([]);
       setAddedSummary(null);
+      setPreview(null);
     }
     onOpenChange(open);
   };
@@ -231,6 +256,59 @@ export function FindContactsModal({
                 </label>
               ))}
             </div>
+            {/* Search Context Preview */}
+            {previewLoading && (
+              <p className="text-xs text-muted-foreground mt-4 animate-pulse">Loading search preview…</p>
+            )}
+            {!previewLoading && preview && (
+              <details className="mt-4 border rounded-lg bg-muted/50 text-sm" open>
+                <summary className="cursor-pointer px-4 py-2 font-medium text-foreground select-none">
+                  Search Preview
+                </summary>
+                <div className="px-4 pb-3 space-y-2">
+                  {preview.titles.length > 0 ? (
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Titles:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {preview.titles.map((t) => (
+                          <span key={t} className="inline-block px-2 py-0.5 bg-card border border-border rounded text-xs">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      No matching titles for the selected seniority levels. Consider enriching or editing target roles first.
+                    </p>
+                  )}
+                  {preview.keywords.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Keywords:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {preview.keywords.map((k) => (
+                          <span key={k} className="inline-block px-2 py-0.5 bg-card border border-border rounded text-xs">
+                            {k}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {preview.seniorityLevels.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Seniority (Apollo):</span>
+                      <span className="text-xs ml-1">{preview.seniorityLevels.join(', ')}</span>
+                    </div>
+                  )}
+                  {preview.titles.length === 0 && preview.keywords.length === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      This group has limited targeting data. Consider enriching or editing target roles first.
+                    </p>
+                  )}
+                </div>
+              </details>
+            )}
+
             <DialogFooter className="mt-6">
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Cancel
