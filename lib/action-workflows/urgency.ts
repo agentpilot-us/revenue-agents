@@ -14,6 +14,7 @@ import {
   type ActiveObjectionForScoring,
 } from '@/lib/roadmap/plan-urgency';
 import { prisma } from '@/lib/db';
+import { ContentType } from '@prisma/client';
 
 type Signal = { type: string; publishedAt: Date | string; relevanceScore?: number };
 type ExistingProduct = { contractRenewalDate: Date | string | null };
@@ -79,15 +80,16 @@ export async function evaluateConditions(
 
     switch (condition.type) {
       case 'event_window': {
-        const days = config.defaultDays ?? config.daysWindow ?? 14;
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() + days);
+        const roadmap = await prisma.adaptiveRoadmap.findUnique({
+          where: { id: roadmapId },
+          select: { userId: true },
+        });
+        if (!roadmap?.userId) break;
         const upcomingEvent = await prisma.contentLibrary.findFirst({
           where: {
-            companyId: ctx.companyId,
-            contentType: 'CompanyEvent',
+            userId: roadmap.userId,
+            type: ContentType.CompanyEvent,
             isActive: true,
-            publishedAt: { lte: cutoff, gte: new Date() },
           },
         });
         if (upcomingEvent) multiplier *= 1.3;
