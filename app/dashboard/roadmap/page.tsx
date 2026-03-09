@@ -145,6 +145,7 @@ export default async function RoadmapPage({
               useCase: true,
               valueProp: true,
               targetRoles: true,
+              searchKeywords: true,
               estimatedOpportunity: true,
               whyThisGroupBuys: true,
               objectionHandlers: true,
