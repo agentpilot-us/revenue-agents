@@ -296,6 +296,7 @@ export default async function RoadmapPage({
           useCase: d.useCase,
           objectionHandlers: d.objectionHandlers as Array<{ objection: string; response: string }> | null,
           targetRoles: d.targetRoles as { economicBuyer?: string[]; technicalEvaluator?: string[]; champion?: string[]; influencer?: string[] } | null,
+          searchKeywords: d.searchKeywords as string[] | null,
           estimatedOpportunity: d.estimatedOpportunity,
           _count: d._count,
         },
