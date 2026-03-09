@@ -6,22 +6,23 @@ import type { CompanyDepartment, DepartmentType } from '@prisma/client';
  * we map enum + customName to those keys for value-props API and multi-dept config.
  */
 const DEPARTMENT_TYPE_TO_PLAYBOOK_KEY: Record<DepartmentType, string> = {
-  MANUFACTURING_OPERATIONS: 'Manufacturing',
-  INDUSTRIAL_DESIGN: 'Industrial Design',
-  IT_DATA_CENTER: 'IT',
-  AUTONOMOUS_VEHICLES: 'Autonomous Vehicles',
-  SUPPLY_CHAIN: 'Supply Chain',
-  CONNECTED_SERVICES: 'Connected Services',
-  ENGINEERING: 'Engineering',
-  PRODUCT: 'Product',
   SALES: 'Sales',
   MARKETING: 'Marketing',
   CUSTOMER_SUCCESS: 'Customer Success',
   REVENUE_OPERATIONS: 'Revenue Operations',
-  EXECUTIVE_LEADERSHIP: 'Executive Leadership',
+  PRODUCT: 'Product',
+  ENGINEERING: 'Engineering',
+  IT_INFRASTRUCTURE: 'IT',
   FINANCE: 'Finance',
   LEGAL: 'Legal',
   HR: 'HR',
+  SUPPLY_CHAIN: 'Supply Chain',
+  OPERATIONS: 'Operations',
+  SECURITY: 'Security',
+  DATA_ANALYTICS: 'Data & Analytics',
+  PROCUREMENT: 'Procurement',
+  PARTNERSHIPS: 'Partnerships',
+  EXECUTIVE_LEADERSHIP: 'Executive Leadership',
   OTHER: 'Other',
 };
 

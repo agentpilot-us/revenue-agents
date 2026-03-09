@@ -172,10 +172,8 @@ export async function POST(
         const departmentType = (segment.departmentType as DepartmentType) ?? DepartmentType.OTHER;
         const customName = segment.departmentType ? (segment.customName ?? null) : (segment.customName ?? segment.name);
 
-        const existingDept = await prisma.companyDepartment.findUnique({
-          where: {
-            companyId_type: { companyId, type: departmentType },
-          },
+        const existingDept = await prisma.companyDepartment.findFirst({
+          where: { companyId, type: departmentType },
         });
 
         const useCaseText =
@@ -260,10 +258,8 @@ export async function POST(
         const departmentType = segment.departmentType ?? DepartmentType.OTHER;
         const customName = segment.departmentType ? null : segment.name;
 
-        const existingDept = await prisma.companyDepartment.findUnique({
-          where: {
-            companyId_type: { companyId, type: departmentType },
-          },
+        const existingDept = await prisma.companyDepartment.findFirst({
+          where: { companyId, type: departmentType },
         });
 
         const deptData = {

@@ -3,10 +3,10 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { generateOneContent, type GenerateContentType } from '@/lib/plays/generate-content';
 
-const contentTypeSchema = ['email', 'linkedin', 'custom_url', 'talking_points', 'presentation'] as const;
+const contentTypeSchema = ['email', 'linkedin', 'custom_url', 'talking_points', 'presentation', 'sms'] as const;
 
 function isContentType(s: string): s is GenerateContentType {
-  return contentTypeSchema.includes(s as GenerateContentType);
+  return (contentTypeSchema as readonly string[]).includes(s);
 }
 
 export async function POST(

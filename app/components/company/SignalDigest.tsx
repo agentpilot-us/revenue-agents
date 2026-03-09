@@ -71,9 +71,9 @@ function tierLabel(tier: SignalTier): string {
 }
 
 function tierColor(tier: SignalTier): string {
-  if (tier === 1) return 'bg-red-50 text-red-700 border-red-200';
-  if (tier === 2) return 'bg-blue-50 text-blue-700 border-blue-200';
-  return 'bg-slate-50 text-slate-600 border-slate-200';
+  if (tier === 1) return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20';
+  if (tier === 2) return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20';
+  return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/20';
 }
 
 function handleCTAAction(action: string, companyId: string) {
@@ -94,7 +94,7 @@ function handleCTAAction(action: string, companyId: string) {
       window.location.href = `/dashboard/companies/${companyId}?tab=overview`;
       break;
     case 'activity':
-      window.location.href = `/dashboard/companies/${companyId}?tab=signals`;
+      window.location.href = `/dashboard/companies/${companyId}?tab=overview`;
       break;
     default:
       console.warn('Unknown CTA action:', action);

@@ -27,8 +27,9 @@ import {
 } from '@/lib/content-library-rag';
 import { prisma } from '@/lib/db';
 import { buildExistingStackBlock, resolveProductFraming } from '@/lib/products/resolve-product-framing';
+import { getChannelConfig, playContentTypeToChannel, deriveToneFromContacts } from '@/lib/content/channel-config';
 
-export type GenerateContentType = 'email' | 'linkedin' | 'custom_url' | 'talking_points' | 'presentation';
+export type GenerateContentType = 'email' | 'linkedin' | 'custom_url' | 'talking_points' | 'presentation' | 'sms' | 'ad_brief' | 'demo_script' | 'video';
 
 export async function generateOneContent(params: {
   companyId: string;
@@ -36,13 +37,14 @@ export async function generateOneContent(params: {
   contentType: GenerateContentType;
   prompt: string;
   divisionId?: string;
+  contacts?: Array<{ firstName?: string | null; lastName?: string | null; title?: string | null }>;
 }): Promise<{ content: string }> {
-  const { companyId, userId, contentType, prompt, divisionId } = params;
+  const { companyId, userId, contentType, prompt, divisionId, contacts } = params;
 
   const [company, userRecord] = await Promise.all([
     prisma.company.findFirst({
       where: { id: companyId, userId },
-      select: { id: true, name: true, industry: true, dealObjective: true, dealContext: true },
+      select: { id: true, name: true, industry: true, dealObjective: true, dealContext: true, accountType: true },
     }),
     prisma.user.findUnique({
       where: { id: userId },
@@ -60,11 +62,12 @@ export async function generateOneContent(params: {
   if (divisionId) {
     const dept = await prisma.companyDepartment.findFirst({
       where: { id: divisionId, companyId },
-      select: { valueProp: true, useCase: true, objectionHandlers: true, customName: true, type: true },
+      select: { valueProp: true, useCase: true, objectionHandlers: true, customName: true, type: true, industry: true },
     });
     if (dept) {
       departmentLabel = dept.customName || dept.type.replace(/_/g, ' ');
       const parts: string[] = [];
+      if (dept.industry) parts.push(`Industry vertical: ${dept.industry}.`);
       if (dept.useCase) parts.push(`The buyer's division cares about: ${dept.useCase}.`);
       if (dept.valueProp) parts.push(`Our value prop to them: ${dept.valueProp}.`);
       const oh = dept.objectionHandlers;
@@ -88,7 +91,7 @@ export async function generateOneContent(params: {
   const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
     getProductKnowledgeBlock(userId, relevantProductIds.length > 0 ? relevantProductIds : undefined),
     getIndustryPlaybookBlock(userId, company.industry ?? null),
-    getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds),
+    getCaseStudiesBlock(userId, company.industry ?? null, departmentLabel, relevantProductIds),
     getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
       activeObjections: objectionTexts,
       existingProducts: productNames,
@@ -119,6 +122,11 @@ export async function generateOneContent(params: {
 
   // Strategic account plan context
   let dealContextLine = '';
+  if (company.accountType) {
+    const typeLabels: Record<string, string> = { partner: 'Partner', customer: 'Existing Customer', new_logo: 'New Logo', prospect: 'Prospect' };
+    const label = typeLabels[company.accountType] ?? company.accountType;
+    dealContextLine += `\nACCOUNT TYPE: ${label}${company.accountType === 'partner' ? ' — use peer-to-peer tone, not vendor-to-buyer.' : ''}\n`;
+  }
   if (company.dealObjective) {
     dealContextLine += `\nDEAL OBJECTIVE: ${company.dealObjective}\n`;
   }
@@ -147,17 +155,19 @@ export async function generateOneContent(params: {
     } catch { /* non-critical */ }
   }
 
-  const contentTypeInstruction = getContentTypeInstruction(contentType, company.name);
+  const channelId = playContentTypeToChannel(contentType);
+  const channelCfg = getChannelConfig(channelId);
+  const channelInstruction = channelCfg.buildInstruction(company.name);
+
+  const toneLine = contacts?.length ? deriveToneFromContacts(contacts) : '';
 
   const aeIdentityLine = aeCompany
     ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
     : `You are writing on behalf of ${aeName}.\n`;
 
   const systemPrompt = `You are a B2B content writer.
-${aeIdentityLine}${divisionIntelLine}
-The user is creating ${contentType.replace(/_/g, ' ')} content for the target account "${company.name}".
-
-${contentTypeInstruction}
+${aeIdentityLine}${toneLine}${divisionIntelLine}
+The user is creating ${channelCfg.label} content for the target account "${company.name}".
 
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
@@ -169,31 +179,32 @@ ${playbookSection}
 ${caseStudiesSection}
 ${eventsSection}
 ${featureReleasesSection}
-${messagingSection}${accountSection}${researchSection}`;
+${messagingSection}${accountSection}${researchSection}
+${channelInstruction}`;
 
   const { text } = await generateText({
     model: getChatModel(),
-    maxOutputTokens: 1500,
+    maxOutputTokens: channelCfg.maxOutputTokens,
     system: systemPrompt,
-    prompt: `User prompt: ${prompt}\n\nGenerate the content. Output only the requested content, no preamble.`,
+    prompt: `User prompt: ${prompt}\n\n${channelCfg.buildUserPrompt()}`,
   });
 
   return { content: text.trim() };
 }
 
 export function getContentTypeInstruction(contentType: GenerateContentType, companyName: string): string {
-  switch (contentType) {
-    case 'email':
-      return `Generate an email: include a "Subject:" line first, then a blank line, then the email body (plain text, 2-4 short paragraphs). Use the context below for the target account and your company's messaging and value props.`;
+  if (contentType === 'email' || contentType === 'linkedin' || contentType === 'presentation' || contentType === 'sms'
+    || contentType === 'ad_brief' || contentType === 'demo_script' || contentType === 'video') {
+    const channelId = playContentTypeToChannel(contentType);
+    return getChannelConfig(channelId).buildInstruction(companyName);
+  }
 
-    case 'linkedin':
-      return `Generate a LinkedIn message: connection request or InMail tone. Professional but not stiff. Under 300 characters for a connection request, under 200 words for an InMail. Reference something specific about ${companyName}. End with a clear but low-pressure ask (15-minute call, not "let's schedule a demo"). Output plain text only.`;
+  if (contentType === 'custom_url') {
+    return getChannelConfig('sales_page').buildInstruction(companyName);
+  }
 
-    case 'custom_url':
-      return `Generate copy for a custom URL or landing page: include a short headline, a body paragraph or two, and a CTA button label. Use the context below. Output plain text with clear line breaks (e.g. "Headline: ...", "Body: ...", "CTA: ...").`;
-
-    case 'talking_points':
-      return `Generate a pre-meeting talking points sheet for a sales rep preparing to meet with someone at ${companyName}. Structure the output as follows:
+  // talking_points has no direct channel equivalent — keep as-is
+  return `Generate a pre-meeting talking points sheet for a sales rep preparing to meet with someone at ${companyName}. Structure the output as follows:
 
 OPENING (2-3 options):
 - Conversation starters tied to what's happening at the account right now
@@ -215,24 +226,6 @@ SUGGESTED NEXT STEP:
 - How to close the meeting and advance the deal
 
 Keep each section tight — this is a quick-reference sheet, not a script. Output plain text with the section headers above.`;
-
-    case 'presentation':
-      return `Generate a 3-5 slide presentation outline for a sales meeting with ${companyName}. Structure each slide as:
-
-SLIDE [N]: [Title]
-BULLETS:
-- [bullet point]
-SPEAKER NOTES: [what to say, 2-3 sentences]
-
-Suggested structure:
-Slide 1: Their world (account initiative/pain, not about us)
-Slide 2: How we map to that (product fit, specific to this division)
-Slide 3: Proof (case study or metric from a similar company)
-Slide 4: What changes for them (outcomes, not features)
-Slide 5: Suggested next step
-
-Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`;
-  }
 }
 
 const combinedPlaySchema = z.object({
@@ -265,7 +258,7 @@ export async function generateCombinedPlayContent(params: {
   const [company, userRecord] = await Promise.all([
     prisma.company.findFirst({
       where: { id: companyId, userId },
-      select: { id: true, name: true, industry: true, dealObjective: true, dealContext: true },
+      select: { id: true, name: true, industry: true, dealObjective: true, dealContext: true, accountType: true },
     }),
     prisma.user.findUnique({
       where: { id: userId },
@@ -282,11 +275,12 @@ export async function generateCombinedPlayContent(params: {
   if (divisionId) {
     const dept = await prisma.companyDepartment.findFirst({
       where: { id: divisionId, companyId },
-      select: { valueProp: true, useCase: true, objectionHandlers: true, customName: true, type: true },
+      select: { valueProp: true, useCase: true, objectionHandlers: true, customName: true, type: true, industry: true },
     });
     if (dept) {
       departmentLabel = dept.customName || dept.type.replace(/_/g, ' ');
       const parts: string[] = [];
+      if (dept.industry) parts.push(`Industry vertical: ${dept.industry}.`);
       if (dept.useCase) parts.push(`The buyer's division cares about: ${dept.useCase}.`);
       if (dept.valueProp) parts.push(`Our value prop to them: ${dept.valueProp}.`);
       const oh = dept.objectionHandlers;
@@ -310,7 +304,7 @@ export async function generateCombinedPlayContent(params: {
   const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
     getProductKnowledgeBlock(userId, relevantProductIds2.length > 0 ? relevantProductIds2 : undefined),
     getIndustryPlaybookBlock(userId, company.industry ?? null),
-    getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds2),
+    getCaseStudiesBlock(userId, company.industry ?? null, departmentLabel, relevantProductIds2),
     getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
       activeObjections: objectionTexts2,
       existingProducts: productNames2,
@@ -340,6 +334,11 @@ export async function generateCombinedPlayContent(params: {
 
   // Strategic account plan context
   let dealContextLine2 = '';
+  if (company.accountType) {
+    const typeLabels: Record<string, string> = { partner: 'Partner', customer: 'Existing Customer', new_logo: 'New Logo', prospect: 'Prospect' };
+    const label = typeLabels[company.accountType] ?? company.accountType;
+    dealContextLine2 += `\nACCOUNT TYPE: ${label}${company.accountType === 'partner' ? ' — use peer-to-peer tone, not vendor-to-buyer.' : ''}\n`;
+  }
   if (company.dealObjective) {
     dealContextLine2 += `\nDEAL OBJECTIVE: ${company.dealObjective}\n`;
   }
@@ -374,8 +373,8 @@ export async function generateCombinedPlayContent(params: {
 
   const outputInstructions = outputs.map((t) => {
     switch (t) {
-      case 'email': return '- EMAIL: subject line + body (2-4 short paragraphs, plain text)';
-      case 'linkedin': return '- LINKEDIN: InMail or connection request (under 200 words, reference something specific about the account)';
+      case 'email': return '- EMAIL: "Subject: <max 60 chars>" line, blank line, then 2-4 short paragraphs. Address recipient by first name.';
+      case 'linkedin': return '- LINKEDIN: "SUBJECT: <max 200 chars — question or curiosity trigger>" line, blank line, then 2-3 short paragraphs (max 1900 chars). Reference something specific about the account. End with a low-pressure question.';
       case 'talking_points': return '- TALKING_POINTS: Pre-meeting sheet with OPENING, KEY PAIN, VALUE PROPS, OBJECTIONS, PROOF POINT, NEXT STEP';
     }
   }).join('\n');

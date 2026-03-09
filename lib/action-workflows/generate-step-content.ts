@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/db';
 import { generateOneContent, type GenerateContentType } from '@/lib/plays/generate-content';
+import { getChannelConfig, playContentTypeToChannel } from '@/lib/content/channel-config';
 
 export type GenerateStepContentInput = {
   workflowId: string;
@@ -20,7 +21,10 @@ const CONTENT_TYPE_MAP: Record<string, GenerateContentType> = {
   linkedin_post: 'linkedin',
   talking_points: 'talking_points',
   presentation: 'presentation',
-  sms: 'email',
+  sms: 'sms',
+  ad_brief: 'ad_brief',
+  demo_script: 'demo_script',
+  video: 'video',
 };
 
 export async function generateStepContent(input: GenerateStepContentInput) {
@@ -95,12 +99,17 @@ export async function generateStepContent(input: GenerateStepContentInput) {
       .filter(Boolean)
       .join('\n');
 
+    const contactsForTone = workflow.targetContact
+      ? [{ firstName: workflow.targetContact.firstName, lastName: workflow.targetContact.lastName, title: workflow.targetContact.title }]
+      : undefined;
+
     const { content } = await generateOneContent({
       companyId: workflow.companyId,
       userId,
       contentType,
       prompt,
       divisionId: step.divisionId || undefined,
+      contacts: contactsForTone,
     });
 
     const generatedContent = parseContentByType(content, contentType);
@@ -130,12 +139,9 @@ export async function generateStepContent(input: GenerateStepContentInput) {
 function parseContentByType(
   raw: string,
   contentType: GenerateContentType,
-): Record<string, string> {
-  if (contentType === 'email') {
-    const subjectMatch = raw.match(/^Subject:\s*(.+)/im);
-    const subject = subjectMatch ? subjectMatch[1].trim() : '';
-    const body = raw.replace(/^Subject:\s*.+\n?\n?/im, '').trim();
-    return { subject, body, raw };
-  }
-  return { body: raw, raw };
+): Record<string, unknown> {
+  const channelId = playContentTypeToChannel(contentType);
+  const config = getChannelConfig(channelId);
+  const parsed = config.parseOutput(raw);
+  return { ...parsed, raw };
 }

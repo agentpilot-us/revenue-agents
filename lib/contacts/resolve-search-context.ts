@@ -48,12 +48,13 @@ function filterByLevel(titles: string[], levels: SeniorityLevel[]): string[] {
     const t = title.toLowerCase();
     return levels.some((level) => {
       if (level === 'c_level')
-        return /\b(ceo|coo|cfo|cto|cmo|cro|chief|president)\b/.test(t);
-      if (level === 'vp') return /\bvp\b|vice president/.test(t);
+        return /\b(ceo|coo|cfo|cto|cmo|cro|cdo|ciso|chief|president)\b/.test(t);
+      if (level === 'vp')
+        return /\b(vp|svp|evp|avp|gvp)\b|vice president|senior vice president|executive vice president/.test(t);
       if (level === 'manager_director')
-        return /\b(director|manager|head of|lead)\b/.test(t);
+        return /\b(director|sr\.?\s*director|senior director|manager|sr\.?\s*manager|senior manager|gm|general manager|head of|lead|group lead|principal)\b/.test(t);
       if (level === 'specialist')
-        return !/\b(vp|vice president|director|manager|chief|president)\b/.test(t);
+        return !/\b(vp|svp|evp|avp|gvp|vice president|director|manager|chief|president|gm|general manager|head of)\b/.test(t);
       return true;
     });
   });
@@ -92,29 +93,62 @@ export type DepartmentForSearchContext = {
     influencer?: string[];
   } | null;
   useCase: string | null;
+  seniorityByRole?: Record<string, string> | null;
+  searchKeywords?: string[] | null;
 };
 
 /**
  * Build search context for Apollo: titles (from targetRoles, filtered by seniority),
- * keywords (for USE_CASE/DIVISIONAL to bridge buying group name and profile vocabulary),
+ * keywords (group name + use-case phrases to scope results to the target buying group),
  * and Apollo seniority levels.
+ *
+ * Keywords are ALWAYS included — the buying group name is the core targeting context
+ * regardless of segmentation strategy.
  */
+/**
+ * Infer seniority levels from seniorityByRole when the caller doesn't provide
+ * an explicit seniorityFilter. Maps free-text seniority labels (from AI research)
+ * to our SeniorityLevel buckets.
+ */
+function inferSeniorityFromRoles(seniorityByRole: Record<string, string>): SeniorityLevel[] {
+  const levels = new Set<SeniorityLevel>();
+  for (const label of Object.values(seniorityByRole)) {
+    const l = label.toLowerCase();
+    if (/c[\s-]?(level|suite)|chief|president/.test(l)) levels.add('c_level');
+    else if (/vp|svp|evp|vice president/.test(l)) levels.add('vp');
+    else if (/director|manager|gm|general manager|head|lead|principal/.test(l)) levels.add('manager_director');
+    else levels.add('specialist');
+  }
+  return [...levels];
+}
+
 export function resolveSearchContext(
   department: DepartmentForSearchContext,
   segmentationStrategy: string | null,
   seniorityFilter: SeniorityLevel[]
 ): SearchContext {
   const rolesFromResearch = flattenTargetRoles(department.targetRoles);
-  const titles = filterByLevel(rolesFromResearch, seniorityFilter);
+
+  // If no explicit seniority filter but seniorityByRole exists from AI research, infer levels
+  const effectiveSeniority =
+    seniorityFilter.length > 0
+      ? seniorityFilter
+      : department.seniorityByRole && Object.keys(department.seniorityByRole).length > 0
+        ? inferSeniorityFromRoles(department.seniorityByRole)
+        : [];
+
+  const titles = filterByLevel(rolesFromResearch, effectiveSeniority);
   const keywords: string[] = [];
 
-  if (segmentationStrategy === 'USE_CASE' || segmentationStrategy === 'DIVISIONAL') {
-    if (department.customName) keywords.push(department.customName);
-    if (department.useCase) {
-      keywords.push(...extractKeyPhrases(department.useCase));
-    }
+  if (department.customName) keywords.push(department.customName);
+  if (department.useCase) {
+    keywords.push(...extractKeyPhrases(department.useCase));
+  }
+  // Append searchKeywords from AI enrichment (domain-specific terms)
+  if (department.searchKeywords?.length) {
+    keywords.push(...department.searchKeywords.filter((k) => !keywords.includes(k)));
   }
 
-  const seniorityLevels = mapToApolloSeniority(seniorityFilter);
+  const seniorityLevels = mapToApolloSeniority(effectiveSeniority);
   return { titles, keywords, seniorityLevels };
 }

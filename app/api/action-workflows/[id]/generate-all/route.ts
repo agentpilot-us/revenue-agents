@@ -146,7 +146,7 @@ export async function POST(
     const [productKnowledgeBlock, industryPlaybookBlock, caseStudiesBlock, eventsBlock, featureReleasesBlock] = await Promise.all([
       getProductKnowledgeBlock(userId, relevantProductIds.length > 0 ? relevantProductIds : undefined),
       getIndustryPlaybookBlock(userId, company.industry ?? null),
-      getCaseStudiesBlock(userId, company.industry ?? null, null, relevantProductIds),
+      getCaseStudiesBlock(userId, company.industry ?? null, departmentLabel, relevantProductIds),
       getCompanyEventsBlock(userId, company.industry ?? null, departmentLabel, null, {
         activeObjections: objectionTexts,
         existingProducts: productNames,

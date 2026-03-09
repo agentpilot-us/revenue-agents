@@ -47,11 +47,12 @@ export async function findContactsForSegment(
   return result.people.map((p) => {
     const firstName = p.first_name ?? p.name?.split(/\s+/)[0] ?? '';
     const lastName = p.last_name ?? p.last_name_obfuscated ?? p.name?.split(/\s+/).slice(1).join(' ') ?? '';
+    const apolloDept = p.departments?.[0] ?? p.subdepartments?.[0] ?? undefined;
     return {
       firstName,
       lastName,
       title: p.title ?? '',
-      department: undefined,
+      department: apolloDept,
       linkedinUrl: p.linkedin_url ?? undefined,
       email: p.email ?? undefined,
       seniority: p.seniority ?? undefined,

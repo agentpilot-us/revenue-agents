@@ -403,6 +403,7 @@ ${ragBlock ? `\n${ragBlock}\n` : ''}${existingStackSection}
 
 OUTPUT SHAPE: One buying group detail with:
 - name, segmentType, orgDepartment (Apollo-friendly department label, e.g. "Engineering")
+- industry (optional): if this group is tied to a specific industry vertical (e.g. "Automotive", "Financial Services"), include it. Omit if the group is cross-industry.
 - valueProp: 2–3 sentences for this group at this company. Use our content library when relevant.
 - useCasesAtThisCompany: 2–3 concrete use cases (max 2 if rep goal is narrow).
 - whyThisGroupBuys: one sentence for contact cards.

@@ -27,6 +27,8 @@ export type ApolloPerson = {
   email?: string;
   organization?: { primary_domain?: string; name?: string };
   seniority?: string;
+  departments?: string[];
+  subdepartments?: string[];
 };
 
 export type SearchApolloContactsResult =

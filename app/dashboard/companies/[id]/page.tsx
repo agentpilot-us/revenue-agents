@@ -7,7 +7,7 @@ import { CompanyTabs } from '@/app/components/company/CompanyTabs';
 import { DeleteCompanyButton } from '@/app/components/company/DeleteCompanyButton';
 import { AccountChatWidget } from '@/app/components/company/AccountChatWidget';
 import AccountWorkspacePage from './workspace/AccountWorkspacePage';
-import { DepartmentStatus, ContentType } from '@prisma/client';
+import { ContentType } from '@prisma/client';
 
 /** Parse estimatedOpportunity string (e.g. "$50K-$150K", "$500K – $2M") to a number. Uses midpoint for ranges. */
 function parseEstimatedOpportunity(s: string | null): number | null {
@@ -66,12 +66,13 @@ export default async function CompanyDetailPage({
   }
 
   const tabParam = search.tab;
-  /** 6-tab set per Spec 2. Legacy tab params map to new tab so old links still work. */
-  const validTabs = ['overview', 'buying-groups', 'contacts', 'content', 'engagement', 'signals'] as const;
+  const validTabs = ['overview', 'buying-groups', 'contacts', 'content'] as const;
   const legacyTabMap: Record<string, (typeof validTabs)[number]> = {
     departments: 'buying-groups',
     campaigns: 'content',
-    activity: 'signals',
+    activity: 'overview',
+    signals: 'overview',
+    engagement: 'overview',
     messaging: 'content',
     map: 'contacts',
     expansion: 'overview',
@@ -97,6 +98,7 @@ export default async function CompanyDetailPage({
       domain: true,
       industry: true,
       website: true,
+      accountType: true,
       employees: true,
       headquarters: true,
       revenue: true,
@@ -331,6 +333,8 @@ export default async function CompanyDetailPage({
     updatedAt: c.updatedAt.toISOString(),
   }));
 
+  const signalCount = await prisma.accountSignal.count({ where: { companyId: id } });
+
   const hasMessaging = !!accountMessaging;
   const hasResearch = !!company.researchData;
   const hasDepartments = departments.length > 0;
@@ -351,8 +355,6 @@ export default async function CompanyDetailPage({
     'buying-groups': 'Buying Groups',
     contacts: 'Contacts',
     content: 'Content',
-    engagement: 'Engagement',
-    signals: 'Signals',
   };
   const divisionDept = search.division
     ? departments.find((d: { id: string }) => d.id === search.division)
@@ -380,17 +382,6 @@ export default async function CompanyDetailPage({
   type DeptItem = (typeof departments)[number];
   const deptLabel = (d: { type: string; customName: string | null }) =>
     d.customName || d.type.replace(/_/g, ' ');
-  const expansionStrategy = {
-    phase1: departments
-      .filter((d: DeptItem) => d.status === DepartmentStatus.EXPANSION_TARGET || d.status === DepartmentStatus.RESEARCH_PHASE)
-      .map(deptLabel),
-    phase2: departments
-      .filter((d: DeptItem) => d.status === DepartmentStatus.ACTIVE_CUSTOMER)
-      .map(deptLabel),
-    phase3: departments
-      .filter((d: DeptItem) => d.status === DepartmentStatus.NOT_ENGAGED || d.status === DepartmentStatus.NOT_APPLICABLE)
-      .map(deptLabel),
-  };
 
   // Engagement metrics: activities and new contacts by department
   const thirtyDaysAgo = new Date();
@@ -513,7 +504,25 @@ export default async function CompanyDetailPage({
         <div className="bg-card rounded-lg shadow p-6 mb-6 border border-border">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h1 className="text-3xl font-bold mb-2 text-card-foreground">{company.name}</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-card-foreground">{company.name}</h1>
+                {company.accountType && (
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                    company.accountType === 'partner'
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                      : company.accountType === 'customer'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                        : company.accountType === 'new_logo'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                  }`}>
+                    {company.accountType === 'new_logo' ? 'New Logo'
+                      : company.accountType === 'customer' ? 'Customer'
+                      : company.accountType === 'partner' ? 'Partner'
+                      : 'Prospect'}
+                  </span>
+                )}
+              </div>
               <p className="text-muted-foreground">{company.domain ?? '—'}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -536,7 +545,7 @@ export default async function CompanyDetailPage({
               <div className="text-xl font-semibold text-card-foreground">
                 ${currentARR.toLocaleString()}
               </div>
-              <Link href={`/dashboard/companies/${id}#engagement`} className="text-xs text-primary hover:underline mt-1 inline-block">Engagement</Link>
+              <Link href={`/dashboard/companies/${id}?tab=overview`} className="text-xs text-primary hover:underline mt-1 inline-block">Overview</Link>
             </div>
             <div>
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Expansion Opportunity</div>
@@ -558,7 +567,7 @@ export default async function CompanyDetailPage({
           </div>
         </div>
 
-        {/* Tabs: Overview, Buying Groups, Contacts, Content, Engagement, Signals (6-tab set) */}
+        {/* Tabs: Overview, Buying Groups, Contacts, Content */}
         <div className="mb-6">
           <CompanyTabs
             companyId={company.id}
@@ -601,7 +610,6 @@ export default async function CompanyDetailPage({
               lastName: c.lastName,
             }))}
             contactCount={company.contacts.length}
-            expansionStrategy={expansionStrategy}
             accountMessaging={accountMessaging}
             contentLibraryUseCasesAndStories={contentLibraryForMessaging}
             initialTab={initialTab}
@@ -614,6 +622,7 @@ export default async function CompanyDetailPage({
             hasResearch={hasResearch}
             hasDepartments={hasDepartments}
             hasContacts={hasContacts}
+            signalCount={signalCount}
           />
         </div>
       </div>

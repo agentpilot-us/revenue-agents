@@ -83,12 +83,29 @@ export async function POST(req: NextRequest) {
         signalType = signal?.type;
       }
 
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, userId: session.user.id },
+        select: { industry: true },
+      });
+      let deptLabel: string | undefined;
+      let deptType: string | undefined;
+      if (targetDivisionId) {
+        const dept = await prisma.companyDepartment.findFirst({
+          where: { id: targetDivisionId },
+          select: { customName: true, type: true },
+        });
+        deptLabel = dept?.customName ?? undefined;
+        deptType = dept?.type ?? undefined;
+      }
       templateId = await resolveTemplateForContext({
         userId: session.user.id,
         companyId,
         signalType,
         signalId: accountSignalId,
         roadmapPlanId,
+        companyIndustry: company?.industry ?? undefined,
+        departmentLabel: deptLabel,
+        departmentType: deptType,
       });
     }
 

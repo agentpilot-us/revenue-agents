@@ -1,8 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ActivityChannel } from '@/lib/types/channels';
+
+type BuyingGroupOption = {
+  id: string;
+  customName: string | null;
+  type: string;
+  industry: string | null;
+};
 
 const CHANNELS: { value: ActivityChannel; label: string }[] = [
   { value: 'email', label: 'Email' },
@@ -58,9 +65,18 @@ export default function CustomPlayBuilder({ companyId, companyName }: Props) {
   const router = useRouter();
   const [playName, setPlayName] = useState('');
   const [playDescription, setPlayDescription] = useState('');
+  const [targetDivisionId, setTargetDivisionId] = useState<string>('');
+  const [buyingGroups, setBuyingGroups] = useState<BuyingGroupOption[]>([]);
   const [steps, setSteps] = useState<StepDraft[]>([makeStep()]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/companies/${companyId}/departments`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: BuyingGroupOption[]) => setBuyingGroups(Array.isArray(list) ? list : []))
+      .catch(() => {});
+  }, [companyId]);
 
   const addStep = () => setSteps((prev) => [...prev, makeStep()]);
 
@@ -103,6 +119,7 @@ export default function CustomPlayBuilder({ companyId, companyName }: Props) {
           companyId,
           title: playName,
           description: playDescription || undefined,
+          targetDivisionId: targetDivisionId || undefined,
           customSteps,
         }),
       });
@@ -182,6 +199,37 @@ export default function CustomPlayBuilder({ companyId, companyName }: Props) {
             style={inputStyle}
           />
         </div>
+
+        {/* Target Buying Group */}
+        {buyingGroups.length > 0 && (
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4 }}>
+              Target Buying Group
+            </label>
+            <select
+              value={targetDivisionId}
+              onChange={(e) => setTargetDivisionId(e.target.value)}
+              style={{
+                ...inputStyle,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">All buying groups (no filter)</option>
+              {buyingGroups.map((bg) => {
+                const label = bg.customName || bg.type.replace(/_/g, ' ');
+                const suffix = bg.industry ? ` — ${bg.industry}` : '';
+                return (
+                  <option key={bg.id} value={bg.id}>
+                    {label}{suffix}
+                  </option>
+                );
+              })}
+            </select>
+            <p style={{ fontSize: 11, color: t.text4, marginTop: 2 }}>
+              Content will be personalized for this buying group&apos;s context, contacts, and industry.
+            </p>
+          </div>
+        )}
 
         {/* Steps */}
         <div>

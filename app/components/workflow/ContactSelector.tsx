@@ -293,7 +293,7 @@ export default function ContactSelector({
           const isActive = activeDeptId === dept.id;
           return (
             <button
-              key={dept.id ?? 'all'}
+              key={dept.id || `dept-${dept.name}-${dept.count}`}
               type="button"
               onClick={() => {
                 setActiveDeptId(dept.id);

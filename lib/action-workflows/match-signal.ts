@@ -53,19 +53,6 @@ export async function matchSignalToRoadmapRules(signal: Signal): Promise<void> {
     const mapping = rule.actionMappings[0];
     if (!mapping) continue;
 
-    // Resolve template: prefer explicit mapping.templateId, then shared resolver
-    let templateId = mapping.templateId ?? undefined;
-    if (!templateId) {
-      templateId =
-        (await resolveTemplateForContext({
-          userId: signal.userId,
-          companyId: signal.companyId,
-          signalType: signal.type,
-          signalId: signal.id,
-        })) ?? undefined;
-    }
-    if (!templateId) continue;
-
     const target = await prisma.roadmapTarget.findFirst({
       where: { roadmapId: roadmap.id },
       select: {
@@ -77,6 +64,32 @@ export async function matchSignalToRoadmapRules(signal: Signal): Promise<void> {
         },
       },
     });
+
+    // Resolve template: prefer explicit mapping.templateId, then shared resolver
+    let templateId = mapping.templateId ?? undefined;
+    if (!templateId) {
+      const company = await prisma.company.findFirst({
+        where: { id: signal.companyId },
+        select: { industry: true },
+      });
+      const dept = target?.companyDepartmentId
+        ? await prisma.companyDepartment.findFirst({
+            where: { id: target.companyDepartmentId },
+            select: { customName: true, type: true },
+          })
+        : null;
+      templateId =
+        (await resolveTemplateForContext({
+          userId: signal.userId,
+          companyId: signal.companyId,
+          signalType: signal.type,
+          signalId: signal.id,
+          companyIndustry: company?.industry ?? undefined,
+          departmentLabel: dept?.customName ?? undefined,
+          departmentType: dept?.type ?? undefined,
+        })) ?? undefined;
+    }
+    if (!templateId) continue;
 
     const plan = await prisma.roadmapPlan.create({
       data: {

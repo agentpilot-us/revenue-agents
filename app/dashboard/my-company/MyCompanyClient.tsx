@@ -3,6 +3,9 @@
 import { MyCompanyTabs } from '@/app/dashboard/my-company/MyCompanyTabs';
 import { ProfileTab } from '@/app/dashboard/my-company/tabs/ProfileTab';
 import { ProductsTab } from '@/app/dashboard/my-company/tabs/ProductsTab';
+import { ContentLibraryTab } from '@/app/dashboard/my-company/tabs/ContentLibraryTab';
+import { PlaybooksTab } from '@/app/dashboard/my-company/tabs/PlaybooksTab';
+import { MessagingTab } from '@/app/dashboard/my-company/tabs/MessagingTab';
 import { IntelligenceTab } from '@/app/dashboard/my-company/tabs/IntelligenceTab';
 
 export type ProfileData = {
@@ -111,6 +114,15 @@ export function MyCompanyClient({
                 catalogProducts={catalogProducts}
                 hasContentLibrary={hasContentLibrary}
               />
+            )}
+            {activeTab === 'Content Library' && (
+              <ContentLibraryTab />
+            )}
+            {activeTab === 'Playbooks' && (
+              <PlaybooksTab />
+            )}
+            {activeTab === 'Messaging' && (
+              <MessagingTab />
             )}
             {activeTab === 'Intelligence' && (
               <IntelligenceTab

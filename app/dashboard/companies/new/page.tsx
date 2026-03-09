@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ResearchCompleteScreen, type EnrichmentResult } from '@/app/components/company/ResearchCompleteScreen';
@@ -15,6 +15,7 @@ export default function NewCompanyPage() {
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
   const [industry, setIndustry] = useState('');
+  const [accountType, setAccountType] = useState('new_logo');
   const [status, setStatus] = useState<Status>('form');
   const [error, setError] = useState('');
   const [researchResults, setResearchResults] = useState<EnrichmentResult | null>(null);
@@ -38,6 +39,7 @@ export default function NewCompanyPage() {
           name: name.trim(),
           domain: domain.trim() || undefined,
           industry: industry.trim() || undefined,
+          accountType,
         }),
       });
       const data = await res.json();
@@ -110,32 +112,7 @@ export default function NewCompanyPage() {
   }
 
   if (status === 'researching') {
-    return (
-      <div className="max-w-lg mx-auto py-8 px-6 bg-gray-50 dark:bg-zinc-900 min-h-screen">
-        <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-8 text-center">
-          <div className="animate-pulse text-4xl mb-4">🔄</div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Setting up {name || 'your company'}…
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Company added to your pipeline
-          </p>
-          <ul className="text-left text-sm text-gray-600 dark:text-gray-400 space-y-2 max-w-sm mx-auto">
-            <li className="flex items-center gap-2">
-              <span className="text-amber-500">⏳</span>
-              AI researching (news, signals, decision makers)
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-amber-500">⏳</span>
-              Finding key contacts
-            </li>
-          </ul>
-          <p className="text-xs text-gray-500 mt-6">
-            This usually takes 30–45 seconds…
-          </p>
-        </div>
-      </div>
-    );
+    return <ResearchingScreen companyName={name} />;
   }
 
   if (status === 'complete' && researchResults) {
@@ -192,6 +169,32 @@ export default function NewCompanyPage() {
             placeholder="e.g. Healthcare, SaaS"
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+            Account type
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { value: 'new_logo', label: 'New Logo' },
+              { value: 'customer', label: 'Existing Customer' },
+              { value: 'partner', label: 'Partner' },
+              { value: 'prospect', label: 'Prospect' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setAccountType(opt.value)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium border transition-colors ${
+                  accountType === opt.value
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-400'
+                    : 'border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-zinc-500'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-3 pt-4">
           <button
             type="submit"
@@ -207,6 +210,193 @@ export default function NewCompanyPage() {
           </Link>
         </div>
       </form>
+    </div>
+  );
+}
+
+/* ─── Researching loading screen ─────────────────────────────────────────── */
+
+const RESEARCH_STEPS = [
+  { label: 'Scanning news & press releases', icon: 'newspaper' },
+  { label: 'Analyzing market signals', icon: 'signal' },
+  { label: 'Identifying decision makers', icon: 'users' },
+  { label: 'Finding key contacts', icon: 'contact' },
+  { label: 'Building account intelligence', icon: 'brain' },
+] as const;
+
+function StepIcon({ type, active }: { type: string; active: boolean }) {
+  const cls = `w-4 h-4 ${active ? 'text-blue-400' : 'text-zinc-500'}`;
+  switch (type) {
+    case 'newspaper':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>;
+    case 'signal':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m2 20 .73-2.2A9.96 9.96 0 0 1 2 14C2 8.48 6.48 4 12 4s10 4.48 10 10-4.48 10-10 10a9.96 9.96 0 0 1-3.8-.73L2 20Z"/><path d="M12 12v.01"/></svg>;
+    case 'users':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+    case 'contact':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+    case 'brain':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.37 2.11 6.25 5.08 7.39A3 3 0 0 0 12 20a3 3 0 0 0 2.92-2.61C17.89 16.25 20 13.37 20 10a8 8 0 0 0-8-8Z"/><path d="M12 2v8"/><path d="m4.93 10.93 5.66-2.83"/><path d="m19.07 10.93-5.66-2.83"/></svg>;
+    default:
+      return null;
+  }
+}
+
+function ResearchingScreen({ companyName }: { companyName: string }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const stepInterval = setInterval(() => {
+      setActiveStep((prev) =>
+        prev < RESEARCH_STEPS.length - 1 ? prev + 1 : prev,
+      );
+    }, 6000);
+    const tickInterval = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => {
+      clearInterval(stepInterval);
+      clearInterval(tickInterval);
+    };
+  }, []);
+
+  const displayName = companyName || 'your company';
+
+  const progressPct = useMemo(
+    () => Math.min(((activeStep + 1) / RESEARCH_STEPS.length) * 100, 95),
+    [activeStep],
+  );
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="w-full max-w-md">
+        {/* Outer card */}
+        <div className="relative rounded-2xl border border-border bg-card shadow-2xl shadow-blue-500/5 overflow-hidden">
+          {/* Top gradient accent */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+
+          <div className="px-8 pt-10 pb-8">
+            {/* Animated logo / spinner */}
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20 flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8 text-blue-400 animate-spin"
+                    style={{ animationDuration: '3s' }}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2v4" />
+                    <path d="M12 18v4" />
+                    <path d="m4.93 4.93 2.83 2.83" />
+                    <path d="m16.24 16.24 2.83 2.83" />
+                    <path d="M2 12h4" />
+                    <path d="M18 12h4" />
+                    <path d="m4.93 19.07 2.83-2.83" />
+                    <path d="m16.24 4.93 2.83 2.83" />
+                  </svg>
+                </div>
+                <div className="absolute -inset-1 rounded-2xl bg-blue-500/10 animate-pulse" style={{ animationDuration: '2s' }} />
+              </div>
+            </div>
+
+            {/* Heading */}
+            <div className="text-center mb-8">
+              <h2 className="text-xl font-semibold text-foreground tracking-tight">
+                Setting up {displayName}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                Building your account intelligence profile
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mb-6">
+              <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000 ease-out"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Steps */}
+            <div className="space-y-1">
+              {RESEARCH_STEPS.map((step, i) => {
+                const isDone = i < activeStep;
+                const isActive = i === activeStep;
+                const isPending = i > activeStep;
+
+                return (
+                  <div
+                    key={step.label}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-500 ${
+                      isActive
+                        ? 'bg-blue-500/8 border border-blue-500/15'
+                        : isDone
+                          ? 'opacity-60'
+                          : 'opacity-30'
+                    }`}
+                  >
+                    {/* Status indicator */}
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                      {isDone ? (
+                        <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      ) : isActive ? (
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                      ) : (
+                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                      )}
+                    </div>
+
+                    {/* Icon */}
+                    <StepIcon type={step.icon} active={isActive || isDone} />
+
+                    {/* Label */}
+                    <span
+                      className={`text-sm transition-colors duration-300 ${
+                        isActive
+                          ? 'text-foreground font-medium'
+                          : isDone
+                            ? 'text-muted-foreground'
+                            : 'text-muted-foreground/60'
+                      }`}
+                    >
+                      {step.label}
+                    </span>
+
+                    {/* Active spinner */}
+                    {isActive && (
+                      <div className="ml-auto">
+                        <div className="w-3.5 h-3.5 border-2 border-blue-500/30 border-t-blue-400 rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-border px-8 py-4 bg-card/50">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Typically completes in 30–45 seconds
+              </p>
+              <span className="text-xs tabular-nums text-muted-foreground/60">
+                {elapsed}s
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

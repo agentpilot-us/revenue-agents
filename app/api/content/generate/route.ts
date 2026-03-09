@@ -22,6 +22,11 @@ import {
   formatRAGChunksForPrompt,
 } from '@/lib/content-library-rag';
 import { buildExistingStackBlock } from '@/lib/products/resolve-product-framing';
+import {
+  getChannelConfig,
+  buildRecipientsBlock,
+  deriveToneFromContacts,
+} from '@/lib/content/channel-config';
 
 const GenerateSchema = z.object({
   companyId: z.string(),
@@ -34,11 +39,14 @@ const GenerateSchema = z.object({
     'sms',
     'sales_page',
     'presentation',
+    'ad_brief',
+    'demo_script',
+    'video',
   ]),
-  persona: z.enum(['csuite', 'vp', 'director', 'all']).optional(),
   contactIds: z.array(z.string()).optional(),
   triggerId: z.string().optional(),
   activeActionIndex: z.number().int().min(0).optional(),
+  userContext: z.string().max(1000).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -51,6 +59,8 @@ export async function POST(req: NextRequest) {
     const json = await req.json();
     const input = GenerateSchema.parse(json);
     const { companyId, divisionId, channel } = input;
+
+    const channelConfig = getChannelConfig(channel);
 
     const [company, user] = await Promise.all([
       prisma.company.findFirst({
@@ -69,7 +79,7 @@ export async function POST(req: NextRequest) {
     const aeName = user?.name || 'the sales rep';
     const aeCompany = user?.companyName || '';
 
-    // Buying group / division context (maps to CompanyDepartment)
+    // Buying group / division context
     let departmentContext = '';
     let departmentLabel: string | null = null;
     let divisionValuProp: string | null = null;
@@ -104,33 +114,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Recipient context (optional)
-    let recipientsSection = '';
+    // Fetch contacts for recipient context + seniority-based tone
+    type ContactRow = { firstName: string | null; lastName: string | null; title: string | null };
+    let contacts: ContactRow[] = [];
     if (input.contactIds && input.contactIds.length > 0) {
-      const contacts = await prisma.contact.findMany({
+      contacts = await prisma.contact.findMany({
         where: { companyId, id: { in: input.contactIds } },
         select: { firstName: true, lastName: true, title: true },
       });
-      if (contacts.length > 0) {
-        const lines = contacts.map((c, idx) => {
-          const name = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || 'Contact';
-          return `- Recipient ${idx + 1}: ${name}${
-            c.title ? ` (${c.title})` : ''
-          }`;
-        });
-        recipientsSection = `\n\nRECIPIENTS:\n${lines.join('\n')}`;
-      }
     }
 
-    const personaLabelMap: Record<string, string> = {
-      csuite: 'C-Suite',
-      vp: 'VP and above',
-      director: 'Director and above',
-      all: 'All levels in buying group',
-    };
-    const personaLine = input.persona
-      ? `Target seniority: ${personaLabelMap[input.persona]}.\n`
-      : '';
+    const recipientsSection = buildRecipientsBlock(contacts, channelConfig.mode);
+    const toneLine = deriveToneFromContacts(contacts);
 
     const [researchBlock, accountBlock, activeObjectionsBlock, messagingSection, relevantProductIds, objectionTexts, productNames] =
       await Promise.all([
@@ -157,7 +152,7 @@ export async function POST(req: NextRequest) {
         getCaseStudiesBlock(
           session.user.id,
           company.industry ?? null,
-          null,
+          departmentLabel,
           relevantProductIds
         ),
         getCompanyEventsBlock(session.user.id, company.industry ?? null, departmentLabel, null, {
@@ -173,14 +168,14 @@ export async function POST(req: NextRequest) {
           : Promise.resolve(null),
       ]);
 
-    // Phase 4: Channel-based context tiering
+    // Context tiering — short-form channels get less context to avoid drowning the instruction
     const isShortForm = ['sms', 'slack'].includes(channel);
-    const isMediumForm = ['linkedin_post'].includes(channel);
+    const isMediumForm = ['linkedin_post', 'linkedin_inmail'].includes(channel);
 
     const researchSection = researchBlock && !isShortForm ? `\n\n${researchBlock}` : '';
     const accountSection = accountBlock && !isShortForm ? `\n\n${accountBlock}` : '';
     const activeObjectionsSection = activeObjectionsBlock ? `\n\n${activeObjectionsBlock}` : '';
-    const productSection = productKnowledgeBlock ? `\n\n${productKnowledgeBlock}` : '';
+    const productSection = productKnowledgeBlock && !isShortForm ? `\n\n${productKnowledgeBlock}` : '';
     const playbookSection = industryPlaybookBlock && !isShortForm
       ? `\n\n${industryPlaybookBlock}`
       : '';
@@ -192,7 +187,6 @@ export async function POST(req: NextRequest) {
       ? `\n\n${featureReleasesBlock}`
       : '';
 
-    // Phase 4: Targeted RAG query — use division + product when available
     const ragQueryParts = [company.name, company.industry ?? ''];
     if (departmentLabel) ragQueryParts.push(departmentLabel);
     ragQueryParts.push('value proposition');
@@ -206,12 +200,10 @@ export async function POST(req: NextRequest) {
         ? `\n\n${formatRAGChunksForPrompt(ragChunks)}`
         : '';
 
-    // AE identity line
     const aeIdentityLine = aeCompany
       ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
       : `You are writing on behalf of ${aeName}.\n`;
 
-    // Active action context (from trigger-based CTA)
     let actionLine = '';
     if (input.activeActionIndex != null) {
       const actionLabels = [
@@ -225,17 +217,18 @@ export async function POST(req: NextRequest) {
       actionLine = `Frame this outreach around the following chosen action: "${actionText}".\n`;
     }
 
-    // Explicit landmines (Do NOT)
+    const userContextLine = input.userContext?.trim()
+      ? `The user provided this specific context for the outreach: "${input.userContext.trim()}". Incorporate this intent into the content.\n`
+      : '';
+
     const landminesArr = Array.isArray(playbook?.landmines) ? (playbook.landmines as string[]) : [];
     const defaultLandmines = ['use generic openers like "I hope this email finds you well"', 'lead with your product name before establishing relevance'];
     const allLandmines = landminesArr.length > 0 ? landminesArr : defaultLandmines;
     const landminesLine = `Do NOT: ${allLandmines.join('; ')}.\n`;
 
-    // Existing stack context for product-aware framing
     const existingStackSection = await buildExistingStackBlock(companyId, session.user.id);
     const existingStackLine = existingStackSection ? `\n${existingStackSection}\n` : '';
 
-    // Division-specific context for talking points
     let divisionIntelLine = '';
     if (divisionValuProp || divisionUseCase || divisionObjectionHandlers) {
       const parts: string[] = [];
@@ -247,50 +240,13 @@ export async function POST(req: NextRequest) {
       divisionIntelLine = parts.join(' ') + '\n';
     }
 
-    let contentInstruction: string;
-    if (channel === 'email') {
-      contentInstruction =
-        'Generate an email: include a "Subject:" line first, then a blank line, then the email body (plain text, 2-4 short paragraphs). Use the context below for the target account and your company\'s messaging and value props.';
-    } else if (channel === 'linkedin_inmail') {
-      contentInstruction =
-        'Generate a LinkedIn InMail. First write a one-sentence hook not longer than 300 characters, prefixed with "HOOK:". Then a blank line, then the full InMail body prefixed with "BODY:". Use the context below for the target account and your company messaging. Output plain text only.';
-    } else if (channel === 'linkedin_post') {
-      contentInstruction =
-        'Generate a LinkedIn post: 1–3 short paragraphs, conversational and value-driven. Do NOT include any labels or markdown; output plain text only.';
-    } else if (channel === 'slack') {
-      contentInstruction =
-        'Generate a short Slack DM: 2–4 sentences, friendly but professional. Output plain text only.';
-    } else if (channel === 'sms') {
-      contentInstruction =
-        'Generate a brief SMS/text message: maximum 2–3 sentences, concise and clear. Output plain text only.';
-    } else if (channel === 'presentation') {
-      contentInstruction = `Generate a 3-5 slide presentation outline for a sales meeting with ${company.name}. Structure each slide as:
-
-SLIDE [N]: [Title]
-BULLETS:
-- [bullet point]
-SPEAKER NOTES: [what to say, 2-3 sentences]
-
-Suggested structure:
-Slide 1: Their world (account initiative/pain, not about us)
-Slide 2: How we map to that (product fit, specific to this division)
-Slide 3: Proof (case study or metric from a similar company)
-Slide 4: What changes for them (outcomes, not features)
-Slide 5: Suggested next step
-
-Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`;
-    } else {
-      // sales_page
-      contentInstruction =
-        'Generate a short outline for a division-specific sales page: include a headline, 3–5 bullet points of value props, and one suggested CTA label. Output as plain text with clear line breaks.';
-    }
+    // Channel instruction from shared config — placed at the END for recency bias
+    const channelInstruction = channelConfig.buildInstruction(company.name);
 
     const systemPrompt = `You are a B2B sales content writer.
-${aeIdentityLine}${actionLine}${personaLine}${landminesLine}${divisionIntelLine}
-The user is creating ${channel.replace('_', ' ')} for the target account "${company.name}".
+${aeIdentityLine}${actionLine}${userContextLine}${toneLine}${landminesLine}${divisionIntelLine}
+The user is creating ${channelConfig.label} content for the target account "${company.name}".
 ${departmentContext}${recipientsSection}
-
-${contentInstruction}
 
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.
@@ -303,117 +259,22 @@ ${playbookSection}
 ${caseStudiesSection}
 ${eventsSection}
 ${featureReleasesSection}
-${messagingSection}${accountSection}${researchSection}`;
-
-    // Phase 4: Per-channel maxOutputTokens
-    const maxOutputTokensByChannel: Record<string, number> = {
-      sms: 100,
-      slack: 200,
-      linkedin_post: 400,
-      linkedin_inmail: 800,
-      email: 1000,
-      talking_points: 1500,
-      presentation: 2500,
-      sales_page: 1500,
-    };
-    const maxOutputTokens = maxOutputTokensByChannel[channel] ?? 1500;
+${messagingSection}${accountSection}${researchSection}
+${channelInstruction}`;
 
     const { text } = await generateText({
       model: getChatModel(),
-      maxOutputTokens,
+      maxOutputTokens: channelConfig.maxOutputTokens,
       system: systemPrompt,
-      prompt:
-        channel === 'email'
-          ? `Generate the email as specified. Output only the email text.`
-          : channel === 'linkedin_inmail'
-            ? `Generate the InMail as specified. Output only the HOOK and BODY sections.`
-            : channel === 'presentation'
-              ? `Generate the presentation outline as specified. Output only the SLIDE/BULLETS/SPEAKER NOTES blocks.`
-              : `Generate the content as specified. Output only the raw text content.`,
+      prompt: channelConfig.buildUserPrompt(),
     });
 
     const raw = text.trim();
+    const parsed = channelConfig.parseOutput(raw);
 
-    if (channel === 'email') {
-      const lines = raw.split('\n');
-      let subject = '';
-      let bodyStart = 0;
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].toLowerCase().startsWith('subject:')) {
-          subject = lines[i].replace(/^subject:\s*/i, '').trim();
-          bodyStart = i + 1;
-          if (lines[bodyStart]?.trim() === '') bodyStart++;
-          break;
-        }
-      }
-      const body = lines.slice(bodyStart).join('\n').trim();
-      return NextResponse.json({
-        contentId: crypto.randomUUID(),
-        subject,
-        body,
-      });
-    }
-
-    if (channel === 'linkedin_inmail') {
-      let hook = '';
-      let body = raw;
-      const hookMatch = raw.match(/HOOK:\s*(.+)/i);
-      if (hookMatch) {
-        hook = hookMatch[1].trim();
-        const bodyIndex = raw.toLowerCase().indexOf('body:');
-        if (bodyIndex >= 0) {
-          body = raw.slice(bodyIndex + 'body:'.length).trim();
-        }
-      }
-
-      return NextResponse.json({
-        contentId: crypto.randomUUID(),
-        hook,
-        body,
-      });
-    }
-
-    if (channel === 'presentation') {
-      const slides: Array<{ slideNumber: number; title: string; bullets: string[]; speakerNotes: string }> = [];
-      const slideBlocks = raw.split(/\n(?=SLIDE\s*\d+\s*:)/im);
-      for (const block of slideBlocks) {
-        const numMatch = block.match(/^SLIDE\s*(\d+)\s*:\s*(.+?)(?=\n|$)/im);
-        if (!numMatch) continue;
-        const slideNumber = parseInt(numMatch[1], 10);
-        const title = numMatch[2].trim();
-        let bullets: string[] = [];
-        let speakerNotes = '';
-        const bulletsMatch = block.match(/BULLETS?\s*:\s*([\s\S]*?)(?=SPEAKER\s+NOTES\s*:|$)/im);
-        if (bulletsMatch) {
-          bullets = bulletsMatch[1]
-            .split(/\n/)
-            .map((l) => l.replace(/^[\s\-*]*/, '').trim())
-            .filter(Boolean);
-        }
-        const notesMatch = block.match(/SPEAKER\s+NOTES\s*:\s*([\s\S]*?)$/im);
-        if (notesMatch) {
-          speakerNotes = notesMatch[1].trim();
-        }
-        slides.push({ slideNumber, title, bullets, speakerNotes });
-      }
-      if (slides.length === 0) {
-        slides.push({
-          slideNumber: 1,
-          title: 'Presentation',
-          bullets: [raw],
-          speakerNotes: '',
-        });
-      }
-      return NextResponse.json({
-        contentId: crypto.randomUUID(),
-        slides,
-      });
-    }
-
-    // Other channels: body-only content
     return NextResponse.json({
       contentId: crypto.randomUUID(),
-      body: raw,
+      ...parsed,
     });
   } catch (error) {
     console.error('POST /api/content/generate error:', error);
@@ -429,4 +290,3 @@ ${messagingSection}${accountSection}${researchSection}`;
     );
   }
 }
-

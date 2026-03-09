@@ -5,21 +5,17 @@ import Link from 'next/link';
 import { Target } from 'lucide-react';
 import { DepartmentsTab } from '@/app/components/company/DepartmentsTab';
 import { PrepMePanel, type PrepMePanelParams } from '@/app/components/company/PrepMePanel';
-import { EngagementByBuyingGroup } from '@/app/components/company/EngagementByBuyingGroup';
 import type { EngagementRow } from '@/app/components/company/EngagementByBuyingGroup';
-import { EventCoverageCard } from '@/app/components/company/EventCoverageCard';
 import type { CampaignItem } from '@/app/components/company/CampaignsTab';
 import { SalesforceBlock } from '@/app/components/company/SalesforceBlock';
 import { ContactsByBuyingGroup } from '@/app/components/company/ContactsByBuyingGroup';
 import { ContentTabV2 as ContentTab } from '@/app/components/company/ContentTabV2';
 import { NextStepBar } from '@/app/components/company/NextStepBar';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SignalDigest } from '@/app/components/company/SignalDigest';
 import { ExistingStackEditor } from '@/app/components/company/ExistingStackEditor';
 import { ActiveObjectionsPanel } from '@/app/components/company/ActiveObjectionsPanel';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'engagement' | 'signals';
+type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content';
 
 type AccountMessagingData = {
   id: string;
@@ -72,7 +68,6 @@ type CompanyTabsProps = {
   activities: Array<{ id: string; type: string; summary: string; createdAt: Date }>;
   contacts?: Array<{ id: string; firstName: string | null; lastName: string | null }>;
   contactCount: number;
-  expansionStrategy: { phase1: string[]; phase2: string[]; phase3: string[] };
   accountMessaging: AccountMessagingData;
   contentLibraryUseCasesAndStories: ContentItem[];
   initialTab?: TabId;
@@ -98,6 +93,7 @@ type CompanyTabsProps = {
   hasResearch?: boolean;
   hasDepartments?: boolean;
   hasContacts?: boolean;
+  signalCount?: number;
   /** URL context from searchParams for deep-links (Spec 1): division, type, signal, contact, action, contactName, contentFilter */
   urlContext?: {
     division?: string;
@@ -117,8 +113,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'buying-groups', label: 'Buying Groups' },
   { id: 'contacts', label: 'Contacts' },
   { id: 'content', label: 'Content' },
-  { id: 'engagement', label: 'Engagement' },
-  { id: 'signals', label: 'Signals' },
 ];
 
 function DealObjectiveBar({
@@ -218,7 +212,6 @@ export function CompanyTabs({
   caseStudies = [],
   activities,
   contactCount,
-  expansionStrategy,
   accountMessaging,
   contentLibraryUseCasesAndStories,
   initialTab,
@@ -231,6 +224,7 @@ export function CompanyTabs({
   hasResearch = false,
   hasDepartments = false,
   hasContacts = false,
+  signalCount = 0,
   urlContext,
   prepMeFromUrl,
 }: CompanyTabsProps) {
@@ -326,18 +320,15 @@ export function CompanyTabs({
       </div>
 
       {activeTab === 'buying-groups' && (
-        <div className="space-y-6">
-          <DepartmentsTab
-            companyId={companyId}
-            companyName={companyName}
-            departments={departments as Parameters<typeof DepartmentsTab>[0]['departments']}
-            segmentationStrategy={companyData?.segmentationStrategy}
-            segmentationRationale={companyData?.segmentationRationale}
-            caseStudies={caseStudies}
-            onPrepMeOpen={openPrepMe}
-          />
-          <ExpansionStrategySection strategy={expansionStrategy} companyId={companyId} />
-        </div>
+        <DepartmentsTab
+          companyId={companyId}
+          companyName={companyName}
+          departments={departments as Parameters<typeof DepartmentsTab>[0]['departments']}
+          segmentationStrategy={companyData?.segmentationStrategy}
+          segmentationRationale={companyData?.segmentationRationale}
+          caseStudies={caseStudies}
+          onPrepMeOpen={openPrepMe}
+        />
       )}
 
       {prepMeOpen && prepMeParams && (
@@ -350,7 +341,7 @@ export function CompanyTabs({
       {activeTab === 'overview' && (
         <div className="space-y-6">
           {setupIncomplete ? (
-            <GetStartedCard companyId={companyId} companyName={companyName} hasResearch={hasResearch} hasDepartments={hasDepartments} hasContacts={hasContacts} />
+            <GetStartedCard companyId={companyId} companyName={companyName} hasResearch={hasResearch} hasDepartments={hasDepartments} hasContacts={hasContacts} signalCount={signalCount} contactCount={contactCount} />
           ) : (
             <>
               {/* State 2: Company Snapshot */}
@@ -459,6 +450,14 @@ export function CompanyTabs({
                   name: d.customName ?? d.type.replace(/_/g, ' '),
                 }))}
               />
+
+              {/* Engagement Summary */}
+              {engagementByDept.length > 0 && (
+                <EngagementSummaryCard rows={engagementByDept} />
+              )}
+
+              {/* Recent Signals */}
+              <RecentSignalsCard companyId={companyId} companyName={companyName} />
             </>
           )}
         </div>
@@ -495,24 +494,6 @@ export function CompanyTabs({
         />
       )}
 
-      {activeTab === 'engagement' && (
-        <div id="engagement" className="space-y-6">
-          <EngagementByBuyingGroup
-            companyId={companyId}
-            companyName={companyName}
-            rows={engagementByDept}
-          />
-          <EventCoverageCard companyId={companyId} />
-        </div>
-      )}
-
-      {activeTab === 'signals' && (
-        <SignalDigestTab
-          companyId={companyId}
-          companyName={companyName}
-          onPrepMeOpen={openPrepMe}
-        />
-      )}
     </div>
   );
 }
@@ -523,47 +504,153 @@ function GetStartedCard({
   hasResearch,
   hasDepartments,
   hasContacts,
+  signalCount,
+  contactCount,
 }: {
   companyId: string;
   companyName: string;
   hasResearch: boolean;
   hasDepartments: boolean;
   hasContacts: boolean;
+  signalCount: number;
+  contactCount: number;
 }) {
-  const intelligenceHref = `/dashboard/companies/${companyId}?tab=contacts&action=find`;
+  const intelligenceHref = `/dashboard/companies/${companyId}/intelligence`;
+  const contactsHref = `/dashboard/companies/${companyId}?tab=contacts&action=find`;
+
+  const stepsComplete = [hasResearch, hasDepartments, hasContacts].filter(Boolean).length;
+  const anyProgress = stepsComplete > 0;
+
+  const steps = [
+    {
+      done: hasResearch,
+      label: 'Account intelligence',
+      detail: hasResearch
+        ? `${signalCount} signal${signalCount !== 1 ? 's' : ''} found, ${contactCount} contact${contactCount !== 1 ? 's' : ''} discovered`
+        : 'Research news, signals, and decision makers',
+    },
+    {
+      done: hasDepartments,
+      label: 'Buying groups',
+      detail: hasDepartments
+        ? 'Segments configured'
+        : 'Define how this account buys',
+    },
+    {
+      done: hasContacts,
+      label: 'Contacts',
+      detail: hasContacts
+        ? `${contactCount} contact${contactCount !== 1 ? 's' : ''} mapped`
+        : 'Find and map contacts to each group',
+    },
+  ];
+
+  let ctaLabel: string;
+  let ctaHref: string;
+  if (!hasResearch) {
+    ctaLabel = 'Run Account Intelligence';
+    ctaHref = intelligenceHref;
+  } else if (!hasDepartments) {
+    ctaLabel = 'Set Up Buying Groups';
+    ctaHref = intelligenceHref;
+  } else {
+    ctaLabel = 'Find Contacts';
+    ctaHref = contactsHref;
+  }
+
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Get started with {companyName}</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        To use AgentPilot on this account you need:
-      </p>
-      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300 mb-6">
-        <li className="flex items-center gap-2">
-          {hasResearch ? <span className="text-green-600 dark:text-green-400" aria-hidden>✓</span> : <span className="text-gray-400" aria-hidden>○</span>}
-          <span>Account research</span>
-          {!hasResearch && (
-            <Link href={intelligenceHref} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-              Research with AI →
-            </Link>
-          )}
-        </li>
-        <li className="flex items-center gap-2">
-          {hasDepartments ? <span className="text-green-600 dark:text-green-400" aria-hidden>✓</span> : <span className="text-gray-400" aria-hidden>○</span>}
-          At least one buying group
-        </li>
-        <li className="flex items-center gap-2">
-          {hasContacts ? <span className="text-green-600 dark:text-green-400" aria-hidden>✓</span> : <span className="text-gray-400" aria-hidden>○</span>}
-          Contacts in each group
-        </li>
-      </ul>
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href={intelligenceHref}
-          className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-        >
-          Complete account setup →
-        </Link>
-        <span className="text-xs text-gray-500 dark:text-gray-400">~5 minutes</span>
+    <div className="relative rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
+      {/* Top accent */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+
+      <div className="p-6 sm:p-8">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              {anyProgress ? `Continue setting up ${companyName}` : `Get started with ${companyName}`}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Complete these steps to unlock AI-powered plays and outreach.
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-2 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1">
+            <span className="text-xs font-semibold text-blue-400">{stepsComplete}/3</span>
+            <span className="text-xs text-blue-400/70">complete</span>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mb-6">
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-700 ease-out"
+              style={{ width: `${(stepsComplete / 3) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div className="space-y-1 mb-6">
+          {steps.map((step, i) => {
+            const isNext = !step.done && steps.slice(0, i).every((s) => s.done);
+            return (
+              <div
+                key={step.label}
+                className={cn(
+                  'flex items-start gap-3 rounded-lg px-3 py-3 transition-all',
+                  isNext && 'bg-blue-500/5 border border-blue-500/15',
+                  step.done && 'opacity-70',
+                  !step.done && !isNext && 'opacity-40',
+                )}
+              >
+                <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+                  {step.done ? (
+                    <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : isNext ? (
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
+                  ) : (
+                    <div className="w-2 h-2 rounded-full bg-zinc-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    'text-sm',
+                    step.done ? 'text-muted-foreground' : isNext ? 'text-foreground font-medium' : 'text-muted-foreground/60',
+                  )}>
+                    {step.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">
+                    {step.detail}
+                  </p>
+                </div>
+                {isNext && (
+                  <div className="shrink-0 mt-0.5">
+                    <div className="w-3.5 h-3.5 border-2 border-blue-500/30 border-t-blue-400 rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* CTA */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={ctaHref}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm shadow-blue-500/20"
+          >
+            {ctaLabel}
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
+          </Link>
+          <span className="text-xs text-muted-foreground">
+            {!hasResearch ? '~30 seconds' : !hasDepartments ? '~2 minutes' : '~2 minutes'}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -592,60 +679,111 @@ function BuyingGroupCoverageCard({
   );
 }
 
-function SignalDigestTab({
-  companyId,
-  companyName,
-  onPrepMeOpen,
-}: {
-  companyId: string;
-  companyName: string;
-  onPrepMeOpen?: (params: PrepMePanelParams) => void;
-}) {
-  return (
-    <SignalDigest
-      companyId={companyId}
-      companyName={companyName}
-      days={7}
-      onPrepMeOpen={onPrepMeOpen}
-    />
-  );
-}
-
-function ExpansionStrategySection({
-  strategy,
-  companyId,
-}: {
-  strategy: { phase1: string[]; phase2: string[]; phase3: string[] };
-  companyId: string;
-}) {
-  const hasPhases = strategy.phase1.length > 0 || strategy.phase2.length > 0 || strategy.phase3.length > 0;
-  if (!hasPhases) return null;
+function EngagementSummaryCard({ rows }: { rows: EngagementRow[] }) {
+  const totalEmails = rows.reduce((s, r) => s + r.emailsSent, 0);
+  const totalReplies = rows.reduce((s, r) => s + r.replies, 0);
+  const totalMeetings = rows.reduce((s, r) => s + r.meetings, 0);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Where to focus first</h2>
-      <div className="space-y-3 text-sm">
-        {strategy.phase1.length > 0 && (
-          <p>
-            <span className="font-medium text-gray-700 dark:text-gray-300">Phase 1:</span> Focus on{' '}
-            {strategy.phase1.join(', ')} (highest fit scores, budget signals detected).
-          </p>
-        )}
-        {strategy.phase2.length > 0 && (
-          <p>
-            <span className="font-medium text-gray-700 dark:text-gray-300">Phase 2:</span> Upsell in {strategy.phase2.join(', ')}{' '}
-            (leverage existing relationship).
-          </p>
-        )}
-        {strategy.phase3.length > 0 && (
-          <p>
-            <span className="font-medium text-gray-700 dark:text-gray-300">Phase 3:</span> {strategy.phase3.join(', ')} (longer cycle or lower priority).
-          </p>
-        )}
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Engagement Summary</h2>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+        {totalEmails} emails sent &middot; {totalReplies} replies &middot; {totalMeetings} meetings
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-zinc-700">
+              <th className="pb-2 font-medium">Buying Group</th>
+              <th className="pb-2 font-medium text-right">Contacts</th>
+              <th className="pb-2 font-medium text-right">Emails</th>
+              <th className="pb-2 font-medium text-right">Replies</th>
+              <th className="pb-2 font-medium text-right">Meetings</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-gray-100 dark:border-zinc-700/50 last:border-0">
+                <td className="py-2 text-gray-900 dark:text-gray-100 font-medium">{row.name}</td>
+                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.contactCount}</td>
+                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.emailsSent}</td>
+                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.replies}</td>
+                <td className="py-2 text-right text-gray-600 dark:text-gray-400">{row.meetings}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      <Link href={`/dashboard/companies/${companyId}/contacts`} className="inline-block mt-4">
-        <Button>Find contacts for Phase 1 segments</Button>
-      </Link>
     </div>
   );
 }
+
+type RecentSignal = {
+  tier: number;
+  date: string;
+  headline: string;
+};
+
+function RecentSignalsCard({ companyId, companyName }: { companyId: string; companyName: string }) {
+  const [signals, setSignals] = React.useState<RecentSignal[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/companies/${companyId}/signals?days=14`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled) setSignals((data.signals ?? []).slice(0, 5));
+      } catch {
+        // silently fail
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [companyId]);
+
+  if (loading) return null;
+  if (signals.length === 0) return null;
+
+  const tierBadge = (tier: number) => {
+    if (tier === 1) return 'bg-red-500/10 text-red-700 dark:text-red-400';
+    if (tier === 2) return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
+    return 'bg-slate-500/10 text-slate-600 dark:text-slate-400';
+  };
+  const tierName = (tier: number) => (tier === 1 ? 'High' : tier === 2 ? 'Strategic' : 'FYI');
+
+  const formatDate = (dateString: string) => {
+    const d = new Date(dateString);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    if (diff < 7) return `${diff}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-200 dark:border-zinc-700">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Signals</h2>
+      <div className="space-y-2">
+        {signals.map((sig, i) => (
+          <div key={i} className="flex items-center gap-3 text-sm">
+            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded', tierBadge(sig.tier))}>
+              {tierName(sig.tier)}
+            </span>
+            <span className="flex-1 min-w-0 truncate text-gray-900 dark:text-gray-100">
+              {sig.headline}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+              {formatDate(sig.date)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

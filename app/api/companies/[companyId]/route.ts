@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { deleteWebset } from '@/lib/exa/websets';
 
-const PATCH_ALLOWED = ['dealObjective'] as const;
+const PATCH_ALLOWED = ['dealObjective', 'accountType'] as const;
 
 export async function PATCH(
   req: NextRequest,
@@ -39,7 +39,7 @@ export async function PATCH(
 
     const updated = await prisma.company.update({
       where: { id: companyId },
-      data: data as { dealObjective?: string | null },
+      data: data as { dealObjective?: string | null; accountType?: string | null },
     });
 
     return NextResponse.json(updated);

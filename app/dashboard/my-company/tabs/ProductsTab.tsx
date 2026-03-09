@@ -18,10 +18,15 @@ type ProfileData = {
   elevatorPitch?: string;
   valueProps?: string[];
   painPoints?: string[];
+  bestForDepartments?: string[];
+  bestForIndustries?: string[];
+  technicalRequirements?: string[];
   objectionHandlers?: { objection: string; response: string }[];
   competitivePositioning?: string[];
   priceRangeText?: string;
+  dealSizeSweetSpot?: string;
   salesCycle?: string;
+  deployment?: string;
 };
 
 type Props = {
@@ -39,6 +44,7 @@ export function ProductsTab({ catalogProducts: initialProducts, hasContentLibrar
   const [generatingProfileFor, setGeneratingProfileFor] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, ProfileData>>({});
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
+  const [editingProfileFor, setEditingProfileFor] = useState<string | null>(null);
 
   const handleDiscover = async () => {
     setDiscovering(true);
@@ -371,12 +377,24 @@ export function ProductsTab({ catalogProducts: initialProducts, hasContentLibrar
                   </div>
 
                   {/* Expanded profile view */}
-                  {isExpanded && profile && (
+                  {isExpanded && profile && editingProfileFor !== cp.id && (
                     <div className="border-t border-border bg-background/40 p-5 space-y-4">
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setEditingProfileFor(cp.id)}
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          Edit profile
+                        </button>
+                      </div>
                       <ProfileField label="One-liner" value={profile.oneLiner} />
                       <ProfileField label="Elevator pitch" value={profile.elevatorPitch} />
                       <ProfileListField label="Value propositions" items={profile.valueProps} />
                       <ProfileListField label="Pain points addressed" items={profile.painPoints} />
+                      <ProfileListField label="Best for departments" items={profile.bestForDepartments} />
+                      <ProfileListField label="Best for industries" items={profile.bestForIndustries} />
+                      <ProfileListField label="Technical requirements" items={profile.technicalRequirements} />
                       {profile.objectionHandlers && profile.objectionHandlers.length > 0 && (
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
@@ -397,10 +415,27 @@ export function ProductsTab({ catalogProducts: initialProducts, hasContentLibrar
                         </div>
                       )}
                       <ProfileListField label="Competitive positioning" items={profile.competitivePositioning} />
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <ProfileField label="Price range" value={profile.priceRangeText} />
+                        <ProfileField label="Deal size sweet spot" value={profile.dealSizeSweetSpot} />
                         <ProfileField label="Sales cycle" value={profile.salesCycle} />
+                        <ProfileField label="Deployment" value={profile.deployment} />
                       </div>
+                    </div>
+                  )}
+
+                  {/* Profile edit form */}
+                  {editingProfileFor === cp.id && (
+                    <div className="border-t border-border bg-background/40 p-5">
+                      <ProfileEditForm
+                        catalogProductId={cp.id}
+                        initial={profile ?? {}}
+                        onSaved={(updated) => {
+                          setProfiles((prev) => ({ ...prev, [cp.id]: updated }));
+                          setEditingProfileFor(null);
+                        }}
+                        onCancel={() => setEditingProfileFor(null)}
+                      />
                     </div>
                   )}
 
@@ -458,6 +493,196 @@ export function ProductsTab({ catalogProducts: initialProducts, hasContentLibrar
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+function ProfileEditForm({
+  catalogProductId,
+  initial,
+  onSaved,
+  onCancel,
+}: {
+  catalogProductId: string;
+  initial: ProfileData;
+  onSaved: (p: ProfileData) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    oneLiner: initial.oneLiner ?? '',
+    elevatorPitch: initial.elevatorPitch ?? '',
+    valueProps: (initial.valueProps ?? []).join('\n'),
+    painPoints: (initial.painPoints ?? []).join('\n'),
+    bestForDepartments: (initial.bestForDepartments ?? []).join('\n'),
+    bestForIndustries: (initial.bestForIndustries ?? []).join('\n'),
+    technicalRequirements: (initial.technicalRequirements ?? []).join('\n'),
+    competitivePositioning: (initial.competitivePositioning ?? []).join('\n'),
+    priceRangeText: initial.priceRangeText ?? '',
+    dealSizeSweetSpot: initial.dealSizeSweetSpot ?? '',
+    salesCycle: initial.salesCycle ?? '',
+    deployment: initial.deployment ?? '',
+  });
+  const [objections, setObjections] = useState(
+    initial.objectionHandlers ?? [],
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const set = (key: string, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const splitLines = (s: string) =>
+    s.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const body = {
+        oneLiner: form.oneLiner || null,
+        elevatorPitch: form.elevatorPitch || null,
+        valueProps: splitLines(form.valueProps),
+        painPoints: splitLines(form.painPoints),
+        bestForDepartments: splitLines(form.bestForDepartments),
+        bestForIndustries: splitLines(form.bestForIndustries),
+        technicalRequirements: splitLines(form.technicalRequirements),
+        competitivePositioning: splitLines(form.competitivePositioning),
+        objectionHandlers: objections.filter((o) => o.objection.trim()),
+        priceRangeText: form.priceRangeText || null,
+        dealSizeSweetSpot: form.dealSizeSweetSpot || null,
+        salesCycle: form.salesCycle || null,
+        deployment: form.deployment || null,
+      };
+      const res = await fetch(
+        `/api/catalog-products/${encodeURIComponent(catalogProductId)}/profile`,
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+      );
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        setError(d?.error ?? 'Failed to save');
+        return;
+      }
+      const updated = await res.json();
+      onSaved(updated);
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldInput = (label: string, key: string) => (
+    <label key={key} className="space-y-1 block">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <input
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+        value={(form as Record<string, string>)[key] ?? ''}
+        onChange={(e) => set(key, e.target.value)}
+      />
+    </label>
+  );
+
+  const fieldTextarea = (label: string, key: string, hint?: string) => (
+    <label key={key} className="space-y-1 block">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+      <textarea
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm min-h-[80px]"
+        value={(form as Record<string, string>)[key] ?? ''}
+        onChange={(e) => set(key, e.target.value)}
+      />
+    </label>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Edit Product Profile</h3>
+      </div>
+      {error && (
+        <p className="text-xs text-red-400 bg-red-500/10 p-2 rounded">{error}</p>
+      )}
+      {fieldInput('One-liner', 'oneLiner')}
+      {fieldTextarea('Elevator pitch', 'elevatorPitch')}
+      {fieldTextarea('Value propositions', 'valueProps', 'One per line')}
+      {fieldTextarea('Pain points', 'painPoints', 'One per line')}
+      {fieldTextarea('Best for departments', 'bestForDepartments', 'One per line')}
+      {fieldTextarea('Best for industries', 'bestForIndustries', 'One per line')}
+      {fieldTextarea('Technical requirements', 'technicalRequirements', 'One per line')}
+      {fieldTextarea('Competitive positioning', 'competitivePositioning', 'One per line')}
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-muted-foreground">Objection handlers</span>
+          <button
+            type="button"
+            onClick={() => setObjections((prev) => [...prev, { objection: '', response: '' }])}
+            className="text-[10px] text-blue-400 hover:text-blue-300"
+          >
+            + Add objection
+          </button>
+        </div>
+        <div className="space-y-2">
+          {objections.map((oh, i) => (
+            <div key={i} className="rounded-lg border border-border/40 bg-background/60 p-2.5 space-y-1.5">
+              <div className="flex items-start gap-2">
+                <input
+                  className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                  value={oh.objection}
+                  onChange={(e) => {
+                    const next = [...objections];
+                    next[i] = { ...next[i], objection: e.target.value };
+                    setObjections(next);
+                  }}
+                  placeholder="Objection"
+                />
+                <button
+                  type="button"
+                  onClick={() => setObjections((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-[10px] text-red-400 hover:text-red-300 shrink-0 pt-1"
+                >
+                  Remove
+                </button>
+              </div>
+              <textarea
+                className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs min-h-[40px]"
+                value={oh.response}
+                onChange={(e) => {
+                  const next = [...objections];
+                  next[i] = { ...next[i], response: e.target.value };
+                  setObjections(next);
+                }}
+                placeholder="Response"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {fieldInput('Price range', 'priceRangeText')}
+        {fieldInput('Deal size sweet spot', 'dealSizeSweetSpot')}
+        {fieldInput('Sales cycle', 'salesCycle')}
+        {fieldInput('Deployment', 'deployment')}
+      </div>
+
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-md bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save Profile'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-border px-4 py-2 text-xs font-medium text-foreground hover:bg-accent"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

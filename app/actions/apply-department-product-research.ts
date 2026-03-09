@@ -91,10 +91,8 @@ INSTRUCTIONS:
   const departmentIdsByType: Record<string, string> = {};
 
   for (const dept of object.departments) {
-    const existing = await prisma.companyDepartment.findUnique({
-      where: {
-        companyId_type: { companyId, type: dept.type },
-      },
+    const existing = await prisma.companyDepartment.findFirst({
+      where: { companyId, type: dept.type },
     });
 
     if (existing) {

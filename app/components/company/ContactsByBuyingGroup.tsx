@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { WarmIndicator } from './WarmIndicator';
-import { FileText } from 'lucide-react';
+import { FileText, Trash2 } from 'lucide-react';
 import { FindContactsModal } from './FindContactsModal';
 import {
   Select,
@@ -110,6 +110,7 @@ export function ContactsByBuyingGroup({
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [selectedDeptByContact, setSelectedDeptByContact] = useState<Record<string, string>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchGroups = useCallback(async () => {
     try {
@@ -187,6 +188,20 @@ export function ContactsByBuyingGroup({
       console.error(e);
     } finally {
       setAssigningId(null);
+    }
+  }
+
+  async function deleteContact(contactId: string) {
+    if (!confirm('Remove this contact? This cannot be undone.')) return;
+    setDeletingId(contactId);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      await fetchGroups();
+    } catch (e) {
+      console.error('Delete failed:', e);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -352,6 +367,7 @@ export function ContactsByBuyingGroup({
                             }
                           : undefined
                       }
+                      onDelete={deletingId ? undefined : deleteContact}
                     />
                     {!group.department.id && (
                       <AssignToGroupRow
@@ -469,7 +485,7 @@ function AssignToGroupRow({
   );
 }
 
-function ContactRow({ contact, onPrepMe }: { contact: Contact; onPrepMe?: () => void }) {
+function ContactRow({ contact, onPrepMe, onDelete }: { contact: Contact; onPrepMe?: () => void; onDelete?: (contactId: string) => void }) {
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
 
   return (
@@ -538,18 +554,32 @@ function ContactRow({ contact, onPrepMe }: { contact: Contact; onPrepMe?: () => 
           </div>
         </div>
       </div>
-      {onPrepMe && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="shrink-0 h-8 px-2 text-muted-foreground hover:text-foreground"
-          onClick={onPrepMe}
-          title="Prep Me — talking points for this contact"
-        >
-          <FileText className="h-4 w-4" />
-          <span className="sr-only">Prep</span>
-        </Button>
-      )}
+      <div className="flex items-center gap-1 shrink-0">
+        {onPrepMe && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2 text-muted-foreground hover:text-foreground"
+            onClick={onPrepMe}
+            title="Prep Me — talking points for this contact"
+          >
+            <FileText className="h-4 w-4" />
+            <span className="sr-only">Prep</span>
+          </Button>
+        )}
+        {onDelete && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2 text-muted-foreground hover:text-red-500"
+            onClick={() => onDelete(contact.id)}
+            title="Delete contact"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Delete</span>
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

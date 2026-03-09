@@ -57,12 +57,10 @@ async function seedTestAccounts() {
   }
   
   // Department 1: Autonomous Vehicles (EXISTING CUSTOMER)
-  let gmAvDept = await prisma.companyDepartment.findUnique({
+  let gmAvDept = await prisma.companyDepartment.findFirst({
     where: {
-      companyId_type: {
-        companyId: gm.id,
-        type: DepartmentType.AUTONOMOUS_VEHICLES,
-      },
+      companyId: gm.id,
+      type: DepartmentType.OPERATIONS,
     },
   })
   
@@ -70,7 +68,7 @@ async function seedTestAccounts() {
     gmAvDept = await prisma.companyDepartment.create({
       data: {
         companyId: gm.id,
-        type: DepartmentType.AUTONOMOUS_VEHICLES,
+        type: DepartmentType.OPERATIONS,
         customName: 'Cruise (GM\'s AV Division)',
         status: DepartmentStatus.ACTIVE_CUSTOMER,
         estimatedSize: 500,
@@ -132,12 +130,10 @@ async function seedTestAccounts() {
   })
   
   // Department 2: Manufacturing Operations (EXPANSION TARGET)
-  let gmMfgDept = await prisma.companyDepartment.findUnique({
+  let gmMfgDept = await prisma.companyDepartment.findFirst({
     where: {
-      companyId_type: {
-        companyId: gm.id,
-        type: DepartmentType.MANUFACTURING_OPERATIONS,
-      },
+      companyId: gm.id,
+      type: DepartmentType.OPERATIONS,
     },
   })
   
@@ -145,7 +141,7 @@ async function seedTestAccounts() {
     gmMfgDept = await prisma.companyDepartment.create({
       data: {
         companyId: gm.id,
-        type: DepartmentType.MANUFACTURING_OPERATIONS,
+        type: DepartmentType.OPERATIONS,
         status: DepartmentStatus.EXPANSION_TARGET,
         estimatedSize: 5000,
         notes: 'Ultium 2.0 battery launch announced. Job posting for "Manufacturing Automation Engineer" posted 2 weeks ago. Q4 earnings: CFO mentioned "investing in quality control automation".',
@@ -204,12 +200,10 @@ async function seedTestAccounts() {
   })
   
   // Department 3: Industrial Design (RESEARCH PHASE)
-  let gmDesignDept = await prisma.companyDepartment.findUnique({
+  let gmDesignDept = await prisma.companyDepartment.findFirst({
     where: {
-      companyId_type: {
-        companyId: gm.id,
-        type: DepartmentType.INDUSTRIAL_DESIGN,
-      },
+      companyId: gm.id,
+      type: DepartmentType.INDUSTRIAL_DESIGN,
     },
   })
   
@@ -354,12 +348,10 @@ async function seedTestAccounts() {
   }
   
   // Department 1: Autonomous Vehicles (ACTIVE CUSTOMER)
-  let rivianAvDept = await prisma.companyDepartment.findUnique({
+  let rivianAvDept = await prisma.companyDepartment.findFirst({
     where: {
-      companyId_type: {
-        companyId: rivian.id,
-        type: DepartmentType.AUTONOMOUS_VEHICLES,
-      },
+      companyId: rivian.id,
+      type: DepartmentType.OPERATIONS,
     },
   })
   
@@ -367,7 +359,7 @@ async function seedTestAccounts() {
     rivianAvDept = await prisma.companyDepartment.create({
       data: {
         companyId: rivian.id,
-        type: DepartmentType.AUTONOMOUS_VEHICLES,
+        type: DepartmentType.OPERATIONS,
         status: DepartmentStatus.ACTIVE_CUSTOMER,
         estimatedSize: 150,
         notes: 'Good relationship. Champion recently left (went to Lucid Motors). Need to establish continuity with replacement.',
@@ -423,12 +415,10 @@ async function seedTestAccounts() {
   })
   
   // Department 2: Manufacturing (EXPANSION TARGET)
-  let rivianMfgDept = await prisma.companyDepartment.findUnique({
+  let rivianMfgDept = await prisma.companyDepartment.findFirst({
     where: {
-      companyId_type: {
-        companyId: rivian.id,
-        type: DepartmentType.MANUFACTURING_OPERATIONS,
-      },
+      companyId: rivian.id,
+      type: DepartmentType.OPERATIONS,
     },
   })
   
@@ -436,7 +426,7 @@ async function seedTestAccounts() {
     rivianMfgDept = await prisma.companyDepartment.create({
       data: {
         companyId: rivian.id,
-        type: DepartmentType.MANUFACTURING_OPERATIONS,
+        type: DepartmentType.OPERATIONS,
         status: DepartmentStatus.EXPANSION_TARGET,
         estimatedSize: 800,
         notes: '$1.5B funding round announced Feb 3. CEO quote: "Accelerate R2 platform launch and expand Georgia facility to 150K vehicles annually." Scaling production = quality control needs.',

@@ -40,8 +40,8 @@ export async function POST(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    // Get department context if provided
     let departmentContext = '';
+    let departmentLabel: string | null = null;
     if (departmentId) {
       const department = await prisma.companyDepartment.findFirst({
         where: { id: departmentId, companyId },
@@ -54,9 +54,9 @@ export async function POST(
         },
       });
       if (department) {
-        const deptName = department.customName || department.type.replace(/_/g, ' ');
+        departmentLabel = department.customName || department.type.replace(/_/g, ' ');
         departmentContext = `\n\nBUYING GROUP CONTEXT:
-- Name: ${deptName}
+- Name: ${departmentLabel}
 - Value Proposition: ${department.valueProp || 'Not specified'}
 - Use Case: ${department.useCase || 'Not specified'}
 - Target Roles: ${JSON.stringify(department.targetRoles || {})}
@@ -78,7 +78,7 @@ export async function POST(
         relevantProductIds.length > 0 ? relevantProductIds : undefined
       ),
       getIndustryPlaybookBlock(session.user.id, company.industry ?? null),
-      getCaseStudiesBlock(session.user.id, company.industry ?? null, null, relevantProductIds),
+      getCaseStudiesBlock(session.user.id, company.industry ?? null, departmentLabel, relevantProductIds),
     ]);
 
     const researchSection = researchBlock ? `\n\n${researchBlock}` : '';

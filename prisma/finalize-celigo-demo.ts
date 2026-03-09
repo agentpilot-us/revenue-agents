@@ -17,7 +17,7 @@ import { prisma } from '@/lib/db';
 // The 4 groups that must exist — customName and DepartmentType
 const REQUIRED_GROUPS: { name: string; type: DepartmentType }[] = [
   { name: 'RevOps', type: DepartmentType.REVENUE_OPERATIONS },
-  { name: 'IT', type: DepartmentType.IT_DATA_CENTER },
+  { name: 'IT', type: DepartmentType.IT_INFRASTRUCTURE },
   { name: 'PeopleOps', type: DepartmentType.HR },
   { name: 'Finance', type: DepartmentType.FINANCE },
 ];

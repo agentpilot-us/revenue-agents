@@ -10,12 +10,12 @@ const RegenerateSchema = z.object({
   contentId: z.string(),
   companyId: z.string(),
   divisionId: z.string().optional(),
-  channel: z.enum(['email', 'linkedin_inmail', 'linkedin_post', 'slack', 'sms', 'sales_page', 'presentation']),
-  persona: z.enum(['csuite', 'vp', 'director', 'all']).optional(),
+  channel: z.enum(['email', 'linkedin_inmail', 'linkedin_post', 'slack', 'sms', 'sales_page', 'presentation', 'ad_brief', 'demo_script', 'video']),
   contactIds: z.array(z.string()).optional(),
   triggerId: z.string().optional(),
   activeActionIndex: z.number().int().min(0).optional(),
   feedback: z.string().optional(),
+  userContext: z.string().max(1000).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -32,10 +32,10 @@ export async function POST(req: NextRequest) {
         companyId: input.companyId,
         divisionId: input.divisionId,
         channel: input.channel,
-        persona: input.persona,
         contactIds: input.contactIds,
         triggerId: input.triggerId,
         activeActionIndex: input.activeActionIndex,
+        userContext: input.userContext,
       }),
     });
 

@@ -34,8 +34,8 @@ async function main() {
     process.exit(1);
   }
 
-  const existing = await prisma.companyDepartment.findUnique({
-    where: { companyId_type: { companyId: company.id, type: REVOPS.type } },
+  const existing = await prisma.companyDepartment.findFirst({
+    where: { companyId: company.id, type: REVOPS.type },
   });
 
   if (existing) {

@@ -122,15 +122,15 @@ async function main() {
   type DivisionSeed = { label: string; type: DepartmentType; stage: string; notes: string };
   const divisions: DivisionSeed[] = [
     { label: 'Vehicle Engineering & Simulation', type: DepartmentType.ENGINEERING, stage: 'Expansion Target', notes: 'Ultium EV platform and digital twin initiatives.' },
-    { label: 'Autonomous Driving & ADAS (includes Cruise)', type: DepartmentType.AUTONOMOUS_VEHICLES, stage: 'Active Program', notes: 'Cruise L4 plus GM AV/ADAS teams.' },
-    { label: 'Manufacturing & Supply Chain', type: DepartmentType.MANUFACTURING_OPERATIONS, stage: 'Expansion Target', notes: 'Digital factories and Ultium plants.' },
-    { label: 'IT Infrastructure & AI Platform', type: DepartmentType.IT_DATA_CENTER, stage: 'Strategic Platform', notes: 'DGX/HGX and AI platform.' },
+    { label: 'Autonomous Driving & ADAS (includes Cruise)', type: DepartmentType.OPERATIONS, stage: 'Active Program', notes: 'Cruise L4 plus GM AV/ADAS teams.' },
+    { label: 'Manufacturing & Supply Chain', type: DepartmentType.OPERATIONS, stage: 'Expansion Target', notes: 'Digital factories and Ultium plants.' },
+    { label: 'IT Infrastructure & AI Platform', type: DepartmentType.IT_INFRASTRUCTURE, stage: 'Strategic Platform', notes: 'DGX/HGX and AI platform.' },
     { label: 'Software-Defined Vehicle & Connected Services', type: DepartmentType.CONNECTED_SERVICES, stage: 'Emerging', notes: 'Ultifi and connected services.' },
   ];
 
   for (const div of divisions) {
-    let dept = await prisma.companyDepartment.findUnique({
-      where: { companyId_type: { companyId: company.id, type: div.type } },
+    let dept = await prisma.companyDepartment.findFirst({
+      where: { companyId: company.id, type: div.type },
     });
     if (!dept) {
       dept = await prisma.companyDepartment.create({

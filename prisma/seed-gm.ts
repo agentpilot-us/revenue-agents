@@ -13,10 +13,10 @@ const GM_BUYING_GROUPS: Array<{
   status: DepartmentStatus;
   estimatedSize: number;
 }> = [
-  { type: DepartmentType.MANUFACTURING_OPERATIONS, customName: 'Manufacturing', status: DepartmentStatus.EXPANSION_TARGET, estimatedSize: 12000 },
+  { type: DepartmentType.OPERATIONS, customName: 'Manufacturing', status: DepartmentStatus.EXPANSION_TARGET, estimatedSize: 12000 },
   { type: DepartmentType.INDUSTRIAL_DESIGN, customName: 'Design', status: DepartmentStatus.RESEARCH_PHASE, estimatedSize: 2000 },
-  { type: DepartmentType.AUTONOMOUS_VEHICLES, customName: 'Autonomous Vehicles', status: DepartmentStatus.ACTIVE_CUSTOMER, estimatedSize: 3500 },
-  { type: DepartmentType.IT_DATA_CENTER, customName: 'IT / Data Center', status: DepartmentStatus.NOT_ENGAGED, estimatedSize: 1500 },
+  { type: DepartmentType.OPERATIONS, customName: 'Autonomous Vehicles', status: DepartmentStatus.ACTIVE_CUSTOMER, estimatedSize: 3500 },
+  { type: DepartmentType.IT_INFRASTRUCTURE, customName: 'IT / Data Center', status: DepartmentStatus.NOT_ENGAGED, estimatedSize: 1500 },
   { type: DepartmentType.SUPPLY_CHAIN, customName: 'Supply Chain', status: DepartmentStatus.NOT_ENGAGED, estimatedSize: 8000 },
 ];
 
@@ -47,23 +47,25 @@ async function main() {
   }
 
   for (const g of GM_BUYING_GROUPS) {
-    await prisma.companyDepartment.upsert({
-      where: {
-        companyId_type: { companyId: company.id, type: g.type },
-      },
-      create: {
-        companyId: company.id,
-        type: g.type,
-        customName: g.customName,
-        status: g.status,
-        estimatedSize: g.estimatedSize,
-      },
-      update: {
-        customName: g.customName,
-        status: g.status,
-        estimatedSize: g.estimatedSize,
-      },
+    const existing = await prisma.companyDepartment.findFirst({
+      where: { companyId: company.id, type: g.type },
     });
+    if (existing) {
+      await prisma.companyDepartment.update({
+        where: { id: existing.id },
+        data: { customName: g.customName, status: g.status, estimatedSize: g.estimatedSize },
+      });
+    } else {
+      await prisma.companyDepartment.create({
+        data: {
+          companyId: company.id,
+          type: g.type,
+          customName: g.customName,
+          status: g.status,
+          estimatedSize: g.estimatedSize,
+        },
+      });
+    }
   }
   console.log('Upserted 5 buying groups (departments) for GM.');
 
@@ -111,9 +113,9 @@ async function main() {
           companyId: company!.id,
           companyDepartmentId: dept.id,
           productId: product.id,
-          status: dept.type === DepartmentType.AUTONOMOUS_VEHICLES ? 'ACTIVE' : 'OPPORTUNITY',
-          arr: dept.type === DepartmentType.AUTONOMOUS_VEHICLES ? 450000 : null,
-          opportunitySize: dept.type === DepartmentType.MANUFACTURING_OPERATIONS ? 300000 : dept.type === DepartmentType.INDUSTRIAL_DESIGN ? 400000 : 200000,
+          status: dept.type === DepartmentType.OPERATIONS ? 'ACTIVE' : 'OPPORTUNITY',
+          arr: dept.type === DepartmentType.OPERATIONS ? 450000 : null,
+          opportunitySize: dept.type === DepartmentType.OPERATIONS ? 300000 : dept.type === DepartmentType.INDUSTRIAL_DESIGN ? 400000 : 200000,
           fitScore: 85,
         },
         update: {},
@@ -122,7 +124,7 @@ async function main() {
   }
   console.log('Linked products to departments (matrix data).');
 
-  const manufacturingDept = departments.find((d) => d.type === DepartmentType.MANUFACTURING_OPERATIONS);
+  const manufacturingDept = departments.find((d) => d.type === DepartmentType.OPERATIONS);
   if (manufacturingDept) {
     const existingContact = await prisma.contact.findFirst({
       where: { companyId: company!.id, email: 'michael.torres@gm.com' },

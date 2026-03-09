@@ -1,23 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { DepartmentType } from '@prisma/client';
 
-/** Map job title keywords to department types for suggesting buying group assignment. */
-function suggestDepartmentTypeFromTitle(title: string | null): DepartmentType | null {
-  if (!title || !title.trim()) return null;
-  const t = title.toLowerCase();
-  if (/\b(ceo|chief executive|coo|chief operating|cfo|chief financial)\b/.test(t)) return DepartmentType.EXECUTIVE_LEADERSHIP;
-  if (/\b(cto|vp engineering|vice president engineering|technical director|head of engineering)\b/.test(t)) return DepartmentType.ENGINEERING;
-  if (/\b(revops|revenue operations|head of rev ops)\b/.test(t)) return DepartmentType.REVENUE_OPERATIONS;
-  if (/\b(head of strategic accounts|strategic accounts|sales operations|sales ops)\b/.test(t)) return DepartmentType.SALES;
-  if (/\b(customer success|cs manager|head of customer success)\b/.test(t)) return DepartmentType.CUSTOMER_SUCCESS;
-  if (/\b(marketing|cmo|head of marketing)\b/.test(t)) return DepartmentType.MARKETING;
-  if (/\b(product manager|head of product|vp product)\b/.test(t)) return DepartmentType.PRODUCT;
-  if (/\b(engineer|developer|technical)\b/.test(t)) return DepartmentType.ENGINEERING;
-  if (/\b(sales|account executive|ae)\b/.test(t)) return DepartmentType.SALES;
-  if (/\b(finance|fp&a)\b/.test(t)) return DepartmentType.FINANCE;
-  return null;
+type DeptRow = {
+  id: string;
+  type: string;
+  customName: string | null;
+  searchKeywords: unknown;
+};
+
+/**
+ * Score how well a contact title matches a department using customName,
+ * searchKeywords, and the enum type as a loose fallback. Higher = better match.
+ */
+function scoreDeptMatch(title: string, dept: DeptRow): number {
+  const lower = title.toLowerCase();
+  let score = 0;
+
+  if (dept.customName) {
+    const cn = dept.customName.toLowerCase();
+    const words = cn.split(/\s+/);
+    for (const w of words) {
+      if (w.length >= 3 && lower.includes(w)) score += 3;
+    }
+  }
+
+  const keywords = Array.isArray(dept.searchKeywords) ? dept.searchKeywords as string[] : [];
+  for (const kw of keywords) {
+    if (lower.includes(kw.toLowerCase())) score += 2;
+  }
+
+  const typeLabel = dept.type.toLowerCase().replace(/_/g, ' ');
+  const typeWords = typeLabel.split(/\s+/);
+  for (const w of typeWords) {
+    if (w.length >= 3 && lower.includes(w)) score += 1;
+  }
+
+  return score;
+}
+
+function suggestDepartment(title: string | null, departments: DeptRow[]): DeptRow | null {
+  if (!title?.trim() || departments.length === 0) return departments[0] ?? null;
+
+  let best: DeptRow | null = null;
+  let bestScore = 0;
+
+  for (const dept of departments) {
+    const s = scoreDeptMatch(title, dept);
+    if (s > bestScore) {
+      best = dept;
+      bestScore = s;
+    }
+  }
+
+  return best ?? departments[0];
 }
 
 export async function POST(
@@ -47,7 +83,7 @@ export async function POST(
 
     const departments = await prisma.companyDepartment.findMany({
       where: { companyId },
-      select: { id: true, type: true, customName: true },
+      select: { id: true, type: true, customName: true, searchKeywords: true },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -60,10 +96,7 @@ export async function POST(
     }> = [];
 
     for (const c of unassigned) {
-      const suggestedType = suggestDepartmentTypeFromTitle(c.title);
-      const dept = suggestedType
-        ? departments.find((d) => d.type === suggestedType) ?? departments[0]
-        : departments[0];
+      const dept = suggestDepartment(c.title, departments);
       if (!dept) continue;
       const name = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || 'Unknown';
       suggestions.push({

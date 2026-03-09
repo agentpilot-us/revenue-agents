@@ -41,6 +41,10 @@ export async function POST(
     const groups = Array.isArray(body.groups) ? body.groups : [];
     const userGoal =
       typeof body.userGoal === 'string' ? body.userGoal.trim() || undefined : undefined;
+    const cachedSummary =
+      typeof body.perplexitySummary === 'string' && body.perplexitySummary.trim()
+        ? body.perplexitySummary.trim()
+        : null;
 
     if (groups.length === 0) {
       return NextResponse.json(
@@ -49,25 +53,29 @@ export async function POST(
       );
     }
 
-    const perplexityResult = await runPerplexityResearchOnly(
-      company.name,
-      company.domain ?? undefined,
-      session.user.id,
-      userGoal
-    );
-    if (!perplexityResult.ok) {
-      const msg = perplexityResult.error;
-      const isSetup =
-        msg.includes('company setup') ||
-        msg.includes('Content Library') ||
-        msg.includes('No products found');
-      return NextResponse.json(
-        { error: msg },
-        { status: isSetup ? 400 : 500 }
+    let summary: string;
+    if (cachedSummary) {
+      summary = cachedSummary;
+    } else {
+      const perplexityResult = await runPerplexityResearchOnly(
+        company.name,
+        company.domain ?? undefined,
+        session.user.id,
+        userGoal
       );
+      if (!perplexityResult.ok) {
+        const msg = perplexityResult.error;
+        const isSetup =
+          msg.includes('company setup') ||
+          msg.includes('Content Library') ||
+          msg.includes('No products found');
+        return NextResponse.json(
+          { error: msg },
+          { status: isSetup ? 400 : 500 }
+        );
+      }
+      summary = perplexityResult.summary;
     }
-
-    const summary = perplexityResult.summary;
 
     const settled = await Promise.allSettled(
       groups.map((seed: BuyingGroupSeed) =>

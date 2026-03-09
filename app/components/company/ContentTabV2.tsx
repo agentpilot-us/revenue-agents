@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildContentUrl } from '@/lib/urls/content';
+import ContactSelector from '@/app/components/workflow/ContactSelector';
 
 type DepartmentOption = {
   id: string;
@@ -23,91 +24,18 @@ type Props = {
   initialContactId?: string;
 };
 
-type TriggerData = {
-  id: string;
-  type: string;
-  category: string;
-  title: string;
-  description: string;
-  priority: string;
-  timingWindow: string;
-  suggestedActions: string[];
-};
-
-const MOCK_TRIGGER: TriggerData = {
-  id: 'trg_001',
-  type: 'SIGNAL',
-  category: 'new_vp_hire',
-  title: 'New VP of Engineering hired at General Motors',
-  description:
-    'David Chen joined GM as VP of Vehicle Software Engineering. Previously VP Platform at Rivian. Background in autonomous systems and ADAS.',
-  priority: 'HIGH',
-  timingWindow: 'Week 1\u20136',
-  suggestedActions: [
-    'Send personalized video message congratulating them',
-    'Share relevant industry benchmark report they can use immediately',
-    'Offer Tactical Onboarding session or Quick-Wins Assessment',
-    "Reference their department's likely priorities based on role",
-    'Position as fast path to early departmental success',
-  ],
-};
-
 const CHANNELS = [
-  { id: 'email', label: 'Email', icon: '✉', desc: 'Subject + 3–5 paragraph body' },
-  { id: 'linkedin_inmail', label: 'LinkedIn InMail', icon: 'in', desc: '300 char hook + 1–2 paragraphs' },
-  { id: 'linkedin_post', label: 'LinkedIn Post', icon: '📝', desc: '1–3 paragraphs, conversational' },
-  { id: 'slack', label: 'Slack DM', icon: '💬', desc: '2–4 sentences, casual' },
-  { id: 'sms', label: 'Text / SMS', icon: '📱', desc: '160 chars or 2–3 sentences' },
-  { id: 'sales_page', label: 'Sales Page', icon: '🌐', desc: 'Outline hero + key value props' },
-  { id: 'presentation', label: 'Presentation', icon: '📊', desc: '3–5 slide outline with speaker notes for a sales meeting' },
+  { id: 'email', label: 'Email', icon: '\u2709', desc: 'Subject + 3\u20135 paragraph body' },
+  { id: 'linkedin_inmail', label: 'LinkedIn InMail', icon: 'in', desc: '200 char subject + 2\u20133 paragraphs' },
+  { id: 'linkedin_post', label: 'LinkedIn Post', icon: '\ud83d\udcdd', desc: '1\u20133 paragraphs, conversational' },
+  { id: 'slack', label: 'Slack DM', icon: '\ud83d\udcac', desc: '2\u20134 sentences, casual' },
+  { id: 'sms', label: 'Text / SMS', icon: '\ud83d\udcf1', desc: '160 chars or 2\u20133 sentences' },
+  { id: 'sales_page', label: 'Sales Page', icon: '\ud83c\udf10', desc: 'Outline hero + key value props' },
+  { id: 'presentation', label: 'Presentation', icon: '\ud83d\udcca', desc: '3\u20135 slide outline with speaker notes' },
+  { id: 'ad_brief', label: 'Ad Brief', icon: '\ud83d\udcf0', desc: 'Structured ad brief with headline options' },
+  { id: 'demo_script', label: 'Demo Script', icon: '\ud83c\udfac', desc: '5-section scripted demo with talk tracks' },
+  { id: 'video', label: 'Video Script', icon: '\ud83c\udfa5', desc: 'Structured video script with timing cues' },
 ] as const;
-
-const SENIORITY_LEVELS = [
-  { id: 'C-Suite', label: 'C-Suite' },
-  { id: 'VP', label: 'VP & above' },
-  { id: 'Director', label: 'Director & above' },
-  { id: 'All', label: 'All contacts' },
-] as const;
-
-const MOCK_EMAIL = {
-  subject: 'Congratulations on Your New Role — NVIDIA DRIVE for Vehicle Software Teams',
-  body: `David,
-
-Congratulations on joining General Motors as VP of Vehicle Software Engineering. Your background leading Rivian's platform team makes this an exciting move — GM's SDV ambitions are clearly accelerating.
-
-Given your experience with autonomous systems, I wanted to share how NVIDIA DRIVE is helping vehicle software teams like yours accelerate simulation cycles by 40% while reducing physical testing costs. Teams at your scale typically see ROI within the first quarter.
-
-I've put together a brief technical overview specific to GM's Vehicle Engineering division — would a 20-minute walkthrough be useful as you're getting oriented in the first few weeks?
-
-Best,
-[Your name]`,
-} as const;
-
-const MOCK_INMAIL = {
-  hook: 'Congrats on the GM role, David — your Rivian platform experience is a perfect fit for their SDV push.',
-  body: `I lead partnerships at NVIDIA for automotive software teams. Given your background in autonomous systems, thought you'd find our DRIVE platform overview relevant — it's helped similar teams cut simulation cycles by 40%.
-
-Happy to share a quick technical brief if useful as you're ramping up.`,
-} as const;
-
-const t = {
-  bg: '#0b1120',
-  surface: 'rgba(15,23,42,0.6)',
-  surfaceSolid: '#0f172a',
-  elevated: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.9))',
-  border: 'rgba(255,255,255,0.06)',
-  borderMed: 'rgba(255,255,255,0.10)',
-  text1: '#e2e8f0',
-  text2: '#94a3b8',
-  text3: '#64748b',
-  text4: '#475569',
-  blue: '#3b82f6',
-  blueLight: '#60a5fa',
-  blueBg: 'rgba(59,130,246,0.08)',
-  blueBorder: 'rgba(59,130,246,0.25)',
-  green: '#22c55e',
-  amber: '#f59e0b',
-};
 
 type SlideItem = { slideNumber: number; title: string; bullets: string[]; speakerNotes: string };
 
@@ -116,13 +44,11 @@ function PresentationSlidesOutput({
   onCopyAll,
   onDownloadPptx,
   isDownloading,
-  t: tokens,
 }: {
   slides: SlideItem[];
   onCopyAll: () => void;
   onDownloadPptx: () => void;
   isDownloading: boolean;
-  t: typeof t;
 }) {
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({});
   const copySlide = (slide: SlideItem) => {
@@ -130,94 +56,53 @@ function PresentationSlidesOutput({
     void navigator.clipboard.writeText(text);
   };
   return (
-    <div style={{ padding: '16px 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+    <div className="p-4">
+      <div className="flex justify-end gap-2 mb-3">
         <button
           type="button"
           onClick={onDownloadPptx}
           disabled={isDownloading}
-          style={{
-            padding: '6px 14px',
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 600,
-            background: isDownloading ? 'transparent' : tokens.blueBg,
-            border: `1px solid ${tokens.blueBorder}`,
-            color: isDownloading ? tokens.text3 : tokens.blueLight,
-            cursor: isDownloading ? 'default' : 'pointer',
-            opacity: isDownloading ? 0.7 : 1,
-          }}
+          className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-blue-500/25 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-50 disabled:cursor-default"
         >
-          {isDownloading ? 'Generating…' : '⤓ Download as PowerPoint'}
+          {isDownloading ? 'Generating\u2026' : '\u2913 Download as PowerPoint'}
         </button>
         <button
           type="button"
           onClick={onCopyAll}
-          style={{
-            padding: '6px 14px',
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 600,
-            background: 'transparent',
-            border: `1px solid ${tokens.border}`,
-            color: tokens.text2,
-            cursor: 'pointer',
-          }}
+          className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-zinc-700 text-gray-400 hover:text-gray-300"
         >
           Copy All
         </button>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="flex flex-col gap-3">
         {slides.map((slide) => (
           <div
             key={slide.slideNumber}
-            style={{
-              background: 'rgba(0,0,0,0.2)',
-              border: `1px solid ${tokens.border}`,
-              borderRadius: 8,
-              overflow: 'hidden',
-            }}
+            className="bg-black/20 border border-zinc-700 rounded-lg overflow-hidden"
           >
-            <div
-              style={{
-                padding: '12px 16px',
-                borderBottom: `1px solid ${tokens.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 600, color: tokens.blue, flexShrink: 0 }}>
+            <div className="px-4 py-3 border-b border-zinc-700 flex items-center gap-3">
+              <span className="text-xs font-semibold text-blue-500 shrink-0">
                 Slide {slide.slideNumber}
               </span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: tokens.text1, flex: 1, minWidth: 0 }}>
+              <span className="text-sm font-semibold text-gray-100 flex-1 min-w-0">
                 {slide.title}
               </span>
               <button
                 type="button"
                 onClick={() => copySlide(slide)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  background: 'transparent',
-                  border: `1px solid ${tokens.border}`,
-                  color: tokens.text2,
-                  cursor: 'pointer',
-                }}
+                className="px-2.5 py-1 rounded-md text-xs font-semibold border border-zinc-700 text-gray-400 hover:text-gray-300"
               >
                 Copy Slide
               </button>
             </div>
-            <div style={{ padding: '12px 16px' }}>
-              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: tokens.text2, lineHeight: 1.6 }}>
+            <div className="px-4 py-3">
+              <ul className="list-disc pl-5 text-sm text-gray-400 leading-relaxed">
                 {slide.bullets.map((b, i) => (
                   <li key={i}>{b}</li>
                 ))}
               </ul>
               {slide.speakerNotes && (
-                <div style={{ marginTop: 12 }}>
+                <div className="mt-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -226,31 +111,12 @@ function PresentationSlidesOutput({
                         [slide.slideNumber]: !prev[slide.slideNumber],
                       }))
                     }
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: tokens.blue,
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 0,
-                    }}
+                    className="text-xs font-semibold text-blue-500 hover:text-blue-400"
                   >
-                    {expandedNotes[slide.slideNumber] ? '▼' : '▶'} Speaker notes
+                    {expandedNotes[slide.slideNumber] ? '\u25bc' : '\u25b6'} Speaker notes
                   </button>
                   {expandedNotes[slide.slideNumber] && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        padding: 10,
-                        borderRadius: 6,
-                        background: 'rgba(0,0,0,0.2)',
-                        fontSize: 12,
-                        color: tokens.text3,
-                        lineHeight: 1.5,
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
+                    <div className="mt-1.5 p-2.5 rounded-md bg-black/20 text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">
                       {slide.speakerNotes}
                     </div>
                   )}
@@ -267,272 +133,58 @@ function PresentationSlidesOutput({
 export function ContentTabV2({
   companyId,
   companyName,
-  departments,
-  hasMessaging, // reserved for future use
   initialDepartmentId,
-  signalId, // reserved for future Trigger wiring
+  signalId,
   initialType,
-  contentFilter,
-  autoCreate,
-  initialContactId,
 }: Props) {
   const router = useRouter();
-  const [trigger, setTrigger] = useState<TriggerData>(MOCK_TRIGGER);
 
-  useEffect(() => {
-    if (!signalId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/signals/${signalId}/preview-play`);
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.matched && data.template && data.signal) {
-          const pri = data.template.priority;
-          const priorityLabel = pri >= 8 ? 'HIGH' : pri >= 5 ? 'MEDIUM' : 'LOW';
-          setTrigger({
-            id: data.signal.id,
-            type: 'SIGNAL',
-            category: data.signal.type,
-            title: data.signal.title,
-            description: data.signal.summary ?? '',
-            priority: priorityLabel,
-            timingWindow: data.template.timingWindow ?? '',
-            suggestedActions: data.template.steps.map(
-              (s: { name: string }) => s.name,
-            ),
-          });
-        }
-      } catch {
-        // keep MOCK_TRIGGER as fallback
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [signalId]);
-
-  const initialDivisions = useMemo(
-    () =>
-      (departments.length > 0
-        ? departments
-        : [{ id: 'div_default', customName: 'Primary Buying Group', type: 'PRIMARY' }]
-      ).map((d) => ({
-        id: d.id,
-        name: d.customName || d.type.replace(/_/g, ' '),
-        contactCount: 0,
-      })),
-    [departments]
-  );
-
-  const [divisions, setDivisions] = useState(initialDivisions);
-  const [divisionsError, setDivisionsError] = useState<string | null>(null);
-  const [loadingDivisions, setLoadingDivisions] = useState(false);
-
-  useEffect(() => {
-    setDivisions(initialDivisions);
-  }, [initialDivisions]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoadingDivisions(true);
-        setDivisionsError(null);
-        const res = await fetch(`/api/companies/${companyId}/divisions`);
-        if (!res.ok) {
-          throw new Error('Failed to load divisions');
-        }
-        const data = await res.json();
-        const apiDivisions = (data?.divisions ?? []) as Array<{
-          id: string;
-          name: string;
-          contactCount?: number;
-        }>;
-        if (!cancelled && Array.isArray(apiDivisions) && apiDivisions.length > 0) {
-          setDivisions(
-            apiDivisions.map((d) => ({
-              id: d.id,
-              name: d.name,
-              contactCount: d.contactCount ?? 0,
-            }))
-          );
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setDivisionsError(
-            e instanceof Error ? e.message : 'Unable to load divisions right now.'
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingDivisions(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId]);
-
-  const initialDivision =
-    initialDepartmentId && divisions.some((d) => d.id === initialDepartmentId)
-      ? initialDepartmentId
-      : divisions[0]?.id ?? null;
-
-  const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(initialDivision);
-  const [seniorityFilter, setSeniorityFilter] = useState<'C-Suite' | 'VP' | 'Director' | 'All'>('VP');
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(initialDepartmentId ?? null);
   const [selectedChannel, setSelectedChannel] = useState<string>(initialType || 'email');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
-  const [activeAction, setActiveAction] = useState(0);
-  const [allContacts, setAllContacts] = useState<
-    Array<{
-      id: string;
-      name: string;
-      title: string | null;
-      email: string | null;
-      linkedin: boolean;
-      engagement: 'active' | 'warm' | 'cold' | 'new';
-      levelRank: number;
-      levelLabel: string;
-    }>
-  >([]);
-  const [contactsError, setContactsError] = useState<string | null>(null);
-  const [loadingContacts, setLoadingContacts] = useState(false);
   const [generated, setGenerated] = useState<{
     id?: string;
     subject?: string;
     hook?: string;
     body?: string;
-    slides?: Array<{ slideNumber: number; title: string; bullets: string[]; speakerNotes: string }>;
+    slides?: SlideItem[];
   } | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
-  const [findingContacts, setFindingContacts] = useState(false);
-  const [findError, setFindError] = useState<string | null>(null);
   const [downloadingPptx, setDownloadingPptx] = useState(false);
+  const [userContext, setUserContext] = useState('');
 
-  useEffect(() => {
-    if (!selectedDivisionId) {
-      setAllContacts([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoadingContacts(true);
-        setContactsError(null);
-        const res = await fetch(
-          `/api/companies/${companyId}/divisions/${selectedDivisionId}/contacts`
-        );
-        if (!res.ok) {
-          throw new Error('Failed to load contacts');
-        }
-        const data = await res.json();
-        const contacts = (data?.contacts ?? []) as Array<{
-          id: string;
-          name: string;
-          title: string | null;
-          email: string | null;
-          linkedin: boolean;
-          engagement: 'active' | 'warm' | 'cold' | 'new';
-          levelRank: number;
-          levelLabel: string;
-        }>;
-        if (!cancelled) {
-          setAllContacts(contacts);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setContactsError(
-            e instanceof Error ? e.message : 'Unable to load contacts right now.'
-          );
-          setAllContacts([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingContacts(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId, selectedDivisionId]);
-
-  const filteredContacts = useMemo(() => {
-    if (!allContacts.length) return [];
-    const maxRank =
-      seniorityFilter === 'C-Suite'
-        ? 0
-        : seniorityFilter === 'VP'
-          ? 1
-          : seniorityFilter === 'Director'
-            ? 2
-            : 4;
-    return allContacts.filter((c) => c.levelRank <= maxRank);
-  }, [allContacts, seniorityFilter]);
-
-  const selectedDiv = divisions.find((d) => d.id === selectedDivisionId);
-
-  // Keep URL in sync with Content tab state so deep-links remain shareable.
-  useEffect(() => {
-    const primaryContactId = selectedContacts[0];
-    const personaMap: Record<typeof seniorityFilter, 'csuite' | 'vp' | 'director' | 'all'> = {
-      'C-Suite': 'csuite',
-      VP: 'vp',
-      Director: 'director',
-      All: 'all',
-    };
-    const persona = personaMap[seniorityFilter];
-    const url = buildContentUrl({
-      companyId,
-      divisionId: selectedDivisionId ?? undefined,
-      channel: selectedChannel as 'email' | 'linkedin_inmail',
-      persona,
-      contactId: primaryContactId,
-      triggerId: signalId,
-    });
-    router.replace(url, { scroll: false });
-  }, [router, companyId, selectedDivisionId, selectedChannel, seniorityFilter, selectedContacts, signalId]);
-
-  const toggleContact = (id: string) => {
-    setSelectedContacts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-    setIsGenerated(false);
-  };
+  const handleSelectionChange = useCallback(
+    (contactIds: string[], divisionId: string | null) => {
+      setSelectedContacts(contactIds);
+      if (divisionId) setSelectedDivisionId(divisionId);
+      setIsGenerated(false);
+    },
+    [],
+  );
 
   const handleGenerate = async () => {
-    if (!selectedDivisionId) return;
-    if (selectedChannel !== 'presentation' && selectedContacts.length === 0) return;
+    const broadcastChannels = ['presentation', 'ad_brief', 'demo_script', 'video'];
+    if (!broadcastChannels.includes(selectedChannel) && selectedContacts.length === 0) return;
     setGenerateError(null);
     setIsGenerating(true);
     setIsGenerated(false);
     setGenerated(null);
     try {
-      const personaMap: Record<typeof seniorityFilter, 'csuite' | 'vp' | 'director' | 'all'> = {
-        'C-Suite': 'csuite',
-        VP: 'vp',
-        Director: 'director',
-        All: 'all',
-      };
       const res = await fetch('/api/content/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId,
-          divisionId: selectedDivisionId,
+          divisionId: selectedDivisionId ?? undefined,
           channel: selectedChannel,
-          persona: personaMap[seniorityFilter],
           contactIds: selectedContacts,
           triggerId: signalId,
-          activeActionIndex: activeAction,
+          userContext: userContext.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -549,10 +201,17 @@ export function ContentTabV2({
         slides: Array.isArray(data.slides) ? data.slides : undefined,
       });
       setIsGenerated(true);
+
+      const url = buildContentUrl({
+        companyId,
+        divisionId: selectedDivisionId ?? undefined,
+        channel: selectedChannel as 'email' | 'linkedin_inmail',
+        contactId: selectedContacts[0],
+        triggerId: signalId,
+      });
+      router.replace(url, { scroll: false });
     } catch (e) {
-      setGenerateError(
-        e instanceof Error ? e.message : 'Failed to generate content.'
-      );
+      setGenerateError(e instanceof Error ? e.message : 'Failed to generate content.');
     } finally {
       setIsGenerating(false);
     }
@@ -567,26 +226,17 @@ export function ContentTabV2({
     setIsGenerating(true);
     setIsGenerated(false);
     try {
-      const personaMap: Record<typeof seniorityFilter, 'csuite' | 'vp' | 'director' | 'all'> = {
-        'C-Suite': 'csuite',
-        VP: 'vp',
-        Director: 'director',
-        All: 'all',
-      };
       const res = await fetch('/api/content/regenerate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentId: generated.id,
           companyId,
           divisionId: selectedDivisionId ?? undefined,
           channel: selectedChannel,
-          persona: personaMap[seniorityFilter],
           contactIds: selectedContacts,
           triggerId: signalId,
-          activeActionIndex: activeAction,
+          userContext: userContext.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -604,9 +254,7 @@ export function ContentTabV2({
       });
       setIsGenerated(true);
     } catch (e) {
-      setGenerateError(
-        e instanceof Error ? e.message : 'Failed to regenerate content.'
-      );
+      setGenerateError(e instanceof Error ? e.message : 'Failed to regenerate content.');
     } finally {
       setIsGenerating(false);
     }
@@ -620,9 +268,7 @@ export function ContentTabV2({
     try {
       const res = await fetch('/api/content/send', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId,
           divisionId: selectedDivisionId,
@@ -640,48 +286,12 @@ export function ContentTabV2({
         return;
       }
       setSendSuccess(
-        selectedChannel === 'email'
-          ? 'Email ready to send (mock).'
-          : 'InMail ready to send (mock).'
+        selectedChannel === 'email' ? 'Email ready to send (mock).' : 'Content ready to send (mock).'
       );
     } catch (e) {
       setSendError(e instanceof Error ? e.message : 'Failed to send content.');
     } finally {
       setSending(false);
-    }
-  };
-
-  const handleFindContacts = async () => {
-    if (!selectedDivisionId) return;
-    setFindError(null);
-    setFindingContacts(true);
-    try {
-      const res = await fetch(
-        `/api/companies/${companyId}/divisions/${selectedDivisionId}/contacts/find`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        }
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        setFindError(data?.error ?? 'Failed to start contact discovery.');
-        return;
-      }
-      // After find completes, refetch contacts for this division
-      const data = await res.json();
-      if (Array.isArray(data.results) && data.results.length > 0) {
-        // Trigger a refresh by forcing contacts effect to re-run
-        setSelectedContacts([]);
-        setIsGenerated(false);
-      }
-    } catch (e) {
-      setFindError(
-        e instanceof Error ? e.message : 'Failed to start contact discovery.'
-      );
-    } finally {
-      setFindingContacts(false);
     }
   };
 
@@ -693,7 +303,7 @@ export function ContentTabV2({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `${companyName} – Sales Presentation`,
+          title: `${companyName} \u2013 Sales Presentation`,
           companyName,
           slides: generated.slides.map((s) => ({
             title: s.title,
@@ -722,906 +332,201 @@ export function ContentTabV2({
     }
   };
 
-  const engagementColor = (e: string) =>
-    e === 'active' ? t.green : e === 'warm' ? t.amber : e === 'new' ? t.blue : t.text4;
-
-  const priorityColor = trigger.priority === 'HIGH' ? t.amber : t.text3;
+  const broadcastChannels = new Set(['presentation', 'ad_brief', 'demo_script', 'video']);
+  const needContacts = !broadcastChannels.has(selectedChannel);
+  const canGenerate = needContacts ? selectedContacts.length > 0 : true;
+  const generateDisabled = !canGenerate || isGenerating;
+  const channelLabel = CHANNELS.find((c) => c.id === selectedChannel)?.label ?? selectedChannel;
+  const generateLabel = isGenerating
+    ? 'Generating...'
+    : needContacts && selectedContacts.length === 0
+      ? 'Select contacts to generate'
+      : broadcastChannels.has(selectedChannel)
+        ? `Generate ${channelLabel}`
+        : `Generate ${channelLabel} for ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}`;
 
   return (
-    <div
-      style={{
-        background: t.bg,
-        borderRadius: 12,
-        padding: '16px 24px 24px',
-        color: t.text1,
-        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-      }}
-    >
-      {/* Trigger banner */}
-      <div
-        style={{
-          background: t.elevated,
-          borderRadius: 10,
-          border: `1px solid ${t.blueBorder}`,
-          padding: '16px 20px',
-          marginBottom: 20,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              background: t.blueBg,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 16,
-              flexShrink: 0,
-            }}
-          >
-            ⚡
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: t.blueLight,
-                }}
-              >
-                Signal
-              </span>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: priorityColor,
-                  background: `${priorityColor}15`,
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                }}
-              >
-                {trigger.priority}
-              </span>
-              <span style={{ fontSize: 11, color: t.text3 }}>
-                Window: {trigger.timingWindow}
-              </span>
-            </div>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 700,
-                color: t.text1,
-                lineHeight: 1.3,
-              }}
-            >
-              {trigger.title}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: t.text2,
-                marginTop: 4,
-                lineHeight: 1.5,
-              }}
-            >
-              {trigger.description}
-            </div>
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* Contact Selector — full-width, same UX as play execution */}
+      <ContactSelector
+        companyId={companyId}
+        selectedContactIds={selectedContacts}
+        selectedDivisionId={selectedDivisionId}
+        onSelectionChange={handleSelectionChange}
+      />
 
-        {/* Suggested actions stepper */}
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: t.text3,
-              marginBottom: 8,
-            }}
-          >
-            Suggested Actions
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {trigger.suggestedActions.map((action, i) => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => setActiveAction(i)}
-                style={{
-                  flex: 1,
-                  padding: '8px 10px',
-                  borderRadius: 6,
-                  fontSize: 11,
-                  lineHeight: 1.3,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  background: i === activeAction ? t.blueBg : 'transparent',
-                  border: `1px solid ${i === activeAction ? t.blueBorder : t.border}`,
-                  color: i === activeAction ? t.blueLight : t.text3,
-                  fontWeight: i === activeAction ? 600 : 400,
-                }}
-              >
-                <span
-                  style={{
-                    color: i === activeAction ? t.blue : t.text4,
-                    fontWeight: 700,
-                    marginRight: 4,
-                  }}
-                >
-                  {i + 1}.
-                </span>
-                {action}
-              </button>
-            ))}
-          </div>
+      {/* Channel strip + Generate */}
+      <div className="bg-white dark:bg-zinc-800 rounded-xl border border-gray-200 dark:border-zinc-700 p-5">
+        <div className="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-3">
+          Channel
         </div>
-      </div>
-
-      {/* 2-column layout */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '340px 1fr',
-          gap: 20,
-          alignItems: 'flex-start',
-        }}
-      >
-        {/* Left: selection panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Division */}
-          <div
-            style={{
-              background: t.surface,
-              borderRadius: 10,
-              border: `1px solid ${t.border}`,
-              padding: 16,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: t.text3,
-                marginBottom: 10,
-              }}
-            >
-              Division
-            </div>
-            <select
-              value={selectedDivisionId ?? ''}
-              onChange={(e) => {
-                setSelectedDivisionId(e.target.value || null);
-                setSelectedContacts([]);
+        <div className="flex flex-wrap gap-2 mb-4">
+          {CHANNELS.map((ch) => (
+            <button
+              key={ch.id}
+              type="button"
+              onClick={() => {
+                setSelectedChannel(ch.id);
                 setIsGenerated(false);
                 setGenerated(null);
               }}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                background: t.surfaceSolid,
-                border: `1px solid ${t.borderMed}`,
-                color: t.text1,
-                cursor: 'pointer',
-                appearance: 'none',
-              }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-left border transition-colors ${
+                selectedChannel === ch.id
+                  ? 'bg-blue-500/10 border-blue-500/25'
+                  : 'bg-transparent border-gray-200 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              }`}
             >
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                  {d.contactCount ? ` (${d.contactCount})` : ''}
-                </option>
-              ))}
-            </select>
-            {divisionsError && (
-              <p
-                style={{
-                  marginTop: 8,
-                  fontSize: 11,
-                  color: t.amber,
-                }}
-              >
-                {divisionsError}
-              </p>
-            )}
-          </div>
+              <span className="text-sm">{ch.icon}</span>
+              <span className={`text-xs font-semibold ${selectedChannel === ch.id ? 'text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                {ch.label}
+              </span>
+            </button>
+          ))}
+        </div>
 
-          {/* Buying group */}
-          <div
-            style={{
-              background: t.surface,
-              borderRadius: 10,
-              border: `1px solid ${t.border}`,
-              padding: 16,
-            }}
+        {/* User context / intent */}
+        <div className="mb-4">
+          <label
+            htmlFor="user-context"
+            className="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-1.5 block"
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 10,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: t.text3,
-                }}
-              >
-                Buying Group
-              </div>
-              <span style={{ fontSize: 11, color: t.text3 }}>
-                {selectedContacts.length} selected
+            What do you want to say? <span className="font-normal normal-case tracking-normal">(optional)</span>
+          </label>
+          <textarea
+            id="user-context"
+            value={userContext}
+            onChange={(e) => setUserContext(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            placeholder="e.g. Set up a meeting to discuss renewal, Congratulate on new role, Invite to our upcoming webinar..."
+            className="w-full rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900/60 text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={generateDisabled}
+          className={`w-full py-3 rounded-lg text-sm font-bold text-white tracking-wide transition-colors ${
+            generateDisabled
+              ? 'bg-gray-400 dark:bg-gray-600 cursor-default'
+              : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer'
+          } ${isGenerating ? 'opacity-70' : ''}`}
+        >
+          {generateLabel}
+        </button>
+        {(generateError || sendError || sendSuccess) && (
+          <div className={`mt-2 text-xs ${generateError || sendError ? 'text-amber-500' : 'text-gray-400'}`}>
+            {generateError || sendError || sendSuccess}
+          </div>
+        )}
+      </div>
+
+      {/* Content output */}
+      {!isGenerated && !isGenerating ? (
+        <div className="bg-gray-50 dark:bg-zinc-900/60 rounded-xl border border-gray-200 dark:border-zinc-700 py-16 px-10 text-center">
+          <div className="text-4xl mb-4 opacity-30">{'✉'}</div>
+          <div className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+            Select contacts and a channel, then generate content
+          </div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 max-w-sm mx-auto leading-relaxed">
+            The AI will use division data, buying group details, and your company value props to create personalized outreach.
+          </div>
+        </div>
+      ) : isGenerating ? (
+        <div className="bg-gray-50 dark:bg-zinc-900/60 rounded-xl border border-gray-200 dark:border-zinc-700 py-16 px-10 text-center">
+          <div className="text-sm text-blue-500 font-semibold">
+            {'⟳'} Generating personalized content...
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
+            Using division data + your company value props
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-zinc-900/80 rounded-xl border border-gray-200 dark:border-zinc-700 overflow-hidden">
+          {/* Header */}
+          <div className="px-5 py-3.5 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">
+                {CHANNELS.find((c) => c.id === selectedChannel)?.icon}
+              </span>
+              <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                {channelLabel}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                {selectedContacts.length} contact{selectedContacts.length !== 1 ? 's' : ''}
               </span>
             </div>
-
-            {/* Seniority filter */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-              {SENIORITY_LEVELS.map((s) => (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={isGenerating || !generated}
+                className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              >
+                {'↻'} Regenerate
+              </button>
+              {!broadcastChannels.has(selectedChannel) && (
                 <button
-                  key={s.id}
                   type="button"
-                  onClick={() => {
-                    setSeniorityFilter(s.id as typeof seniorityFilter);
-                    setSelectedContacts([]);
-                    setIsGenerated(false);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '6px 4px',
-                    borderRadius: 6,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    background:
-                      seniorityFilter === s.id ? t.blueBg : 'transparent',
-                    border: `1px solid ${
-                      seniorityFilter === s.id ? t.blueBorder : t.border
-                    }`,
-                    color:
-                      seniorityFilter === s.id ? t.blue : t.text4,
-                  }}
+                  onClick={handleSend}
+                  disabled={sending || !generated?.body || selectedContacts.length === 0}
+                  className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 >
-                  {s.label}
+                  {'✉'} Send
                 </button>
-              ))}
-            </div>
-
-            {/* Contact list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {loadingContacts ? (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: t.text4,
-                    textAlign: 'center',
-                    padding: 16,
-                  }}
-                >
-                  Loading contacts…
-                </div>
-              ) : filteredContacts.length === 0 ? (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: t.text4,
-                    textAlign: 'center',
-                    padding: 16,
-                  }}
-                >
-                  No contacts at this seniority level.
-                  <br />
-                  <button
-                    type="button"
-                    onClick={handleFindContacts}
-                    style={{
-                      color: t.blue,
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      marginTop: 4,
-                    }}
-                  >
-                    {findingContacts ? 'Finding contacts…' : 'Find contacts with Exa →'}
-                  </button>
-                  {findError && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        fontSize: 11,
-                        color: t.amber,
-                      }}
-                    >
-                      {findError}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                filteredContacts.map((c) => {
-                  const selected = selectedContacts.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => toggleContact(c.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        padding: '10px 12px',
-                        borderRadius: 8,
-                        background: selected ? t.blueBg : 'transparent',
-                        border: `1px solid ${
-                          selected ? t.blueBorder : t.border
-                        }`,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        width: '100%',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 4,
-                          flexShrink: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: selected ? t.blue : 'transparent',
-                          border: `2px solid ${
-                            selected ? t.blue : t.border
-                          }`,
-                          fontSize: 11,
-                          color: '#fff',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {selected ? '✓' : ''}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: selected ? t.text1 : t.text2,
-                            }}
-                          >
-                            {c.name}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              letterSpacing: '0.06em',
-                              padding: '1px 5px',
-                              borderRadius: 3,
-                              background: `${engagementColor(c.engagement)}15`,
-                              color: engagementColor(c.engagement),
-                            }}
-                          >
-                            {c.engagement}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: t.text3,
-                            marginTop: 1,
-                          }}
-                        >
-                          {c.title}
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-                          <span
-                            style={{
-                              fontSize: 10,
-                              color: t.text4,
-                            }}
-                          >
-                            ✉ {c.email}
-                          </span>
-                          {c.linkedin && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: t.blue,
-                              }}
-                            >
-                              in LinkedIn
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
               )}
             </div>
           </div>
 
-          {/* Channels */}
-          <div
-            style={{
-              background: t.surface,
-              borderRadius: 10,
-              border: `1px solid ${t.border}`,
-              padding: 16,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: t.text3,
-                marginBottom: 10,
-              }}
-            >
-              Channel
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 6,
-              }}
-            >
-              {CHANNELS.map((ch) => (
-                <button
-                  key={ch.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedChannel(ch.id);
-                    setIsGenerated(false);
-                    setGenerated(null);
-                  }}
-                  style={{
-                    padding: '10px 10px',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    background:
-                      selectedChannel === ch.id ? t.blueBg : 'transparent',
-                    border: `1px solid ${
-                      selectedChannel === ch.id ? t.blueBorder : t.border
-                    }`,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>{ch.icon}</span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color:
-                          selectedChannel === ch.id
-                            ? t.blueLight
-                            : t.text2,
-                      }}
-                    >
-                      {ch.label}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: t.text4,
-                      marginTop: 3,
-                      marginLeft: 22,
-                    }}
-                  >
-                    {ch.desc}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Generate */}
-          {(() => {
-            const needContacts = selectedChannel !== 'presentation';
-            const canGenerate = selectedDivisionId && (needContacts ? selectedContacts.length > 0 : true);
-            const disabled = !canGenerate || isGenerating;
-            const label = isGenerating
-              ? 'Generating...'
-              : !selectedDivisionId
-                ? 'Select a division'
-                : needContacts && selectedContacts.length === 0
-                  ? 'Select contacts to generate'
-                  : selectedChannel === 'presentation'
-                    ? `Generate ${CHANNELS.find((c) => c.id === selectedChannel)?.label}`
-                    : `Generate ${CHANNELS.find((c) => c.id === selectedChannel)?.label} for ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}`;
-            return (
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={disabled}
-                style={{
-                  width: '100%',
-                  padding: 14,
-                  borderRadius: 10,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: disabled ? 'default' : 'pointer',
-                  background: disabled ? t.text4 : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                  border: 'none',
-                  color: '#fff',
-                  letterSpacing: '0.02em',
-                  opacity: isGenerating ? 0.7 : 1,
-                }}
-              >
-                {label}
-              </button>
-            );
-          })()}
-          {(generateError || sendError || sendSuccess) && (
-            <div
-              style={{
-                marginTop: 8,
-                fontSize: 11,
-                color: generateError || sendError ? t.amber : t.text2,
-              }}
-            >
-              {generateError || sendError || sendSuccess}
+          {/* Subject / hook */}
+          {selectedChannel === 'email' && generated?.subject && (
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
+              <div className="text-[10px] font-semibold tracking-wide uppercase text-blue-500 mb-1">
+                Subject
+              </div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {generated.subject}
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Right: content output */}
-        <div>
-          {!isGenerated && !isGenerating ? (
-            <div
-              style={{
-                background: t.surface,
-                borderRadius: 10,
-                border: `1px solid ${t.border}`,
-                padding: '80px 40px',
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.3 }}>✉</div>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: t.text2,
-                  marginBottom: 6,
-                }}
-              >
-                Select a contact and channel to generate content
+          {selectedChannel === 'linkedin_inmail' && generated?.hook && (
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
+              <div className="text-[10px] font-semibold tracking-wide uppercase text-blue-500 mb-1">
+                Subject (200 char max)
               </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: t.text4,
-                  maxWidth: 400,
-                  margin: '0 auto',
-                  lineHeight: 1.6,
-                }}
-              >
-                The AI will use trigger context, division data, buying group
-                details, and your company value props to create personalized
-                outreach.
+              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {generated.hook}
               </div>
             </div>
-          ) : isGenerating ? (
-            <div
-              style={{
-                background: t.surface,
-                borderRadius: 10,
-                border: `1px solid ${t.border}`,
-                padding: '80px 40px',
-                textAlign: 'center',
+          )}
+
+          {/* Presentation slides */}
+          {selectedChannel === 'presentation' && generated?.slides && generated.slides.length > 0 && (
+            <PresentationSlidesOutput
+              slides={generated.slides}
+              onCopyAll={() => {
+                const text = generated.slides!
+                  .map((s) => `Slide ${s.slideNumber}: ${s.title}\n${s.bullets.map((b) => `- ${b}`).join('\n')}${s.speakerNotes ? `\nSpeaker notes: ${s.speakerNotes}` : ''}`)
+                  .join('\n\n');
+                void navigator.clipboard.writeText(text);
               }}
-            >
-              <div
-                style={{
-                  fontSize: 14,
-                  color: t.blue,
-                  fontWeight: 600,
-                }}
-              >
-                ⟳ Generating personalized content...
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: t.text3,
-                  marginTop: 8,
-                }}
-              >
-                Using signal context + {selectedDiv?.name ?? 'division'} data +
-                your company value props
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Recipient banner */}
-              <div
-                style={{
-                  background: t.surface,
-                  borderRadius: 10,
-                  border: `1px solid ${t.border}`,
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: t.text3,
-                  }}
-                >
-                  For:
-                </div>
-                {selectedContacts.map((cid) => {
-                  const c = filteredContacts.find((x) => x.id === cid);
-                  if (!c) return null;
-                  return (
-                    <div
-                      key={c.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '4px 10px',
-                        borderRadius: 6,
-                        background: t.blueBg,
-                        border: `1px solid ${t.blueBorder}`,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: t.text1,
-                        }}
-                      >
-                        {c.name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: t.text3,
-                        }}
-                      >
-                        {c.title}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              onDownloadPptx={handleDownloadPptx}
+              isDownloading={downloadingPptx}
+            />
+          )}
 
-              {/* Content card */}
-              <div
-                style={{
-                  background: t.elevated,
-                  borderRadius: 10,
-                  border: `1px solid ${t.border}`,
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Header */}
-                <div
-                  style={{
-                    padding: '14px 20px',
-                    borderBottom: `1px solid ${t.border}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>
-                      {
-                        CHANNELS.find((c) => c.id === selectedChannel)?.icon
-                      }
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: t.text1,
-                      }}
-                    >
-                      {CHANNELS.find((c) => c.id === selectedChannel)?.label ?? selectedChannel}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleRegenerate}
-                      disabled={isGenerating || !generated}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: 6,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: 'transparent',
-                        border: `1px solid ${t.border}`,
-                        color: t.text2,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ↻ Regenerate
-                    </button>
-                    {selectedChannel !== 'presentation' && (
-                      <button
-                        type="button"
-                        onClick={handleSend}
-                        disabled={sending || !generated?.body || selectedContacts.length === 0}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: 'transparent',
-                          border: `1px solid ${t.border}`,
-                          color: t.text2,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ✉ Send
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Subject / hook */}
-                {selectedChannel === 'email' && generated && generated.subject && (
-                  <div
-                    style={{
-                      padding: '12px 20px',
-                      borderBottom: `1px solid ${t.border}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: t.blue,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Subject
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: t.text1,
-                      }}
-                    >
-                      {generated.subject}
-                    </div>
-                  </div>
-                )}
-
-                {selectedChannel === 'linkedin_inmail' && generated && generated.hook && (
-                  <div
-                    style={{
-                      padding: '12px 20px',
-                      borderBottom: `1px solid ${t.border}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: t.blue,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Hook (300 char max)
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: t.text1,
-                      }}
-                    >
-                      {generated.hook}
-                    </div>
-                  </div>
-                )}
-
-                {/* Presentation slides */}
-                {selectedChannel === 'presentation' && generated?.slides && generated.slides.length > 0 && (
-                  <PresentationSlidesOutput
-                    slides={generated.slides}
-                    onCopyAll={() => {
-                      const text = generated.slides!
-                        .map(
-                          (s) =>
-                            `Slide ${s.slideNumber}: ${s.title}\n${s.bullets.map((b) => `- ${b}`).join('\n')}${s.speakerNotes ? `\nSpeaker notes: ${s.speakerNotes}` : ''}`
-                        )
-                        .join('\n\n');
-                      void navigator.clipboard.writeText(text);
-                    }}
-                    onDownloadPptx={handleDownloadPptx}
-                    isDownloading={downloadingPptx}
-                    t={t}
-                  />
-                )}
-
-                {/* Body (email, linkedin, etc.) */}
-                {selectedChannel !== 'presentation' && (
-                  <div style={{ padding: '16px 20px' }}>
-                    <div
-                      style={{
-                        fontFamily:
-                          "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                        fontSize: 13,
-                        lineHeight: 1.7,
-                        color: t.text2,
-                        whiteSpace: 'pre-wrap',
-                        padding: 16,
-                        borderRadius: 8,
-                        background: 'rgba(0,0,0,0.2)',
-                        border: `1px solid ${t.border}`,
-                      }}
-                    >
-                      {generated?.body ??
-                        'Content generation not available for this channel.'}
-                    </div>
-                  </div>
-                )}
+          {/* Body (all channels except presentation, which renders slides) */}
+          {selectedChannel !== 'presentation' && (
+            <div className="p-5">
+              <div className="font-mono text-sm leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap p-4 rounded-lg bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-zinc-700">
+                {generated?.body ?? 'Content generation not available for this channel.'}
               </div>
             </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
-

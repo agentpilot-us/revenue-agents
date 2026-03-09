@@ -198,6 +198,10 @@ export const buyingGroupDetailSchema = z.object({
   orgDepartment: z
     .string()
     .describe('Org-chart department label used for Apollo department filters, e.g. "Engineering".'),
+  industry: z
+    .string()
+    .optional()
+    .describe('Industry vertical this buying group operates in (e.g. "Automotive", "Healthcare"). Omit if group is not industry-specific.'),
 
   // Messaging
   valueProp: z

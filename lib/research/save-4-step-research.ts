@@ -8,13 +8,14 @@ export const DEPARTMENT_TYPES_ORDER: DepartmentType[] = [
   DepartmentType.REVENUE_OPERATIONS,
   DepartmentType.PRODUCT,
   DepartmentType.ENGINEERING,
-  DepartmentType.AUTONOMOUS_VEHICLES,
-  DepartmentType.MANUFACTURING_OPERATIONS,
   DepartmentType.CUSTOMER_SUCCESS,
-  DepartmentType.INDUSTRIAL_DESIGN,
-  DepartmentType.IT_DATA_CENTER,
+  DepartmentType.IT_INFRASTRUCTURE,
   DepartmentType.SUPPLY_CHAIN,
-  DepartmentType.CONNECTED_SERVICES,
+  DepartmentType.OPERATIONS,
+  DepartmentType.SECURITY,
+  DepartmentType.DATA_ANALYTICS,
+  DepartmentType.PROCUREMENT,
+  DepartmentType.PARTNERSHIPS,
   DepartmentType.EXECUTIVE_LEADERSHIP,
   DepartmentType.FINANCE,
   DepartmentType.LEGAL,
@@ -28,14 +29,15 @@ const DEPARTMENT_TYPE_KEYWORDS: Record<DepartmentType, string[]> = {
   [DepartmentType.MARKETING]: ['marketing', 'brand', 'advertising', 'content', 'demand gen', 'growth', 'crm'],
   [DepartmentType.CUSTOMER_SUCCESS]: ['customer success', 'cs', 'support', 'customer experience', 'cx', 'success'],
   [DepartmentType.REVENUE_OPERATIONS]: ['revops', 'revenue operations', 'sales ops', 'go-to-market', 'gtm'],
-  [DepartmentType.PRODUCT]: ['product', 'pd', 'product management', 'pm'],
+  [DepartmentType.PRODUCT]: ['product', 'pd', 'product management', 'pm', 'design', 'ux'],
   [DepartmentType.ENGINEERING]: ['engineering', 'dev', 'software', 'development', 'r&d', 'rd', 'tech'],
-  [DepartmentType.AUTONOMOUS_VEHICLES]: ['autonomous', 'vehicles', 'av', 'self-driving', 'adas'],
-  [DepartmentType.MANUFACTURING_OPERATIONS]: ['manufacturing', 'operations', 'production', 'plant', 'factory'],
-  [DepartmentType.INDUSTRIAL_DESIGN]: ['industrial design', 'design', 'styling', 'design studio'],
-  [DepartmentType.IT_DATA_CENTER]: ['it', 'infrastructure', 'devops', 'data center', 'platform', 'cloud'],
-  [DepartmentType.SUPPLY_CHAIN]: ['supply chain', 'procurement', 'logistics', 'sourcing', 'purchasing'],
-  [DepartmentType.CONNECTED_SERVICES]: ['connected', 'services', 'mobility', 'telematics', 'connected services'],
+  [DepartmentType.IT_INFRASTRUCTURE]: ['it', 'infrastructure', 'devops', 'data center', 'platform', 'cloud', 'systems', 'information technology'],
+  [DepartmentType.SUPPLY_CHAIN]: ['supply chain', 'logistics', 'sourcing'],
+  [DepartmentType.OPERATIONS]: ['operations', 'manufacturing', 'production', 'plant', 'factory', 'fulfillment'],
+  [DepartmentType.SECURITY]: ['security', 'cybersecurity', 'infosec', 'risk', 'soc', 'ciso'],
+  [DepartmentType.DATA_ANALYTICS]: ['data', 'analytics', 'bi', 'business intelligence', 'data science', 'ml', 'ai'],
+  [DepartmentType.PROCUREMENT]: ['procurement', 'purchasing', 'vendor management'],
+  [DepartmentType.PARTNERSHIPS]: ['partnerships', 'alliances', 'channel', 'partner', 'ecosystem', 'co-sell'],
   [DepartmentType.EXECUTIVE_LEADERSHIP]: ['executive', 'leadership', 'c-level', 'c-suite', 'ceo', 'cfo', 'coo', 'cto'],
   [DepartmentType.FINANCE]: ['finance', 'fp&a', 'accounting', 'treasury', 'controller'],
   [DepartmentType.LEGAL]: ['legal', 'compliance', 'general counsel', 'gc'],
@@ -54,13 +56,12 @@ function scoreGroupNameForDepartmentType(groupName: string, deptType: Department
 
 function pickDepartmentTypeForGroup(
   groupName: string,
-  alreadyAssigned: Set<DepartmentType>
+  _alreadyAssigned: Set<DepartmentType>
 ): DepartmentType {
   let bestType: DepartmentType | null = null;
   let bestScore = 0;
 
   for (const deptType of DEPARTMENT_TYPES_ORDER) {
-    if (alreadyAssigned.has(deptType)) continue;
     const score = scoreGroupNameForDepartmentType(groupName, deptType);
     if (score > bestScore && score >= MIN_SEMANTIC_SCORE_THRESHOLD) {
       bestScore = score;
@@ -68,19 +69,16 @@ function pickDepartmentTypeForGroup(
     }
   }
 
-  if (bestType) return bestType;
-
-  // No semantic match above threshold: use first available unassigned type
-  for (const deptType of DEPARTMENT_TYPES_ORDER) {
-    if (!alreadyAssigned.has(deptType)) return deptType;
-  }
-  return DepartmentType.OTHER;
+  // Use the best semantic match, or OTHER if nothing fits.
+  // The real identity lives in customName + searchKeywords; the enum is advisory.
+  return bestType ?? DepartmentType.OTHER;
 }
 
 export type EnrichedGroupForSave = {
   name: string;
   segmentType?: string;
   orgDepartment?: string;
+  industry?: string;
   valueProp?: string;
   useCasesAtThisCompany?: string[];
   whyThisGroupBuys?: string;
@@ -143,6 +141,18 @@ export async function save4StepResearch(params: {
   const productNameToId = new Map(catalogProducts.map((p) => [p.name.trim().toLowerCase(), p.id]));
   const productSlugToId = new Map(catalogProducts.map((p) => [p.slug, p.id]));
 
+  const segTypes = enrichedGroups
+    .map((g) => g.segmentType?.toUpperCase())
+    .filter(Boolean) as string[];
+  const hasDivisional = segTypes.includes('DIVISIONAL');
+  const hasUseCase = segTypes.includes('USE_CASE');
+  const hasFunctional = segTypes.includes('FUNCTIONAL');
+  let inferredStrategy: string;
+  if (hasDivisional && !hasFunctional && !hasUseCase) inferredStrategy = 'DIVISIONAL';
+  else if (hasUseCase && !hasFunctional && !hasDivisional) inferredStrategy = 'USE_CASE';
+  else if (hasFunctional && !hasDivisional && !hasUseCase) inferredStrategy = 'FUNCTIONAL';
+  else inferredStrategy = 'HYBRID';
+
   await prisma.company.update({
     where: { id: companyId },
     data: {
@@ -153,17 +163,21 @@ export async function save4StepResearch(params: {
       headquarters: companyBasics.headquarters ?? company.headquarters,
       revenue: companyBasics.revenue ?? company.revenue,
       researchGoal: researchGoal ?? undefined,
+      segmentationStrategy: inferredStrategy,
       ...(researchDataPayload != null && { researchData: researchDataPayload }),
     },
   });
 
   const assignedTypes = new Set<DepartmentType>();
+  const createdDeptIds: Array<{ id: string; name: string }> = [];
 
   for (const segment of enrichedGroups) {
     const departmentType = pickDepartmentTypeForGroup(segment.name, assignedTypes);
     assignedTypes.add(departmentType);
-    const existingDept = await prisma.companyDepartment.findUnique({
-      where: { companyId_type: { companyId, type: departmentType } },
+    const existingDept = await prisma.companyDepartment.findFirst({
+      where: { companyId, customName: segment.name },
+    }) ?? await prisma.companyDepartment.findFirst({
+      where: { companyId, type: departmentType },
     });
     const useCaseText =
       segment.useCasesAtThisCompany?.length
@@ -181,6 +195,7 @@ export async function save4StepResearch(params: {
       objectionHandlers: segment.objectionHandlers ?? undefined,
       notes: `AI-generated (4-step): ${segment.name}. ${segment.whyThisGroupBuys ?? ''}`.trim(),
       segmentType: segment.segmentType ?? undefined,
+      industry: segment.industry ?? undefined,
       searchKeywords: segment.searchKeywords ?? undefined,
       orgDepartment: segment.orgDepartment ?? undefined,
       seniorityByRole: segment.seniorityByRole ?? undefined,
@@ -197,6 +212,7 @@ export async function save4StepResearch(params: {
       dept = await prisma.companyDepartment.create({ data: deptData });
       summary.departmentsCreated++;
     }
+    createdDeptIds.push({ id: dept.id, name: segment.name });
     for (const pf of segment.products ?? []) {
       const productId =
         productNameToId.get((pf.productName ?? pf.productSlug ?? '').trim().toLowerCase()) ??
@@ -222,5 +238,63 @@ export async function save4StepResearch(params: {
       }
     }
   }
+  // Auto-create Strategic Account Plan scaffolding (AdaptiveRoadmap + RoadmapTargets)
+  if (createdDeptIds.length > 0) {
+    const roadmap = await prisma.adaptiveRoadmap.upsert({
+      where: { userId_companyId: { userId, companyId } },
+      create: {
+        userId,
+        companyId,
+        roadmapType: 'account_plan',
+        objective: researchGoal
+          ? ({ goalText: researchGoal } as Prisma.InputJsonValue)
+          : undefined,
+      },
+      update: {
+        ...(researchGoal
+          ? { objective: { goalText: researchGoal } as Prisma.InputJsonValue }
+          : {}),
+      },
+    });
+
+    const existingCompanyTarget = await prisma.roadmapTarget.findFirst({
+      where: { roadmapId: roadmap.id, targetType: 'company', companyId },
+    });
+    const companyTargetId =
+      existingCompanyTarget?.id ??
+      (
+        await prisma.roadmapTarget.create({
+          data: {
+            roadmapId: roadmap.id,
+            targetType: 'company',
+            name: companyBasics.name,
+            companyId,
+          },
+        })
+      ).id;
+
+    for (const dept of createdDeptIds) {
+      const exists = await prisma.roadmapTarget.findFirst({
+        where: {
+          roadmapId: roadmap.id,
+          targetType: 'division',
+          companyDepartmentId: dept.id,
+        },
+      });
+      if (!exists) {
+        await prisma.roadmapTarget.create({
+          data: {
+            roadmapId: roadmap.id,
+            targetType: 'division',
+            name: dept.name,
+            companyId,
+            companyDepartmentId: dept.id,
+            parentTargetId: companyTargetId,
+          },
+        });
+      }
+    }
+  }
+
   return summary;
 }

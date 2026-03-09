@@ -6,8 +6,16 @@ import { DepartmentStatus } from '@prisma/client';
 import { discoverDepartments, type DiscoveredDepartment } from '@/app/actions/discover-departments';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { DivisionIntelligenceCard } from '@/app/dashboard/companies/[id]/buying-groups/DivisionIntelligenceCard';
+
+const DEPARTMENT_TYPES = [
+  'SALES', 'MARKETING', 'CUSTOMER_SUCCESS', 'REVENUE_OPERATIONS',
+  'PRODUCT', 'ENGINEERING', 'IT_INFRASTRUCTURE', 'FINANCE',
+  'LEGAL', 'HR', 'SUPPLY_CHAIN', 'OPERATIONS',
+  'SECURITY', 'DATA_ANALYTICS', 'PROCUREMENT', 'PARTNERSHIPS',
+  'EXECUTIVE_LEADERSHIP', 'OTHER',
+];
 
 type TargetRoles = {
   economicBuyer?: string[];
@@ -95,6 +103,96 @@ export function DepartmentsTab({
   const [discovering, setDiscovering] = useState(false);
   const [discovered, setDiscovered] = useState<DiscoveredDepartment[]>([]);
   const [addingType, setAddingType] = useState<string | null>(null);
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSegmentType, setNewSegmentType] = useState<'FUNCTIONAL' | 'USE_CASE' | 'DIVISIONAL'>('FUNCTIONAL');
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupType, setNewGroupType] = useState('SALES');
+  const [newGroupIndustry, setNewGroupIndustry] = useState('');
+  const [newUseCase, setNewUseCase] = useState('');
+  const [newSearchKeywords, setNewSearchKeywords] = useState('');
+  const [newOrgDepartment, setNewOrgDepartment] = useState('');
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [enrichingNewGroup, setEnrichingNewGroup] = useState(false);
+  const [addFormError, setAddFormError] = useState<string | null>(null);
+
+  const isNonFunctional = newSegmentType === 'USE_CASE' || newSegmentType === 'DIVISIONAL';
+
+  const resetAddForm = () => {
+    setNewGroupName('');
+    setNewGroupIndustry('');
+    setNewGroupType('SALES');
+    setNewSegmentType('FUNCTIONAL');
+    setNewUseCase('');
+    setNewSearchKeywords('');
+    setNewOrgDepartment('');
+    setAddFormError(null);
+  };
+
+  const handleAddCustomGroup = async (enrichAfter = false) => {
+    if (!newGroupName.trim()) return;
+    setAddingCustom(true);
+    setAddFormError(null);
+    try {
+      const keywords = newSearchKeywords
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean);
+
+      const res = await fetch(`/api/companies/${companyId}/departments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: newGroupType,
+          customName: newGroupName.trim(),
+          industry: newGroupIndustry.trim() || undefined,
+          segmentType: newSegmentType,
+          useCase: newUseCase.trim() || undefined,
+          searchKeywords: keywords.length > 0 ? keywords : undefined,
+          orgDepartment: newOrgDepartment.trim() || undefined,
+          status: 'NOT_ENGAGED',
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to add buying group');
+      }
+      const newDept = await res.json();
+
+      if (enrichAfter && newDept?.id) {
+        setAddingCustom(false);
+        setEnrichingNewGroup(true);
+        try {
+          const enrichRes = await fetch(
+            `/api/companies/${companyId}/departments/${newDept.id}/enrich`,
+            { method: 'POST' },
+          );
+          if (!enrichRes.ok) {
+            const data = await enrichRes.json().catch(() => ({}));
+            setAddFormError(data.error || 'Enrichment failed — group was created but not enriched.');
+          }
+        } catch {
+          setAddFormError('Enrichment failed — group was created but not enriched.');
+        } finally {
+          setEnrichingNewGroup(false);
+        }
+      }
+
+      const listRes = await fetch(`/api/companies/${companyId}/departments`);
+      if (listRes.ok) {
+        const list = await listRes.json();
+        setDepartments(list);
+      }
+      resetAddForm();
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Add custom buying group failed:', error);
+      setAddFormError(error instanceof Error ? error.message : 'Failed to add buying group');
+    } finally {
+      setAddingCustom(false);
+      setEnrichingNewGroup(false);
+    }
+  };
 
   const handleDiscover = async () => {
     setDiscovering(true);
@@ -192,6 +290,14 @@ export function DepartmentsTab({
             </Button>
           )}
           <Button
+            onClick={() => setShowAddForm((v) => !v)}
+            variant="outline"
+            size="sm"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Buying Group
+          </Button>
+          <Button
             onClick={handleDiscover}
             disabled={discovering}
             variant="outline"
@@ -200,6 +306,188 @@ export function DepartmentsTab({
           </Button>
         </div>
       </div>
+
+      {showAddForm && (
+        <div className="border rounded-lg p-5 bg-card border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-card-foreground">New Buying Group</h3>
+            <button type="button" onClick={() => setShowAddForm(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Segment type pills */}
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Segment Type
+            </label>
+            <div className="flex gap-2">
+              {([
+                { value: 'FUNCTIONAL', label: 'Functional', hint: 'By department' },
+                { value: 'USE_CASE', label: 'Use Case', hint: 'By what they do' },
+                { value: 'DIVISIONAL', label: 'Divisional', hint: 'By business unit / practice' },
+              ] as const).map((st) => (
+                <button
+                  key={st.value}
+                  type="button"
+                  onClick={() => {
+                    setNewSegmentType(st.value);
+                    if (st.value !== 'FUNCTIONAL' && newGroupType !== 'OTHER') {
+                      setNewGroupType('OTHER');
+                    }
+                  }}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium border transition-colors ${
+                    newSegmentType === st.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-400'
+                      : 'border-border text-muted-foreground hover:border-gray-400'
+                  }`}
+                >
+                  {st.label}
+                  <span className="ml-1 opacity-60">{st.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 1: Name + Department Type + Industry */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Group Name *
+              </label>
+              <input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder={
+                  newSegmentType === 'DIVISIONAL'
+                    ? 'e.g. Salesforce Practice, AV Software Team'
+                    : newSegmentType === 'USE_CASE'
+                      ? 'e.g. Autonomous Vehicle Testing'
+                      : 'e.g. Automotive Strategic Sales'
+                }
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Department Type
+              </label>
+              <select
+                value={newGroupType}
+                onChange={(e) => setNewGroupType(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {DEPARTMENT_TYPES.map((dt) => (
+                  <option key={dt} value={dt}>
+                    {dt.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+              {isNonFunctional && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Closest org-chart match (used as fallback)
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Industry Vertical
+              </label>
+              <input
+                value={newGroupIndustry}
+                onChange={(e) => setNewGroupIndustry(e.target.value)}
+                placeholder="e.g. Automotive, Healthcare"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Conditional fields for USE_CASE / DIVISIONAL */}
+          {isNonFunctional && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-border">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Use Case
+                </label>
+                <input
+                  value={newUseCase}
+                  onChange={(e) => setNewUseCase(e.target.value)}
+                  placeholder={
+                    newSegmentType === 'DIVISIONAL'
+                      ? 'e.g. CRM transformation consulting'
+                      : 'e.g. Simulation platform for AV testing'
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  What they would use your products for
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Search Keywords
+                </label>
+                <input
+                  value={newSearchKeywords}
+                  onChange={(e) => setNewSearchKeywords(e.target.value)}
+                  placeholder={
+                    newSegmentType === 'DIVISIONAL'
+                      ? 'e.g. Salesforce, SFDC, CRM, Sales Cloud'
+                      : 'e.g. autonomous driving, ADAS, L4'
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Comma-separated. Used for LinkedIn/Apollo contact search.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Org Department
+                </label>
+                <input
+                  value={newOrgDepartment}
+                  onChange={(e) => setNewOrgDepartment(e.target.value)}
+                  placeholder="e.g. Engineering, Consulting"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Apollo org-chart filter to narrow contact results
+                </p>
+              </div>
+            </div>
+          )}
+
+          {addFormError && (
+            <p className="text-xs text-red-500">{addFormError}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => { setShowAddForm(false); setAddFormError(null); }}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleAddCustomGroup(false)}
+              disabled={addingCustom || enrichingNewGroup || !newGroupName.trim()}
+            >
+              {addingCustom && !enrichingNewGroup ? 'Adding…' : 'Add Group'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleAddCustomGroup(true)}
+              disabled={addingCustom || enrichingNewGroup || !newGroupName.trim()}
+            >
+              {enrichingNewGroup ? 'Enriching…' : addingCustom ? 'Adding…' : 'Add & Enrich with AI'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {discovered.length > 0 && (
         <div className="border rounded-lg p-4 bg-accent/30 border-border">
@@ -304,6 +592,13 @@ export function DepartmentsTab({
                 statusIcons={statusIcons}
                 showRunAccountIntelligence
                 onPrepMeOpen={onPrepMeOpen}
+                onDepartmentEnriched={async () => {
+                  const listRes = await fetch(`/api/companies/${companyId}/departments`);
+                  if (listRes.ok) {
+                    const list = await listRes.json();
+                    setDepartments(list);
+                  }
+                }}
               />
             );
           })
@@ -325,6 +620,7 @@ function BuyingGroupCard({
   statusIcons,
   showRunAccountIntelligence = false,
   onPrepMeOpen,
+  onDepartmentEnriched,
 }: {
   dept: CompanyDepartmentWithRelations;
   companyId: string;
@@ -337,11 +633,14 @@ function BuyingGroupCard({
   statusIcons: Record<DepartmentStatus, string>;
   showRunAccountIntelligence?: boolean;
   onPrepMeOpen?: (params: PrepMePanelParams) => void;
+  onDepartmentEnriched?: () => void;
 }) {
   const [dept, setDept] = useState(initialDept);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [editingField, setEditingField] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -627,15 +926,40 @@ function BuyingGroupCard({
       )}
 
       {showRunAccountIntelligence && (
-        <div className="mb-4 p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
-          <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
-            Run Account Intelligence to get value prop, product fit, and objection handlers for this division.
+        <div className="mb-4 p-3 rounded-lg border border-blue-500/30 bg-blue-500/10">
+          <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+            Enrich this buying group with AI to generate a value proposition, target roles, objection handlers, and contact search keywords.
           </p>
-          <Button size="sm" asChild>
-            <Link href={`/dashboard/companies/${companyId}/intelligence`}>
-              Run Account Intelligence
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              disabled={enriching}
+              onClick={async () => {
+                setEnriching(true);
+                setEnrichError(null);
+                try {
+                  const res = await fetch(
+                    `/api/companies/${companyId}/departments/${dept.id}/enrich`,
+                    { method: 'POST' },
+                  );
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'Enrichment failed');
+                  }
+                  onDepartmentEnriched?.();
+                } catch (e) {
+                  setEnrichError(e instanceof Error ? e.message : 'Enrichment failed');
+                } finally {
+                  setEnriching(false);
+                }
+              }}
+            >
+              {enriching ? 'Enriching…' : 'Enrich with AI'}
+            </Button>
+            {enrichError && (
+              <span className="text-xs text-red-500">{enrichError}</span>
+            )}
+          </div>
         </div>
       )}
       <div className="flex flex-wrap gap-2 pt-3 border-t">

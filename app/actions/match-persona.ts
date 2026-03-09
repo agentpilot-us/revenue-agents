@@ -4,14 +4,13 @@ import { prisma } from '@/lib/db';
 import { generateObject } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
-import { DepartmentType } from '@prisma/client';
 
 const personaMatchSchema = z.object({
   personaId: z.string(),
   personaName: z.string(),
   confidence: z.number().min(0).max(100),
   reasoning: z.string(),
-  suggestedDepartment: z.nativeEnum(DepartmentType).optional(),
+  suggestedDepartment: z.string().optional(),
 });
 
 export async function matchPersona(contactData: {
@@ -21,21 +20,12 @@ export async function matchPersona(contactData: {
   companyName: string;
   linkedinBio?: string;
   companyIndustry?: string;
-  departmentType?: DepartmentType;
+  department?: string;
 }) {
-  // 1. Fetch all personas (or filter by department if known)
-  const personas = await prisma.persona.findMany({
-    where: contactData.departmentType
-      ? {
-          OR: [
-            { primaryDepartment: contactData.departmentType },
-            { secondaryDepartments: { has: contactData.departmentType } },
-          ],
-        }
-      : undefined,
-  });
+  const personas = await prisma.persona.findMany();
 
-  // 2. Use Claude to match
+  const deptLine = contactData.department ? `Department: ${contactData.department}` : '';
+
   const { object } = await generateObject({
     model: getChatModel(),
     schema: personaMatchSchema,
@@ -48,7 +38,7 @@ export async function matchPersona(contactData: {
       Company: ${contactData.companyName}
       Industry: ${contactData.companyIndustry ?? 'Unknown'}
       ${contactData.linkedinBio ? `Bio: ${contactData.linkedinBio}` : ''}
-      ${contactData.departmentType ? `Department: ${contactData.departmentType}` : ''}
+      ${deptLine}
       
       AVAILABLE PERSONAS:
       ${personas

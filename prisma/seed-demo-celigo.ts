@@ -42,7 +42,7 @@ const BASE_URL =
 // Map string labels to DepartmentType for CatalogProduct.targetDepartments
 function mapTargetDepartments(labels: string[]): DepartmentType[] {
   const map: Record<string, DepartmentType> = {
-    IT: DepartmentType.IT_DATA_CENTER,
+    IT: DepartmentType.IT_INFRASTRUCTURE,
     RevOps: DepartmentType.REVENUE_OPERATIONS,
     Operations: DepartmentType.OTHER,
     Finance: DepartmentType.FINANCE,
@@ -337,7 +337,7 @@ const DEPARTMENTS: Array<{
     segmentType: 'primary',
   },
   {
-    type: DepartmentType.IT_DATA_CENTER,
+    type: DepartmentType.IT_INFRASTRUCTURE,
     customName: 'IT',
     useCase: 'Integration platform governance, new hire provisioning automation, and eliminating the IT integration backlog across Workday, Okta, Slack, and Zendesk.',
     valueProp:
@@ -696,8 +696,8 @@ async function main() {
 
   const deptIds: Record<string, string> = {};
   for (const dept of DEPARTMENTS) {
-    const existing = await prisma.companyDepartment.findUnique({
-      where: { companyId_type: { companyId: company.id, type: dept.type } },
+    const existing = await prisma.companyDepartment.findFirst({
+      where: { companyId: company.id, type: dept.type },
     });
     const targetRolesJson = {
       economicBuyer: dept.targetRoles,

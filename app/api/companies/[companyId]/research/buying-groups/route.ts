@@ -72,7 +72,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ data: result.data });
+    return NextResponse.json({ data: result.data, perplexitySummary: result.perplexitySummary });
   } catch (error) {
     console.error('POST /api/companies/[companyId]/research/buying-groups error:', error);
     const message = error instanceof Error ? error.message : 'Discovery failed';

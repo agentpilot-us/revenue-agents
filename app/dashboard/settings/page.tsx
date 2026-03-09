@@ -127,10 +127,10 @@ export default async function SettingsPage() {
               Services
             </Link>
             <Link
-              href="/dashboard/messaging"
+              href="/dashboard/my-company"
               className="border-transparent text-muted-foreground hover:text-foreground hover:border-border whitespace-nowrap py-4 px-1 border-b-2 font-medium"
             >
-              Messaging frameworks
+              My Company
             </Link>
             <Link
               href="/dashboard/settings#your-company-data"

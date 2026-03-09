@@ -149,6 +149,7 @@ model Company {
   industry     String?
   website      String?
   size         String? // "1-50", "51-200", etc.
+  accountType  String? // partner | customer | new_logo | prospect
   salesforceId String? // Salesforce Account Id for sync; match on pull by this or by domain/name
   crmSource    String? // salesforce | hubspot | other (for multi-CRM)
   hubspotId    String? // HubSpot company Id when crmSource = hubspot
@@ -427,14 +428,17 @@ model PendingAction {
 
 // ----- Outreach sequences and enrollment -----
 model OutreachSequence {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  description String?  @db.Text
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?  @db.Text
+  isDefault       Boolean  @default(false)
+  isRecurring     Boolean  @default(false)
+  repeatCycleDays Int?     // Days between cycle restarts (e.g. 30, 60, 90)
+  maxCycles       Int?     // Max repeat cycles (null = unlimited until manually stopped)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   steps       OutreachSequenceStep[]
   enrollments ContactSequenceEnrollment[]
@@ -467,6 +471,7 @@ model ContactSequenceEnrollment {
   userId           String
   status           EnrollmentStatus @default(active)
   currentStepIndex Int              @default(0) // 0-based
+  currentCycle     Int              @default(1) // Which recurring cycle (1 = first run)
   enrolledAt       DateTime         @default(now())
   nextTouchDueAt   DateTime?
   completedAt      DateTime?
@@ -592,16 +597,17 @@ enum DepartmentType {
   REVENUE_OPERATIONS
   PRODUCT
   ENGINEERING
-  AUTONOMOUS_VEHICLES
-  MANUFACTURING_OPERATIONS
-  INDUSTRIAL_DESIGN
-  IT_DATA_CENTER
-  SUPPLY_CHAIN
-  CONNECTED_SERVICES
-  EXECUTIVE_LEADERSHIP
+  IT_INFRASTRUCTURE
   FINANCE
   LEGAL
   HR
+  SUPPLY_CHAIN
+  OPERATIONS
+  SECURITY
+  DATA_ANALYTICS
+  PROCUREMENT
+  PARTNERSHIPS
+  EXECUTIVE_LEADERSHIP
   OTHER
 }
 
@@ -642,6 +648,7 @@ model CompanyDepartment {
   notes         String?  @db.Text
 
   // AI Research fields for micro-segments
+  industry             String? // Industry vertical for multi-industry selling (e.g. "Automotive", "Healthcare")
   useCase              String? @db.Text // What this department/division would use products for
   targetRoles          Json? // { economicBuyer: string[], technicalEvaluator: string[], champion: string[], influencer: string[] }
   estimatedOpportunity String? // e.g., "$500K - $2M"
@@ -671,7 +678,7 @@ model CompanyDepartment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([companyId, type])
+  @@index([companyId, type])
   @@index([companyId])
   @@index([status])
 }

@@ -513,11 +513,16 @@ function extractSubjectName(title?: string | null, summary?: string | null): str
 function extractDeptHints(contextText: string): string[] {
   const text = contextText.toLowerCase();
   const deptKeywords: Record<string, string[]> = {
-    AUTONOMOUS_VEHICLES: ['autonomous', 'adas', 'self-driving', 'av ', 'av/', 'av,', 'cruise'],
-    ENGINEERING: ['engineering', 'vehicle engineering', 'software engineering', 'cfd', 'cae'],
-    MANUFACTURING: ['manufacturing', 'factory', 'plant', 'production', 'supply chain'],
-    IT: ['it infrastructure', 'data center', 'cloud', 'information technology'],
-    CONNECTED_SERVICES: ['connected', 'infotainment', 'telematics', 'digital cockpit'],
+    ENGINEERING: ['engineering', 'software engineering', 'r&d', 'development'],
+    OPERATIONS: ['manufacturing', 'factory', 'plant', 'production', 'operations', 'fulfillment'],
+    IT_INFRASTRUCTURE: ['it infrastructure', 'data center', 'cloud', 'information technology', 'devops'],
+    SECURITY: ['security', 'cybersecurity', 'infosec', 'compliance'],
+    DATA_ANALYTICS: ['data', 'analytics', 'business intelligence', 'data science'],
+    SALES: ['sales', 'revenue', 'pipeline', 'quota'],
+    MARKETING: ['marketing', 'brand', 'demand gen', 'content marketing'],
+    PRODUCT: ['product', 'product management', 'roadmap'],
+    SUPPLY_CHAIN: ['supply chain', 'logistics', 'procurement', 'sourcing'],
+    PARTNERSHIPS: ['partnerships', 'alliances', 'channel', 'partner'],
   };
   const hints: string[] = [];
   for (const [dept, keywords] of Object.entries(deptKeywords)) {

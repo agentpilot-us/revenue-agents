@@ -127,6 +127,7 @@ export async function getActiveEnrollmentContext(
 
 /**
  * Advance enrollment after a touch was sent: increment step, set nextTouchDueAt or completedAt.
+ * For recurring sequences, restart from step 0 after the last step if cycles remain.
  */
 export async function advanceEnrollment(enrollmentId: string): Promise<void> {
   const enrollment = await prisma.contactSequenceEnrollment.findUnique({
@@ -135,10 +136,33 @@ export async function advanceEnrollment(enrollmentId: string): Promise<void> {
   });
   if (!enrollment) return;
 
-  const steps = enrollment.sequence.steps;
+  const { sequence } = enrollment;
+  const steps = sequence.steps;
   const nextIndex = enrollment.currentStepIndex + 1;
 
   if (nextIndex >= steps.length) {
+    // Check if this is a recurring sequence that should restart
+    if (
+      sequence.isRecurring &&
+      sequence.repeatCycleDays &&
+      sequence.repeatCycleDays > 0 &&
+      (sequence.maxCycles == null || enrollment.currentCycle < sequence.maxCycles)
+    ) {
+      const nextCycleDue = new Date();
+      nextCycleDue.setDate(nextCycleDue.getDate() + sequence.repeatCycleDays);
+
+      await prisma.contactSequenceEnrollment.update({
+        where: { id: enrollmentId },
+        data: {
+          currentStepIndex: 0,
+          currentCycle: enrollment.currentCycle + 1,
+          nextTouchDueAt: nextCycleDue,
+          updatedAt: new Date(),
+        },
+      });
+      return;
+    }
+
     await prisma.contactSequenceEnrollment.update({
       where: { id: enrollmentId },
       data: {

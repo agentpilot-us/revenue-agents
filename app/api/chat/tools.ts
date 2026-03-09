@@ -2,7 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { DepartmentType, DepartmentStatus, Prisma } from '@prisma/client';
+import { DepartmentStatus, Prisma } from '@prisma/client';
 import { discoverDepartments } from '@/app/actions/discover-departments';
 import { isDemoAccount } from '@/lib/demo/is-demo-account';
 import { fetchAccountSignals } from '@/lib/signals/fetch-account-signals';
@@ -126,22 +126,20 @@ export const chatTools = {
 
   find_contacts_in_department: tool({
     description:
-      'Find contacts in a specific department at a company. departmentType must be the exact enum value (e.g. MANUFACTURING_OPERATIONS for Manufacturing, AUTONOMOUS_VEHICLES for Autonomous Vehicles, IT_DATA_CENTER for IT). Use the type returned by list_departments.',
+      'Find contacts in a specific department/buying group at a company. Pass the department name as shown in the account (e.g. "Autonomous Driving", "NVIDIA Sales", "Revenue Operations").',
     inputSchema: z.object({
       companyId: z.string().describe('The company ID (use the current account ID from context)'),
-      departmentType: z.nativeEnum(DepartmentType).describe('Department type enum, e.g. MANUFACTURING_OPERATIONS, SALES, AUTONOMOUS_VEHICLES'),
+      department: z.string().describe('Department or buying group name, e.g. "Autonomous Driving", "Sales"'),
     }),
-    execute: async ({ companyId, departmentType }) => {
+    execute: async ({ companyId, department: deptQuery }) => {
       const session = await auth();
       if (!session?.user?.id) return { error: 'Unauthorized' };
       const company = await prisma.company.findFirst({
         where: { id: companyId, userId: session.user.id },
       });
       if (!company) return { error: 'Company not found' };
-      const department = await prisma.companyDepartment.findUnique({
-        where: {
-          companyId_type: { companyId, type: departmentType },
-        },
+      const allDepts = await prisma.companyDepartment.findMany({
+        where: { companyId },
         include: {
           contacts: {
             select: {
@@ -155,13 +153,21 @@ export const chatTools = {
           },
         },
       });
-      if (!department) {
-        return { error: 'Department not found' };
+      const q = deptQuery.toLowerCase();
+      const matched = allDepts.find(
+        (d) =>
+          d.customName?.toLowerCase().includes(q) ||
+          q.includes(d.customName?.toLowerCase() ?? '') ||
+          d.type.toLowerCase().replace(/_/g, ' ').includes(q) ||
+          (Array.isArray(d.searchKeywords) && (d.searchKeywords as string[]).some((kw) => q.includes(kw.toLowerCase())))
+      );
+      if (!matched) {
+        return { error: `Department "${deptQuery}" not found. Available: ${allDepts.map((d) => d.customName || d.type).join(', ')}` };
       }
       return {
-        department: department.type,
-        customName: department.customName,
-        contacts: department.contacts,
+        department: matched.type,
+        customName: matched.customName,
+        contacts: matched.contacts,
       };
     },
   }),
@@ -407,22 +413,14 @@ export const chatTools = {
   }),
 
   list_personas: tool({
-    description: 'List all personas in the system, optionally filtered by department.',
+    description: 'List all personas in the system, optionally filtered by department name.',
     inputSchema: z.object({
-      departmentType: z.nativeEnum(DepartmentType).optional(),
+      department: z.string().optional().describe('Optional department name to filter by'),
     }),
-    execute: async ({ departmentType }) => {
+    execute: async ({ department }) => {
       const session = await auth();
       if (!session?.user?.id) return { error: 'Unauthorized' };
-      const personas = await prisma.persona.findMany({
-        where: departmentType
-          ? {
-              OR: [
-                { primaryDepartment: departmentType },
-                { secondaryDepartments: { has: departmentType } },
-              ],
-            }
-          : undefined,
+      const allPersonas = await prisma.persona.findMany({
         select: {
           id: true,
           name: true,
@@ -434,7 +432,13 @@ export const chatTools = {
           messagingTone: true,
         },
       });
-      return { personas };
+      if (!department) return { personas: allPersonas };
+      const q = department.toLowerCase();
+      const filtered = allPersonas.filter((p) => {
+        const pd = p.primaryDepartment?.toLowerCase().replace(/_/g, ' ') ?? '';
+        return pd.includes(q) || q.includes(pd);
+      });
+      return { personas: filtered.length > 0 ? filtered : allPersonas };
     },
   }),
 
@@ -446,7 +450,7 @@ export const chatTools = {
       title: z.string(),
       companyName: z.string(),
       companyIndustry: z.string().optional(),
-      departmentType: z.nativeEnum(DepartmentType).optional(),
+      department: z.string().optional().describe('Department or buying group name'),
     }),
     execute: async (params) => {
       const session = await auth();
@@ -458,7 +462,7 @@ export const chatTools = {
         title: params.title,
         companyName: params.companyName,
         companyIndustry: params.companyIndustry,
-        departmentType: params.departmentType,
+        department: params.department,
       });
       return result;
     },

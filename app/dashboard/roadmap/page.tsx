@@ -36,7 +36,7 @@ export default async function RoadmapPage({
       prisma.company.findMany({
         where: { userId: session.user.id },
         orderBy: { updatedAt: 'desc' },
-        select: { id: true, name: true, industry: true },
+        select: { id: true, name: true, industry: true, accountType: true },
       }),
       prisma.adaptiveRoadmap.findMany({
         where: { userId: session.user.id, companyId: { not: null } },
@@ -76,7 +76,19 @@ export default async function RoadmapPage({
                     href={`/dashboard/roadmap?companyId=${c.id}`}
                     className="rounded-lg border border-border bg-card/80 p-4 hover:border-primary/40 hover:bg-card transition-colors"
                   >
-                    <p className="text-sm font-medium text-foreground">{c.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">{c.name}</p>
+                      {c.accountType && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          c.accountType === 'partner' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                            : c.accountType === 'customer' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : c.accountType === 'new_logo' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          {c.accountType === 'new_logo' ? 'New Logo' : c.accountType === 'customer' ? 'Customer' : c.accountType === 'partner' ? 'Partner' : 'Prospect'}
+                        </span>
+                      )}
+                    </div>
                     {c.industry && (
                       <p className="text-xs text-muted-foreground mt-0.5">{c.industry}</p>
                     )}
@@ -105,6 +117,7 @@ export default async function RoadmapPage({
     select: {
       id: true,
       name: true,
+      accountType: true,
       businessOverview: true,
       keyInitiatives: true,
       dealObjective: true,
@@ -312,6 +325,7 @@ export default async function RoadmapPage({
         {/* ═══ Hero: Objective + Health + Metrics ═══ */}
         <AccountStoryBar
           objectiveText={(objective?.goalText as string) ?? null}
+          accountType={company.accountType}
           healthScore={healthScore}
           currentPhaseIndex={currentPhaseIndex}
           currentPhaseName={currentPhaseName}

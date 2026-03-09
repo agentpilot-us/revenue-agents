@@ -95,7 +95,7 @@ const NVIDIA_PRODUCTS = [
     slug: 'nvidia-drive',
     description:
       'End-to-end autonomous vehicle development platform: simulation, perception, mapping, and in-vehicle compute for L2+ to L4/L5.',
-    targetDepartments: [DepartmentType.AUTONOMOUS_VEHICLES, DepartmentType.ENGINEERING, DepartmentType.CONNECTED_SERVICES],
+    targetDepartments: [DepartmentType.OPERATIONS, DepartmentType.ENGINEERING, DepartmentType.CONNECTED_SERVICES],
     targetPersonas: ['VP Vehicle Engineering', 'AV/ADAS Director', 'Software-Defined Vehicle Lead'],
     useCases: ['AV development', 'ADAS', 'Simulation', 'In-vehicle compute'],
     contentTags: ['automotive', 'autonomous', 'simulation', 'ADAS'],
@@ -131,7 +131,7 @@ const NVIDIA_PRODUCTS = [
     slug: 'nvidia-omniverse',
     description:
       'Platform for 3D design collaboration, industrial digital twins, and large-scale simulation for manufacturing and engineering.',
-    targetDepartments: [DepartmentType.ENGINEERING, DepartmentType.MANUFACTURING_OPERATIONS, DepartmentType.INDUSTRIAL_DESIGN],
+    targetDepartments: [DepartmentType.ENGINEERING, DepartmentType.OPERATIONS, DepartmentType.INDUSTRIAL_DESIGN],
     targetPersonas: ['VP Manufacturing', 'Digital Twin Lead', 'Simulation Director', 'VP Vehicle Engineering'],
     useCases: ['Digital twin', 'Design collaboration', 'Factory simulation', 'Battery thermal analysis'],
     contentTags: ['digital-twin', 'manufacturing', 'simulation', '3D'],
@@ -167,7 +167,7 @@ const NVIDIA_PRODUCTS = [
     slug: 'nvidia-dgx',
     description:
       'AI infrastructure for training and inference — DGX/HGX systems for enterprise AI, AV model training, and data center workloads.',
-    targetDepartments: [DepartmentType.IT_DATA_CENTER, DepartmentType.ENGINEERING],
+    targetDepartments: [DepartmentType.IT_INFRASTRUCTURE, DepartmentType.ENGINEERING],
     targetPersonas: ['VP IT Infrastructure', 'AI/ML Director', 'Data Center Lead'],
     useCases: ['AI training', 'AV model training', 'Enterprise AI platform', 'Simulation at scale'],
     contentTags: ['AI', 'data-center', 'training', 'inference', 'GPU'],
@@ -300,7 +300,7 @@ const GM_DIVISIONS: DivisionSeed[] = [
   },
   {
     label: 'Autonomous Driving & ADAS (includes Cruise)',
-    type: DepartmentType.AUTONOMOUS_VEHICLES,
+    type: DepartmentType.OPERATIONS,
     status: DepartmentStatus.ACTIVE_CUSTOMER,
     estimatedSize: 3500,
     notes: 'Cruise L4 robotaxis plus GM corporate AV/ADAS teams; needs scalable compute and simulation from development to deployment.',
@@ -316,7 +316,7 @@ const GM_DIVISIONS: DivisionSeed[] = [
   },
   {
     label: 'Manufacturing & Supply Chain',
-    type: DepartmentType.MANUFACTURING_OPERATIONS,
+    type: DepartmentType.OPERATIONS,
     status: DepartmentStatus.EXPANSION_TARGET,
     estimatedSize: 12000,
     notes: 'Digital factories and supply chain optimization for Ultium plants; interest in quality control, predictive maintenance, and throughput.',
@@ -332,7 +332,7 @@ const GM_DIVISIONS: DivisionSeed[] = [
   },
   {
     label: 'IT Infrastructure & AI Platform',
-    type: DepartmentType.IT_DATA_CENTER,
+    type: DepartmentType.IT_INFRASTRUCTURE,
     status: DepartmentStatus.RESEARCH_PHASE,
     estimatedSize: 1500,
     notes: 'DGX/HGX clusters and AI platform to support AV training, simulation, and broader enterprise AI workloads.',
@@ -485,8 +485,8 @@ async function seedGMCompanyAndDepartments(userId: string) {
   const deptMap: Record<string, string> = {};
 
   for (const div of GM_DIVISIONS) {
-    let dept = await prisma.companyDepartment.findUnique({
-      where: { companyId_type: { companyId: company.id, type: div.type } },
+    let dept = await prisma.companyDepartment.findFirst({
+      where: { companyId: company.id, type: div.type },
     });
     if (!dept) {
       dept = await prisma.companyDepartment.create({
@@ -575,7 +575,7 @@ const GM_CONTACTS: ContactSeed[] = [
   // Autonomous Driving & ADAS
   {
     firstName: 'David', lastName: 'Richardson', email: 'david.richardson@gm.com',
-    title: 'VP Autonomous Vehicle Engineering', deptType: DepartmentType.AUTONOMOUS_VEHICLES,
+    title: 'VP Autonomous Vehicle Engineering', deptType: DepartmentType.OPERATIONS,
     seniority: 'VP', seniorityLevel: 4,
     city: 'San Francisco', state: 'California',
     linkedinUrl: 'https://www.linkedin.com/in/david-richardson-gm',
@@ -584,7 +584,7 @@ const GM_CONTACTS: ContactSeed[] = [
   },
   {
     firstName: 'Maria', lastName: 'Lopez', email: 'maria.lopez@gm.com',
-    title: 'Director, ADAS & Safety Systems', deptType: DepartmentType.AUTONOMOUS_VEHICLES,
+    title: 'Director, ADAS & Safety Systems', deptType: DepartmentType.OPERATIONS,
     seniority: 'Director', seniorityLevel: 3,
     city: 'Warren', state: 'Michigan',
     linkedinUrl: 'https://www.linkedin.com/in/maria-lopez-gm',
@@ -593,7 +593,7 @@ const GM_CONTACTS: ContactSeed[] = [
   },
   {
     firstName: 'James', lastName: 'Park', email: 'james.park@gm.com',
-    title: 'Senior Manager, AV Compute Platform', deptType: DepartmentType.AUTONOMOUS_VEHICLES,
+    title: 'Senior Manager, AV Compute Platform', deptType: DepartmentType.OPERATIONS,
     seniority: 'Senior Manager', seniorityLevel: 2,
     city: 'San Francisco', state: 'California',
     linkedinUrl: 'https://www.linkedin.com/in/james-park-gm',
@@ -604,7 +604,7 @@ const GM_CONTACTS: ContactSeed[] = [
   // Manufacturing & Supply Chain
   {
     firstName: 'Michael', lastName: 'Torres', email: 'michael.torres@gm.com',
-    title: 'VP Manufacturing Technology', deptType: DepartmentType.MANUFACTURING_OPERATIONS,
+    title: 'VP Manufacturing Technology', deptType: DepartmentType.OPERATIONS,
     seniority: 'VP', seniorityLevel: 4,
     city: 'Detroit', state: 'Michigan',
     linkedinUrl: 'https://www.linkedin.com/in/michael-torres-gm',
@@ -613,7 +613,7 @@ const GM_CONTACTS: ContactSeed[] = [
   },
   {
     firstName: 'Sarah', lastName: 'Kim', email: 'sarah.kim@gm.com',
-    title: 'Director, Digital Factory Operations', deptType: DepartmentType.MANUFACTURING_OPERATIONS,
+    title: 'Director, Digital Factory Operations', deptType: DepartmentType.OPERATIONS,
     seniority: 'Director', seniorityLevel: 3,
     city: 'Spring Hill', state: 'Tennessee',
     linkedinUrl: 'https://www.linkedin.com/in/sarah-kim-gm',
@@ -624,7 +624,7 @@ const GM_CONTACTS: ContactSeed[] = [
   // IT Infrastructure & AI Platform
   {
     firstName: 'Mark', lastName: 'Haener', email: 'mark.haener@gm.com',
-    title: 'VP IT Infrastructure', deptType: DepartmentType.IT_DATA_CENTER,
+    title: 'VP IT Infrastructure', deptType: DepartmentType.IT_INFRASTRUCTURE,
     seniority: 'VP', seniorityLevel: 4,
     city: 'Austin', state: 'Texas',
     linkedinUrl: 'https://www.linkedin.com/in/mark-haener-gm',
@@ -633,7 +633,7 @@ const GM_CONTACTS: ContactSeed[] = [
   },
   {
     firstName: 'Rachel', lastName: 'Chen', email: 'rachel.chen@gm.com',
-    title: 'Director, AI/ML Platform Engineering', deptType: DepartmentType.IT_DATA_CENTER,
+    title: 'Director, AI/ML Platform Engineering', deptType: DepartmentType.IT_INFRASTRUCTURE,
     seniority: 'Director', seniorityLevel: 3,
     city: 'Austin', state: 'Texas',
     linkedinUrl: 'https://www.linkedin.com/in/rachel-chen-gm',
@@ -642,7 +642,7 @@ const GM_CONTACTS: ContactSeed[] = [
   },
   {
     firstName: 'Thomas', lastName: 'Wright', email: 'thomas.wright@gm.com',
-    title: 'Senior Manager, GPU Infrastructure', deptType: DepartmentType.IT_DATA_CENTER,
+    title: 'Senior Manager, GPU Infrastructure', deptType: DepartmentType.IT_INFRASTRUCTURE,
     seniority: 'Senior Manager', seniorityLevel: 2,
     city: 'Austin', state: 'Texas',
     linkedinUrl: 'https://www.linkedin.com/in/thomas-wright-gm',
@@ -653,7 +653,7 @@ const GM_CONTACTS: ContactSeed[] = [
   // New GM hire — General Manager of AV & ADAS (demo centerpiece signal)
   {
     firstName: 'Jordan', lastName: 'Lee', email: 'jordan.lee@gm.com',
-    title: 'General Manager, Autonomous Vehicles & ADAS', deptType: DepartmentType.AUTONOMOUS_VEHICLES,
+    title: 'General Manager, Autonomous Vehicles & ADAS', deptType: DepartmentType.OPERATIONS,
     seniority: 'GM', seniorityLevel: 5,
     city: 'Detroit', state: 'Michigan',
     linkedinUrl: 'https://www.linkedin.com/in/jordan-lee-gm-av',
@@ -1171,16 +1171,16 @@ async function seedProductMatrix(companyId: string, userId: string, deptMap: Rec
     { deptType: DepartmentType.ENGINEERING, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 75, opportunitySize: 800_000 },
 
     // Autonomous Vehicles
-    { deptType: DepartmentType.AUTONOMOUS_VEHICLES, productSlug: 'nvidia-drive', status: ProductOwnershipStatus.ACTIVE, arr: 2_500_000, fitScore: 95 },
-    { deptType: DepartmentType.AUTONOMOUS_VEHICLES, productSlug: 'nvidia-omniverse', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 85, opportunitySize: 500_000 },
-    { deptType: DepartmentType.AUTONOMOUS_VEHICLES, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.ACTIVE, arr: 1_200_000, fitScore: 90 },
+    { deptType: DepartmentType.OPERATIONS, productSlug: 'nvidia-drive', status: ProductOwnershipStatus.ACTIVE, arr: 2_500_000, fitScore: 95 },
+    { deptType: DepartmentType.OPERATIONS, productSlug: 'nvidia-omniverse', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 85, opportunitySize: 500_000 },
+    { deptType: DepartmentType.OPERATIONS, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.ACTIVE, arr: 1_200_000, fitScore: 90 },
 
     // Manufacturing
-    { deptType: DepartmentType.MANUFACTURING_OPERATIONS, productSlug: 'nvidia-omniverse', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 88, opportunitySize: 1_000_000 },
-    { deptType: DepartmentType.MANUFACTURING_OPERATIONS, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 70, opportunitySize: 400_000 },
+    { deptType: DepartmentType.OPERATIONS, productSlug: 'nvidia-omniverse', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 88, opportunitySize: 1_000_000 },
+    { deptType: DepartmentType.OPERATIONS, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 70, opportunitySize: 400_000 },
 
     // IT/Data Center
-    { deptType: DepartmentType.IT_DATA_CENTER, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 93, opportunitySize: 5_000_000 },
+    { deptType: DepartmentType.IT_INFRASTRUCTURE, productSlug: 'nvidia-dgx', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 93, opportunitySize: 5_000_000 },
 
     // Connected Services
     { deptType: DepartmentType.CONNECTED_SERVICES, productSlug: 'nvidia-drive', status: ProductOwnershipStatus.OPPORTUNITY, fitScore: 75, opportunitySize: 800_000 },
@@ -1343,9 +1343,9 @@ async function seedActivitiesAndDemoLock(companyId: string, userId: string, dept
   }
 
   const engDeptId = deptMap[DepartmentType.ENGINEERING] ?? null;
-  const avDeptId = deptMap[DepartmentType.AUTONOMOUS_VEHICLES] ?? null;
-  const mfgDeptId = deptMap[DepartmentType.MANUFACTURING_OPERATIONS] ?? null;
-  const itDeptId = deptMap[DepartmentType.IT_DATA_CENTER] ?? null;
+  const avDeptId = deptMap[DepartmentType.OPERATIONS] ?? null;
+  const mfgDeptId = deptMap[DepartmentType.OPERATIONS] ?? null;
+  const itDeptId = deptMap[DepartmentType.IT_INFRASTRUCTURE] ?? null;
 
   const activities = [
     { type: 'Research', summary: 'Account research completed for General Motors — 5 divisions mapped', createdAt: daysAgo(14), companyDepartmentId: null as string | null, contactId: null as string | null },
@@ -1384,7 +1384,7 @@ async function seedPersonas() {
       description: 'VP/Director-level autonomous vehicle and ADAS engineering leadership at automotive OEMs.',
       includeTitles: ['VP Autonomous', 'VP AV', 'Director ADAS', 'Director Autonomous', 'Head of AV', 'Chief Engineer AV'],
       excludeTitles: ['Intern', 'Coordinator'],
-      primaryDepartment: DepartmentType.AUTONOMOUS_VEHICLES,
+      primaryDepartment: DepartmentType.OPERATIONS,
       secondaryDepartments: [DepartmentType.ENGINEERING, DepartmentType.CONNECTED_SERVICES],
       painPoints: [
         'Simulation scale insufficient for safety-critical validation',
@@ -1402,7 +1402,7 @@ async function seedPersonas() {
       description: 'VP/Director-level manufacturing and digital factory leadership at automotive OEMs.',
       includeTitles: ['VP Manufacturing', 'Director Manufacturing', 'Director Digital Factory', 'Director Smart Factory', 'Head of Manufacturing Technology'],
       excludeTitles: ['Intern', 'Line Supervisor'],
-      primaryDepartment: DepartmentType.MANUFACTURING_OPERATIONS,
+      primaryDepartment: DepartmentType.OPERATIONS,
       secondaryDepartments: [DepartmentType.SUPPLY_CHAIN, DepartmentType.ENGINEERING],
       painPoints: [
         'Costly physical prototyping and factory layout changes',
@@ -1420,7 +1420,7 @@ async function seedPersonas() {
       description: 'VP/Director-level IT infrastructure and AI platform leadership at large enterprises.',
       includeTitles: ['VP IT', 'Director AI Platform', 'Director Data Center', 'Director Infrastructure', 'Head of AI/ML Platform', 'CTO'],
       excludeTitles: ['Intern', 'Help Desk'],
-      primaryDepartment: DepartmentType.IT_DATA_CENTER,
+      primaryDepartment: DepartmentType.IT_INFRASTRUCTURE,
       secondaryDepartments: [DepartmentType.ENGINEERING],
       painPoints: [
         'Cloud GPU costs escalating for large-scale AI training',
@@ -1439,7 +1439,7 @@ async function seedPersonas() {
       includeTitles: ['VP Vehicle Software', 'Director Vehicle Software', 'Director Connected Services', 'Director SDV', 'Head of OTA', 'Director In-Vehicle AI'],
       excludeTitles: ['Intern'],
       primaryDepartment: DepartmentType.CONNECTED_SERVICES,
-      secondaryDepartments: [DepartmentType.ENGINEERING, DepartmentType.AUTONOMOUS_VEHICLES],
+      secondaryDepartments: [DepartmentType.ENGINEERING, DepartmentType.OPERATIONS],
       painPoints: [
         'Building a competitive SDV platform from scratch vs. leveraging partners',
         'OTA update reliability and feature delivery cadence',
@@ -1572,7 +1572,7 @@ async function seedPlaybookTargetingAndActivations(userId: string, companyId: st
     priority?: number;
   }> = {
     'New Executive Introduction': {
-      targetDepartmentTypes: ['ENGINEERING', 'AUTONOMOUS_VEHICLES', 'EXECUTIVE', 'CONNECTED_SERVICES', 'IT_DATA_CENTER'],
+      targetDepartmentTypes: ['ENGINEERING', 'OPERATIONS', 'EXECUTIVE', 'CONNECTED_SERVICES', 'IT_INFRASTRUCTURE'],
       targetIndustries: ['Automotive', 'Technology', 'Manufacturing'],
       targetPersonas: ['VP', 'C-Suite', 'Director'],
       timingConfig: { triggerDaysBefore: 0, validWindowDays: 56, urgencyDecay: 'step' },
@@ -1580,7 +1580,7 @@ async function seedPlaybookTargetingAndActivations(userId: string, companyId: st
       priority: 10,
     },
     'Event Invite': {
-      targetDepartmentTypes: ['ENGINEERING', 'AUTONOMOUS_VEHICLES', 'CONNECTED_SERVICES', 'IT_DATA_CENTER', 'MANUFACTURING_OPERATIONS'],
+      targetDepartmentTypes: ['ENGINEERING', 'OPERATIONS', 'CONNECTED_SERVICES', 'IT_INFRASTRUCTURE', 'OPERATIONS'],
       targetIndustries: ['Automotive', 'Technology', 'Manufacturing', 'Retail'],
       targetPersonas: ['VP', 'Director', 'Manager'],
       timingConfig: { triggerDaysBefore: 30, validWindowDays: 30, urgencyDecay: 'linear' },
@@ -1588,7 +1588,7 @@ async function seedPlaybookTargetingAndActivations(userId: string, companyId: st
       priority: 8,
     },
     'Signal Response': {
-      targetDepartmentTypes: ['ENGINEERING', 'AUTONOMOUS_VEHICLES', 'IT_DATA_CENTER'],
+      targetDepartmentTypes: ['ENGINEERING', 'OPERATIONS', 'IT_INFRASTRUCTURE'],
       targetIndustries: ['Automotive', 'Technology'],
       targetPersonas: ['VP', 'Director', 'C-Suite'],
       timingConfig: { triggerDaysBefore: 0, validWindowDays: 14, urgencyDecay: 'linear' },
@@ -1596,7 +1596,7 @@ async function seedPlaybookTargetingAndActivations(userId: string, companyId: st
       priority: 7,
     },
     'Re-Engagement': {
-      targetDepartmentTypes: ['ENGINEERING', 'AUTONOMOUS_VEHICLES', 'CONNECTED_SERVICES'],
+      targetDepartmentTypes: ['ENGINEERING', 'OPERATIONS', 'CONNECTED_SERVICES'],
       targetIndustries: ['Automotive', 'Technology'],
       targetPersonas: ['VP', 'Director'],
       timingConfig: { triggerDaysBefore: 0, validWindowDays: 30, urgencyDecay: 'linear' },
@@ -1604,7 +1604,7 @@ async function seedPlaybookTargetingAndActivations(userId: string, companyId: st
       priority: 5,
     },
     'Feature / Product Announcement': {
-      targetDepartmentTypes: ['ENGINEERING', 'AUTONOMOUS_VEHICLES', 'CONNECTED_SERVICES', 'IT_DATA_CENTER', 'MANUFACTURING_OPERATIONS'],
+      targetDepartmentTypes: ['ENGINEERING', 'OPERATIONS', 'CONNECTED_SERVICES', 'IT_INFRASTRUCTURE', 'OPERATIONS'],
       targetIndustries: ['Automotive', 'Technology', 'Manufacturing'],
       targetPersonas: ['VP', 'Director', 'Manager'],
       timingConfig: { triggerDaysBefore: 7, validWindowDays: 30, urgencyDecay: 'linear' },
@@ -1858,7 +1858,7 @@ async function seedInProgressWorkflow(userId: string, companyId: string, deptMap
     return;
   }
 
-  const avDeptId = deptMap[DepartmentType.AUTONOMOUS_VEHICLES] ?? null;
+  const avDeptId = deptMap[DepartmentType.OPERATIONS] ?? null;
   const contactId = contactIdMap['david.richardson@gm.com'] ?? null;
 
   const workflow = await prisma.actionWorkflow.create({

@@ -7,6 +7,9 @@ const patchSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
   isDefault: z.boolean().optional(),
+  isRecurring: z.boolean().optional(),
+  repeatCycleDays: z.number().int().min(1).max(365).nullable().optional(),
+  maxCycles: z.number().int().min(1).max(100).nullable().optional(),
 });
 
 export async function GET(
@@ -36,6 +39,9 @@ export async function GET(
       name: sequence.name,
       description: sequence.description,
       isDefault: sequence.isDefault,
+      isRecurring: sequence.isRecurring,
+      repeatCycleDays: sequence.repeatCycleDays,
+      maxCycles: sequence.maxCycles,
       createdAt: sequence.createdAt.toISOString(),
       updatedAt: sequence.updatedAt.toISOString(),
       steps: sequence.steps.map((s) => ({
@@ -83,6 +89,9 @@ export async function PATCH(
         ...(data.name != null && { name: data.name }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.isDefault != null && { isDefault: data.isDefault }),
+        ...(data.isRecurring != null && { isRecurring: data.isRecurring }),
+        ...(data.repeatCycleDays !== undefined && { repeatCycleDays: data.repeatCycleDays }),
+        ...(data.maxCycles !== undefined && { maxCycles: data.maxCycles }),
       },
     });
 
@@ -91,6 +100,9 @@ export async function PATCH(
       name: sequence.name,
       description: sequence.description,
       isDefault: sequence.isDefault,
+      isRecurring: sequence.isRecurring,
+      repeatCycleDays: sequence.repeatCycleDays,
+      maxCycles: sequence.maxCycles,
       updatedAt: sequence.updatedAt.toISOString(),
     });
   } catch (e) {

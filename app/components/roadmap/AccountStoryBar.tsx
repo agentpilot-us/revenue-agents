@@ -2,6 +2,7 @@
 
 type Props = {
   objectiveText: string | null;
+  accountType?: string | null;
   healthScore: number;
   currentPhaseIndex: number;
   currentPhaseName: string | null;
@@ -36,8 +37,16 @@ const t = {
   blueBg: 'rgba(59,130,246,0.08)',
 };
 
+const ACCOUNT_TYPE_STYLES: Record<string, { bg: string; color: string; border: string; label: string }> = {
+  partner: { bg: 'rgba(168,85,247,0.10)', color: '#c084fc', border: 'rgba(168,85,247,0.25)', label: 'Partner' },
+  customer: { bg: 'rgba(34,197,94,0.10)', color: '#4ade80', border: 'rgba(34,197,94,0.25)', label: 'Customer' },
+  new_logo: { bg: 'rgba(59,130,246,0.10)', color: '#60a5fa', border: 'rgba(59,130,246,0.25)', label: 'New Logo' },
+  prospect: { bg: 'rgba(245,158,11,0.10)', color: '#fbbf24', border: 'rgba(245,158,11,0.25)', label: 'Prospect' },
+};
+
 export default function AccountStoryBar({
   objectiveText,
+  accountType,
   healthScore,
   currentPhaseIndex,
   currentPhaseName,
@@ -70,11 +79,26 @@ export default function AccountStoryBar({
         marginBottom: 24,
       }}
     >
-      {/* Top row: objective + health badge */}
+      {/* Top row: objective + badges */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: t.text3, marginBottom: 6 }}>
-            The Story
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: t.text3 }}>
+              The Story
+            </div>
+            {accountType && ACCOUNT_TYPE_STYLES[accountType] && (
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: ACCOUNT_TYPE_STYLES[accountType].bg,
+                color: ACCOUNT_TYPE_STYLES[accountType].color,
+                border: `1px solid ${ACCOUNT_TYPE_STYLES[accountType].border}`,
+              }}>
+                {ACCOUNT_TYPE_STYLES[accountType].label}
+              </span>
+            )}
           </div>
           <p style={{ fontSize: 15, fontWeight: 500, color: t.text1, lineHeight: 1.5, margin: 0 }}>
             {objectiveText || 'No objective configured yet.'}

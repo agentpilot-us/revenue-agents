@@ -359,7 +359,7 @@ export async function seedDemoRoadmapForCompany(
             'End-to-end autonomous vehicle development platform: simulation, perception, mapping, and in-vehicle compute for L2+ to L4/L5.',
           targetDepartments: [
             DepartmentType.ENGINEERING,
-            DepartmentType.AUTONOMOUS_VEHICLES,
+            DepartmentType.OPERATIONS,
             DepartmentType.CONNECTED_SERVICES,
           ] as DepartmentType[],
           targetPersonas: ['VP Vehicle Engineering', 'AV/ADAS Director', 'Software-Defined Vehicle Lead'],
@@ -373,7 +373,7 @@ export async function seedDemoRoadmapForCompany(
             'Platform for 3D design collaboration and digital twin simulation; connects tools and teams for manufacturing and vehicle engineering.',
           targetDepartments: [
             DepartmentType.ENGINEERING,
-            DepartmentType.MANUFACTURING_OPERATIONS,
+            DepartmentType.OPERATIONS,
             DepartmentType.INDUSTRIAL_DESIGN,
           ] as DepartmentType[],
           targetPersonas: ['VP Manufacturing', 'Digital Twin Lead', 'Simulation Director'],
@@ -385,7 +385,7 @@ export async function seedDemoRoadmapForCompany(
           slug: 'nvidia-dgx',
           description:
             'AI infrastructure and platform for training and inference; DGX/HGX systems for enterprise AI, AV training, and data center workloads.',
-          targetDepartments: [DepartmentType.IT_DATA_CENTER, DepartmentType.ENGINEERING] as DepartmentType[],
+          targetDepartments: [DepartmentType.IT_INFRASTRUCTURE, DepartmentType.ENGINEERING] as DepartmentType[],
           targetPersonas: ['VP IT', 'AI/ML Director', 'Data Center Lead'],
           useCases: ['AI training', 'Simulation at scale', 'Enterprise AI platform'],
           contentTags: ['AI', 'data-center', 'training'],
@@ -488,21 +488,21 @@ export async function seedDemoRoadmapForCompany(
       },
       {
         label: 'Autonomous Driving & ADAS (includes Cruise)',
-        type: DepartmentType.AUTONOMOUS_VEHICLES,
+        type: DepartmentType.OPERATIONS,
         stage: 'Active Program',
         notes:
           'Cruise L4 robotaxis plus GM corporate AV/ADAS teams; needs scalable compute and simulation from development to deployment.',
       },
       {
         label: 'Manufacturing & Supply Chain',
-        type: DepartmentType.MANUFACTURING_OPERATIONS,
+        type: DepartmentType.OPERATIONS,
         stage: 'Expansion Target',
         notes:
           'Digital factories and supply chain optimization for Ultium plants; interest in quality control, predictive maintenance, and throughput.',
       },
       {
         label: 'IT Infrastructure & AI Platform',
-        type: DepartmentType.IT_DATA_CENTER,
+        type: DepartmentType.IT_INFRASTRUCTURE,
         stage: 'Strategic Platform',
         notes:
           'DGX/HGX clusters and AI platform to support AV training, simulation, and broader enterprise AI workloads.',
@@ -519,12 +519,10 @@ export async function seedDemoRoadmapForCompany(
     // Create or update divisions, contacts, and roadmap contacts
     for (const div of divisions) {
       // Ensure CompanyDepartment exists
-      let dept = await prisma.companyDepartment.findUnique({
+      let dept = await prisma.companyDepartment.findFirst({
         where: {
-          companyId_type: {
-            companyId: company.id,
-            type: div.type,
-          },
+          companyId: company.id,
+          type: div.type,
         },
       });
       if (!dept) {

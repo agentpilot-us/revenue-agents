@@ -37,11 +37,17 @@ export async function GET(
     return NextResponse.json({ error: 'Signal not found' }, { status: 404 });
   }
 
+  const company = await prisma.company.findFirst({
+    where: { id: signal.companyId, userId: session.user.id },
+    select: { industry: true },
+  });
+
   const templateId = await resolveTemplateForContext({
     userId: session.user.id,
     companyId: signal.companyId,
     signalType: signal.type,
     signalId: signal.id,
+    companyIndustry: company?.industry ?? undefined,
   });
 
   if (!templateId) {

@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { SequenceStepsClient } from '@/app/components/sequences/SequenceStepsClient';
+import { RecurringCadenceControls } from '@/app/components/sequences/RecurringCadenceControls';
 
 export default async function SequenceDetailPage({
   params,
@@ -40,6 +41,12 @@ export default async function SequenceDetailPage({
         {sequence.description && (
           <p className="text-gray-600 dark:text-gray-400 mb-6">{sequence.description}</p>
         )}
+        <RecurringCadenceControls
+          sequenceId={sequence.id}
+          isRecurring={sequence.isRecurring}
+          repeatCycleDays={sequence.repeatCycleDays}
+          maxCycles={sequence.maxCycles}
+        />
         <SequenceStepsClient
           sequenceId={sequence.id}
           sequenceName={sequence.name}

@@ -9,8 +9,6 @@ import { generateWhyRelevant } from '@/lib/contacts/why-relevant';
 import type { SeniorityLevel } from '@/lib/contacts/resolve-search-context';
 import { resolveSearchContext } from '@/lib/contacts/resolve-search-context';
 import { matchPersona } from '@/app/actions/match-persona';
-import { DepartmentType } from '@prisma/client';
-
 export type SearchScopeOption = 'apollo' | 'linkedin';
 
 export type FoundContact = {
@@ -54,7 +52,7 @@ export async function findContactsForDepartment(
 
   const department = await prisma.companyDepartment.findFirst({
     where: { id: departmentId, companyId },
-    select: { id: true, type: true, customName: true, targetRoles: true, useCase: true },
+    select: { id: true, type: true, customName: true, targetRoles: true, useCase: true, seniorityByRole: true, searchKeywords: true },
   });
   if (!department) return { ok: false, error: 'Department not found' };
 
@@ -80,6 +78,8 @@ export async function findContactsForDepartment(
           influencer?: string[];
         } | null,
         useCase: department.useCase,
+        seniorityByRole: department.seniorityByRole as Record<string, string> | null,
+        searchKeywords: department.searchKeywords as string[] | null,
       },
       company.segmentationStrategy,
       seniorityFilter
@@ -104,7 +104,7 @@ export async function findContactsForDepartment(
       detail: `Searched contacts (found ${segmentResults.length} matches)`,
     });
 
-    const deptType = department.type as DepartmentType;
+    const deptType = department.customName || department.type;
     const results: FoundContact[] = [];
     let enriched = 0;
 
@@ -140,7 +140,7 @@ export async function findContactsForDepartment(
           lastName: c.lastName,
           title: c.title,
           companyName: company.name,
-          departmentType: deptType,
+          department: deptType,
         });
         personaId = match.personaId;
         personaName = match.personaName;
@@ -334,7 +334,7 @@ export async function findAndEnrichContactsForCompany(
       companyId,
       ...(options.departmentIds?.length ? { id: { in: options.departmentIds } } : {}),
     },
-    select: { id: true, type: true, customName: true, targetRoles: true, useCase: true },
+    select: { id: true, type: true, customName: true, targetRoles: true, useCase: true, seniorityByRole: true, searchKeywords: true },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -368,6 +368,8 @@ export async function findAndEnrichContactsForCompany(
             influencer?: string[];
           } | null,
           useCase: dept.useCase,
+          seniorityByRole: dept.seniorityByRole as Record<string, string> | null,
+          searchKeywords: dept.searchKeywords as string[] | null,
         },
         company.segmentationStrategy,
         DEFAULT_SENIORITY
