@@ -118,7 +118,7 @@ export async function generateStepContent(input: GenerateStepContentInput) {
       where: { id: stepId },
       data: {
         status: 'ready',
-        generatedContent,
+        generatedContent: generatedContent as import('@prisma/client').Prisma.InputJsonValue,
       },
     });
 
