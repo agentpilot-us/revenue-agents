@@ -4,7 +4,13 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { generateOneContent } from '@/lib/plays/generate-content';
 import { CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
-import type { ChannelId } from '@/lib/content/channel-config';
+import {
+  channelSupportsVariants,
+  getChannelConfig,
+  type ChannelId,
+} from '@/lib/content/channel-config';
+import { buildContentContext } from '@/lib/content/build-content-context';
+import { buildAssetPackage } from '@/lib/content/build-asset-package';
 
 const CHANNEL_IDS = [
   'email',
@@ -78,7 +84,7 @@ export async function POST(req: NextRequest) {
         : Promise.resolve(null),
     ]);
 
-    const { raw, parsed } = await generateOneContent({
+    const generationInput = {
       companyId: input.companyId,
       userId: session.user.id,
       channel: input.channel as ChannelId,
@@ -98,12 +104,39 @@ export async function POST(req: NextRequest) {
           }
         : undefined,
       activeActionIndex: input.activeActionIndex,
+    };
+    const shouldReturnVariants = channelSupportsVariants(input.channel);
+    const context = await buildContentContext(generationInput);
+    const result = await generateOneContent({
+      ...generationInput,
+      variantCount: shouldReturnVariants ? 3 : undefined,
+    });
+    const config = getChannelConfig(input.channel);
+    const firstVariant = result.variants?.[0];
+    const assetPackage = await buildAssetPackage({
+      contextInput: generationInput,
+      context,
+      generation: {
+        raw: firstVariant?.raw ?? result.raw,
+        parsed: firstVariant?.parsed ?? result.parsed,
+      },
     });
 
     return NextResponse.json({
       contentId: crypto.randomUUID(),
-      raw,
-      ...parsed,
+      raw: firstVariant?.raw ?? result.raw,
+      renderer: config.renderer,
+      deliveryMode: config.deliveryMode,
+      destinationTargets: config.destinationTargets,
+      templateType: config.templateType,
+      assetPackage,
+      variants: result.variants?.map((variant) => ({
+        contentId: crypto.randomUUID(),
+        label: variant.label,
+        raw: variant.raw,
+        ...variant.parsed,
+      })),
+      ...(firstVariant?.parsed ?? result.parsed),
     });
   } catch (error) {
     console.error('POST /api/content/generate error:', error);

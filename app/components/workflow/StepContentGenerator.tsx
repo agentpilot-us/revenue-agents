@@ -42,8 +42,12 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
   const [editBody, setEditBody] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const content = (step.editedContent || step.generatedContent) as Record<string, string> | null;
-  const hasContent = content && (content.body || content.raw);
+  const content = (step.editedContent || step.generatedContent) as Record<string, unknown> | null;
+  const hasContent =
+    content &&
+    (typeof content.body === 'string' ||
+      typeof content.raw === 'string' ||
+      typeof content.subject === 'string');
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -61,8 +65,14 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
 
   const handleStartEdit = () => {
     if (!content) return;
-    setEditSubject(content.subject || '');
-    setEditBody(content.body || content.raw || '');
+    setEditSubject(typeof content.subject === 'string' ? content.subject : '');
+    setEditBody(
+      typeof content.body === 'string'
+        ? content.body
+        : typeof content.raw === 'string'
+          ? content.raw
+          : '',
+    );
     setEditMode(true);
   };
 
@@ -268,7 +278,7 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
   // Content preview (ready/sent)
   return (
     <div>
-      {content!.subject && (
+      {typeof content!.subject === 'string' && content!.subject && (
         <div style={{ marginBottom: 8 }}>
           <span
             style={{
@@ -300,7 +310,11 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
           overflowY: 'auto',
         }}
       >
-        {content!.body || content!.raw}
+        {typeof content!.body === 'string'
+          ? content!.body
+          : typeof content!.raw === 'string'
+            ? content!.raw
+            : ''}
       </div>
       {step.status !== 'sent' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>

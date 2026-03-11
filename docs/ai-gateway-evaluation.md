@@ -121,3 +121,31 @@ Gateway support was added as an opt-in path. Set `AI_GATEWAY_API_KEY` in your en
 ### Viewing spend
 
 Once `AI_GATEWAY_API_KEY` is active, all chat and embedding token usage appears in the [Vercel AI Gateway usage dashboard](https://vercel.com/docs/ai-gateway/capabilities/usage) for the project.
+
+### Current routing behavior
+
+- Chat precedence is now:
+  1. `USE_MOCK_LLM=true`
+  2. `LLM_PROVIDER=lmstudio`
+  3. `AI_GATEWAY_API_KEY` with `gatewayModel -> modelHint -> tier default`
+  4. direct provider fallback
+- Content routing lives in `lib/content/channel-config.ts`.
+- Structured channels use schema-driven generation; `sms` and `slack` remain plain text.
+- Email and LinkedIn channels can request multi-variant structured outputs in one call.
+
+### Vercel rollout checklist
+
+1. Enable AI Gateway for the team/project in Vercel.
+2. Set `AI_GATEWAY_API_KEY` on the project.
+3. Add BYOK credentials in Vercel for any providers you want Gateway to use on your behalf:
+   - Anthropic
+   - Google
+   - Perplexity
+4. Verify the model IDs referenced by `lib/content/channel-config.ts` and `lib/llm/get-model.ts` are available in Gateway.
+5. Redeploy and confirm usage appears for both chat and embeddings.
+6. Set Gateway budgets / alerts after you have baseline traffic.
+
+### Local development
+
+- Local LM Studio still works through `LLM_PROVIDER=lmstudio`.
+- When LM Studio is active, Gateway-only model IDs are ignored and the app uses the local OpenAI-compatible endpoint.

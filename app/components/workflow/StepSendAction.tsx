@@ -59,7 +59,16 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
   }
 
   const channel = step.channel || step.contentType || 'email';
-  const content = (step.editedContent || step.generatedContent) as Record<string, string> | null;
+  const content = (step.editedContent || step.generatedContent) as Record<string, unknown> | null;
+  const deliveryMode =
+    content?.deliveryMode === 'asset_package' ? 'asset_package' : 'direct_draft';
+  const destinationTargets = Array.isArray(content?.destinationTargets)
+    ? content.destinationTargets.filter((item): item is string => typeof item === 'string')
+    : [];
+  const assetPackage =
+    content?.assetPackage && typeof content.assetPackage === 'object'
+      ? (content.assetPackage as Record<string, unknown>)
+      : null;
 
   const handleSendEmail = async () => {
     setSending(true);
@@ -83,7 +92,12 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
   };
 
   const handleCopyLinkedIn = async () => {
-    const text = content?.body || content?.raw || '';
+    const text =
+      typeof content?.body === 'string'
+        ? content.body
+        : typeof content?.raw === 'string'
+          ? content.raw
+          : '';
     await navigator.clipboard.writeText(text);
     setCopied(true);
 
@@ -112,7 +126,12 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
   const isOtherCopyable = !isEmailChannel && !isLinkedInChannel && !isAdBrief && channel !== 'presentation';
 
   const handleCopyGeneric = async () => {
-    const text = content?.body || content?.raw || '';
+    const text =
+      typeof content?.body === 'string'
+        ? content.body
+        : typeof content?.raw === 'string'
+          ? content.raw
+          : '';
     await navigator.clipboard.writeText(text);
     setCopied(true);
     await fetch(
@@ -124,12 +143,170 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
 
   const linkedInProfile = buildLinkedInProfileUrl(step.contact?.linkedinUrl ?? null);
   const linkedInMessage = buildLinkedInMessageUrl(step.contact?.linkedinUrl ?? null);
+  const handleAssetWorkspace = async (
+    destination: 'google_docs' | 'google_slides' | 'google_drive_file',
+  ) => {
+    if (!assetPackage) return;
+    const res = await fetch('/api/handoff/google-workspace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        destination,
+        assetPackage,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setError(data?.error || 'Handoff failed');
+      return;
+    }
+    if (typeof data?.result?.url === 'string') {
+      window.open(data.result.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleAssetExport = async (mode: 'html_preview' | 'html_download' | 'pptx_download') => {
+    if (!assetPackage) return;
+    const res = await fetch('/api/export/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode,
+        assetPackage,
+      }),
+    });
+    if (mode === 'html_preview') {
+      const data = await res.json().catch(() => null);
+      if (!res.ok || typeof data?.html !== 'string') {
+        setError(data?.error || 'Preview failed');
+        return;
+      }
+      const previewWindow = window.open('', '_blank', 'noopener,noreferrer');
+      if (previewWindow) {
+        previewWindow.document.open();
+        previewWindow.document.write(data.html);
+        previewWindow.document.close();
+      }
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error || 'Export failed');
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = mode === 'pptx_download' ? 'asset.pptx' : 'asset.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div>
       {/* Primary action row */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {isEmailChannel && (
+        {deliveryMode === 'asset_package' && (
+          <>
+            {destinationTargets.includes('html_preview') && (
+              <button
+                type="button"
+                onClick={() => handleAssetExport('html_preview')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 8,
+                  background: t.blueBg,
+                  border: `1px solid ${t.blueBorder}`,
+                  color: t.blue,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Open Preview
+              </button>
+            )}
+            {destinationTargets.includes('google_docs') && (
+              <button
+                type="button"
+                onClick={() => handleAssetWorkspace('google_docs')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 8,
+                  background: t.blueBg,
+                  border: `1px solid ${t.blueBorder}`,
+                  color: t.blue,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Open in Google Docs
+              </button>
+            )}
+            {destinationTargets.includes('google_slides') && (
+              <button
+                type="button"
+                onClick={() => handleAssetWorkspace('google_slides')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 8,
+                  background: t.blueBg,
+                  border: `1px solid ${t.blueBorder}`,
+                  color: t.blue,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Open in Google Slides
+              </button>
+            )}
+            {destinationTargets.includes('google_drive_file') && (
+              <button
+                type="button"
+                onClick={() => handleAssetWorkspace('google_drive_file')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 8,
+                  background: t.blueBg,
+                  border: `1px solid ${t.blueBorder}`,
+                  color: t.blue,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Save to Drive
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() =>
+                handleAssetExport(
+                  destinationTargets.includes('pptx_download')
+                    ? 'pptx_download'
+                    : 'html_download',
+                )
+              }
+              style={{
+                padding: '10px 20px',
+                borderRadius: 8,
+                background: t.blueBg,
+                border: `1px solid ${t.blueBorder}`,
+                color: t.blue,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Export Artifact
+            </button>
+          </>
+        )}
+
+        {deliveryMode !== 'asset_package' && isEmailChannel && (
           <button
             type="button"
             onClick={handleSendEmail}
@@ -154,7 +331,7 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
           </button>
         )}
 
-        {isLinkedInChannel && (
+        {deliveryMode !== 'asset_package' && isLinkedInChannel && (
           <button
             type="button"
             onClick={handleCopyLinkedIn}
@@ -173,7 +350,7 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
           </button>
         )}
 
-        {isOtherCopyable && (
+        {deliveryMode !== 'asset_package' && isOtherCopyable && (
           <button
             type="button"
             onClick={handleCopyGeneric}
@@ -192,12 +369,17 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
           </button>
         )}
 
-        {isAdBrief && (
+        {deliveryMode !== 'asset_package' && isAdBrief && (
           <>
             <button
               type="button"
               onClick={async () => {
-                const text = content?.body || content?.raw || '';
+                const text =
+                  typeof content?.body === 'string'
+                    ? content.body
+                    : typeof content?.raw === 'string'
+                      ? content.raw
+                      : '';
                 await navigator.clipboard.writeText(text);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
@@ -218,8 +400,14 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
             <button
               type="button"
               onClick={() => {
-                const text = content?.body || content?.raw || '';
-                const subject = content?.subject || 'Ad Brief';
+                const text =
+                  typeof content?.body === 'string'
+                    ? content.body
+                    : typeof content?.raw === 'string'
+                      ? content.raw
+                      : '';
+                const subject =
+                  typeof content?.subject === 'string' ? content.subject : 'Ad Brief';
                 const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
                 window.open(mailtoUrl, '_blank');
                 fetch(`/api/action-workflows/${workflowId}/steps/${step.id}/send`, { method: 'POST' });
@@ -241,7 +429,7 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
           </>
         )}
 
-        {channel === 'presentation' && (
+        {deliveryMode !== 'asset_package' && channel === 'presentation' && (
           <button
             type="button"
             onClick={async () => {
@@ -250,7 +438,12 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    content: content?.body || content?.raw || '',
+                    content:
+                      typeof content?.body === 'string'
+                        ? content.body
+                        : typeof content?.raw === 'string'
+                          ? content.raw
+                          : '',
                     title: `Presentation`,
                   }),
                 });
@@ -307,16 +500,28 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
               label="Open in Gmail"
               href={buildGmailComposeUrl({
                 to: step.contact.email,
-                subject: content?.subject ?? '',
-                body: content?.body ?? content?.raw ?? '',
+                subject:
+                  typeof content?.subject === 'string' ? content.subject : '',
+                body:
+                  typeof content?.body === 'string'
+                    ? content.body
+                    : typeof content?.raw === 'string'
+                      ? content.raw
+                      : '',
               })}
             />
             <IntegrationLink
               label="Open in Outlook"
               href={buildOutlookComposeUrl({
                 to: step.contact.email,
-                subject: content?.subject ?? '',
-                body: content?.body ?? content?.raw ?? '',
+                subject:
+                  typeof content?.subject === 'string' ? content.subject : '',
+                body:
+                  typeof content?.body === 'string'
+                    ? content.body
+                    : typeof content?.raw === 'string'
+                      ? content.raw
+                      : '',
               })}
             />
           </>

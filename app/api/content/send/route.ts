@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { createGmailDraft } from '@/lib/integrations/google-workspace-tools';
 
 const SendSchema = z.object({
   companyId: z.string(),
@@ -32,12 +33,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    // For now, we treat "send" as a no-op that simply acknowledges the request.
-    // Future work can hook this into the email/LinkedIn delivery pipeline.
+    if (input.channel !== 'email') {
+      return NextResponse.json(
+        { error: 'Direct server-side send is only available for email drafts.' },
+        { status: 400 },
+      );
+    }
+
+    const contacts = await prisma.contact.findMany({
+      where: {
+        companyId: input.companyId,
+        id: { in: input.contactIds },
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+
+    const contactsWithEmail = contacts.filter(
+      (contact): contact is typeof contact & { email: string } => typeof contact.email === 'string',
+    );
+    if (contactsWithEmail.length === 0) {
+      return NextResponse.json(
+        { error: 'None of the selected contacts have email addresses.' },
+        { status: 400 },
+      );
+    }
+
+    const drafts = await Promise.all(
+      contactsWithEmail.map(async (contact) => {
+        const result = await createGmailDraft({
+          userId: session.user.id,
+          to: contact.email,
+          subject: input.subject ?? 'Draft from AgentPilot',
+          body: input.body,
+        });
+        return {
+          contactId: contact.id,
+          email: contact.email,
+          url: result.url,
+          draftId: result.id,
+        };
+      }),
+    );
+
     return NextResponse.json({
       ok: true,
       channel: input.channel,
-      sentTo: input.contactIds.length,
+      draftsCreated: drafts.length,
+      drafts,
     });
   } catch (error) {
     console.error('POST /api/content/send error:', error);

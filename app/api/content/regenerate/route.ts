@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateText } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { buildContentContext } from '@/lib/content/build-content-context';
 import { CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
-import type { ChannelId } from '@/lib/content/channel-config';
+import { getChannelConfig, type ChannelId } from '@/lib/content/channel-config';
+import { buildAssetPackage } from '@/lib/content/build-asset-package';
 
 const CHANNEL_IDS = [
   'email',
@@ -116,20 +117,105 @@ export async function POST(req: NextRequest) {
             },
           ]
         : [{ role: 'user' as const, content: ctx.userPrompt }];
+    const model = getChatModel(
+      ctx.effectiveModelTier,
+      ctx.modelHint,
+      ctx.gatewayModel,
+    );
+    const config = getChannelConfig(input.channel);
+
+    if (config.outputMode === 'object' && config.outputSchema) {
+      const { object } = await generateObject({
+        model,
+        schema: config.outputSchema,
+        maxOutputTokens: ctx.maxOutputTokens,
+        system: ctx.systemPrompt,
+        messages,
+      });
+
+      const parsed = object as Record<string, unknown>;
+      const raw = config.formatOutput(parsed);
+      const assetPackage = await buildAssetPackage({
+        contextInput: {
+          companyId: input.companyId,
+          userId: session.user.id,
+          channel: input.channel as ChannelId,
+          divisionId: input.divisionId,
+          contacts,
+          motion: input.motion,
+          playId: input.playId,
+          contentType: input.contentType,
+          contentIntent: input.contentIntent,
+          senderRole: input.senderRole,
+          tone: input.tone,
+          userContext: input.userContext,
+          signalContext: signal
+            ? {
+                title: signal.title,
+                summary: signal.summary,
+              }
+            : undefined,
+          activeActionIndex: input.activeActionIndex,
+        },
+        context: ctx,
+        generation: { raw, parsed },
+      });
+
+      return NextResponse.json({
+        contentId: input.contentId,
+        raw,
+        renderer: config.renderer,
+        deliveryMode: config.deliveryMode,
+        destinationTargets: config.destinationTargets,
+        templateType: config.templateType,
+        assetPackage,
+        ...parsed,
+      });
+    }
 
     const { text } = await generateText({
-      model: getChatModel(ctx.effectiveModelTier, ctx.modelHint),
+      model,
       maxOutputTokens: ctx.maxOutputTokens,
       system: ctx.systemPrompt,
       messages,
     });
 
     const raw = text.trim();
-    const parsed = ctx.channelConfig.parseOutput(raw);
+    const parsed = config.parseOutput(raw);
+    const assetPackage = await buildAssetPackage({
+      contextInput: {
+        companyId: input.companyId,
+        userId: session.user.id,
+        channel: input.channel as ChannelId,
+        divisionId: input.divisionId,
+        contacts,
+        motion: input.motion,
+        playId: input.playId,
+        contentType: input.contentType,
+        contentIntent: input.contentIntent,
+        senderRole: input.senderRole,
+        tone: input.tone,
+        userContext: input.userContext,
+        signalContext: signal
+          ? {
+              title: signal.title,
+              summary: signal.summary,
+            }
+          : undefined,
+        activeActionIndex: input.activeActionIndex,
+      },
+      context: ctx,
+      generation: { raw, parsed },
+    });
 
     return NextResponse.json({
       contentId: input.contentId,
       raw,
+      renderer: config.renderer,
+      deliveryMode: config.deliveryMode,
+      destinationTargets: config.destinationTargets,
+      templateType: config.templateType,
+      assetPackage,
       ...parsed,
     });
   } catch (error) {

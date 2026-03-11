@@ -72,6 +72,7 @@ export type ContentContextInput = {
 export type ContentContextOutput = {
   systemPrompt: string;
   userPrompt: string;
+  gatewayModel?: string;
   modelHint?: ContentHint;
   effectiveModelTier: Extract<ModelTier, 'fast' | 'full'>;
   maxOutputTokens: number;
@@ -497,10 +498,22 @@ ${channelInstruction}`;
   if (senderRole === 'executive' || recipientMaxSeniority >= 4) {
     effectiveModelTier = 'full';
   }
+  const videoRequestText = `${contentType ?? ''} ${contentIntent ?? ''} ${
+    userContext ?? ''
+  }`.toLowerCase();
+  if (
+    channel === 'video' &&
+    /(2 ?min|2-minute|3 ?min|3-minute|long-form|long form|detailed video|multi-minute)/.test(
+      videoRequestText,
+    )
+  ) {
+    effectiveModelTier = 'full';
+  }
 
   return {
     systemPrompt,
     userPrompt: channelConfig.buildUserPrompt(),
+    gatewayModel: channelConfig.gatewayModel,
     modelHint: channelConfig.modelHint,
     effectiveModelTier,
     maxOutputTokens: channelConfig.maxOutputTokens,

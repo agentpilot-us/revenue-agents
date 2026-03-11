@@ -1,7 +1,7 @@
 /**
  * POST /api/companies/[companyId]/plays/send-email
  *
- * Sends an email to a contact via Gmail MCP and logs the activity.
+ * Creates a Gmail draft for a contact and logs the activity.
  *
  * Body: { contactId: string, subject: string, body: string }
  */
@@ -10,9 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { checkCanSendToContact } from '@/lib/outreach/limits';
-import Anthropic from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic();
+import { createGmailDraft } from '@/lib/integrations/google-workspace-tools';
 
 export async function POST(
   req: NextRequest,
@@ -81,59 +79,15 @@ export async function POST(
       return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
     }
 
-    // Send via Gmail MCP
-    const response = await anthropic.beta.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      mcp_servers: [
-        {
-          type: 'url',
-          url: 'https://gmail.mcp.claude.com/mcp',
-          name: 'gmail-mcp',
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: `Send an email using Gmail with these exact details:
-
-To: ${toName} <${toAddress}>
-Subject: ${body.subject}
-Body:
-${body.body}
-
-Send this email now. Return only "sent" when complete.`,
-        },
-      ],
-    } as Parameters<typeof anthropic.beta.messages.create>[0]);
-
-    // Non-streaming response: BetaMessage with content array (Stream not used here)
-    type MessageResponse = { content: Array<{ type: string; text?: string }> };
-    const message = response as MessageResponse;
-
-    const responseText = message.content
-      .filter((c) => c.type === 'text')
-      .map((c) => (c as { text: string }).text)
-      .join('');
-
-    const succeeded =
-      responseText.toLowerCase().includes('sent') ||
-      responseText.toLowerCase().includes('success') ||
-      message.content.some((c) => c.type === 'mcp_tool_result');
-
-    if (!succeeded) {
-      console.error('Gmail MCP send response:', responseText);
-      return NextResponse.json(
-        {
-          error: 'Email send may have failed',
-          details: responseText,
-        },
-        { status: 502 }
-      );
-    }
+    const draft = await createGmailDraft({
+      userId: session.user.id,
+      to: toAddress,
+      subject: body.subject,
+      body: body.body,
+    });
 
     // Log activity (schema: summary, content, type; store messageId in metadata when available for tracking)
-    const activitySummary = `Email sent to ${toName} (${toAddress}): ${body.subject}`;
+    const activitySummary = `Gmail draft created for ${toName} (${toAddress}): ${body.subject}`;
     const activity = await prisma.activity
       .create({
         data: {
@@ -150,8 +104,9 @@ Send this email now. Return only "sent" when complete.`,
             to: toAddress,
             toName,
             sentAt: new Date().toISOString(),
-            channel: 'gmail_mcp',
+            channel: 'gmail_draft',
             sentVia: 'plays_run',
+            draftUrl: draft.url,
           },
           agentUsed: 'plays',
         },
@@ -161,49 +116,12 @@ Send this email now. Return only "sent" when complete.`,
         return null;
       });
 
-    // Update contact for lastActivity / Re-Engagement loop
-    await prisma.contact
-      .update({
-        where: { id: contact.id },
-        data: {
-          lastEmailSentAt: new Date(),
-          totalEmailsSent: { increment: 1 },
-        },
-      })
-      .catch((e) => {
-        console.warn('Contact update failed:', e);
-      });
-
-    // Log to Salesforce when user has connected Salesforce and contact has salesforceId
-    if (activity && contact.salesforceId) {
-      try {
-        const { pushActivityToSalesforceForUser } = await import(
-          '@/lib/integrations/salesforce-push-activity'
-        );
-        const user = await prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { salesforceAccessToken: true },
-        });
-        if (user?.salesforceAccessToken) {
-          const sfResult = await pushActivityToSalesforceForUser({
-            userId: session.user.id,
-            contactSalesforceId: contact.salesforceId,
-            type: 'email',
-            subject: body.subject,
-            body: body.body,
-            summary: activitySummary,
-            createdAt: new Date(),
-          });
-          if (!sfResult.ok) {
-            console.warn('Salesforce push failed:', sfResult.error);
-          }
-        }
-      } catch (e) {
-        console.warn('Salesforce push error:', e);
-      }
-    }
-
-    return NextResponse.json({ success: true, sent: true, to: toAddress });
+    return NextResponse.json({
+      success: true,
+      drafted: true,
+      to: toAddress,
+      draftUrl: draft.url,
+    });
   } catch (error: unknown) {
     console.error('send-email error:', error);
     return NextResponse.json(

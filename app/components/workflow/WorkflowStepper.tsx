@@ -36,8 +36,8 @@ export type WorkflowStep = {
   channel: string | null;
   status: string;
   promptHint: string | null;
-  generatedContent: Record<string, string> | null;
-  editedContent: Record<string, string> | null;
+  generatedContent: Record<string, unknown> | null;
+  editedContent: Record<string, unknown> | null;
   completedAt: string | null;
   failureReason: string | null;
   contact: {

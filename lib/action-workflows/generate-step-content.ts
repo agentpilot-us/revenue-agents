@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db';
 import { generateOneContent } from '@/lib/plays/generate-content';
+import { buildContentContext } from '@/lib/content/build-content-context';
+import { buildAssetPackage } from '@/lib/content/build-asset-package';
 import {
   getChannelConfig,
   playContentTypeToChannel,
@@ -71,7 +73,7 @@ export async function generateStepContent(input: GenerateStepContentInput) {
       .filter(Boolean)
       .join('\n');
 
-    const { raw, parsed } = await generateOneContent({
+    const generationInput = {
       companyId: workflow.companyId,
       userId,
       channel: channelId,
@@ -99,9 +101,23 @@ export async function generateStepContent(input: GenerateStepContentInput) {
             speakers: stringArrayOrUndefined(event.speakers),
           }
         : undefined,
+    };
+    const context = await buildContentContext(generationInput);
+    const { raw, parsed } = await generateOneContent(generationInput);
+    const assetPackage = await buildAssetPackage({
+      contextInput: generationInput,
+      context,
+      generation: { raw, parsed },
     });
 
-    const generatedContent = { ...parsed, raw };
+    const generatedContent = {
+      ...parsed,
+      raw,
+      deliveryMode: context.channelConfig.deliveryMode,
+      templateType: context.channelConfig.templateType,
+      destinationTargets: context.channelConfig.destinationTargets,
+      assetPackage,
+    };
 
     const updated = await prisma.actionWorkflowStep.update({
       where: { id: stepId },

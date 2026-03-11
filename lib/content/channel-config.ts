@@ -1,15 +1,12 @@
 /**
  * Shared channel configuration for all content generation paths.
- * Defines per-channel constraints, prompt instructions, output token
- * limits, and response parsers so ad-hoc content and play-based
- * generation stay in sync.
+ * Defines per-channel constraints, routing metadata, structured schemas,
+ * serializers, and render hints so ad-hoc content and play-based generation
+ * stay in sync.
  */
 
+import { z } from 'zod';
 import type { ContentHint } from '@/lib/llm/get-model';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export type ChannelId =
   | 'email'
@@ -29,39 +26,105 @@ export type ChannelId =
   | 'qbr_ebr_script';
 
 export type ChannelGroup = 'outreach' | 'sales_asset';
-
 export type ChannelMode = 'one_to_one' | 'broadcast';
-
 export type ContextTier = 'light' | 'standard' | 'deep';
+export type OutputMode = 'text' | 'object';
+export type DeliveryMode = 'direct_draft' | 'asset_package';
+export type TemplateType =
+  | 'email_message'
+  | 'linkedin_message'
+  | 'linkedin_post'
+  | 'slack_message'
+  | 'sms_message'
+  | 'sales_page_html'
+  | 'presentation_deck'
+  | 'ad_brief_doc'
+  | 'demo_runbook'
+  | 'video_script_package'
+  | 'one_pager_doc'
+  | 'talk_track_sheet'
+  | 'champion_kit'
+  | 'map_timeline'
+  | 'qbr_report';
+export type DestinationTarget =
+  | 'google_docs'
+  | 'google_slides'
+  | 'google_drive_file'
+  | 'gmail_draft'
+  | 'pptx_download'
+  | 'html_preview'
+  | 'copy';
+export type RendererKind =
+  | 'text'
+  | 'email'
+  | 'linkedin_inmail'
+  | 'linkedin_post'
+  | 'sales_page'
+  | 'presentation'
+  | 'ad_brief'
+  | 'demo_script'
+  | 'video'
+  | 'one_pager'
+  | 'talk_track'
+  | 'champion_enablement'
+  | 'map'
+  | 'qbr_ebr_script';
+
+export type GeneratedVariant = {
+  label: string;
+  raw: string;
+  parsed: Record<string, unknown>;
+};
 
 export interface ChannelConfig {
   id: ChannelId;
   label: string;
   mode: ChannelMode;
   group: ChannelGroup;
+  deliveryMode: DeliveryMode;
+  templateType: TemplateType;
+  destinationTargets: DestinationTarget[];
   contextTier: ContextTier;
   modelTier: 'fast' | 'full';
   maxOutputTokens: number;
-  /** When set and AI Gateway is enabled, route to this model (visual, web_grounded, long_form). */
+  outputMode: OutputMode;
+  renderer: RendererKind;
+  gatewayModel?: string;
   modelHint?: ContentHint;
-  /** Build the channel-specific instruction block. `companyName` is the target account. */
+  outputSchema?: z.ZodType<Record<string, unknown>>;
+  buildVariantSchema?: (
+    count: number,
+  ) => z.ZodType<{ variants: Array<Record<string, unknown>> }>;
   buildInstruction: (companyName: string) => string;
-  /** Build the user-message prompt sent alongside the system prompt. */
   buildUserPrompt: () => string;
-  /** Parse raw LLM output into structured fields + apply hard limits. */
   parseOutput: (raw: string) => Record<string, unknown>;
+  formatOutput: (value: Record<string, unknown>) => string;
 }
 
-// ---------------------------------------------------------------------------
-// Seniority helpers
-// ---------------------------------------------------------------------------
-
 const SENIORITY_KEYWORDS: Record<string, number> = {
-  chief: 6, ceo: 6, cfo: 6, cto: 6, coo: 6, cio: 6, cmo: 6, cro: 6, 'c-level': 6, president: 6,
-  'senior vice president': 5, svp: 5, 'executive vice president': 5, evp: 5,
-  'vice president': 4, vp: 4,
-  director: 3, 'senior director': 3, 'group director': 3,
-  manager: 2, 'senior manager': 2, lead: 2, head: 2,
+  chief: 6,
+  ceo: 6,
+  cfo: 6,
+  cto: 6,
+  coo: 6,
+  cio: 6,
+  cmo: 6,
+  cro: 6,
+  'c-level': 6,
+  president: 6,
+  'senior vice president': 5,
+  svp: 5,
+  'executive vice president': 5,
+  evp: 5,
+  'vice president': 4,
+  vp: 4,
+  director: 3,
+  'senior director': 3,
+  'group director': 3,
+  manager: 2,
+  'senior manager': 2,
+  lead: 2,
+  head: 2,
 };
 
 export function inferSeniority(title: string | null | undefined): number {
@@ -96,12 +159,12 @@ export function deriveToneFromContacts(
   return `Tone: Practitioner-level. Be specific, reference technical details and day-to-day benefits. Writing to ${label} recipients.\n`;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers for multi-contact context
-// ---------------------------------------------------------------------------
-
 export function buildRecipientsBlock(
-  contacts: Array<{ firstName?: string | null; lastName?: string | null; title?: string | null }>,
+  contacts: Array<{
+    firstName?: string | null;
+    lastName?: string | null;
+    title?: string | null;
+  }>,
   channelMode: ChannelMode,
 ): string {
   if (contacts.length === 0) return '';
@@ -117,10 +180,6 @@ export function buildRecipientsBlock(
   return header;
 }
 
-// ---------------------------------------------------------------------------
-// Truncation / validation helpers
-// ---------------------------------------------------------------------------
-
 function truncateAtBoundary(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   const truncated = text.slice(0, maxChars);
@@ -131,9 +190,449 @@ function truncateAtBoundary(text: string, maxChars: number): string {
   return truncated.trimEnd() + '…';
 }
 
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function recordArray<T extends Record<string, unknown>>(value: unknown): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is T =>
+      !!item && typeof item === 'object' && !Array.isArray(item),
+  );
+}
+
+function bulletList(items: string[]): string {
+  return items.map((item) => `- ${item}`).join('\n');
+}
+
+const emailSchema = z.object({
+  subject: z.string().min(1).max(80),
+  body: z.string().min(1),
+  ps: z.string().optional(),
+});
+
+const emailVariantSchema = z.object({
+  label: z.string().min(1),
+  subject: z.string().min(1).max(80),
+  body: z.string().min(1),
+  ps: z.string().optional(),
+});
+
+const linkedinInmailSchema = z.object({
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(1900),
+});
+
+const linkedinInmailVariantSchema = z.object({
+  label: z.string().min(1),
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(1900),
+});
+
+const linkedinPostSchema = z.object({
+  hook: z.string().min(1),
+  body: z.string().min(1),
+  hashtags: z.array(z.string()).optional(),
+});
+
+const linkedinPostVariantSchema = z.object({
+  label: z.string().min(1),
+  hook: z.string().min(1),
+  body: z.string().min(1),
+  hashtags: z.array(z.string()).optional(),
+});
+
+const salesPageSchema = z.object({
+  headline: z.string().min(1),
+  valueProps: z.array(z.string()).min(3).max(5),
+  cta: z.string().min(1),
+});
+
+const presentationSchema = z.object({
+  slides: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        bullets: z.array(z.string()).min(1),
+        speakerNotes: z.string().optional(),
+      }),
+    )
+    .min(3)
+    .max(5),
+});
+
+const adBriefSchema = z.object({
+  objective: z.string().min(1),
+  targetAudience: z.string().min(1),
+  keyMessage: z.string().min(1),
+  headlineOptions: z.array(z.string()).min(2).max(4),
+  bodyCopy: z.string().min(1),
+  cta: z.string().min(1),
+  visualDirection: z.string().min(1),
+});
+
+const demoScriptSchema = z.object({
+  setup: z.string().min(1),
+  discoveryQuestions: z.array(z.string()).min(2),
+  demoFlow: z
+    .array(
+      z.object({
+        feature: z.string().min(1),
+        narrative: z.string().min(1),
+      }),
+    )
+    .min(2),
+  close: z.string().min(1),
+});
+
+const videoSchema = z.object({
+  hook: z.string().min(1),
+  body: z.string().min(1),
+  cta: z.string().min(1),
+  talkTrack: z.string().min(1),
+});
+
+const onePagerSchema = z.object({
+  headline: z.string().min(1),
+  sections: z
+    .array(
+      z.object({
+        heading: z.string().min(1),
+        body: z.string().min(1),
+      }),
+    )
+    .min(2),
+  cta: z.string().min(1),
+});
+
+const talkTrackSchema = z.object({
+  opening: z.string().min(1),
+  painProbe: z.string().min(1),
+  valueProps: z.array(z.string()).min(2),
+  objections: z
+    .array(
+      z.object({
+        objection: z.string().min(1),
+        response: z.string().min(1),
+      }),
+    )
+    .min(1),
+  proofPoint: z.string().min(1),
+  nextStep: z.string().min(1),
+});
+
+const championEnablementSchema = z.object({
+  deckOutline: z
+    .array(
+      z.object({
+        slide: z.string().min(1),
+        content: z.string().min(1),
+      }),
+    )
+    .min(3),
+  talkingPoints: z.array(z.string()).min(3),
+  forwardEmail: z.object({
+    subject: z.string().min(1),
+    body: z.string().min(1),
+  }),
+});
+
+const mapSchema = z.object({
+  milestones: z
+    .array(
+      z.object({
+        date: z.string().min(1),
+        action: z.string().min(1),
+        owner: z.string().min(1),
+        status: z.string().min(1),
+      }),
+    )
+    .min(3),
+});
+
+const qbrEbrSchema = z.object({
+  sections: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        metrics: z.array(z.string()).optional(),
+        narrative: z.string().min(1),
+        recommendations: z.array(z.string()).min(1),
+      }),
+    )
+    .min(3),
+});
+
+function buildVariantsSchema<T extends z.ZodType<Record<string, unknown>>>(
+  itemSchema: T,
+  count: number,
+) {
+  return z.object({
+    variants: z.array(itemSchema).min(count).max(count),
+  });
+}
+
+function formatEmail(value: Record<string, unknown>): string {
+  const subject = truncateAtBoundary(stringValue(value.subject), 80);
+  const body = stringValue(value.body).trim();
+  const ps = stringValue(value.ps).trim();
+  return [`Subject: ${subject}`, '', body, ps ? `P.S. ${ps}` : '']
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatLinkedInInmail(value: Record<string, unknown>): string {
+  const subject = truncateAtBoundary(stringValue(value.subject), 200);
+  const body = truncateAtBoundary(stringValue(value.body).trim(), 1900);
+  return [`SUBJECT: ${subject}`, '', body].join('\n');
+}
+
+function formatLinkedInPost(value: Record<string, unknown>): string {
+  const hook = stringValue(value.hook).trim();
+  const body = stringValue(value.body).trim();
+  const hashtags = stringArray(value.hashtags)
+    .map((tag) => (tag.startsWith('#') ? tag : `#${tag}`))
+    .join(' ');
+  return [hook, '', body, hashtags].filter(Boolean).join('\n');
+}
+
+function formatSalesPage(value: Record<string, unknown>): string {
+  return [
+    `HEADLINE: ${stringValue(value.headline)}`,
+    '',
+    'VALUE PROPS:',
+    bulletList(stringArray(value.valueProps)),
+    '',
+    `CTA: ${stringValue(value.cta)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatPresentation(value: Record<string, unknown>): string {
+  const slides = recordArray<{
+    title: string;
+    bullets: string[];
+    speakerNotes?: string;
+  }>(value.slides);
+  return slides
+    .map((slide, index) =>
+      [
+        `SLIDE ${index + 1}: ${slide.title}`,
+        'BULLETS:',
+        bulletList(slide.bullets),
+        slide.speakerNotes ? `SPEAKER NOTES: ${slide.speakerNotes}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
+    .join('\n\n');
+}
+
+function formatAdBrief(value: Record<string, unknown>): string {
+  return [
+    `OBJECTIVE: ${stringValue(value.objective)}`,
+    `TARGET AUDIENCE: ${stringValue(value.targetAudience)}`,
+    `KEY MESSAGE: ${stringValue(value.keyMessage)}`,
+    '',
+    'HEADLINE OPTIONS:',
+    bulletList(stringArray(value.headlineOptions)),
+    '',
+    `BODY COPY: ${stringValue(value.bodyCopy)}`,
+    `CTA: ${stringValue(value.cta)}`,
+    `VISUAL DIRECTION: ${stringValue(value.visualDirection)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatDemoScript(value: Record<string, unknown>): string {
+  const flow = recordArray<{ feature: string; narrative: string }>(value.demoFlow);
+  return [
+    `SETUP: ${stringValue(value.setup)}`,
+    '',
+    'DISCOVERY QUESTIONS:',
+    bulletList(stringArray(value.discoveryQuestions)),
+    '',
+    'DEMO FLOW:',
+    flow
+      .map((item, index) =>
+        [`STEP ${index + 1}: ${item.feature}`, `NARRATIVE: ${item.narrative}`].join(
+          '\n',
+        ),
+      )
+      .join('\n\n'),
+    '',
+    `CLOSE: ${stringValue(value.close)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatVideo(value: Record<string, unknown>): string {
+  return [
+    `HOOK: ${stringValue(value.hook)}`,
+    '',
+    `BODY: ${stringValue(value.body)}`,
+    '',
+    `CTA: ${stringValue(value.cta)}`,
+    '',
+    `TALK TRACK: ${stringValue(value.talkTrack)}`,
+  ].join('\n');
+}
+
+function formatOnePager(value: Record<string, unknown>): string {
+  const sections = recordArray<{ heading: string; body: string }>(value.sections);
+  return [
+    `HEADLINE: ${stringValue(value.headline)}`,
+    '',
+    ...sections.flatMap((section) => [
+      `${section.heading.toUpperCase()}:`,
+      section.body,
+      '',
+    ]),
+    `CTA: ${stringValue(value.cta)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatTalkTrack(value: Record<string, unknown>): string {
+  const objections = recordArray<{ objection: string; response: string }>(
+    value.objections,
+  );
+  return [
+    `OPENING: ${stringValue(value.opening)}`,
+    '',
+    `PAIN PROBE: ${stringValue(value.painProbe)}`,
+    '',
+    'VALUE PROPS:',
+    bulletList(stringArray(value.valueProps)),
+    '',
+    'OBJECTIONS:',
+    objections
+      .map((item) => `- ${item.objection}\n  RESPONSE: ${item.response}`)
+      .join('\n'),
+    '',
+    `PROOF POINT: ${stringValue(value.proofPoint)}`,
+    '',
+    `NEXT STEP: ${stringValue(value.nextStep)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatChampionEnablement(value: Record<string, unknown>): string {
+  const deckOutline = recordArray<{ slide: string; content: string }>(
+    value.deckOutline,
+  );
+  const forwardEmail =
+    value.forwardEmail && typeof value.forwardEmail === 'object'
+      ? (value.forwardEmail as Record<string, unknown>)
+      : {};
+  return [
+    'DECK OUTLINE:',
+    deckOutline
+      .map((item, index) => `- Slide ${index + 1}: ${item.slide}\n  ${item.content}`)
+      .join('\n'),
+    '',
+    'TALKING POINTS:',
+    bulletList(stringArray(value.talkingPoints)),
+    '',
+    `FORWARD EMAIL SUBJECT: ${stringValue(forwardEmail.subject)}`,
+    `FORWARD EMAIL BODY: ${stringValue(forwardEmail.body)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatMap(value: Record<string, unknown>): string {
+  const milestones = recordArray<{
+    date: string;
+    action: string;
+    owner: string;
+    status: string;
+  }>(value.milestones);
+  return [
+    'MILESTONES:',
+    milestones
+      .map(
+        (item) =>
+          `- ${item.date} | ${item.owner} | ${item.action} | ${item.status.toUpperCase()}`,
+      )
+      .join('\n'),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatQbrEbr(value: Record<string, unknown>): string {
+  const sections = recordArray<{
+    title: string;
+    metrics?: string[];
+    narrative: string;
+    recommendations: string[];
+  }>(value.sections);
+  return sections
+    .map((section) =>
+      [
+        `SECTION: ${section.title}`,
+        section.metrics?.length
+          ? `METRICS:\n${bulletList(section.metrics)}`
+          : '',
+        `NARRATIVE: ${section.narrative}`,
+        `RECOMMENDATIONS:\n${bulletList(section.recommendations)}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
+    .join('\n\n');
+}
+
+function parseEmail(raw: string): Record<string, unknown> {
+  const lines = raw.split('\n');
+  let subject = '';
+  let bodyStart = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].toLowerCase().startsWith('subject:')) {
+      subject = lines[i].replace(/^subject:\s*/i, '').trim();
+      bodyStart = i + 1;
+      if (lines[bodyStart]?.trim() === '') bodyStart += 1;
+      break;
+    }
+  }
+  const body = lines.slice(bodyStart).join('\n').trim();
+  return { subject, body };
+}
+
+function parseLinkedInInmail(raw: string): Record<string, unknown> {
+  const subjectMatch = raw.match(/^(?:SUBJECT|HOOK):\s*(.+)$/im);
+  const subject = subjectMatch?.[1]?.trim() ?? '';
+  const body = raw
+    .replace(/^(?:SUBJECT|HOOK):.*$/im, '')
+    .replace(/^BODY:\s*/im, '')
+    .trim();
+  return { subject, body };
+}
+
+function parseTextBody(raw: string): Record<string, unknown> {
+  return { body: raw.trim() };
+}
+
 const CHANNEL_TIERS: Record<
   ChannelId,
-  { contextTier: ContextTier; modelTier: 'fast' | 'full' }
+  {
+    contextTier: ContextTier;
+    modelTier: 'fast' | 'full';
+    gatewayModel?: string;
+    modelHint?: ContentHint;
+  }
 > = {
   email: { contextTier: 'standard', modelTier: 'fast' },
   linkedin_inmail: { contextTier: 'standard', modelTier: 'fast' },
@@ -142,7 +641,11 @@ const CHANNEL_TIERS: Record<
   sms: { contextTier: 'light', modelTier: 'fast' },
   sales_page: { contextTier: 'deep', modelTier: 'full' },
   presentation: { contextTier: 'deep', modelTier: 'full' },
-  ad_brief: { contextTier: 'standard', modelTier: 'fast' },
+  ad_brief: {
+    contextTier: 'standard',
+    modelTier: 'fast',
+    modelHint: 'visual',
+  },
   demo_script: { contextTier: 'deep', modelTier: 'full' },
   video: { contextTier: 'standard', modelTier: 'fast' },
   one_pager: { contextTier: 'deep', modelTier: 'full' },
@@ -152,46 +655,33 @@ const CHANNEL_TIERS: Record<
   qbr_ebr_script: { contextTier: 'deep', modelTier: 'full' },
 };
 
-// ---------------------------------------------------------------------------
-// Per-channel configs
-// ---------------------------------------------------------------------------
-
 const emailConfig: ChannelConfig = {
   id: 'email',
   label: 'Email',
   mode: 'one_to_one',
   group: 'outreach',
+  deliveryMode: 'direct_draft',
+  templateType: 'email_message',
+  destinationTargets: ['gmail_draft', 'copy'],
+  outputMode: 'object',
+  renderer: 'email',
   ...CHANNEL_TIERS.email,
-  maxOutputTokens: 1000,
-  modelHint: 'web_grounded',
+  maxOutputTokens: 1200,
+  outputSchema: emailSchema,
+  buildVariantSchema: (count) => buildVariantsSchema(emailVariantSchema, count),
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Email
-- First line: "Subject: <subject line>" — MAX 60 characters, compelling and specific.
-- Then one blank line.
-- Then the email body: 2–4 short paragraphs, plain text.
-- Address the recipient by first name.
-- End with a clear, low-pressure CTA (e.g., "Would a 15-minute call next week make sense?").
-- Do NOT use markdown, HTML, or bullet points in the body.
-- Sign off with the sender's name.`,
+- Return structured email content with subject, body, and optional postscript.
+- Subject: compelling, specific, under 80 characters.
+- Body: 2-4 short paragraphs in plain text.
+- Address the recipient by first name when possible.
+- End with a clear, low-pressure CTA.
+- Do NOT use markdown or HTML.`,
   buildUserPrompt: () =>
-    'Generate the email. Output ONLY the Subject line and email body — no other text.',
-  parseOutput: (raw) => {
-    const lines = raw.split('\n');
-    let subject = '';
-    let bodyStart = 0;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].toLowerCase().startsWith('subject:')) {
-        subject = lines[i].replace(/^subject:\s*/i, '').trim();
-        bodyStart = i + 1;
-        if (lines[bodyStart]?.trim() === '') bodyStart++;
-        break;
-      }
-    }
-    subject = truncateAtBoundary(subject, 80);
-    const body = lines.slice(bodyStart).join('\n').trim();
-    return { subject, body };
-  },
+    'Generate the email in structured form with keys for subject, body, and optional ps.',
+  parseOutput: parseEmail,
+  formatOutput: formatEmail,
 };
 
 const linkedinInmailConfig: ChannelConfig = {
@@ -199,57 +689,28 @@ const linkedinInmailConfig: ChannelConfig = {
   label: 'LinkedIn InMail',
   mode: 'one_to_one',
   group: 'outreach',
+  deliveryMode: 'direct_draft',
+  templateType: 'linkedin_message',
+  destinationTargets: ['copy'],
+  outputMode: 'object',
+  renderer: 'linkedin_inmail',
   ...CHANNEL_TIERS.linkedin_inmail,
-  maxOutputTokens: 600,
-  modelHint: 'web_grounded',
+  maxOutputTokens: 700,
+  outputSchema: linkedinInmailSchema,
+  buildVariantSchema: (count) =>
+    buildVariantsSchema(linkedinInmailVariantSchema, count),
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: LinkedIn InMail
-- Line 1: "SUBJECT: <subject line>" — MAX 200 characters. Make it a question or curiosity trigger, not a headline.
-- Blank line.
-- Line 3+: The InMail body — 2–3 short paragraphs, MAX 1900 characters total.
-- Address the recipient by first name.
+- Return structured content with subject and body.
+- Subject: curiosity-driven, under 200 characters.
+- Body: 2-3 short paragraphs, under 1900 characters.
 - Reference something specific to their role or company.
-- End with a single low-pressure question (not "let's schedule a demo").
-- Output plain text only — no markdown, no bullet points, no labels in the body.`,
+- End with one low-pressure question.`,
   buildUserPrompt: () =>
-    'Generate the LinkedIn InMail. Output ONLY the SUBJECT line and body — no other text, no "BODY:" prefix.',
-  parseOutput: (raw) => {
-    let hook = '';
-    let body = raw;
-
-    // Try SUBJECT: first, then HOOK: for backward compat
-    const subjectMatch = raw.match(/^(?:SUBJECT|HOOK):\s*(.+)/im);
-    if (subjectMatch) {
-      hook = subjectMatch[1].trim();
-      // Find where the body starts (after the SUBJECT line + optional blank)
-      const afterSubject = raw.slice(raw.indexOf(subjectMatch[0]) + subjectMatch[0].length);
-      // Strip optional BODY: prefix
-      body = afterSubject.replace(/^\s*\n?\s*(?:BODY:\s*)?/i, '').trim();
-    }
-
-    // If body is empty or still contains only the hook, use raw minus the subject line
-    if (!body || body === hook) {
-      const lines = raw.split('\n');
-      const subjectLineIdx = lines.findIndex((l) =>
-        /^(?:SUBJECT|HOOK):/i.test(l),
-      );
-      if (subjectLineIdx >= 0) {
-        let start = subjectLineIdx + 1;
-        while (start < lines.length && lines[start].trim() === '') start++;
-        body = lines
-          .slice(start)
-          .join('\n')
-          .replace(/^BODY:\s*/i, '')
-          .trim();
-      }
-    }
-
-    hook = truncateAtBoundary(hook, 200);
-    body = truncateAtBoundary(body, 1900);
-
-    return { hook, body };
-  },
+    'Generate the LinkedIn InMail in structured form with keys for subject and body.',
+  parseOutput: parseLinkedInInmail,
+  formatOutput: formatLinkedInInmail,
 };
 
 const linkedinPostConfig: ChannelConfig = {
@@ -257,23 +718,27 @@ const linkedinPostConfig: ChannelConfig = {
   label: 'LinkedIn Post',
   mode: 'broadcast',
   group: 'outreach',
+  deliveryMode: 'direct_draft',
+  templateType: 'linkedin_post',
+  destinationTargets: ['copy'],
+  outputMode: 'object',
+  renderer: 'linkedin_post',
   ...CHANNEL_TIERS.linkedin_post,
-  maxOutputTokens: 500,
+  maxOutputTokens: 900,
+  outputSchema: linkedinPostSchema,
+  buildVariantSchema: (count) =>
+    buildVariantsSchema(linkedinPostVariantSchema, count),
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: LinkedIn Post
-- 1–3 short paragraphs, MAX 3000 characters total.
-- Start with a strong hook sentence that stops the scroll.
-- Conversational, value-driven — share insight, not a pitch.
-- Do NOT include any labels, prefixes, or markdown.
-- Optional: end with 2–3 relevant hashtags.
-- Plain text only.`,
+- Return structured content with hook, body, and optional hashtags.
+- Hook: first line that stops the scroll.
+- Body: 1-3 concise paragraphs.
+- Hashtags: optional relevant tags only.`,
   buildUserPrompt: () =>
-    'Generate the LinkedIn post. Output ONLY the post text — no other text.',
-  parseOutput: (raw) => {
-    const body = truncateAtBoundary(raw.trim(), 3000);
-    return { body };
-  },
+    'Generate the LinkedIn post in structured form with keys for hook, body, and optional hashtags.',
+  parseOutput: parseTextBody,
+  formatOutput: formatLinkedInPost,
 };
 
 const slackConfig: ChannelConfig = {
@@ -281,22 +746,22 @@ const slackConfig: ChannelConfig = {
   label: 'Slack DM',
   mode: 'one_to_one',
   group: 'outreach',
+  deliveryMode: 'direct_draft',
+  templateType: 'slack_message',
+  destinationTargets: ['copy'],
+  outputMode: 'text',
+  renderer: 'text',
   ...CHANNEL_TIERS.slack,
   maxOutputTokens: 200,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Slack DM
-- 2–4 sentences, MAX 500 characters.
-- Friendly, casual-professional tone — like messaging a colleague.
-- Use the recipient's first name.
-- End with a quick ask or link.
-- Plain text only. Emojis are OK sparingly.`,
-  buildUserPrompt: () =>
-    'Generate the Slack DM. Output ONLY the message text.',
-  parseOutput: (raw) => {
-    const body = truncateAtBoundary(raw.trim(), 500);
-    return { body };
-  },
+- 2-4 sentences, max 500 characters.
+- Friendly, casual-professional tone.
+- End with a quick ask or link.`,
+  buildUserPrompt: () => 'Generate the Slack DM as plain text only.',
+  parseOutput: parseTextBody,
+  formatOutput: (value) => stringValue(value.body).trim(),
 };
 
 const smsConfig: ChannelConfig = {
@@ -304,21 +769,23 @@ const smsConfig: ChannelConfig = {
   label: 'Text / SMS',
   mode: 'one_to_one',
   group: 'outreach',
+  deliveryMode: 'direct_draft',
+  templateType: 'sms_message',
+  destinationTargets: ['copy'],
+  outputMode: 'text',
+  renderer: 'text',
   ...CHANNEL_TIERS.sms,
   maxOutputTokens: 100,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: SMS / Text Message
-- MAX 160 characters (one SMS segment). Brevity is critical.
-- 1–2 sentences only.
-- Use first name. Clear CTA.
-- Plain text, no links unless essential.`,
-  buildUserPrompt: () =>
-    'Generate the SMS. Output ONLY the message text, under 160 characters.',
-  parseOutput: (raw) => {
-    const body = truncateAtBoundary(raw.trim(), 160);
-    return { body };
-  },
+- Max 160 characters.
+- 1-2 sentences only.
+- Clear CTA.`,
+  buildUserPrompt: () => 'Generate the SMS as plain text only.',
+  parseOutput: parseTextBody,
+  formatOutput: (value) =>
+    truncateAtBoundary(stringValue(value.body).trim(), 160),
 };
 
 const salesPageConfig: ChannelConfig = {
@@ -326,21 +793,23 @@ const salesPageConfig: ChannelConfig = {
   label: 'Sales Page',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'sales_page_html',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'sales_page',
   ...CHANNEL_TIERS.sales_page,
-  maxOutputTokens: 1500,
+  maxOutputTokens: 1800,
+  outputSchema: salesPageSchema,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Sales Page Outline
-- Headline: one compelling line.
-- 3–5 bullet points of value props specific to this division/account.
-- One suggested CTA label (e.g., "Book a Strategy Session").
-- Output as plain text with clear line breaks.`,
+- Return structured content with headline, valueProps, and cta.
+- Value props should be account-specific and concise.`,
   buildUserPrompt: () =>
-    'Generate the sales page outline. Output ONLY the headline, bullets, and CTA.',
-  parseOutput: (raw) => {
-    const body = raw.trim();
-    return { body };
-  },
+    'Generate the sales page outline in structured form with keys for headline, valueProps, and cta.',
+  parseOutput: parseTextBody,
+  formatOutput: formatSalesPage,
 };
 
 const presentationConfig: ChannelConfig = {
@@ -348,69 +817,23 @@ const presentationConfig: ChannelConfig = {
   label: 'Presentation',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'presentation_deck',
+  destinationTargets: ['pptx_download', 'google_slides', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'presentation',
   ...CHANNEL_TIERS.presentation,
-  maxOutputTokens: 2500,
-  modelHint: 'visual',
+  maxOutputTokens: 2600,
+  outputSchema: presentationSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
-Channel: Presentation Outline (3–5 slides for ${companyName})
-Structure each slide as:
-
-SLIDE [N]: [Title]
-BULLETS:
-- [bullet point]
-SPEAKER NOTES: [what to say, 2-3 sentences]
-
-Suggested structure:
-Slide 1: Their world (account initiative/pain, not about us)
-Slide 2: How we map to that (product fit, specific to this division)
-Slide 3: Proof (case study or metric from a similar company)
-Slide 4: What changes for them (outcomes, not features)
-Slide 5: Suggested next step
-
-Output plain text with the SLIDE/BULLETS/SPEAKER NOTES markers.`,
+Channel: Presentation Outline (3-5 slides for ${companyName})
+- Return structured content with a slides array.
+- Each slide must include title, bullets, and optional speakerNotes.`,
   buildUserPrompt: () =>
-    'Generate the presentation outline. Output ONLY the SLIDE/BULLETS/SPEAKER NOTES blocks.',
-  parseOutput: (raw) => {
-    const slides: Array<{
-      slideNumber: number;
-      title: string;
-      bullets: string[];
-      speakerNotes: string;
-    }> = [];
-    const slideBlocks = raw.split(/\n(?=SLIDE\s*\d+\s*:)/im);
-    for (const block of slideBlocks) {
-      const numMatch = block.match(/^SLIDE\s*(\d+)\s*:\s*(.+?)(?=\n|$)/im);
-      if (!numMatch) continue;
-      const slideNumber = parseInt(numMatch[1], 10);
-      const title = numMatch[2].trim();
-      let bullets: string[] = [];
-      let speakerNotes = '';
-      const bulletsMatch = block.match(
-        /BULLETS?\s*:\s*([\s\S]*?)(?=SPEAKER\s+NOTES\s*:|$)/im,
-      );
-      if (bulletsMatch) {
-        bullets = bulletsMatch[1]
-          .split(/\n/)
-          .map((l) => l.replace(/^[\s\-*]*/, '').trim())
-          .filter(Boolean);
-      }
-      const notesMatch = block.match(/SPEAKER\s+NOTES\s*:\s*([\s\S]*?)$/im);
-      if (notesMatch) {
-        speakerNotes = notesMatch[1].trim();
-      }
-      slides.push({ slideNumber, title, bullets, speakerNotes });
-    }
-    if (slides.length === 0) {
-      slides.push({
-        slideNumber: 1,
-        title: 'Presentation',
-        bullets: [raw],
-        speakerNotes: '',
-      });
-    }
-    return { slides };
-  },
+    'Generate the presentation as a structured slides array.',
+  parseOutput: parseTextBody,
+  formatOutput: formatPresentation,
 };
 
 const adBriefConfig: ChannelConfig = {
@@ -418,30 +841,21 @@ const adBriefConfig: ChannelConfig = {
   label: 'Ad Brief',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'ad_brief_doc',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'ad_brief',
   ...CHANNEL_TIERS.ad_brief,
-  maxOutputTokens: 1200,
-  modelHint: 'visual',
+  maxOutputTokens: 1400,
+  outputSchema: adBriefSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Ad Brief for ${companyName}
-Structure:
-OBJECTIVE: One sentence describing what the ad should accomplish.
-TARGET AUDIENCE: Who sees this ad (role, seniority, industry).
-KEY MESSAGE: The single most important takeaway (one sentence).
-HEADLINE OPTIONS:
-- [option 1]
-- [option 2]
-- [option 3]
-BODY COPY: 2–3 sentences of ad body text.
-CTA: The call-to-action label and destination.
-VISUAL DIRECTION: 1–2 sentences describing imagery/layout suggestions.
-Output plain text with the section markers above.`,
-  buildUserPrompt: () =>
-    'Generate the ad brief. Output ONLY the structured sections — no other text.',
-  parseOutput: (raw) => {
-    const body = raw.trim();
-    return { body };
-  },
+- Return structured content with objective, targetAudience, keyMessage, headlineOptions, bodyCopy, cta, and visualDirection.`,
+  buildUserPrompt: () => 'Generate the ad brief as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatAdBrief,
 };
 
 const demoScriptConfig: ChannelConfig = {
@@ -449,33 +863,21 @@ const demoScriptConfig: ChannelConfig = {
   label: 'Demo Script',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'demo_runbook',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'demo_script',
   ...CHANNEL_TIERS.demo_script,
-  maxOutputTokens: 2500,
-  modelHint: 'long_form',
+  maxOutputTokens: 2600,
+  outputSchema: demoScriptSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Demo Script for ${companyName}
-Structure each section as:
-
-SECTION [N]: [Title] ([estimated minutes])
-TALK TRACK: What the presenter says (2–4 sentences, conversational).
-DEMO ACTION: What to show on screen (1–2 sentences).
-KEY POINT: The one takeaway from this section.
-
-Suggested structure:
-Section 1: Hook — why this matters to them (1 min)
-Section 2: Their world — current pain/workflow (2 min)
-Section 3: Live product walkthrough — show the core value (5 min)
-Section 4: Results/proof — metrics or case study (2 min)
-Section 5: Next steps — clear ask (1 min)
-
-Output plain text with SECTION/TALK TRACK/DEMO ACTION/KEY POINT markers.`,
-  buildUserPrompt: () =>
-    'Generate the demo script. Output ONLY the SECTION blocks.',
-  parseOutput: (raw) => {
-    const body = raw.trim();
-    return { body };
-  },
+- Return structured content with setup, discoveryQuestions, demoFlow, and close.`,
+  buildUserPrompt: () => 'Generate the demo script as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatDemoScript,
 };
 
 const videoConfig: ChannelConfig = {
@@ -483,30 +885,22 @@ const videoConfig: ChannelConfig = {
   label: 'Video Script',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'video_script_package',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'video',
   ...CHANNEL_TIERS.video,
-  maxOutputTokens: 2000,
-  modelHint: 'long_form',
+  maxOutputTokens: 2200,
+  outputSchema: videoSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Video Script for ${companyName}
-Structure:
-
-TITLE: Video title (compelling, under 80 chars).
-DURATION: Suggested length (e.g. "90 seconds", "3 minutes").
-HOOK (0:00–0:10): Opening line that grabs attention. 1–2 sentences.
-PROBLEM (0:10–0:30): Pain point the viewer relates to. 2–3 sentences.
-SOLUTION (0:30–1:30): How your product solves it, with specifics. 3–5 sentences.
-PROOF (1:30–2:00): Quick stat, quote, or case study reference. 1–2 sentences.
-CTA (2:00–2:15): What the viewer should do next. 1 sentence.
-VISUAL NOTES: Brief notes on what should be shown on screen at each section.
-
-Output plain text with the section markers above.`,
-  buildUserPrompt: () =>
-    'Generate the video script. Output ONLY the structured sections.',
-  parseOutput: (raw) => {
-    const body = raw.trim();
-    return { body };
-  },
+- Return structured content with hook, body, cta, and talkTrack.
+- Keep the body readable as a script and the talkTrack conversational.`,
+  buildUserPrompt: () => 'Generate the video script as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatVideo,
 };
 
 const onePagerConfig: ChannelConfig = {
@@ -514,25 +908,22 @@ const onePagerConfig: ChannelConfig = {
   label: 'One-Pager',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'one_pager_doc',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'one_pager',
   ...CHANNEL_TIERS.one_pager,
-  maxOutputTokens: 1200,
-  modelHint: 'visual',
+  maxOutputTokens: 1600,
+  outputSchema: onePagerSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: One-Pager for ${companyName}
-Structure:
-HEADLINE: One compelling line tailored to this account.
-SUBHEADLINE: One sentence expanding the value proposition.
-KEY VALUE PROPS:
-- [Value prop 1 — specific to the account]
-- [Value prop 2]
-- [Value prop 3]
-PROOF POINT: One stat, quote, or case study reference.
-CTA: Clear next step with label and context.
-Output plain text with the section markers above. Keep it to one page worth of content.`,
-  buildUserPrompt: () =>
-    'Generate the one-pager. Output ONLY the structured sections — no other text.',
-  parseOutput: (raw) => ({ body: raw.trim() }),
+- Return structured content with headline, sections, and cta.
+- Keep sections concise and export-friendly.`,
+  buildUserPrompt: () => 'Generate the one-pager as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatOnePager,
 };
 
 const talkTrackConfig: ChannelConfig = {
@@ -540,30 +931,21 @@ const talkTrackConfig: ChannelConfig = {
   label: 'Talk Track',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'talk_track_sheet',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'talk_track',
   ...CHANNEL_TIERS.talk_track,
   maxOutputTokens: 2000,
-  modelHint: 'long_form',
+  outputSchema: talkTrackSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Talk Track for ${companyName}
-Structure each section as:
-
-SECTION [N]: [Title] ([estimated minutes])
-WHAT TO SAY: Conversational script the rep can use verbatim or adapt (3–5 sentences).
-KEY QUESTION: One discovery or qualifying question to ask.
-OBJECTION HANDLE: One likely pushback and how to respond.
-
-Suggested structure:
-Section 1: Opening — build rapport and set context (1 min)
-Section 2: Discovery — understand their current state (3 min)
-Section 3: Value pitch — connect our solution to their pain (3 min)
-Section 4: Proof — reference a relevant case study or metric (2 min)
-Section 5: Close — next steps and commitment (1 min)
-
-Output plain text with SECTION/WHAT TO SAY/KEY QUESTION/OBJECTION HANDLE markers.`,
-  buildUserPrompt: () =>
-    'Generate the talk track. Output ONLY the SECTION blocks.',
-  parseOutput: (raw) => ({ body: raw.trim() }),
+- Return structured content with opening, painProbe, valueProps, objections, proofPoint, and nextStep.`,
+  buildUserPrompt: () => 'Generate the talk track as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatTalkTrack,
 };
 
 const championEnablementConfig: ChannelConfig = {
@@ -571,26 +953,22 @@ const championEnablementConfig: ChannelConfig = {
   label: 'Champion Kit',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'champion_kit',
+  destinationTargets: ['google_slides', 'google_docs', 'google_drive_file', 'gmail_draft', 'copy'],
+  outputMode: 'object',
+  renderer: 'champion_enablement',
   ...CHANNEL_TIERS.champion_enablement,
-  maxOutputTokens: 2000,
-  modelHint: 'long_form',
+  maxOutputTokens: 2400,
+  outputSchema: championEnablementSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Champion Enablement Kit for ${companyName}
-This is internal selling material your champion can use to build consensus.
-
-EXECUTIVE SUMMARY: 2–3 sentences your champion can forward to their boss.
-INTERNAL EMAIL TEMPLATE: A short email your champion can send to stakeholders (3–4 paragraphs).
-OBJECTION FAQ:
-- Q: [Likely internal objection]
-  A: [How to respond]
-(Include 3–5 Q&A pairs covering budget, timing, competitive alternatives, and implementation.)
-ONE-SLIDE SUMMARY: Title + 3–4 bullets for an internal slide.
-
-Output plain text with the section markers above.`,
+- Return structured content with deckOutline, talkingPoints, and forwardEmail.`,
   buildUserPrompt: () =>
-    'Generate the champion enablement kit. Output ONLY the structured sections.',
-  parseOutput: (raw) => ({ body: raw.trim() }),
+    'Generate the champion enablement kit as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatChampionEnablement,
 };
 
 const mapConfig: ChannelConfig = {
@@ -598,34 +976,22 @@ const mapConfig: ChannelConfig = {
   label: 'Mutual Action Plan',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'map_timeline',
+  destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'map',
   ...CHANNEL_TIERS.map,
-  maxOutputTokens: 1500,
+  maxOutputTokens: 1600,
+  outputSchema: mapSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
-Channel: Mutual Action Plan (MAP) for ${companyName}
-Structure:
-
-OBJECTIVE: One sentence — what both parties are working toward.
-TIMELINE: Target close or go-live date.
-
-PHASE 1: [Phase name] (Week X–Y)
-- THEIR ACTION: What the prospect does
-- OUR ACTION: What we do
-- MILESTONE: How we know it's done
-
-PHASE 2: [Phase name] (Week X–Y)
-...
-
-PHASE 3: [Phase name] (Week X–Y)
-...
-
-RISKS & MITIGATIONS:
-- [Risk]: [Mitigation]
-
-Output plain text with PHASE/THEIR ACTION/OUR ACTION/MILESTONE markers.`,
-  buildUserPrompt: () =>
-    'Generate the mutual action plan. Output ONLY the structured phases.',
-  parseOutput: (raw) => ({ body: raw.trim() }),
+Channel: Mutual Action Plan for ${companyName}
+- Return structured content with milestones.
+- Each milestone should include date, action, owner, and status.`,
+  buildUserPrompt: () => 'Generate the MAP as a structured milestones object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatMap,
 };
 
 const qbrEbrScriptConfig: ChannelConfig = {
@@ -633,36 +999,24 @@ const qbrEbrScriptConfig: ChannelConfig = {
   label: 'QBR / EBR Script',
   mode: 'broadcast',
   group: 'sales_asset',
+  deliveryMode: 'asset_package',
+  templateType: 'qbr_report',
+  destinationTargets: ['google_slides', 'google_docs', 'google_drive_file', 'copy'],
+  outputMode: 'object',
+  renderer: 'qbr_ebr_script',
   ...CHANNEL_TIERS.qbr_ebr_script,
-  maxOutputTokens: 2500,
-  modelHint: 'long_form',
+  maxOutputTokens: 2600,
+  outputSchema: qbrEbrSchema,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: QBR / EBR Script for ${companyName}
-Structure each section as:
-
-SECTION [N]: [Title] ([estimated minutes])
-TALK TRACK: What the presenter says (3–5 sentences, executive tone).
-DATA TO SHOW: What metrics, charts, or evidence to display.
-DISCUSSION PROMPT: One question to spark executive dialogue.
-
-Suggested structure:
-Section 1: Relationship recap — wins and milestones since last review (3 min)
-Section 2: Usage & adoption — key metrics and trends (5 min)
-Section 3: Value delivered — ROI, outcomes, business impact (5 min)
-Section 4: Roadmap alignment — upcoming features mapped to their priorities (5 min)
-Section 5: Expansion opportunities — where we can help them do more (5 min)
-Section 6: Next steps — commitments and timeline (2 min)
-
-Output plain text with SECTION/TALK TRACK/DATA TO SHOW/DISCUSSION PROMPT markers.`,
+- Return structured content with sections.
+- Each section should include title, optional metrics, narrative, and recommendations.`,
   buildUserPrompt: () =>
-    'Generate the QBR/EBR script. Output ONLY the SECTION blocks.',
-  parseOutput: (raw) => ({ body: raw.trim() }),
+    'Generate the QBR / EBR script as a structured object.',
+  parseOutput: parseTextBody,
+  formatOutput: formatQbrEbr,
 };
-
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
 
 const CHANNEL_CONFIGS: Record<ChannelId, ChannelConfig> = {
   email: emailConfig,
@@ -683,18 +1037,26 @@ const CHANNEL_CONFIGS: Record<ChannelId, ChannelConfig> = {
 };
 
 export function getChannelConfig(channel: string): ChannelConfig {
-  const config = CHANNEL_CONFIGS[channel as ChannelId];
-  if (!config) return emailConfig;
-  return config;
+  return CHANNEL_CONFIGS[channel as ChannelId] ?? emailConfig;
 }
 
-/** All registered channels in display order. */
-export function getAllChannels(): { id: ChannelId; label: string; mode: ChannelMode; group: ChannelGroup }[] {
+export function getAllChannels(): Array<{
+  id: ChannelId;
+  label: string;
+  mode: ChannelMode;
+  group: ChannelGroup;
+  deliveryMode: DeliveryMode;
+  templateType: TemplateType;
+  destinationTargets: DestinationTarget[];
+}> {
   return Object.values(CHANNEL_CONFIGS).map((c) => ({
     id: c.id,
     label: c.label,
     mode: c.mode,
     group: c.group,
+    deliveryMode: c.deliveryMode,
+    templateType: c.templateType,
+    destinationTargets: c.destinationTargets,
   }));
 }
 
@@ -702,12 +1064,24 @@ export function isOneToOneChannel(channel: string): boolean {
   return getChannelConfig(channel).mode === 'one_to_one';
 }
 
-/**
- * Maps play content types (email, linkedin, etc.) to the closest ChannelId.
- */
-export function playContentTypeToChannel(
-  contentType: string,
-): ChannelId {
+export function channelSupportsVariants(channel: string): boolean {
+  return !!getChannelConfig(channel).buildVariantSchema;
+}
+
+export function isAssetPackageChannel(channel: string): boolean {
+  return getChannelConfig(channel).deliveryMode === 'asset_package';
+}
+
+export function serializeChannelContent(
+  channel: string,
+  value: Record<string, unknown> | null | undefined,
+): string {
+  if (!value) return '';
+  if (typeof value.raw === 'string' && value.raw.trim()) return value.raw;
+  return getChannelConfig(channel).formatOutput(value);
+}
+
+export function playContentTypeToChannel(contentType: string): ChannelId {
   const map: Record<string, ChannelId> = {
     email: 'email',
     linkedin: 'linkedin_inmail',
@@ -716,7 +1090,7 @@ export function playContentTypeToChannel(
     sms: 'sms',
     slack: 'slack',
     custom_url: 'sales_page',
-    talking_points: 'email',
+    talking_points: 'talk_track',
     presentation: 'presentation',
     sales_page: 'sales_page',
     ad_brief: 'ad_brief',

@@ -109,8 +109,15 @@ export type ModelTier = 'full' | 'fast' | 'extraction';
 const GEMINI_FAST_MODEL = process.env.GEMINI_FAST_MODEL ?? 'gemini-2.0-flash-lite';
 const ANTHROPIC_FAST_MODEL = 'claude-3-5-haiku-20241022';
 
-function getGatewayChatModel(tier: ModelTier, hint?: ContentHint) {
+function getGatewayChatModel(
+  tier: ModelTier,
+  hint?: ContentHint,
+  gatewayModel?: string,
+) {
   const gw = getGatewayClient();
+  if (gatewayModel) {
+    return gw(gatewayModel);
+  }
   if (hint && hint !== 'default' && GATEWAY_HINT_MODELS[hint]) {
     return gw(GATEWAY_HINT_MODELS[hint]);
   }
@@ -142,7 +149,11 @@ function getFastModel() {
  * - 'fast': Cheaper model for simple lookups, structured extraction, signal classification.
  * - 'extraction': Alias for 'fast' — schema-constrained tasks where Haiku-class is sufficient.
  *
- * Content hint (only applied when AI Gateway is enabled):
+ * Content hint / routing precedence (only applied when AI Gateway is enabled):
+ * - explicit `gatewayModel`
+ * - then `hint`
+ * - then tier default
+ *
  * - 'visual': Images, ad briefs, presentation outlines → Google Gemini Flash.
  * - 'web_grounded': Email, LinkedIn InMail → Perplexity Sonar (web search).
  * - 'long_form': Video script, demo script → Google Gemini Pro.
@@ -156,20 +167,25 @@ function getFastModel() {
  * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini direct
  * - else ANTHROPIC_API_KEY → Claude direct
  */
-export function getChatModel(tier: ModelTier = 'full', hint?: ContentHint) {
+export function getChatModel(
+  tier: ModelTier = 'full',
+  hint?: ContentHint,
+  gatewayModel?: string,
+) {
   if (process.env.USE_MOCK_LLM === 'true') {
     return getMockChatModel();
-  }
-
-  if (tier === 'fast' || tier === 'extraction') {
-    return getFastModel();
   }
 
   if (process.env.LLM_PROVIDER === 'lmstudio') {
     return getLmStudioModel();
   }
+
   if (useGateway()) {
-    return getGatewayChatModel('full', hint);
+    return getGatewayChatModel(tier, hint, gatewayModel);
+  }
+
+  if (tier === 'fast' || tier === 'extraction') {
+    return getFastModel();
   }
   if (process.env.LLM_PROVIDER === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     return getAnthropicModel();
