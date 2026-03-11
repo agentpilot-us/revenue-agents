@@ -41,13 +41,13 @@ export function ContentDiffView({ currentContent, previousContent }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h3 className="text-sm font-medium text-red-700 dark:text-red-300 mb-2">Previous</h3>
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
                 {previousDesc || '(empty)'}
               </div>
             </div>
             <div>
               <h3 className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">Current</h3>
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
                 {currentDesc || '(empty)'}
               </div>
             </div>

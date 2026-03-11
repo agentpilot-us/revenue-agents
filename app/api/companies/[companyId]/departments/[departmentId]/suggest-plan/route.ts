@@ -4,8 +4,14 @@ import { prisma } from '@/lib/db';
 import { generateObject } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { z } from 'zod';
+import { buildContentModelSummaryForAI, CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
+import { buildContentMatrixSummaryForAI, getContentTypes, getDefaultMotionForAccount } from '@/lib/content/content-matrix';
 
 export const maxDuration = 60;
+
+const CONTENT_TYPE_IDS = getContentTypes()
+  .filter((t) => t.channelIds.length > 0)
+  .map((t) => t.id);
 
 const suggestedStepSchema = z.object({
   label: z.string().describe('Short action-oriented step name'),
@@ -15,6 +21,12 @@ const suggestedStepSchema = z.object({
     'briefing', 'video', 'gift', 'event', 'content', 'ad_brief',
     'crm', 'in_product', 'demo', 'proposal', 'case_study', 'task', 'internal',
   ]).describe('Best channel for this step'),
+  contentIntent: z.enum(CONTENT_INTENT_IDS).optional()
+    .describe('For content-generating steps, the intent (e.g. introduction, follow_up, new_feature). Omit for non-content steps like calls or meetings.'),
+  contentType: z.string().optional()
+    .describe('For content-generating steps, the ABM content type id from the matrix (e.g. case_study, personalized_outreach_email, ebr_deck). Omit for non-content steps.'),
+  sellingMotion: z.enum(['new_logo', 'upsell', 'cross_sell', 'renewal', 'customer_success']).optional()
+    .describe('For content steps, the selling motion this content serves. Omit for non-content steps.'),
   dayOffset: z.number().describe('Suggested day offset from play start'),
 });
 
@@ -48,7 +60,7 @@ export async function POST(
         where: { id: companyId, userId: session.user.id },
         select: {
           id: true, name: true, domain: true, industry: true,
-          accountType: true, dealObjective: true, keyInitiatives: true,
+          accountType: true, primaryMotion: true, dealObjective: true, keyInitiatives: true,
           researchData: true,
         },
       }),
@@ -105,6 +117,10 @@ export async function POST(
       ? JSON.stringify(company.researchData).slice(0, 2000)
       : 'No research data.';
 
+    const contentModelSummary = buildContentModelSummaryForAI();
+    const contentMatrixSummary = buildContentMatrixSummaryForAI();
+    const motion = company.primaryMotion || getDefaultMotionForAccount(company.accountType);
+
     const systemPrompt = `You are an expert B2B sales strategist and account executive coach. You help AEs create actionable, step-by-step play plans tailored to their selling objectives, target accounts, and available resources.
 
 Your plans should be practical and specific — each step should be something the AE can execute this week or month. Favor high-impact, low-friction actions. Consider the buying group context, available content, and channels when suggesting steps.
@@ -116,12 +132,21 @@ Important guidelines:
 - For partner accounts, emphasize co-selling and mutual value
 - For existing customers, emphasize expansion and executive alignment
 - Include follow-up and measurement steps
-- Keep steps actionable and specific, not generic`;
+- Keep steps actionable and specific, not generic
+- For steps that generate content, choose the most fitting contentIntent from the list below. Match intent to the step goal (e.g. first outreach → introduction, sharing a new capability → new_feature, post-meeting follow-up → follow_up).
+- For content steps, also set contentType to an ABM content type id from the matrix below that fits the step and the account's selling motion (${motion}). Set sellingMotion to the motion this content serves (e.g. ${motion}).
+
+${contentModelSummary}
+
+${contentMatrixSummary}
+
+Valid contentType ids (use for content-generating steps): ${CONTENT_TYPE_IDS.slice(0, 50).join(', ')}${CONTENT_TYPE_IDS.length > 50 ? ' ...' : ''}`;
 
     const userPrompt = `AE OBJECTIVE: ${objective}
 
 TARGET COMPANY: ${company.name} (${company.industry || 'industry unknown'})
 Account Type: ${company.accountType || 'unknown'}
+Selling motion for this play: ${motion}
 Deal Objective: ${company.dealObjective || 'not set'}
 Key Initiatives: ${company.keyInitiatives || 'not set'}
 

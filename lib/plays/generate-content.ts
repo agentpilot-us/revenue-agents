@@ -183,7 +183,7 @@ ${messagingSection}${accountSection}${researchSection}
 ${channelInstruction}`;
 
   const { text } = await generateText({
-    model: getChatModel(),
+    model: getChatModel('full', channelCfg.modelHint),
     maxOutputTokens: channelCfg.maxOutputTokens,
     system: systemPrompt,
     prompt: `User prompt: ${prompt}\n\n${channelCfg.buildUserPrompt()}`,
@@ -393,7 +393,7 @@ ${featureReleasesSection}
 ${messagingSection}${accountSection}${researchSection}`;
 
   const { object } = await generateObject({
-    model: getChatModel(),
+    model: getChatModel('full', 'web_grounded'),
     schema: combinedPlaySchema,
     maxOutputTokens: 3000,
     system: systemPrompt,

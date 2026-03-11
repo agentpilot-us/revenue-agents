@@ -119,7 +119,9 @@ export function DraftFollowUpModal({
                 </div>
                 <div className="mb-4">
                   <div className="font-medium text-gray-700 mb-1">Body</div>
-                  <p className="text-gray-800 whitespace-pre-wrap text-sm">{result.draft.body}</p>
+                  <div className="max-h-[320px] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-gray-800 whitespace-pre-wrap text-sm">{result.draft.body}</p>
+                  </div>
                 </div>
                 {result.contentLibraryMatches.length > 0 && (
                   <div className="mb-4">

@@ -27,6 +27,8 @@ import {
   buildRecipientsBlock,
   deriveToneFromContacts,
 } from '@/lib/content/channel-config';
+import { getContentIntentPromptSnippet, CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
+import { getContentTypePromptSnippet, type MotionId } from '@/lib/content/content-matrix';
 
 const GenerateSchema = z.object({
   companyId: z.string(),
@@ -42,11 +44,21 @@ const GenerateSchema = z.object({
     'ad_brief',
     'demo_script',
     'video',
+    'one_pager',
+    'talk_track',
+    'champion_enablement',
+    'map',
+    'qbr_ebr_script',
   ]),
   contactIds: z.array(z.string()).optional(),
   triggerId: z.string().optional(),
   activeActionIndex: z.number().int().min(0).optional(),
   userContext: z.string().max(1000).optional(),
+  contentIntent: z.enum(CONTENT_INTENT_IDS).optional(),
+  motion: z.string().optional(),
+  contentType: z.string().optional(),
+  senderRole: z.string().optional(),
+  tone: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -217,8 +229,39 @@ export async function POST(req: NextRequest) {
       actionLine = `Frame this outreach around the following chosen action: "${actionText}".\n`;
     }
 
+    const intentSnippet = getContentIntentPromptSnippet(input.contentIntent || 'introduction', channel);
+    const intentLine = intentSnippet
+      ? `Content intent: ${intentSnippet}\n`
+      : '';
+
+    const matrixSnippet = input.contentType
+      ? getContentTypePromptSnippet(input.contentType, input.motion as MotionId | undefined)
+      : '';
+    const matrixLine = matrixSnippet
+      ? `ABM content type: ${matrixSnippet}\n`
+      : '';
+
     const userContextLine = input.userContext?.trim()
       ? `The user provided this specific context for the outreach: "${input.userContext.trim()}". Incorporate this intent into the content.\n`
+      : '';
+
+    const SENDER_ROLE_LABELS: Record<string, string> = {
+      ae: 'Account Executive — consultative, solution-oriented',
+      csm: 'Customer Success Manager — supportive, value-focused, relationship-oriented',
+      sdr: 'Sales Development Rep — concise, curiosity-driven, focused on booking meetings',
+      executive: 'Executive / VP — strategic, peer-to-peer, brief and high-impact',
+    };
+    const TONE_LABELS: Record<string, string> = {
+      direct: 'Direct & concise — get to the point quickly, no fluff',
+      consultative: 'Consultative — ask questions, show expertise, guide the conversation',
+      friendly: 'Friendly & warm — approachable, personable, human',
+      formal: 'Formal — professional, structured, appropriate for executive audiences',
+    };
+    const senderRoleLine = input.senderRole && SENDER_ROLE_LABELS[input.senderRole]
+      ? `Sender role: ${SENDER_ROLE_LABELS[input.senderRole]}. Write from this perspective.\n`
+      : '';
+    const requestedToneLine = input.tone && TONE_LABELS[input.tone]
+      ? `Requested tone: ${TONE_LABELS[input.tone]}.\n`
       : '';
 
     const landminesArr = Array.isArray(playbook?.landmines) ? (playbook.landmines as string[]) : [];
@@ -244,7 +287,7 @@ export async function POST(req: NextRequest) {
     const channelInstruction = channelConfig.buildInstruction(company.name);
 
     const systemPrompt = `You are a B2B sales content writer.
-${aeIdentityLine}${actionLine}${userContextLine}${toneLine}${landminesLine}${divisionIntelLine}
+${aeIdentityLine}${senderRoleLine}${requestedToneLine}${intentLine}${matrixLine}${actionLine}${userContextLine}${toneLine}${landminesLine}${divisionIntelLine}
 The user is creating ${channelConfig.label} content for the target account "${company.name}".
 ${departmentContext}${recipientsSection}
 
@@ -263,7 +306,7 @@ ${messagingSection}${accountSection}${researchSection}
 ${channelInstruction}`;
 
     const { text } = await generateText({
-      model: getChatModel(),
+      model: getChatModel('full', channelConfig.modelHint),
       maxOutputTokens: channelConfig.maxOutputTokens,
       system: systemPrompt,
       prompt: channelConfig.buildUserPrompt(),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildContentUrl } from '@/lib/urls/content';
 import ContactSelector from '@/app/components/workflow/ContactSelector';
@@ -9,6 +9,14 @@ type DepartmentOption = {
   id: string;
   customName: string | null;
   type: string;
+};
+
+type ContentTypeItem = {
+  id: string;
+  label: string;
+  stage: string;
+  channelIds: string[];
+  motions: string[];
 };
 
 type Props = {
@@ -22,20 +30,56 @@ type Props = {
   contentFilter?: string;
   autoCreate?: boolean;
   initialContactId?: string;
+  accountType?: string | null;
+  primaryMotion?: string | null;
 };
 
-const CHANNELS = [
-  { id: 'email', label: 'Email', icon: '\u2709', desc: 'Subject + 3\u20135 paragraph body' },
-  { id: 'linkedin_inmail', label: 'LinkedIn InMail', icon: 'in', desc: '200 char subject + 2\u20133 paragraphs' },
-  { id: 'linkedin_post', label: 'LinkedIn Post', icon: '\ud83d\udcdd', desc: '1\u20133 paragraphs, conversational' },
-  { id: 'slack', label: 'Slack DM', icon: '\ud83d\udcac', desc: '2\u20134 sentences, casual' },
-  { id: 'sms', label: 'Text / SMS', icon: '\ud83d\udcf1', desc: '160 chars or 2\u20133 sentences' },
-  { id: 'sales_page', label: 'Sales Page', icon: '\ud83c\udf10', desc: 'Outline hero + key value props' },
-  { id: 'presentation', label: 'Presentation', icon: '\ud83d\udcca', desc: '3\u20135 slide outline with speaker notes' },
-  { id: 'ad_brief', label: 'Ad Brief', icon: '\ud83d\udcf0', desc: 'Structured ad brief with headline options' },
-  { id: 'demo_script', label: 'Demo Script', icon: '\ud83c\udfac', desc: '5-section scripted demo with talk tracks' },
-  { id: 'video', label: 'Video Script', icon: '\ud83c\udfa5', desc: 'Structured video script with timing cues' },
-] as const;
+type ChannelItem = {
+  id: string;
+  label: string;
+  mode: string;
+  group: string;
+  intents: { id: string; label: string }[];
+};
+
+type MotionItem = {
+  id: string;
+  label: string;
+  description: string;
+  stageContext: string;
+};
+
+const CHANNEL_ICONS: Record<string, string> = {
+  email: '\u2709',
+  linkedin_inmail: 'in',
+  linkedin_post: '\ud83d\udcdd',
+  slack: '\ud83d\udcac',
+  sms: '\ud83d\udcf1',
+  sales_page: '\ud83c\udf10',
+  presentation: '\ud83d\udcca',
+  ad_brief: '\ud83d\udcf0',
+  demo_script: '\ud83c\udfac',
+  video: '\ud83c\udfa5',
+  one_pager: '\ud83d\udcc4',
+  talk_track: '\ud83c\udf99',
+  champion_enablement: '\ud83c\udfc6',
+  map: '\ud83d\uddfa',
+  qbr_ebr_script: '\ud83d\udccb',
+};
+
+const SENDER_ROLES = [
+  { id: 'ae', label: 'Account Executive' },
+  { id: 'csm', label: 'Customer Success' },
+  { id: 'sdr', label: 'SDR / BDR' },
+  { id: 'executive', label: 'Executive' },
+];
+
+const TONE_OPTIONS = [
+  { id: 'direct', label: 'Direct & concise' },
+  { id: 'consultative', label: 'Consultative' },
+  { id: 'friendly', label: 'Friendly & warm' },
+  { id: 'formal', label: 'Formal' },
+];
 
 type SlideItem = { slideNumber: number; title: string; bullets: string[]; speakerNotes: string };
 
@@ -62,27 +106,27 @@ function PresentationSlidesOutput({
           type="button"
           onClick={onDownloadPptx}
           disabled={isDownloading}
-          className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-blue-500/25 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-50 disabled:cursor-default"
+          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-violet-500/25 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-default transition-all"
         >
           {isDownloading ? 'Generating\u2026' : '\u2913 Download as PowerPoint'}
         </button>
         <button
           type="button"
           onClick={onCopyAll}
-          className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-zinc-700 text-gray-400 hover:text-gray-300"
+          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-zinc-700 text-gray-400 hover:text-gray-200 transition-colors"
         >
           Copy All
         </button>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto">
         {slides.map((slide) => (
           <div
             key={slide.slideNumber}
-            className="bg-black/20 border border-zinc-700 rounded-lg overflow-hidden"
+            className="bg-zinc-950/40 border border-zinc-700/60 rounded-xl overflow-hidden"
           >
-            <div className="px-4 py-3 border-b border-zinc-700 flex items-center gap-3">
-              <span className="text-xs font-semibold text-blue-500 shrink-0">
-                Slide {slide.slideNumber}
+            <div className="px-4 py-3 border-b border-zinc-700/60 flex items-center gap-3">
+              <span className="text-[10px] font-bold tracking-wider uppercase text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-md shrink-0">
+                {slide.slideNumber}
               </span>
               <span className="text-sm font-semibold text-gray-100 flex-1 min-w-0">
                 {slide.title}
@@ -90,9 +134,9 @@ function PresentationSlidesOutput({
               <button
                 type="button"
                 onClick={() => copySlide(slide)}
-                className="px-2.5 py-1 rounded-md text-xs font-semibold border border-zinc-700 text-gray-400 hover:text-gray-300"
+                className="px-2.5 py-1 rounded-md text-xs font-semibold border border-zinc-700 text-gray-400 hover:text-gray-200 transition-colors"
               >
-                Copy Slide
+                Copy
               </button>
             </div>
             <div className="px-4 py-3">
@@ -111,12 +155,12 @@ function PresentationSlidesOutput({
                         [slide.slideNumber]: !prev[slide.slideNumber],
                       }))
                     }
-                    className="text-xs font-semibold text-blue-500 hover:text-blue-400"
+                    className="text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors"
                   >
                     {expandedNotes[slide.slideNumber] ? '\u25bc' : '\u25b6'} Speaker notes
                   </button>
                   {expandedNotes[slide.slideNumber] && (
-                    <div className="mt-1.5 p-2.5 rounded-md bg-black/20 text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">
+                    <div className="mt-1.5 p-2.5 rounded-lg bg-zinc-950/40 text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">
                       {slide.speakerNotes}
                     </div>
                   )}
@@ -130,18 +174,62 @@ function PresentationSlidesOutput({
   );
 }
 
+function SuggestionChip({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-zinc-700/60 text-gray-500 hover:text-gray-300 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all"
+    >
+      {label}
+    </button>
+  );
+}
+
+function getSuggestionChips(motionId: string, intentId: string): string[] {
+  const byMotion: Record<string, string[]> = {
+    new_logo: ['Set up intro meeting', 'Share relevant case study', 'Congratulate on recent news', 'Invite to upcoming webinar'],
+    upsell: ['Show new feature value', 'Reference their usage data', 'Propose upgrade path', 'Share expansion ROI'],
+    cross_sell: ['Introduce new product line', 'Connect to existing workflow', 'Share cross-sell case study'],
+    renewal: ['Highlight value delivered', 'Share usage metrics', 'Discuss roadmap alignment', 'Address upcoming renewal'],
+    customer_success: ['Check in on adoption', 'Share best practices', 'Celebrate a milestone', 'Recommend next training'],
+  };
+  const byIntent: Record<string, string[]> = {
+    competitive_displacement: ['Compare key differentiators', 'Migration support details', 'Switching success story'],
+    event_invite: ['Invite to webinar', 'Invite to in-person event', 'Share event agenda'],
+  };
+  return byIntent[intentId] ?? byMotion[motionId] ?? ['Set up a meeting', 'Share a case study', 'Reference recent news'];
+}
+
+function defaultMotion(primaryMotion: string | null | undefined, accountType: string | null | undefined): string {
+  if (primaryMotion) return primaryMotion;
+  if (accountType === 'customer') return 'renewal';
+  return 'new_logo';
+}
+
 export function ContentTabV2({
   companyId,
   companyName,
   initialDepartmentId,
   signalId,
   initialType,
+  accountType,
+  primaryMotion,
 }: Props) {
   const router = useRouter();
+  const defaultMotionValue = defaultMotion(primaryMotion ?? null, accountType ?? null);
 
+  const [channels, setChannels] = useState<ChannelItem[]>([]);
+  const [motions, setMotions] = useState<MotionItem[]>([]);
+  const [contentTypes, setContentTypes] = useState<ContentTypeItem[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(initialDepartmentId ?? null);
+  const [selectedMotion, setSelectedMotion] = useState<string>(defaultMotionValue);
+  const [selectedContentType, setSelectedContentType] = useState<string>('');
   const [selectedChannel, setSelectedChannel] = useState<string>(initialType || 'email');
+  const [selectedIntent, setSelectedIntent] = useState<string>('introduction');
+  const [senderRole, setSenderRole] = useState<string>('ae');
+  const [tone, setTone] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
   const [generated, setGenerated] = useState<{
@@ -157,6 +245,35 @@ export function ContentTabV2({
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [downloadingPptx, setDownloadingPptx] = useState(false);
   const [userContext, setUserContext] = useState('');
+  const [contextTouched, setContextTouched] = useState(false);
+
+  useEffect(() => {
+    setSelectedMotion(defaultMotionValue);
+  }, [defaultMotionValue, primaryMotion, accountType]);
+
+  useEffect(() => {
+    const url = selectedMotion ? `/api/content/channels?motion=${encodeURIComponent(selectedMotion)}` : '/api/content/channels';
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.channels)) setChannels(data.channels);
+        if (data.defaultContentIntent) setSelectedIntent(data.defaultContentIntent);
+        if (Array.isArray(data.motions)) setMotions(data.motions);
+        if (Array.isArray(data.contentTypes)) setContentTypes(data.contentTypes);
+      })
+      .catch(() => {});
+  }, [selectedMotion]);
+
+  const currentChannel = channels.find((c) => c.id === selectedChannel);
+  const availableIntents = currentChannel?.intents ?? [{ id: 'introduction', label: 'Introduction' }, { id: 'custom', label: 'Other / Custom' }];
+  const outreachChannels = channels.filter((c) => c.group === 'outreach');
+  const salesAssetChannels = channels.filter((c) => c.group === 'sales_asset');
+
+  useEffect(() => {
+    if (availableIntents.length > 0 && !availableIntents.find((i) => i.id === selectedIntent)) {
+      setSelectedIntent(availableIntents[0].id);
+    }
+  }, [selectedChannel, availableIntents, selectedIntent]);
 
   const handleSelectionChange = useCallback(
     (contactIds: string[], divisionId: string | null) => {
@@ -168,8 +285,7 @@ export function ContentTabV2({
   );
 
   const handleGenerate = async () => {
-    const broadcastChannels = ['presentation', 'ad_brief', 'demo_script', 'video'];
-    if (!broadcastChannels.includes(selectedChannel) && selectedContacts.length === 0) return;
+    if (needContacts && selectedContacts.length === 0) return;
     setGenerateError(null);
     setIsGenerating(true);
     setIsGenerated(false);
@@ -185,6 +301,11 @@ export function ContentTabV2({
           contactIds: selectedContacts,
           triggerId: signalId,
           userContext: userContext.trim() || undefined,
+          contentIntent: selectedIntent || undefined,
+          motion: selectedMotion || undefined,
+          contentType: selectedContentType || undefined,
+          senderRole: senderRole || undefined,
+          tone: tone || undefined,
         }),
       });
       if (!res.ok) {
@@ -237,6 +358,11 @@ export function ContentTabV2({
           contactIds: selectedContacts,
           triggerId: signalId,
           userContext: userContext.trim() || undefined,
+          contentIntent: selectedIntent || undefined,
+          motion: selectedMotion || undefined,
+          contentType: selectedContentType || undefined,
+          senderRole: senderRole || undefined,
+          tone: tone || undefined,
         }),
       });
       if (!res.ok) {
@@ -332,22 +458,25 @@ export function ContentTabV2({
     }
   };
 
-  const broadcastChannels = new Set(['presentation', 'ad_brief', 'demo_script', 'video']);
-  const needContacts = !broadcastChannels.has(selectedChannel);
+  const isBroadcast = currentChannel?.mode === 'broadcast';
+  const needContacts = !isBroadcast;
   const canGenerate = needContacts ? selectedContacts.length > 0 : true;
   const generateDisabled = !canGenerate || isGenerating;
-  const channelLabel = CHANNELS.find((c) => c.id === selectedChannel)?.label ?? selectedChannel;
+  const channelLabel = currentChannel?.label ?? selectedChannel;
   const generateLabel = isGenerating
     ? 'Generating...'
     : needContacts && selectedContacts.length === 0
       ? 'Select contacts to generate'
-      : broadcastChannels.has(selectedChannel)
-        ? `Generate ${channelLabel}`
-        : `Generate ${channelLabel} for ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}`;
+      : isBroadcast
+      ? `Generate ${channelLabel}`
+      : `Generate ${channelLabel} for ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}`;
+
+  const chips = getSuggestionChips(selectedMotion, selectedIntent);
+  const showContextHint = !contextTouched && !userContext.trim();
 
   return (
-    <div className="space-y-4">
-      {/* Contact Selector — full-width, same UX as play execution */}
+    <div className="space-y-5">
+      {/* Contact Selector */}
       <ContactSelector
         companyId={companyId}
         selectedContactIds={selectedContacts}
@@ -355,105 +484,347 @@ export function ContentTabV2({
         onSelectionChange={handleSelectionChange}
       />
 
-      {/* Channel strip + Generate */}
-      <div className="bg-white dark:bg-zinc-800 rounded-xl border border-gray-200 dark:border-zinc-700 p-5">
-        <div className="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-3">
-          Channel
-        </div>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {CHANNELS.map((ch) => (
-            <button
-              key={ch.id}
-              type="button"
-              onClick={() => {
-                setSelectedChannel(ch.id);
-                setIsGenerated(false);
-                setGenerated(null);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-left border transition-colors ${
-                selectedChannel === ch.id
-                  ? 'bg-blue-500/10 border-blue-500/25'
-                  : 'bg-transparent border-gray-200 dark:border-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <span className="text-sm">{ch.icon}</span>
-              <span className={`text-xs font-semibold ${selectedChannel === ch.id ? 'text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                {ch.label}
-              </span>
-            </button>
-          ))}
+      {/* Main content builder card */}
+      <div className="bg-white dark:bg-zinc-900/70 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+
+        {/* ── Selling Motion ─────────────────────────────────── */}
+        {motions.length > 0 && (
+          <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
+              Selling Motion
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {motions.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  title={m.description}
+                  onClick={() => {
+                    setSelectedMotion(m.id);
+                    setSelectedContentType('');
+                    setIsGenerated(false);
+                    setGenerated(null);
+                  }}
+                  className={`group relative px-3.5 py-2 rounded-xl text-left border transition-all duration-150 ${
+                    selectedMotion === m.id
+                      ? 'bg-violet-500/10 border-violet-500/30 shadow-[0_0_0_1px_rgba(139,92,246,0.15)]'
+                      : 'bg-transparent border-gray-200 dark:border-zinc-700/60 hover:border-violet-500/20 hover:bg-violet-500/5'
+                  }`}
+                >
+                  <span className={`text-xs font-semibold block ${
+                    selectedMotion === m.id ? 'text-violet-400' : 'text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {m.label}
+                  </span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-600 block mt-0.5 leading-tight">
+                    {m.stageContext}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Content Goal (pills replacing dropdown) ──────── */}
+        {contentTypes.length > 0 && (
+          <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
+              Content Goal <span className="font-normal normal-case tracking-normal text-gray-400/60">(optional)</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedContentType('');
+                  setIsGenerated(false);
+                  setGenerated(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                  selectedContentType === ''
+                    ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                    : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                }`}
+              >
+                Any
+              </button>
+              {contentTypes.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedContentType(t.id);
+                    if (t.channelIds?.length) {
+                      setSelectedChannel(t.channelIds[0]);
+                    }
+                    setIsGenerated(false);
+                    setGenerated(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                    selectedContentType === t.id
+                      ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                      : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Channels (grouped: Outreach / Sales Assets) ──── */}
+        <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+          <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
+            Channel
+          </div>
+
+          {outreachChannels.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[9px] font-semibold tracking-wider uppercase text-gray-400/50 dark:text-gray-600 mb-1.5">
+                Outreach
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {outreachChannels.map((ch) => (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedChannel(ch.id);
+                      setIsGenerated(false);
+                      setGenerated(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-left border transition-all duration-150 ${
+                      selectedChannel === ch.id
+                        ? 'bg-violet-500/10 border-violet-500/25 shadow-[0_0_0_1px_rgba(139,92,246,0.1)]'
+                        : 'bg-transparent border-gray-200 dark:border-zinc-700/50 hover:border-violet-500/20 hover:bg-violet-500/5'
+                    }`}
+                  >
+                    <span className="text-sm opacity-70">{CHANNEL_ICONS[ch.id] ?? '\u2709'}</span>
+                    <span className={`text-[11px] font-semibold ${selectedChannel === ch.id ? 'text-violet-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                      {ch.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {salesAssetChannels.length > 0 && (
+            <div>
+              <div className="text-[9px] font-semibold tracking-wider uppercase text-gray-400/50 dark:text-gray-600 mb-1.5">
+                Sales Assets
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {salesAssetChannels.map((ch) => (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedChannel(ch.id);
+                      setIsGenerated(false);
+                      setGenerated(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-left border transition-all duration-150 ${
+                      selectedChannel === ch.id
+                        ? 'bg-violet-500/10 border-violet-500/25 shadow-[0_0_0_1px_rgba(139,92,246,0.1)]'
+                        : 'bg-transparent border-gray-200 dark:border-zinc-700/50 hover:border-violet-500/20 hover:bg-violet-500/5'
+                    }`}
+                  >
+                    <span className="text-sm opacity-70">{CHANNEL_ICONS[ch.id] ?? '\ud83d\udcc4'}</span>
+                    <span className={`text-[11px] font-semibold ${selectedChannel === ch.id ? 'text-violet-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                      {ch.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {channels.length === 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-left border bg-violet-500/10 border-violet-500/25"
+              >
+                <span className="text-sm opacity-70">{'\u2709'}</span>
+                <span className="text-[11px] font-semibold text-violet-400">Email</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* User context / intent */}
-        <div className="mb-4">
+        {/* ── Content Intent ───────────────────────────────── */}
+        <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+          <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
+            Content Intent
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {availableIntents.map((intent) => (
+              <button
+                key={intent.id}
+                type="button"
+                onClick={() => setSelectedIntent(intent.id)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                  selectedIntent === intent.id
+                    ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                    : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                }`}
+              >
+                {intent.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-gray-400/70 dark:text-gray-600 leading-relaxed">
+            Uses account research, division context, and your value props; optimized for 1:1 outreach.
+          </p>
+        </div>
+
+        {/* ── Sender Role + Tone ───────────────────────────── */}
+        <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2">
+                Sender Role
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {SENDER_ROLES.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSenderRole(r.id)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                      senderRole === r.id
+                        ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                        : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2">
+                Tone <span className="font-normal normal-case tracking-normal text-gray-400/60">(optional)</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {TONE_OPTIONS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTone(tone === t.id ? '' : t.id)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                      tone === t.id
+                        ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                        : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── User Context ─────────────────────────────────── */}
+        <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
           <label
             htmlFor="user-context"
-            className="text-[10px] font-bold tracking-widest uppercase text-gray-500 dark:text-gray-400 mb-1.5 block"
+            className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2 block"
           >
-            What do you want to say? <span className="font-normal normal-case tracking-normal">(optional)</span>
+            What do you want to say?
+            {showContextHint && (
+              <span className="ml-2 font-normal normal-case tracking-normal text-amber-500/80 text-[10px]">
+                Adding context makes content significantly better
+              </span>
+            )}
           </label>
           <textarea
             id="user-context"
             value={userContext}
-            onChange={(e) => setUserContext(e.target.value)}
+            onChange={(e) => {
+              setUserContext(e.target.value);
+              if (!contextTouched) setContextTouched(true);
+            }}
             maxLength={1000}
             rows={2}
             placeholder="e.g. Set up a meeting to discuss renewal, Congratulate on new role, Invite to our upcoming webinar..."
-            className="w-full rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900/60 text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+            className="w-full rounded-xl border border-gray-200 dark:border-zinc-700/60 bg-gray-50 dark:bg-zinc-950/40 text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/30 resize-none transition-all"
           />
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {chips.map((chip) => (
+              <SuggestionChip
+                key={chip}
+                label={chip}
+                onClick={() => {
+                  setUserContext(chip);
+                  setContextTouched(true);
+                }}
+              />
+            ))}
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={generateDisabled}
-          className={`w-full py-3 rounded-lg text-sm font-bold text-white tracking-wide transition-colors ${
-            generateDisabled
-              ? 'bg-gray-400 dark:bg-gray-600 cursor-default'
-              : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer'
-          } ${isGenerating ? 'opacity-70' : ''}`}
-        >
-          {generateLabel}
-        </button>
-        {(generateError || sendError || sendSuccess) && (
-          <div className={`mt-2 text-xs ${generateError || sendError ? 'text-amber-500' : 'text-gray-400'}`}>
-            {generateError || sendError || sendSuccess}
-          </div>
-        )}
+        {/* ── Generate Button ──────────────────────────────── */}
+        <div className="px-6 py-5">
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generateDisabled}
+            className={`w-full py-3.5 rounded-xl text-sm font-bold text-white tracking-wide transition-all duration-200 ${
+              generateDisabled
+                ? 'bg-gray-300 dark:bg-zinc-700 cursor-default text-gray-500 dark:text-gray-500'
+                : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 cursor-pointer'
+            } ${isGenerating ? 'opacity-70' : ''}`}
+          >
+            {generateLabel}
+          </button>
+          {(generateError || sendError || sendSuccess) && (
+            <div className={`mt-2.5 text-xs font-medium ${generateError || sendError ? 'text-red-400' : 'text-emerald-400'}`}>
+              {generateError || sendError || sendSuccess}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Content output */}
+      {/* ── Content Output ───────────────────────────────── */}
       {!isGenerated && !isGenerating ? (
-        <div className="bg-gray-50 dark:bg-zinc-900/60 rounded-xl border border-gray-200 dark:border-zinc-700 py-16 px-10 text-center">
-          <div className="text-4xl mb-4 opacity-30">{'✉'}</div>
+        <div className="bg-gray-50 dark:bg-zinc-950/40 rounded-2xl border border-gray-200 dark:border-zinc-800 py-16 px-10 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-500/10 mb-5">
+            <span className="text-2xl opacity-60">{CHANNEL_ICONS[selectedChannel] ?? '\u2709'}</span>
+          </div>
           <div className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
             Select contacts and a channel, then generate content
           </div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 max-w-sm mx-auto leading-relaxed">
+          <div className="text-xs text-gray-400 dark:text-gray-600 max-w-sm mx-auto leading-relaxed">
             The AI will use division data, buying group details, and your company value props to create personalized outreach.
           </div>
         </div>
       ) : isGenerating ? (
-        <div className="bg-gray-50 dark:bg-zinc-900/60 rounded-xl border border-gray-200 dark:border-zinc-700 py-16 px-10 text-center">
-          <div className="text-sm text-blue-500 font-semibold">
-            {'⟳'} Generating personalized content...
+        <div className="bg-gray-50 dark:bg-zinc-950/40 rounded-2xl border border-violet-500/20 py-16 px-10 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-500/10 mb-5 animate-pulse">
+            <span className="text-2xl">{CHANNEL_ICONS[selectedChannel] ?? '\u2709'}</span>
+          </div>
+          <div className="text-sm text-violet-400 font-semibold">
+            Generating personalized content...
           </div>
           <div className="text-xs text-gray-500 mt-2">
             Using division data + your company value props
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-zinc-900/80 rounded-xl border border-gray-200 dark:border-zinc-700 overflow-hidden">
-          {/* Header */}
-          <div className="px-5 py-3.5 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">
-                {CHANNELS.find((c) => c.id === selectedChannel)?.icon}
+        <div className="bg-white dark:bg-zinc-900/70 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+          {/* Output header */}
+          <div className="px-5 py-3.5 border-b border-gray-200 dark:border-zinc-800 flex items-center justify-between bg-gray-50 dark:bg-zinc-900/50">
+            <div className="flex items-center gap-2.5">
+              <span className="text-sm opacity-70">
+                {CHANNEL_ICONS[selectedChannel] ?? '\u2709'}
               </span>
               <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
                 {channelLabel}
               </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+              <span className="text-[10px] text-gray-400 dark:text-gray-600 font-medium bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
                 {selectedContacts.length} contact{selectedContacts.length !== 1 ? 's' : ''}
               </span>
             </div>
@@ -462,18 +833,18 @@ export function ContentTabV2({
                 type="button"
                 onClick={handleRegenerate}
                 disabled={isGenerating || !generated}
-                className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-violet-400 hover:border-violet-500/30 transition-all"
               >
-                {'↻'} Regenerate
+                {'\u21bb'} Regenerate
               </button>
-              {!broadcastChannels.has(selectedChannel) && (
+              {needContacts && (
                 <button
                   type="button"
                   onClick={handleSend}
                   disabled={sending || !generated?.body || selectedContacts.length === 0}
-                  className="px-3.5 py-1.5 rounded-md text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-violet-500/25 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all"
                 >
-                  {'✉'} Send
+                  {'\u2709'} Send
                 </button>
               )}
             </div>
@@ -481,8 +852,8 @@ export function ContentTabV2({
 
           {/* Subject / hook */}
           {selectedChannel === 'email' && generated?.subject && (
-            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
-              <div className="text-[10px] font-semibold tracking-wide uppercase text-blue-500 mb-1">
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-800">
+              <div className="text-[10px] font-bold tracking-wider uppercase text-violet-400 mb-1">
                 Subject
               </div>
               <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -492,8 +863,8 @@ export function ContentTabV2({
           )}
 
           {selectedChannel === 'linkedin_inmail' && generated?.hook && (
-            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
-              <div className="text-[10px] font-semibold tracking-wide uppercase text-blue-500 mb-1">
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-800">
+              <div className="text-[10px] font-bold tracking-wider uppercase text-violet-400 mb-1">
                 Subject (200 char max)
               </div>
               <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -517,10 +888,10 @@ export function ContentTabV2({
             />
           )}
 
-          {/* Body (all channels except presentation, which renders slides) */}
+          {/* Body */}
           {selectedChannel !== 'presentation' && (
             <div className="p-5">
-              <div className="font-mono text-sm leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap p-4 rounded-lg bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-zinc-700">
+              <div className="font-mono text-sm leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap p-4 rounded-xl bg-gray-50 dark:bg-zinc-950/40 border border-gray-200 dark:border-zinc-800 max-h-[400px] overflow-y-auto">
                 {generated?.body ?? 'Content generation not available for this channel.'}
               </div>
             </div>

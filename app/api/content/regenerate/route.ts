@@ -6,16 +6,27 @@ import { POST as generate } from '@/app/api/content/generate/route';
 // optionally incorporating user feedback on the client side into the prompt
 // before calling this endpoint.
 
+import { CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
+
 const RegenerateSchema = z.object({
   contentId: z.string(),
   companyId: z.string(),
   divisionId: z.string().optional(),
-  channel: z.enum(['email', 'linkedin_inmail', 'linkedin_post', 'slack', 'sms', 'sales_page', 'presentation', 'ad_brief', 'demo_script', 'video']),
+  channel: z.enum([
+    'email', 'linkedin_inmail', 'linkedin_post', 'slack', 'sms',
+    'sales_page', 'presentation', 'ad_brief', 'demo_script', 'video',
+    'one_pager', 'talk_track', 'champion_enablement', 'map', 'qbr_ebr_script',
+  ]),
   contactIds: z.array(z.string()).optional(),
   triggerId: z.string().optional(),
   activeActionIndex: z.number().int().min(0).optional(),
   feedback: z.string().optional(),
   userContext: z.string().max(1000).optional(),
+  contentIntent: z.enum(CONTENT_INTENT_IDS).optional(),
+  motion: z.string().optional(),
+  contentType: z.string().optional(),
+  senderRole: z.string().optional(),
+  tone: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -36,6 +47,11 @@ export async function POST(req: NextRequest) {
         triggerId: input.triggerId,
         activeActionIndex: input.activeActionIndex,
         userContext: input.userContext,
+        contentIntent: input.contentIntent,
+        motion: input.motion,
+        contentType: input.contentType,
+        senderRole: input.senderRole,
+        tone: input.tone,
       }),
     });
 

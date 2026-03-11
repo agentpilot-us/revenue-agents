@@ -296,6 +296,8 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
           borderRadius: 8,
           background: 'rgba(15,23,42,0.4)',
           border: `1px solid ${t.border}`,
+          maxHeight: 320,
+          overflowY: 'auto',
         }}
       >
         {content!.body || content!.raw}

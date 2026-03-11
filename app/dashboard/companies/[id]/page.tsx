@@ -99,6 +99,7 @@ export default async function CompanyDetailPage({
       industry: true,
       website: true,
       accountType: true,
+      primaryMotion: true,
       employees: true,
       headquarters: true,
       revenue: true,
@@ -574,6 +575,8 @@ export default async function CompanyDetailPage({
             companyName={company.name}
             companyData={{
               dealObjective: company.dealObjective,
+              accountType: company.accountType ?? null,
+              primaryMotion: company.primaryMotion ?? null,
               industry: company.industry,
               domain: company.domain,
               website: company.website,

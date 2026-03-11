@@ -8,6 +8,8 @@
 import { prisma } from '@/lib/db';
 import { generateOneContent, type GenerateContentType } from '@/lib/plays/generate-content';
 import { getChannelConfig, playContentTypeToChannel } from '@/lib/content/channel-config';
+import { getContentIntentPromptSnippet } from '@/lib/content/content-intents';
+import { getContentTypePromptSnippet, type MotionId } from '@/lib/content/content-matrix';
 
 export type GenerateStepContentInput = {
   workflowId: string;
@@ -88,8 +90,21 @@ export async function generateStepContent(input: GenerateStepContentInput) {
       if (dc.dealGoal) dealLine += `\nDeal goal: ${dc.dealGoal}`;
     }
 
+    const channelId = playContentTypeToChannel(contentType);
+    const intentSnippet = step.contentIntent
+      ? getContentIntentPromptSnippet(step.contentIntent, channelId)
+      : '';
+    const intentLine = intentSnippet ? `Content intent: ${intentSnippet}` : '';
+
+    const matrixSnippet = step.abmContentType
+      ? getContentTypePromptSnippet(step.abmContentType, (step.sellingMotion ?? undefined) as MotionId | undefined)
+      : '';
+    const matrixLine = matrixSnippet ? `ABM content type: ${matrixSnippet}` : '';
+
     const prompt = [
       `Action: ${workflow.title}`,
+      intentLine,
+      matrixLine,
       step.promptHint || `Generate ${contentType} content for this outreach step.`,
       signalLine,
       eventLine,

@@ -363,7 +363,7 @@ function TalkingPointsSection({ title, body }: { title: string; body: string }) 
       </button>
       {expanded && (
         <div className="p-3 pt-0 border-t border-border">
-          <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-sans">
+          <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-sans max-h-[320px] overflow-y-auto">
             {body}
           </pre>
         </div>

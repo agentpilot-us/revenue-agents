@@ -5,10 +5,11 @@
  *
  * Env (priority order):
  * - USE_MOCK_LLM=true → mock model (no API calls)
- * - LLM_PROVIDER=lmstudio → Local LM Studio (OpenAI-compatible)
- * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude
- * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
- * - else ANTHROPIC_API_KEY → Claude
+ * - LLM_PROVIDER=lmstudio → Local LM Studio (OpenAI-compatible, bypasses Gateway)
+ * - AI_GATEWAY_API_KEY → Vercel AI Gateway (unified spend tracking for chat + embeddings)
+ * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude direct
+ * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini direct
+ * - else ANTHROPIC_API_KEY → Claude direct
  */
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -18,6 +19,39 @@ import { MockLanguageModelV3 } from 'ai/test';
 
 const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
 const GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL ?? 'gemini-2.5-flash';
+
+// ── AI Gateway model IDs (provider-prefixed) ────────────────────────────
+const GATEWAY_FULL_MODEL = `anthropic/${ANTHROPIC_MODEL}`;
+const GATEWAY_FAST_MODEL = 'anthropic/claude-3-5-haiku-20241022';
+const GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh/v1';
+
+/** Content-type hint: route to a specialized model when using AI Gateway. */
+export type ContentHint = 'default' | 'visual' | 'web_grounded' | 'long_form';
+
+const GATEWAY_HINT_MODELS: Record<Exclude<ContentHint, 'default'>, string> = {
+  visual: 'google/gemini-2.5-flash',
+  web_grounded: 'perplexity/sonar',
+  long_form: 'google/gemini-2.5-pro',
+};
+
+function useGateway(): boolean {
+  return (
+    !!process.env.AI_GATEWAY_API_KEY &&
+    process.env.USE_MOCK_LLM !== 'true' &&
+    process.env.LLM_PROVIDER !== 'lmstudio'
+  );
+}
+
+let _gatewayClient: ReturnType<typeof createOpenAI> | null = null;
+function getGatewayClient() {
+  if (!_gatewayClient) {
+    _gatewayClient = createOpenAI({
+      baseURL: GATEWAY_BASE_URL,
+      apiKey: process.env.AI_GATEWAY_API_KEY!,
+    });
+  }
+  return _gatewayClient;
+}
 
 function getMockChatModel() {
   const mockText =
@@ -75,9 +109,20 @@ export type ModelTier = 'full' | 'fast' | 'extraction';
 const GEMINI_FAST_MODEL = process.env.GEMINI_FAST_MODEL ?? 'gemini-2.0-flash-lite';
 const ANTHROPIC_FAST_MODEL = 'claude-3-5-haiku-20241022';
 
+function getGatewayChatModel(tier: ModelTier, hint?: ContentHint) {
+  const gw = getGatewayClient();
+  if (hint && hint !== 'default' && GATEWAY_HINT_MODELS[hint]) {
+    return gw(GATEWAY_HINT_MODELS[hint]);
+  }
+  return gw(tier === 'full' ? GATEWAY_FULL_MODEL : GATEWAY_FAST_MODEL);
+}
+
 function getFastModel() {
   if (process.env.LLM_PROVIDER === 'lmstudio') {
     return getLmStudioModel();
+  }
+  if (useGateway()) {
+    return getGatewayChatModel('fast');
   }
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini') {
     return google(GEMINI_FAST_MODEL);
@@ -97,14 +142,21 @@ function getFastModel() {
  * - 'fast': Cheaper model for simple lookups, structured extraction, signal classification.
  * - 'extraction': Alias for 'fast' — schema-constrained tasks where Haiku-class is sufficient.
  *
+ * Content hint (only applied when AI Gateway is enabled):
+ * - 'visual': Images, ad briefs, presentation outlines → Google Gemini Flash.
+ * - 'web_grounded': Email, LinkedIn InMail → Perplexity Sonar (web search).
+ * - 'long_form': Video script, demo script → Google Gemini Pro.
+ * - 'default' or omitted: Use tier-based model.
+ *
  * Env overrides (priority order):
  * - USE_MOCK_LLM=true → mock model (no API calls)
- * - LLM_PROVIDER=lmstudio → Local LM Studio (OpenAI-compatible)
- * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude
- * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini
- * - else ANTHROPIC_API_KEY → Claude
+ * - LLM_PROVIDER=lmstudio → Local LM Studio (OpenAI-compatible, bypasses Gateway)
+ * - AI_GATEWAY_API_KEY → Vercel AI Gateway (unified spend tracking; hint applied)
+ * - LLM_PROVIDER=anthropic + ANTHROPIC_API_KEY → Claude direct
+ * - GOOGLE_GENERATIVE_AI_API_KEY or LLM_PROVIDER=gemini → Gemini direct
+ * - else ANTHROPIC_API_KEY → Claude direct
  */
-export function getChatModel(tier: ModelTier = 'full') {
+export function getChatModel(tier: ModelTier = 'full', hint?: ContentHint) {
   if (process.env.USE_MOCK_LLM === 'true') {
     return getMockChatModel();
   }
@@ -115,6 +167,9 @@ export function getChatModel(tier: ModelTier = 'full') {
 
   if (process.env.LLM_PROVIDER === 'lmstudio') {
     return getLmStudioModel();
+  }
+  if (useGateway()) {
+    return getGatewayChatModel('full', hint);
   }
   if (process.env.LLM_PROVIDER === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     return getAnthropicModel();

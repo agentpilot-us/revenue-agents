@@ -5,6 +5,8 @@
  * generation stay in sync.
  */
 
+import type { ContentHint } from '@/lib/llm/get-model';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -19,7 +21,14 @@ export type ChannelId =
   | 'presentation'
   | 'ad_brief'
   | 'demo_script'
-  | 'video';
+  | 'video'
+  | 'one_pager'
+  | 'talk_track'
+  | 'champion_enablement'
+  | 'map'
+  | 'qbr_ebr_script';
+
+export type ChannelGroup = 'outreach' | 'sales_asset';
 
 export type ChannelMode = 'one_to_one' | 'broadcast';
 
@@ -27,7 +36,10 @@ export interface ChannelConfig {
   id: ChannelId;
   label: string;
   mode: ChannelMode;
+  group: ChannelGroup;
   maxOutputTokens: number;
+  /** When set and AI Gateway is enabled, route to this model (visual, web_grounded, long_form). */
+  modelHint?: ContentHint;
   /** Build the channel-specific instruction block. `companyName` is the target account. */
   buildInstruction: (companyName: string) => string;
   /** Build the user-message prompt sent alongside the system prompt. */
@@ -123,7 +135,9 @@ const emailConfig: ChannelConfig = {
   id: 'email',
   label: 'Email',
   mode: 'one_to_one',
+  group: 'outreach',
   maxOutputTokens: 1000,
+  modelHint: 'web_grounded',
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Email
@@ -158,7 +172,9 @@ const linkedinInmailConfig: ChannelConfig = {
   id: 'linkedin_inmail',
   label: 'LinkedIn InMail',
   mode: 'one_to_one',
+  group: 'outreach',
   maxOutputTokens: 600,
+  modelHint: 'web_grounded',
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: LinkedIn InMail
@@ -213,6 +229,7 @@ const linkedinPostConfig: ChannelConfig = {
   id: 'linkedin_post',
   label: 'LinkedIn Post',
   mode: 'broadcast',
+  group: 'outreach',
   maxOutputTokens: 500,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -235,6 +252,7 @@ const slackConfig: ChannelConfig = {
   id: 'slack',
   label: 'Slack DM',
   mode: 'one_to_one',
+  group: 'outreach',
   maxOutputTokens: 200,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -256,6 +274,7 @@ const smsConfig: ChannelConfig = {
   id: 'sms',
   label: 'Text / SMS',
   mode: 'one_to_one',
+  group: 'outreach',
   maxOutputTokens: 100,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -276,6 +295,7 @@ const salesPageConfig: ChannelConfig = {
   id: 'sales_page',
   label: 'Sales Page',
   mode: 'broadcast',
+  group: 'sales_asset',
   maxOutputTokens: 1500,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -296,7 +316,9 @@ const presentationConfig: ChannelConfig = {
   id: 'presentation',
   label: 'Presentation',
   mode: 'broadcast',
+  group: 'sales_asset',
   maxOutputTokens: 2500,
+  modelHint: 'visual',
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Presentation Outline (3–5 slides for ${companyName})
@@ -363,7 +385,9 @@ const adBriefConfig: ChannelConfig = {
   id: 'ad_brief',
   label: 'Ad Brief',
   mode: 'broadcast',
+  group: 'sales_asset',
   maxOutputTokens: 1200,
+  modelHint: 'visual',
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Ad Brief for ${companyName}
@@ -391,7 +415,9 @@ const demoScriptConfig: ChannelConfig = {
   id: 'demo_script',
   label: 'Demo Script',
   mode: 'broadcast',
+  group: 'sales_asset',
   maxOutputTokens: 2500,
+  modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Demo Script for ${companyName}
@@ -422,7 +448,9 @@ const videoConfig: ChannelConfig = {
   id: 'video',
   label: 'Video Script',
   mode: 'broadcast',
+  group: 'sales_asset',
   maxOutputTokens: 2000,
+  modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
 Channel: Video Script for ${companyName}
@@ -446,6 +474,152 @@ Output plain text with the section markers above.`,
   },
 };
 
+const onePagerConfig: ChannelConfig = {
+  id: 'one_pager',
+  label: 'One-Pager',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  maxOutputTokens: 1200,
+  modelHint: 'visual',
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: One-Pager for ${companyName}
+Structure:
+HEADLINE: One compelling line tailored to this account.
+SUBHEADLINE: One sentence expanding the value proposition.
+KEY VALUE PROPS:
+- [Value prop 1 — specific to the account]
+- [Value prop 2]
+- [Value prop 3]
+PROOF POINT: One stat, quote, or case study reference.
+CTA: Clear next step with label and context.
+Output plain text with the section markers above. Keep it to one page worth of content.`,
+  buildUserPrompt: () =>
+    'Generate the one-pager. Output ONLY the structured sections — no other text.',
+  parseOutput: (raw) => ({ body: raw.trim() }),
+};
+
+const talkTrackConfig: ChannelConfig = {
+  id: 'talk_track',
+  label: 'Talk Track',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  maxOutputTokens: 2000,
+  modelHint: 'long_form',
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: Talk Track for ${companyName}
+Structure each section as:
+
+SECTION [N]: [Title] ([estimated minutes])
+WHAT TO SAY: Conversational script the rep can use verbatim or adapt (3–5 sentences).
+KEY QUESTION: One discovery or qualifying question to ask.
+OBJECTION HANDLE: One likely pushback and how to respond.
+
+Suggested structure:
+Section 1: Opening — build rapport and set context (1 min)
+Section 2: Discovery — understand their current state (3 min)
+Section 3: Value pitch — connect our solution to their pain (3 min)
+Section 4: Proof — reference a relevant case study or metric (2 min)
+Section 5: Close — next steps and commitment (1 min)
+
+Output plain text with SECTION/WHAT TO SAY/KEY QUESTION/OBJECTION HANDLE markers.`,
+  buildUserPrompt: () =>
+    'Generate the talk track. Output ONLY the SECTION blocks.',
+  parseOutput: (raw) => ({ body: raw.trim() }),
+};
+
+const championEnablementConfig: ChannelConfig = {
+  id: 'champion_enablement',
+  label: 'Champion Kit',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  maxOutputTokens: 2000,
+  modelHint: 'long_form',
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: Champion Enablement Kit for ${companyName}
+This is internal selling material your champion can use to build consensus.
+
+EXECUTIVE SUMMARY: 2–3 sentences your champion can forward to their boss.
+INTERNAL EMAIL TEMPLATE: A short email your champion can send to stakeholders (3–4 paragraphs).
+OBJECTION FAQ:
+- Q: [Likely internal objection]
+  A: [How to respond]
+(Include 3–5 Q&A pairs covering budget, timing, competitive alternatives, and implementation.)
+ONE-SLIDE SUMMARY: Title + 3–4 bullets for an internal slide.
+
+Output plain text with the section markers above.`,
+  buildUserPrompt: () =>
+    'Generate the champion enablement kit. Output ONLY the structured sections.',
+  parseOutput: (raw) => ({ body: raw.trim() }),
+};
+
+const mapConfig: ChannelConfig = {
+  id: 'map',
+  label: 'Mutual Action Plan',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  maxOutputTokens: 1500,
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: Mutual Action Plan (MAP) for ${companyName}
+Structure:
+
+OBJECTIVE: One sentence — what both parties are working toward.
+TIMELINE: Target close or go-live date.
+
+PHASE 1: [Phase name] (Week X–Y)
+- THEIR ACTION: What the prospect does
+- OUR ACTION: What we do
+- MILESTONE: How we know it's done
+
+PHASE 2: [Phase name] (Week X–Y)
+...
+
+PHASE 3: [Phase name] (Week X–Y)
+...
+
+RISKS & MITIGATIONS:
+- [Risk]: [Mitigation]
+
+Output plain text with PHASE/THEIR ACTION/OUR ACTION/MILESTONE markers.`,
+  buildUserPrompt: () =>
+    'Generate the mutual action plan. Output ONLY the structured phases.',
+  parseOutput: (raw) => ({ body: raw.trim() }),
+};
+
+const qbrEbrScriptConfig: ChannelConfig = {
+  id: 'qbr_ebr_script',
+  label: 'QBR / EBR Script',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  maxOutputTokens: 2500,
+  modelHint: 'long_form',
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: QBR / EBR Script for ${companyName}
+Structure each section as:
+
+SECTION [N]: [Title] ([estimated minutes])
+TALK TRACK: What the presenter says (3–5 sentences, executive tone).
+DATA TO SHOW: What metrics, charts, or evidence to display.
+DISCUSSION PROMPT: One question to spark executive dialogue.
+
+Suggested structure:
+Section 1: Relationship recap — wins and milestones since last review (3 min)
+Section 2: Usage & adoption — key metrics and trends (5 min)
+Section 3: Value delivered — ROI, outcomes, business impact (5 min)
+Section 4: Roadmap alignment — upcoming features mapped to their priorities (5 min)
+Section 5: Expansion opportunities — where we can help them do more (5 min)
+Section 6: Next steps — commitments and timeline (2 min)
+
+Output plain text with SECTION/TALK TRACK/DATA TO SHOW/DISCUSSION PROMPT markers.`,
+  buildUserPrompt: () =>
+    'Generate the QBR/EBR script. Output ONLY the SECTION blocks.',
+  parseOutput: (raw) => ({ body: raw.trim() }),
+};
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -461,12 +635,27 @@ const CHANNEL_CONFIGS: Record<ChannelId, ChannelConfig> = {
   ad_brief: adBriefConfig,
   demo_script: demoScriptConfig,
   video: videoConfig,
+  one_pager: onePagerConfig,
+  talk_track: talkTrackConfig,
+  champion_enablement: championEnablementConfig,
+  map: mapConfig,
+  qbr_ebr_script: qbrEbrScriptConfig,
 };
 
 export function getChannelConfig(channel: string): ChannelConfig {
   const config = CHANNEL_CONFIGS[channel as ChannelId];
   if (!config) return emailConfig;
   return config;
+}
+
+/** All registered channels in display order. */
+export function getAllChannels(): { id: ChannelId; label: string; mode: ChannelMode; group: ChannelGroup }[] {
+  return Object.values(CHANNEL_CONFIGS).map((c) => ({
+    id: c.id,
+    label: c.label,
+    mode: c.mode,
+    group: c.group,
+  }));
 }
 
 export function isOneToOneChannel(channel: string): boolean {

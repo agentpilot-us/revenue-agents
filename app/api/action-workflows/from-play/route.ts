@@ -56,8 +56,17 @@ export async function POST(req: NextRequest) {
         content: 'email',
         sales_page: 'sales_page',
         video: 'video',
+        demo: 'demo_script',
         gift: 'email',
         event: 'email',
+        ad_brief: 'ad_brief',
+        proposal: 'presentation',
+        case_study: 'presentation',
+        one_pager: 'one_pager',
+        talk_track: 'talk_track',
+        champion_enablement: 'champion_enablement',
+        map: 'map',
+        qbr_ebr_script: 'qbr_ebr_script',
       };
       const workflow = await prisma.actionWorkflow.create({
         data: {
@@ -69,11 +78,14 @@ export async function POST(req: NextRequest) {
           urgencyScore: 50,
           ...(targetDivisionId && { targetDivisionId }),
           steps: {
-            create: customSteps.map((step: { order?: number; label: string; description?: string; channel?: string }, idx: number) => ({
+            create: customSteps.map((step: { order?: number; label: string; description?: string; channel?: string; contentIntent?: string; contentType?: string; sellingMotion?: string }, idx: number) => ({
               stepOrder: step.order ?? idx + 1,
               stepType: 'generate_content',
               contentType: channelToContentType[step.channel || 'email'] || 'email',
               channel: step.channel || 'email',
+              contentIntent: step.contentIntent || null,
+              abmContentType: step.contentType || null,
+              sellingMotion: step.sellingMotion || null,
               promptHint: step.description || step.label,
               status: 'pending',
               ...(targetDivisionId && { divisionId: targetDivisionId }),

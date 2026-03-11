@@ -33,6 +33,9 @@ type StepDraft = {
   label: string;
   description: string;
   channel: ActivityChannel;
+  contentIntent?: string;
+  contentType?: string;
+  sellingMotion?: string;
 };
 
 const t = {
@@ -79,6 +82,9 @@ type AISuggestion = {
     label: string;
     description: string;
     channel: string;
+    contentIntent?: string;
+    contentType?: string;
+    sellingMotion?: string;
     dayOffset: number;
   }>;
   reasoning: string;
@@ -145,6 +151,9 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
             label: s.label,
             description: s.description,
             channel: (CHANNELS.find((c) => c.value === s.channel)?.value ?? 'email') as ActivityChannel,
+            contentIntent: s.contentIntent || 'introduction',
+            contentType: s.contentType || undefined,
+            sellingMotion: s.sellingMotion || undefined,
           }),
         ),
       );
@@ -187,6 +196,9 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
         label: s.label,
         description: s.description || s.label,
         channel: s.channel,
+        contentIntent: s.contentIntent || undefined,
+        contentType: s.contentType || undefined,
+        sellingMotion: s.sellingMotion || undefined,
       }));
 
       const res = await fetch('/api/action-workflows/from-play', {

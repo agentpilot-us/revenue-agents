@@ -27,6 +27,7 @@ export async function GET() {
         notifyOnRemovedContent: true,
         nightlyCrawlPreferredHour: true,
         crawlPaused: true,
+        defaultContentIntent: true,
       },
     });
 
@@ -64,6 +65,7 @@ export async function PUT(req: NextRequest) {
       notifyOnRemovedContent,
       nightlyCrawlPreferredHour,
       crawlPaused,
+      defaultContentIntent,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -87,6 +89,12 @@ export async function PUT(req: NextRequest) {
       }
     }
     if (crawlPaused !== undefined) data.crawlPaused = typeof crawlPaused === 'boolean' ? crawlPaused : undefined;
+    if (defaultContentIntent !== undefined) {
+      const valid = ['introduction', 'follow_up', 'quick_signal_response', 'new_feature', 'custom'];
+      data.defaultContentIntent = typeof defaultContentIntent === 'string' && valid.includes(defaultContentIntent)
+        ? defaultContentIntent
+        : null;
+    }
 
     const user = await prisma.user.update({
       where: { id: session.user.id },
@@ -107,6 +115,7 @@ export async function PUT(req: NextRequest) {
         notifyOnRemovedContent: true,
         nightlyCrawlPreferredHour: true,
         crawlPaused: true,
+        defaultContentIntent: true,
       },
     });
 

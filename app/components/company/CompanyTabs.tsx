@@ -35,6 +35,8 @@ type CompanyTabsProps = {
   companyName: string;
   companyData?: {
     dealObjective: string | null;
+    accountType?: string | null;
+    primaryMotion?: string | null;
     industry: string | null;
     domain: string | null;
     website: string | null;
@@ -479,6 +481,8 @@ export function CompanyTabs({
         <ContentTab
           companyId={companyId}
           companyName={companyName}
+          accountType={companyData?.accountType ?? undefined}
+          primaryMotion={companyData?.primaryMotion ?? undefined}
           departments={(departments as Array<{ id: string; customName: string | null; type: string }>).map((d) => ({
             id: d.id,
             customName: d.customName ?? null,

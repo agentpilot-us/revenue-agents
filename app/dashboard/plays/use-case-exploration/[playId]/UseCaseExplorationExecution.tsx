@@ -329,7 +329,9 @@ export function UseCaseExplorationExecution({
                       <p className="text-sm text-gray-600 mb-1">
                         <strong>Subject:</strong> {d!.subject}
                       </p>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap line-clamp-4">{d!.body}</p>
+                      <div className="max-h-40 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2">
+                        <p className="text-sm text-gray-600 whitespace-pre-wrap">{d!.body}</p>
+                      </div>
                       <div className="flex gap-2 mt-3">
                         <button
                           type="button"

@@ -58,6 +58,7 @@ model User {
   notifyOnNewContent        Boolean?  @default(true)
   notifyOnUpdatedContent    Boolean?  @default(true)
   notifyOnRemovedContent    Boolean?  @default(false)
+  defaultContentIntent      String? // introduction | follow_up | quick_signal_response | new_feature | custom
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
 
@@ -149,8 +150,9 @@ model Company {
   industry     String?
   website      String?
   size         String? // "1-50", "51-200", etc.
-  accountType  String? // partner | customer | new_logo | prospect
-  salesforceId String? // Salesforce Account Id for sync; match on pull by this or by domain/name
+  accountType   String? // partner | customer | new_logo | prospect
+  primaryMotion String? // new_logo | upsell | cross_sell | renewal | customer_success — default for content/plays
+  salesforceId  String? // Salesforce Account Id for sync; match on pull by this or by domain/name
   crmSource    String? // salesforce | hubspot | other (for multi-CRM)
   hubspotId    String? // HubSpot company Id when crmSource = hubspot
 
@@ -2059,6 +2061,9 @@ model ActionWorkflowStep {
   divisionId  String?
   division    CompanyDepartment? @relation(fields: [divisionId], references: [id], onDelete: SetNull)
 
+  contentIntent    String? // introduction | follow_up | quick_signal_response | new_feature | custom
+  abmContentType   String? // content matrix type id (e.g. case_study, ebr_deck)
+  sellingMotion    String? // new_logo | upsell | cross_sell | renewal | customer_success
   promptHint       String? @db.Text
   generatedContent Json?
   editedContent    Json?
