@@ -10,6 +10,22 @@ export async function GET(req: NextRequest) {
     }
 
     const companyId = req.nextUrl.searchParams.get('companyId');
+    const includeGlobal = req.nextUrl.searchParams.get('includeGlobal') === '1';
+
+    if (companyId && includeGlobal) {
+      const rows = await prisma.customSignalConfig.findMany({
+        where: {
+          userId: session.user.id,
+          OR: [{ companyId }, { companyId: null }],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const configs = rows.map((r) => ({
+        ...r,
+        scope: r.companyId ? 'company' as const : 'global' as const,
+      }));
+      return NextResponse.json({ configs });
+    }
 
     const configs = await prisma.customSignalConfig.findMany({
       where: {
@@ -19,7 +35,12 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ configs });
+    return NextResponse.json({
+      configs: configs.map((r) => ({
+        ...r,
+        scope: r.companyId ? 'company' as const : 'global' as const,
+      })),
+    });
   } catch (error) {
     console.error('GET /api/signals/config error:', error);
     return NextResponse.json(

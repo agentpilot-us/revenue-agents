@@ -14,6 +14,7 @@ type SignalConfig = {
 
 type Props = {
   companyId?: string;
+  hideEmptyMessage?: boolean;
 };
 
 const SIGNAL_TYPES = [
@@ -21,7 +22,7 @@ const SIGNAL_TYPES = [
   { value: 'date_trigger', label: 'Date Trigger' },
 ];
 
-export function SignalConfigPanel({ companyId }: Props) {
+export function SignalConfigPanel({ companyId, hideEmptyMessage }: Props) {
   const [configs, setConfigs] = useState<SignalConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -151,7 +152,7 @@ export function SignalConfigPanel({ companyId }: Props) {
 
   return (
     <div className="space-y-3">
-      {configs.length === 0 && !showForm && (
+      {configs.length === 0 && !showForm && !hideEmptyMessage && (
         <p className="text-muted-foreground text-sm">No signal configs defined yet.</p>
       )}
 

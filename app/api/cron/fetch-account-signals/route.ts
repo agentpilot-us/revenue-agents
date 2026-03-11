@@ -78,38 +78,80 @@ export async function POST(req: NextRequest) {
             suggestedPlay: (s.suggestedPlay as import('@/lib/signals/fetch-account-signals').SuggestedPlay) ?? undefined,
           }));
 
+          const customConfigs = await prisma.customSignalConfig.findMany({
+            where: {
+              userId: uid,
+              type: 'exa_search',
+              isActive: true,
+              OR: [{ companyId: company.id }, { companyId: null }],
+            },
+          });
+          type ExaSearchConfig = { query: string; numResults?: number };
+          const seenQueryKeys = new Set<string>();
+          const customQueries: CustomExaQuery[] = customConfigs
+            .filter((c: { config: unknown }) => {
+              const cfg = c.config as ExaSearchConfig;
+              if (!cfg?.query) return false;
+              const key = cfg.query.trim().toLowerCase();
+              if (seenQueryKeys.has(key)) return false;
+              seenQueryKeys.add(key);
+              return true;
+            })
+            .map((c: { name: string; config: unknown }) => ({
+              configName: c.name,
+              query: (c.config as ExaSearchConfig).query,
+              numResults: (c.config as ExaSearchConfig).numResults,
+            }));
+
           let result: import('@/lib/signals/fetch-account-signals').FetchSignalsResult;
 
           if (company.exaWebsetId) {
-            // Persistent webset path: fetch accumulated results, then classify
             const websetItems = await fetchWebsetResults(company.exaWebsetId);
-            result = await classifyPreFetchedSignals(
-              company.name,
-              company.domain ?? '',
-              company.industry,
-              websetItems,
-              company.lastSignalHash,
-              prevSignalsMapped
-            );
-          } else {
-            // Ad-hoc Exa search path (fallback)
-            const customConfigs = await prisma.customSignalConfig.findMany({
-              where: {
-                userId: uid,
-                type: 'exa_search',
-                isActive: true,
-                OR: [{ companyId: company.id }, { companyId: null }],
-              },
-            });
-            type ExaSearchConfig = { query: string; numResults?: number };
-            const customQueries: CustomExaQuery[] = customConfigs
-              .filter((c: { config: unknown }) => (c.config as ExaSearchConfig)?.query)
-              .map((c: { name: string; config: unknown }) => ({
-                configName: c.name,
-                query: (c.config as ExaSearchConfig).query,
-                numResults: (c.config as ExaSearchConfig).numResults,
-              }));
 
+            if (customQueries.length > 0) {
+              const adHocResult = await fetchAccountSignals(
+                company.name,
+                company.domain ?? '',
+                company.industry,
+                48,
+                undefined,
+                undefined,
+                customQueries,
+              );
+              const allItems = [
+                ...websetItems,
+                ...adHocResult.signals.map((s) => ({
+                  url: s.url,
+                  title: s.title,
+                  text: s.summary,
+                  publishedDate: s.publishedAt,
+                })),
+              ];
+              const seenUrls = new Set<string>();
+              const deduped = allItems.filter((item) => {
+                if (seenUrls.has(item.url)) return false;
+                seenUrls.add(item.url);
+                return true;
+              });
+              result = await classifyPreFetchedSignals(
+                company.name,
+                company.domain ?? '',
+                company.industry,
+                deduped,
+                company.lastSignalHash,
+                prevSignalsMapped,
+              );
+            } else {
+              result = await classifyPreFetchedSignals(
+                company.name,
+                company.domain ?? '',
+                company.industry,
+                websetItems,
+                company.lastSignalHash,
+                prevSignalsMapped,
+              );
+            }
+          } else {
             result = await fetchAccountSignals(
               company.name,
               company.domain ?? '',

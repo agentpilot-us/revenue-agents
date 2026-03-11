@@ -14,8 +14,10 @@ import { NextStepBar } from '@/app/components/company/NextStepBar';
 import { cn } from '@/lib/utils';
 import { ExistingStackEditor } from '@/app/components/company/ExistingStackEditor';
 import { ActiveObjectionsPanel } from '@/app/components/company/ActiveObjectionsPanel';
+import { SignalDigest } from '@/app/components/company/SignalDigest';
+import { SignalConfigPanel } from '@/app/components/roadmap/SignalConfigPanel';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content';
+type TabId = 'overview' | 'buying-groups' | 'contacts' | 'content' | 'signals';
 
 type AccountMessagingData = {
   id: string;
@@ -115,6 +117,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'buying-groups', label: 'Buying Groups' },
   { id: 'contacts', label: 'Contacts' },
   { id: 'content', label: 'Content' },
+  { id: 'signals', label: 'Signals' },
 ];
 
 function DealObjectiveBar({
@@ -498,6 +501,14 @@ export function CompanyTabs({
         />
       )}
 
+      {activeTab === 'signals' && (
+        <AccountSignalsTab
+          companyId={companyId}
+          companyName={companyName}
+          onPrepMeOpen={openPrepMe}
+        />
+      )}
+
     </div>
   );
 }
@@ -717,6 +728,164 @@ function EngagementSummaryCard({ rows }: { rows: EngagementRow[] }) {
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function AccountSignalsTab({
+  companyId,
+  companyName,
+  onPrepMeOpen,
+}: {
+  companyId: string;
+  companyName: string;
+  onPrepMeOpen: (params: PrepMePanelParams) => void;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<{ created: number; skippedLlm?: boolean } | null>(null);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshResult(null);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/signals/refresh`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setRefreshResult({ created: data.created ?? 0, skippedLlm: data.skippedLlm });
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Recent Signals Feed */}
+      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-card-foreground">Recent Signals</h2>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={cn(
+              'inline-flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg transition-colors',
+              refreshing
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-violet-600 text-white hover:bg-violet-700 shadow-sm',
+            )}
+          >
+            {refreshing ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Refreshing…
+              </>
+            ) : (
+              'Refresh signals now'
+            )}
+          </button>
+        </div>
+        {refreshResult && (
+          <div className="mb-4 text-xs rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-emerald-700 dark:text-emerald-300">
+            {refreshResult.skippedLlm
+              ? 'No new raw data since last check.'
+              : `Refresh complete — ${refreshResult.created} new signal${refreshResult.created !== 1 ? 's' : ''} found.`}
+          </div>
+        )}
+        <SignalDigest companyId={companyId} companyName={companyName} days={14} onPrepMeOpen={onPrepMeOpen} />
+      </div>
+
+      {/* Account Monitoring Config */}
+      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+        <h2 className="text-lg font-semibold text-card-foreground mb-1">Monitoring for This Account</h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Account-specific EXA searches supplement your default monitoring rules (managed in My Company).
+        </p>
+        <AccountSignalConfigs companyId={companyId} />
+      </div>
+    </div>
+  );
+}
+
+type ScopedSignalConfig = {
+  id: string;
+  name: string;
+  type: string;
+  config: Record<string, unknown>;
+  isActive: boolean;
+  companyId: string | null;
+  scope: 'global' | 'company';
+  createdAt: string;
+};
+
+function AccountSignalConfigs({ companyId }: { companyId: string }) {
+  const [configs, setConfigs] = useState<ScopedSignalConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchConfigs = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/signals/config?companyId=${companyId}&includeGlobal=1`);
+      if (res.ok) {
+        const data = await res.json();
+        setConfigs(data.configs ?? []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId]);
+
+  useEffect(() => { fetchConfigs(); }, [fetchConfigs]);
+
+  const globalConfigs = configs.filter((c) => c.scope === 'global');
+  const companyConfigs = configs.filter((c) => c.scope === 'company');
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Loading monitoring rules…</p>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Global (inherited) rules */}
+      {globalConfigs.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Default Rules
+          </h3>
+          <div className="space-y-2">
+            {globalConfigs.map((cfg) => (
+              <div
+                key={cfg.id}
+                className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm"
+              >
+                <span className={cn(
+                  'inline-block h-2 w-2 rounded-full shrink-0',
+                  cfg.isActive ? 'bg-emerald-500' : 'bg-zinc-400',
+                )} />
+                <span className="flex-1 min-w-0 text-card-foreground truncate">{cfg.name}</span>
+                <span className="text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+                  Default
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Manage defaults in My Company &rarr; Intelligence.
+          </p>
+        </div>
+      )}
+
+      {/* Account-specific rules with full CRUD */}
+      <div>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+          This Account
+        </h3>
+        {companyConfigs.length === 0 && (
+          <p className="text-xs text-muted-foreground mb-2">No account-specific rules yet.</p>
+        )}
+        <SignalConfigPanel companyId={companyId} hideEmptyMessage />
       </div>
     </div>
   );

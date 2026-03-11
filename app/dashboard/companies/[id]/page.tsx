@@ -66,12 +66,11 @@ export default async function CompanyDetailPage({
   }
 
   const tabParam = search.tab;
-  const validTabs = ['overview', 'buying-groups', 'contacts', 'content'] as const;
+  const validTabs = ['overview', 'buying-groups', 'contacts', 'content', 'signals'] as const;
   const legacyTabMap: Record<string, (typeof validTabs)[number]> = {
     departments: 'buying-groups',
     campaigns: 'content',
     activity: 'overview',
-    signals: 'overview',
     engagement: 'overview',
     messaging: 'content',
     map: 'contacts',
@@ -356,6 +355,7 @@ export default async function CompanyDetailPage({
     'buying-groups': 'Buying Groups',
     contacts: 'Contacts',
     content: 'Content',
+    signals: 'Signals',
   };
   const divisionDept = search.division
     ? departments.find((d: { id: string }) => d.id === search.division)

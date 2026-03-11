@@ -51,10 +51,10 @@ export function IntelligenceTab({ signals, companyProducts, eventSummaries }: Pr
       <div className="space-y-6">
         <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground mb-3">
-            Signal Sources
+            Default Monitoring Rules
           </h2>
           <p className="text-xs text-muted-foreground mb-3">
-            Configure custom Exa search queries to monitor specific topics across all your accounts.
+            These EXA searches apply across all target accounts unless supplemented with account-specific rules.
           </p>
           <SignalConfigPanel />
         </section>
