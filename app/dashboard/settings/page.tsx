@@ -5,9 +5,11 @@ import { prisma } from '@/lib/db';
 import { isServiceConfigured, type ServiceId } from '@/lib/service-config';
 import { UserProfileSettings } from '@/app/components/settings/UserProfileSettings';
 import { SalesforceSettingsBlock } from '@/app/components/settings/SalesforceSettingsBlock';
+import { GoogleWorkspaceSettingsBlock } from '@/app/components/settings/GoogleWorkspaceSettingsBlock';
 import { TestConnectionButton } from '@/app/components/settings/TestConnectionButton';
 import { NightlyCrawlSettings } from '@/app/components/settings/NightlyCrawlSettings';
 import { DeleteYourCompanyDataButton } from '@/app/components/settings/DeleteYourCompanyDataButton';
+import { getGoogleWorkspaceConnectionStatus } from '@/lib/integrations/google-workspace-auth';
 
 function serviceStatus(id: ServiceId, optional = false) {
   const connected = isServiceConfigured(id);
@@ -60,6 +62,7 @@ export default async function SettingsPage() {
   });
 
   const isSalesforceConnected = !!user?.salesforceAccessToken;
+  const googleWorkspaceStatus = await getGoogleWorkspaceConnectionStatus(session.user.id);
 
   const services = [
     {
@@ -157,6 +160,15 @@ export default async function SettingsPage() {
             <SalesforceSettingsBlock
               isConnected={isSalesforceConnected}
               lastSyncedAt={lastSalesforceSync?.salesforceLastSyncedAt ?? null}
+            />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-card-foreground">Workspace</h3>
+            <GoogleWorkspaceSettingsBlock
+              isConnected={googleWorkspaceStatus.connected}
+              isLegacyPrimaryGoogle={googleWorkspaceStatus.isLegacyPrimaryGoogle}
+              callbackUrl="/dashboard/settings#services"
             />
           </div>
 

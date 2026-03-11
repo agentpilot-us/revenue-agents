@@ -2,26 +2,62 @@ import { prisma } from '@/lib/db';
 
 type GoogleAccountRow = {
   id: string;
+  provider: string;
   access_token: string | null;
   refresh_token: string | null;
   expires_at: number | null;
   scope: string | null;
 };
 
-async function getGoogleAccount(userId: string): Promise<GoogleAccountRow | null> {
-  return prisma.account.findFirst({
+export const GOOGLE_WORKSPACE_SCOPES = [
+  'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/presentations',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/gmail.compose',
+] as const;
+
+function hasRequiredGoogleWorkspaceScopes(scope: string | null | undefined): boolean {
+  if (!scope) return false;
+  const grantedScopes = new Set(scope.split(/\s+/).filter(Boolean));
+  return GOOGLE_WORKSPACE_SCOPES.every((requiredScope) => grantedScopes.has(requiredScope));
+}
+
+async function getWorkspaceCandidateAccounts(
+  userId: string,
+): Promise<GoogleAccountRow[]> {
+  return prisma.account.findMany({
     where: {
       userId,
-      provider: 'google',
+      provider: { in: ['google-workspace', 'google'] },
     },
     select: {
       id: true,
+      provider: true,
       access_token: true,
       refresh_token: true,
       expires_at: true,
       scope: true,
     },
+    orderBy: { provider: 'asc' },
   });
+}
+
+async function getGoogleAccount(userId: string): Promise<GoogleAccountRow | null> {
+  const accounts = await getWorkspaceCandidateAccounts(userId);
+  return (
+    accounts.find(
+      (account) =>
+        account.provider === 'google-workspace' &&
+        hasRequiredGoogleWorkspaceScopes(account.scope),
+    ) ??
+    accounts.find(
+      (account) =>
+        account.provider === 'google' &&
+        hasRequiredGoogleWorkspaceScopes(account.scope),
+    ) ??
+    accounts.find((account) => account.provider === 'google-workspace') ??
+    null
+  );
 }
 
 async function refreshGoogleAccessToken(account: GoogleAccountRow) {
@@ -73,7 +109,9 @@ async function refreshGoogleAccessToken(account: GoogleAccountRow) {
 export async function getGoogleAccessToken(userId: string): Promise<string> {
   const account = await getGoogleAccount(userId);
   if (!account) {
-    throw new Error('Google account not connected. Sign in with Google to use Docs, Slides, Drive, and Gmail handoff.');
+    throw new Error(
+      'Google Workspace is not connected. Connect Docs, Slides, Drive, and Gmail from Settings to use workspace handoff.',
+    );
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -90,5 +128,32 @@ export async function getGoogleAccessToken(userId: string): Promise<string> {
     return account.access_token;
   }
 
-  throw new Error('Google account is connected but no access token is available.');
+  throw new Error('Google Workspace is connected but no usable access token is available.');
+}
+
+export async function getGoogleWorkspaceConnectionStatus(userId: string): Promise<{
+  connected: boolean;
+  provider: 'google-workspace' | 'google' | null;
+  isLegacyPrimaryGoogle: boolean;
+  grantedScopes: string[];
+}> {
+  const account = await getGoogleAccount(userId);
+  if (!account) {
+    return {
+      connected: false,
+      provider: null,
+      isLegacyPrimaryGoogle: false,
+      grantedScopes: [],
+    };
+  }
+
+  return {
+    connected: hasRequiredGoogleWorkspaceScopes(account.scope),
+    provider:
+      account.provider === 'google-workspace' || account.provider === 'google'
+        ? account.provider
+        : null,
+    isLegacyPrimaryGoogle: account.provider === 'google',
+    grantedScopes: account.scope?.split(/\s+/).filter(Boolean) ?? [],
+  };
 }
