@@ -1,6 +1,6 @@
 /**
  * buildPlayPromptFromSignal — shared prompt builder.
- * Used by run-content API and CreateContentClient's useEffect.
+ * Used by the legacy play-run fallback route.
  * Keeps prompt wording in sync across both entry points.
  */
 export function buildPlayPromptFromSignal(params: {

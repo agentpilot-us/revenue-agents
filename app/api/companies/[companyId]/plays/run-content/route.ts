@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateCombinedPlayContent } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/plays/generate-content';
 import { buildPlayPromptFromSignal } from '@/lib/plays/play-prompt-from-signal';
 
 export const maxDuration = 60;
@@ -135,17 +135,32 @@ export async function POST(
       prompt = `${prompt}\n\nInclude this event landing page link in the email and LinkedIn message as the primary CTA: ${eventUrl}. Use it as the main call-to-action (e.g. "Register here" or "Get your spot").`;
     }
 
-    const combined = await generateCombinedPlayContent({
+    const sharedInput = {
       companyId,
       userId: session.user.id,
+      divisionId: runParams.segmentId ?? undefined,
       prompt,
-      outputs: ['email', 'linkedin', 'talking_points'],
-    });
+    };
+
+    const [email, linkedin, talkingPoints] = await Promise.all([
+      generateOneContent({
+        ...sharedInput,
+        channel: 'email',
+      }),
+      generateOneContent({
+        ...sharedInput,
+        channel: 'linkedin_inmail',
+      }),
+      generateOneContent({
+        ...sharedInput,
+        channel: 'talk_track',
+      }),
+    ]);
 
     return NextResponse.json({
-      email: combined.email ?? '',
-      linkedin: combined.linkedin ?? '',
-      talking_points: combined.talking_points ?? '',
+      email: email.raw,
+      linkedin: linkedin.raw,
+      talking_points: talkingPoints.raw,
       segmentId: runParams.segmentId ?? undefined,
       segmentName: runParams.segmentName ?? undefined,
     });

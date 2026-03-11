@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { X, ChevronDown, ChevronUp, Copy, RefreshCw, ExternalLink, Share2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildPrepMePrompt, type PrepMePromptParams, type EventAttendanceInfo } from '@/lib/prompts/prep-me';
+import { buildContentUrl } from '@/lib/urls/content';
 
 export type PrepMePanelParams = PrepMePromptParams & {
   companyId: string;
@@ -128,10 +129,16 @@ export function PrepMePanel({
     }, 1500);
 
     try {
-      const res = await fetch(`/api/companies/${companyId}/create-content`, {
+      const res = await fetch('/api/content/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentType: 'talking_points', prompt }),
+        body: JSON.stringify({
+          companyId,
+          channel: 'talk_track',
+          contentIntent: 'custom',
+          userContext: prompt,
+          tone: 'consultative',
+        }),
       });
       const data = await res.json();
       clearInterval(stepInterval);
@@ -140,7 +147,7 @@ export function PrepMePanel({
         setStatus('error');
         return;
       }
-      setContent(data.content ?? '');
+      setContent(data.body ?? data.raw ?? '');
       setStatus('success');
     } catch (e) {
       clearInterval(stepInterval);
@@ -155,7 +162,10 @@ export function PrepMePanel({
   }, [objectionsFetched, fetchTalkingPoints]);
 
   const sections = content ? parseTalkingPointsSections(content) : [];
-  const createContentUrl = `/dashboard/companies/${companyId}/create-content?contentType=talking_points&prompt=${encodeURIComponent(prompt)}`;
+  const createContentUrl = buildContentUrl({
+    companyId,
+    channel: 'talk_track',
+  });
 
   const handleShare = useCallback(async () => {
     if (!content) return;
@@ -283,7 +293,7 @@ export function PrepMePanel({
               <Button size="sm" asChild className="gap-1.5">
                 <Link href={createContentUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4" />
-                  Open in Create Content
+                  Open in Content Tab
                 </Link>
               </Button>
             </div>

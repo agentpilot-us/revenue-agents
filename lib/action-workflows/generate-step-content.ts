@@ -1,32 +1,15 @@
-/**
- * Generate content for an ActionWorkflowStep.
- *
- * Wraps the existing generateOneContent() engine with workflow context
- * (signal, account context, prompt hint from the step).
- */
-
 import { prisma } from '@/lib/db';
-import { generateOneContent, type GenerateContentType } from '@/lib/plays/generate-content';
-import { getChannelConfig, playContentTypeToChannel } from '@/lib/content/channel-config';
-import { getContentIntentPromptSnippet } from '@/lib/content/content-intents';
-import { getContentTypePromptSnippet, type MotionId } from '@/lib/content/content-matrix';
+import { generateOneContent } from '@/lib/plays/generate-content';
+import {
+  getChannelConfig,
+  playContentTypeToChannel,
+  type ChannelId,
+} from '@/lib/content/channel-config';
 
 export type GenerateStepContentInput = {
   workflowId: string;
   stepId: string;
   userId: string;
-};
-
-const CONTENT_TYPE_MAP: Record<string, GenerateContentType> = {
-  email: 'email',
-  linkedin_inmail: 'linkedin',
-  linkedin_post: 'linkedin',
-  talking_points: 'talking_points',
-  presentation: 'presentation',
-  sms: 'sms',
-  ad_brief: 'ad_brief',
-  demo_script: 'demo_script',
-  video: 'video',
 };
 
 export async function generateStepContent(input: GenerateStepContentInput) {
@@ -54,80 +37,71 @@ export async function generateStepContent(input: GenerateStepContentInput) {
   });
 
   try {
-    const contentType: GenerateContentType =
-      CONTENT_TYPE_MAP[step.contentType || ''] || 'email';
+    const channelId = resolveStepChannel(step.contentType || step.channel || '');
+    const contactsForTone = workflow.targetContact
+      ? [
+          {
+            firstName: workflow.targetContact.firstName,
+            lastName: workflow.targetContact.lastName,
+            title: workflow.targetContact.title,
+          },
+        ]
+      : undefined;
 
-    const signalContext = workflow.signalContext as Record<string, unknown> | null;
-    const signalLine = signalContext
-      ? `\nTriggering signal: ${signalContext.title || ''} — ${signalContext.summary || ''}`
-      : '';
-
-    const contactLine = workflow.targetContact
-      ? `\nTarget contact: ${workflow.targetContact.firstName} ${workflow.targetContact.lastName}, ${workflow.targetContact.title || 'Unknown Title'}`
-      : '';
-
-    const accountCtx = workflow.accountContext as Record<string, unknown> | null;
-    const eventCtx = accountCtx?.event as Record<string, unknown> | null;
-    let eventLine = '';
-    if (eventCtx) {
-      const parts = [`Event: ${eventCtx.eventTitle || ''}`];
-      if (eventCtx.eventDate || eventCtx.date) parts.push(`Date: ${eventCtx.eventDate || eventCtx.date}`);
-      if (eventCtx.location) parts.push(`Location: ${eventCtx.location}`);
-      if (eventCtx.description) parts.push(`Description: ${eventCtx.description}`);
-      if (eventCtx.registrationUrl) parts.push(`Registration: ${eventCtx.registrationUrl}`);
-      if (Array.isArray(eventCtx.topics) && eventCtx.topics.length > 0) parts.push(`Topics/Sessions: ${(eventCtx.topics as string[]).join(', ')}`);
-      if (Array.isArray(eventCtx.speakers) && eventCtx.speakers.length > 0) parts.push(`Speakers: ${(eventCtx.speakers as string[]).join(', ')}`);
-      eventLine = '\n' + parts.join('\n');
-    }
-
-    let dealLine = '';
-    if (workflow.company.dealObjective) {
-      dealLine += `\nDeal objective: ${workflow.company.dealObjective}`;
-    }
-    if (workflow.company.dealContext && typeof workflow.company.dealContext === 'object') {
-      const dc = workflow.company.dealContext as Record<string, unknown>;
-      if (dc.buyingMotion) dealLine += `\nBuying motion: ${dc.buyingMotion}`;
-      if (dc.dealGoal) dealLine += `\nDeal goal: ${dc.dealGoal}`;
-    }
-
-    const channelId = playContentTypeToChannel(contentType);
-    const intentSnippet = step.contentIntent
-      ? getContentIntentPromptSnippet(step.contentIntent, channelId)
-      : '';
-    const intentLine = intentSnippet ? `Content intent: ${intentSnippet}` : '';
-
-    const matrixSnippet = step.abmContentType
-      ? getContentTypePromptSnippet(step.abmContentType, (step.sellingMotion ?? undefined) as MotionId | undefined)
-      : '';
-    const matrixLine = matrixSnippet ? `ABM content type: ${matrixSnippet}` : '';
+    const signal = toRecord(workflow.signalContext);
+    const accountContext = toRecord(workflow.accountContext);
+    const event = toRecord(accountContext?.event);
 
     const prompt = [
       `Action: ${workflow.title}`,
-      intentLine,
-      matrixLine,
-      step.promptHint || `Generate ${contentType} content for this outreach step.`,
-      signalLine,
-      eventLine,
-      contactLine,
-      dealLine,
+      step.promptHint || `Generate ${channelId} content for this outreach step.`,
+      workflow.targetContact
+        ? `Target contact: ${workflow.targetContact.firstName ?? ''} ${
+            workflow.targetContact.lastName ?? ''
+          }, ${workflow.targetContact.title || 'Unknown Title'}`
+        : '',
+      workflow.company.dealObjective
+        ? `Deal objective: ${workflow.company.dealObjective}`
+        : '',
+      accountContext?.dealGoal ? `Deal goal: ${String(accountContext.dealGoal)}` : '',
+      accountContext?.buyingMotion
+        ? `Buying motion: ${String(accountContext.buyingMotion)}`
+        : '',
     ]
       .filter(Boolean)
       .join('\n');
 
-    const contactsForTone = workflow.targetContact
-      ? [{ firstName: workflow.targetContact.firstName, lastName: workflow.targetContact.lastName, title: workflow.targetContact.title }]
-      : undefined;
-
-    const { content } = await generateOneContent({
+    const { raw, parsed } = await generateOneContent({
       companyId: workflow.companyId,
       userId,
-      contentType,
-      prompt,
+      channel: channelId,
       divisionId: step.divisionId || undefined,
       contacts: contactsForTone,
+      motion: step.sellingMotion || undefined,
+      contentType: step.abmContentType || undefined,
+      contentIntent: step.contentIntent || undefined,
+      userContext: prompt,
+      signalContext: signal
+        ? {
+            title: stringOrUndefined(signal.title),
+            summary: stringOrUndefined(signal.summary),
+          }
+        : undefined,
+      eventContext: event
+        ? {
+            eventTitle: stringOrUndefined(event.eventTitle),
+            eventDate: stringOrUndefined(event.eventDate),
+            date: stringOrUndefined(event.date),
+            location: stringOrUndefined(event.location),
+            description: stringOrUndefined(event.description),
+            registrationUrl: stringOrUndefined(event.registrationUrl),
+            topics: stringArrayOrUndefined(event.topics),
+            speakers: stringArrayOrUndefined(event.speakers),
+          }
+        : undefined,
     });
 
-    const generatedContent = parseContentByType(content, contentType);
+    const generatedContent = { ...parsed, raw };
 
     const updated = await prisma.actionWorkflowStep.update({
       where: { id: stepId },
@@ -151,12 +125,22 @@ export async function generateStepContent(input: GenerateStepContentInput) {
   }
 }
 
-function parseContentByType(
-  raw: string,
-  contentType: GenerateContentType,
-): Record<string, unknown> {
-  const channelId = playContentTypeToChannel(contentType);
-  const config = getChannelConfig(channelId);
-  const parsed = config.parseOutput(raw);
-  return { ...parsed, raw };
+function resolveStepChannel(contentType: string): ChannelId {
+  const mapped = playContentTypeToChannel(contentType);
+  return getChannelConfig(mapped).id;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function stringArrayOrUndefined(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter((item): item is string => typeof item === 'string');
+  return items.length > 0 ? items : undefined;
 }

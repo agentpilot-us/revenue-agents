@@ -1,6 +1,6 @@
 /**
  * Pre-built prompt for Prep Me (talking points) flow.
- * Used by PrepMePanel when calling create-content API with contentType: 'talking_points'.
+ * Used by PrepMePanel when calling the shared content API for talk-track generation.
  */
 
 export type EventAttendanceInfo = {

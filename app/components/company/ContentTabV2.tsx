@@ -42,6 +42,12 @@ type ChannelItem = {
   intents: { id: string; label: string }[];
 };
 
+type PlayItem = {
+  id: string;
+  label: string;
+  description: string;
+};
+
 type MotionItem = {
   id: string;
   label: string;
@@ -222,9 +228,11 @@ export function ContentTabV2({
   const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [motions, setMotions] = useState<MotionItem[]>([]);
   const [contentTypes, setContentTypes] = useState<ContentTypeItem[]>([]);
+  const [playsByMotion, setPlaysByMotion] = useState<Record<string, PlayItem[]>>({});
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(initialDepartmentId ?? null);
   const [selectedMotion, setSelectedMotion] = useState<string>(defaultMotionValue);
+  const [selectedPlayId, setSelectedPlayId] = useState<string>('');
   const [selectedContentType, setSelectedContentType] = useState<string>('');
   const [selectedChannel, setSelectedChannel] = useState<string>(initialType || 'email');
   const [selectedIntent, setSelectedIntent] = useState<string>('introduction');
@@ -238,6 +246,7 @@ export function ContentTabV2({
     hook?: string;
     body?: string;
     slides?: SlideItem[];
+    raw?: string;
   } | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -246,6 +255,8 @@ export function ContentTabV2({
   const [downloadingPptx, setDownloadingPptx] = useState(false);
   const [userContext, setUserContext] = useState('');
   const [contextTouched, setContextTouched] = useState(false);
+  const [regenerationFeedback, setRegenerationFeedback] = useState('');
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
 
   useEffect(() => {
     setSelectedMotion(defaultMotionValue);
@@ -264,7 +275,19 @@ export function ContentTabV2({
       .catch(() => {});
   }, [selectedMotion]);
 
+  useEffect(() => {
+    fetch('/api/content/plays')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.plays && typeof data.plays === 'object') {
+          setPlaysByMotion(data.plays as Record<string, PlayItem[]>);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const currentChannel = channels.find((c) => c.id === selectedChannel);
+  const plays = playsByMotion[selectedMotion] ?? [];
   const availableIntents = currentChannel?.intents ?? [{ id: 'introduction', label: 'Introduction' }, { id: 'custom', label: 'Other / Custom' }];
   const outreachChannels = channels.filter((c) => c.group === 'outreach');
   const salesAssetChannels = channels.filter((c) => c.group === 'sales_asset');
@@ -274,6 +297,15 @@ export function ContentTabV2({
       setSelectedIntent(availableIntents[0].id);
     }
   }, [selectedChannel, availableIntents, selectedIntent]);
+
+  useEffect(() => {
+    if (plays.length === 0) {
+      if (selectedPlayId) setSelectedPlayId('');
+      return;
+    }
+    if (selectedPlayId && plays.some((play) => play.id === selectedPlayId)) return;
+    setSelectedPlayId('');
+  }, [plays, selectedPlayId]);
 
   const handleSelectionChange = useCallback(
     (contactIds: string[], divisionId: string | null) => {
@@ -303,6 +335,7 @@ export function ContentTabV2({
           userContext: userContext.trim() || undefined,
           contentIntent: selectedIntent || undefined,
           motion: selectedMotion || undefined,
+          playId: selectedPlayId || undefined,
           contentType: selectedContentType || undefined,
           senderRole: senderRole || undefined,
           tone: tone || undefined,
@@ -320,8 +353,11 @@ export function ContentTabV2({
         hook: data.hook ?? undefined,
         body: data.body ?? '',
         slides: Array.isArray(data.slides) ? data.slides : undefined,
+        raw: data.raw ?? data.body ?? '',
       });
       setIsGenerated(true);
+      setShowFeedbackInput(false);
+      setRegenerationFeedback('');
 
       const url = buildContentUrl({
         companyId,
@@ -360,9 +396,12 @@ export function ContentTabV2({
           userContext: userContext.trim() || undefined,
           contentIntent: selectedIntent || undefined,
           motion: selectedMotion || undefined,
+          playId: selectedPlayId || undefined,
           contentType: selectedContentType || undefined,
           senderRole: senderRole || undefined,
           tone: tone || undefined,
+          feedback: regenerationFeedback.trim() || undefined,
+          previousOutput: generated.raw || undefined,
         }),
       });
       if (!res.ok) {
@@ -377,8 +416,13 @@ export function ContentTabV2({
         hook: data.hook ?? generated.hook,
         body: data.body ?? generated.body,
         slides: Array.isArray(data.slides) ? data.slides : generated.slides,
+        raw: data.raw ?? generated.raw,
       });
       setIsGenerated(true);
+      if (regenerationFeedback.trim()) {
+        setShowFeedbackInput(false);
+        setRegenerationFeedback('');
+      }
     } catch (e) {
       setGenerateError(e instanceof Error ? e.message : 'Failed to regenerate content.');
     } finally {
@@ -679,6 +723,42 @@ export function ContentTabV2({
           </p>
         </div>
 
+        {plays.length > 0 && (
+          <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
+              Play <span className="font-normal normal-case tracking-normal text-gray-400/60">(optional)</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedPlayId('')}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                  selectedPlayId === ''
+                    ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                    : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                }`}
+              >
+                None
+              </button>
+              {plays.map((play) => (
+                <button
+                  key={play.id}
+                  type="button"
+                  title={play.description}
+                  onClick={() => setSelectedPlayId(play.id)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                    selectedPlayId === play.id
+                      ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                      : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                  }`}
+                >
+                  {play.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Sender Role + Tone ───────────────────────────── */}
         <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
           <div className="grid grid-cols-2 gap-4">
@@ -831,6 +911,13 @@ export function ContentTabV2({
             <div className="flex gap-2">
               <button
                 type="button"
+                onClick={() => setShowFeedbackInput((value) => !value)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-violet-400 hover:border-violet-500/30 transition-all"
+              >
+                {showFeedbackInput ? 'Hide Feedback' : 'Add Feedback'}
+              </button>
+              <button
+                type="button"
                 onClick={handleRegenerate}
                 disabled={isGenerating || !generated}
                 className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-violet-400 hover:border-violet-500/30 transition-all"
@@ -849,6 +936,26 @@ export function ContentTabV2({
               )}
             </div>
           </div>
+
+          {showFeedbackInput && (
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-zinc-800 bg-gray-50/70 dark:bg-zinc-900/40">
+              <label
+                htmlFor="regeneration-feedback"
+                className="text-[10px] font-bold tracking-wider uppercase text-gray-400 dark:text-gray-500 mb-2 block"
+              >
+                Regeneration Feedback
+              </label>
+              <textarea
+                id="regeneration-feedback"
+                value={regenerationFeedback}
+                onChange={(e) => setRegenerationFeedback(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder="e.g. Make this shorter, sound more executive, or lean harder into the product launch signal."
+                className="w-full rounded-xl border border-gray-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-950/40 text-sm text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/30 resize-none transition-all"
+              />
+            </div>
+          )}
 
           {/* Subject / hook */}
           {selectedChannel === 'email' && generated?.subject && (

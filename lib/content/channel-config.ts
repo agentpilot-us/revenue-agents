@@ -32,11 +32,15 @@ export type ChannelGroup = 'outreach' | 'sales_asset';
 
 export type ChannelMode = 'one_to_one' | 'broadcast';
 
+export type ContextTier = 'light' | 'standard' | 'deep';
+
 export interface ChannelConfig {
   id: ChannelId;
   label: string;
   mode: ChannelMode;
   group: ChannelGroup;
+  contextTier: ContextTier;
+  modelTier: 'fast' | 'full';
   maxOutputTokens: number;
   /** When set and AI Gateway is enabled, route to this model (visual, web_grounded, long_form). */
   modelHint?: ContentHint;
@@ -127,6 +131,27 @@ function truncateAtBoundary(text: string, maxChars: number): string {
   return truncated.trimEnd() + '…';
 }
 
+const CHANNEL_TIERS: Record<
+  ChannelId,
+  { contextTier: ContextTier; modelTier: 'fast' | 'full' }
+> = {
+  email: { contextTier: 'standard', modelTier: 'fast' },
+  linkedin_inmail: { contextTier: 'standard', modelTier: 'fast' },
+  linkedin_post: { contextTier: 'standard', modelTier: 'fast' },
+  slack: { contextTier: 'light', modelTier: 'fast' },
+  sms: { contextTier: 'light', modelTier: 'fast' },
+  sales_page: { contextTier: 'deep', modelTier: 'full' },
+  presentation: { contextTier: 'deep', modelTier: 'full' },
+  ad_brief: { contextTier: 'standard', modelTier: 'fast' },
+  demo_script: { contextTier: 'deep', modelTier: 'full' },
+  video: { contextTier: 'standard', modelTier: 'fast' },
+  one_pager: { contextTier: 'deep', modelTier: 'full' },
+  talk_track: { contextTier: 'standard', modelTier: 'fast' },
+  champion_enablement: { contextTier: 'deep', modelTier: 'full' },
+  map: { contextTier: 'standard', modelTier: 'fast' },
+  qbr_ebr_script: { contextTier: 'deep', modelTier: 'full' },
+};
+
 // ---------------------------------------------------------------------------
 // Per-channel configs
 // ---------------------------------------------------------------------------
@@ -136,6 +161,7 @@ const emailConfig: ChannelConfig = {
   label: 'Email',
   mode: 'one_to_one',
   group: 'outreach',
+  ...CHANNEL_TIERS.email,
   maxOutputTokens: 1000,
   modelHint: 'web_grounded',
   buildInstruction: () => `
@@ -173,6 +199,7 @@ const linkedinInmailConfig: ChannelConfig = {
   label: 'LinkedIn InMail',
   mode: 'one_to_one',
   group: 'outreach',
+  ...CHANNEL_TIERS.linkedin_inmail,
   maxOutputTokens: 600,
   modelHint: 'web_grounded',
   buildInstruction: () => `
@@ -230,6 +257,7 @@ const linkedinPostConfig: ChannelConfig = {
   label: 'LinkedIn Post',
   mode: 'broadcast',
   group: 'outreach',
+  ...CHANNEL_TIERS.linkedin_post,
   maxOutputTokens: 500,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -253,6 +281,7 @@ const slackConfig: ChannelConfig = {
   label: 'Slack DM',
   mode: 'one_to_one',
   group: 'outreach',
+  ...CHANNEL_TIERS.slack,
   maxOutputTokens: 200,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -275,6 +304,7 @@ const smsConfig: ChannelConfig = {
   label: 'Text / SMS',
   mode: 'one_to_one',
   group: 'outreach',
+  ...CHANNEL_TIERS.sms,
   maxOutputTokens: 100,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -296,6 +326,7 @@ const salesPageConfig: ChannelConfig = {
   label: 'Sales Page',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.sales_page,
   maxOutputTokens: 1500,
   buildInstruction: () => `
 === OUTPUT FORMAT (STRICT) ===
@@ -317,6 +348,7 @@ const presentationConfig: ChannelConfig = {
   label: 'Presentation',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.presentation,
   maxOutputTokens: 2500,
   modelHint: 'visual',
   buildInstruction: (companyName: string) => `
@@ -386,6 +418,7 @@ const adBriefConfig: ChannelConfig = {
   label: 'Ad Brief',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.ad_brief,
   maxOutputTokens: 1200,
   modelHint: 'visual',
   buildInstruction: (companyName: string) => `
@@ -416,6 +449,7 @@ const demoScriptConfig: ChannelConfig = {
   label: 'Demo Script',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.demo_script,
   maxOutputTokens: 2500,
   modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
@@ -449,6 +483,7 @@ const videoConfig: ChannelConfig = {
   label: 'Video Script',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.video,
   maxOutputTokens: 2000,
   modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
@@ -479,6 +514,7 @@ const onePagerConfig: ChannelConfig = {
   label: 'One-Pager',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.one_pager,
   maxOutputTokens: 1200,
   modelHint: 'visual',
   buildInstruction: (companyName: string) => `
@@ -504,6 +540,7 @@ const talkTrackConfig: ChannelConfig = {
   label: 'Talk Track',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.talk_track,
   maxOutputTokens: 2000,
   modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
@@ -534,6 +571,7 @@ const championEnablementConfig: ChannelConfig = {
   label: 'Champion Kit',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.champion_enablement,
   maxOutputTokens: 2000,
   modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
@@ -560,6 +598,7 @@ const mapConfig: ChannelConfig = {
   label: 'Mutual Action Plan',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.map,
   maxOutputTokens: 1500,
   buildInstruction: (companyName: string) => `
 === OUTPUT FORMAT (STRICT) ===
@@ -594,6 +633,7 @@ const qbrEbrScriptConfig: ChannelConfig = {
   label: 'QBR / EBR Script',
   mode: 'broadcast',
   group: 'sales_asset',
+  ...CHANNEL_TIERS.qbr_ebr_script,
   maxOutputTokens: 2500,
   modelHint: 'long_form',
   buildInstruction: (companyName: string) => `
@@ -682,6 +722,11 @@ export function playContentTypeToChannel(
     ad_brief: 'ad_brief',
     demo_script: 'demo_script',
     video: 'video',
+    one_pager: 'one_pager',
+    talk_track: 'talk_track',
+    champion_enablement: 'champion_enablement',
+    map: 'map',
+    qbr_ebr_script: 'qbr_ebr_script',
   };
   return map[contentType] ?? 'email';
 }

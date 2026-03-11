@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateOneContent, type GenerateContentType } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/plays/generate-content';
 import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
 import type { PageType } from '@/lib/campaigns/build-sales-page-prompt';
+import {
+  playContentTypeToChannel,
+  type ChannelId,
+} from '@/lib/content/channel-config';
 
 type PreviewPayload = {
   title?: string;
@@ -16,12 +20,12 @@ type PreviewPayload = {
   existingProductReference?: string;
 };
 
-const GENERATE_ONE_TYPES: Record<string, GenerateContentType> = {
+const GENERATE_ONE_CHANNELS: Record<string, ChannelId> = {
   email: 'email',
   event_invite: 'email',
   presentation: 'presentation',
   roi_deck: 'presentation',
-  talking_points: 'talking_points',
+  talking_points: 'talk_track',
 };
 
 const SALES_PAGE_TYPES: Record<string, PageType> = {
@@ -98,15 +102,15 @@ export async function POST(
       }
       generatedContent = result.data;
     } else {
-      const mappedType = GENERATE_ONE_TYPES[contentType] ?? 'email';
+      const mappedChannel = GENERATE_ONE_CHANNELS[contentType] ?? playContentTypeToChannel(contentType);
       const result = await generateOneContent({
         companyId,
         userId,
-        contentType: mappedType,
+        channel: mappedChannel,
         prompt,
         divisionId,
       });
-      generatedContent = result.content;
+      generatedContent = result.raw;
     }
 
     await prisma.roadmapPlan.update({

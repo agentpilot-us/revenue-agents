@@ -484,7 +484,7 @@ export default function PlayExecuteClient({ companyId, companyName, workflowId }
                   </p>
                 </div>
                 <Link
-                  href={`/dashboard/companies/${companyId}/create-content?contentType=sales_page`}
+                  href={`/dashboard/companies/${companyId}?tab=content&type=sales_page&action=create`}
                   style={{
                     padding: '8px 16px',
                     borderRadius: 8,

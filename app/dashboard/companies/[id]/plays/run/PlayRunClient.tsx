@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { buildContentUrl } from '@/lib/urls/content';
 
 type AEStep = {
   order: number;
@@ -631,7 +632,17 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
   if (runParams.segmentId ?? generated?.segmentId) {
     editBaseParams.set('segmentId', (runParams.segmentId ?? generated?.segmentId)!);
   }
-  const editBase = `/dashboard/companies/${companyId}/create-content`;
+  const editHref = (channel: 'email' | 'linkedin_inmail' | 'talk_track') => {
+    const href = buildContentUrl({
+      companyId,
+      divisionId: (runParams.segmentId ?? generated?.segmentId) || undefined,
+      triggerId: runParams.signalId,
+      channel,
+    });
+    const search = new URLSearchParams(editBaseParams.toString());
+    const separator = href.includes('?') ? '&' : '?';
+    return search.toString() ? `${href}${separator}${search.toString()}` : href;
+  };
 
   const segmentName = generated?.segmentName ?? runParams.segmentName;
   const playId = runParams.playId;
@@ -801,7 +812,7 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                   icon="&#x1F4E7;"
                   label="Email"
                   content={generated.email}
-                  editHref={`${editBase}?${editBaseParams.toString()}&contentType=email`}
+                  editHref={editHref('email')}
                 />
               )}
 
@@ -810,7 +821,7 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                   icon="&#x1F4BC;"
                   label="LinkedIn"
                   content={generated.linkedin}
-                  editHref={`${editBase}?${editBaseParams.toString()}&contentType=linkedin`}
+                  editHref={editHref('linkedin_inmail')}
                 />
               )}
 
@@ -819,7 +830,7 @@ export function PlayRunClient({ companyId, companyName, runParams }: PlayRunClie
                   icon="&#x1F4CB;"
                   label="Talking Points"
                   content={generated.talking_points}
-                  editHref={`${editBase}?${editBaseParams.toString()}&contentType=talking_points`}
+                  editHref={editHref('talk_track')}
                 />
               )}
 
