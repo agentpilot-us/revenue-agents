@@ -12,6 +12,9 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 
+type EmbeddingProviderOptions =
+  NonNullable<Parameters<(typeof import('ai'))['embed']>[0]['providerOptions']>;
+
 const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 const RAG_EMBEDDING_DIMENSION = 1536;
 
@@ -36,9 +39,7 @@ function getGatewayClient() {
 export function getEmbeddingModel() {
   if (useGateway()) {
     const gw = getGatewayClient();
-    return gw.embedding(GATEWAY_EMBEDDING_MODEL, {
-      dimensions: RAG_EMBEDDING_DIMENSION,
-    });
+    return gw.embedding(GATEWAY_EMBEDDING_MODEL);
   }
 
   if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
@@ -49,7 +50,7 @@ export function getEmbeddingModel() {
   return google.embedding(GEMINI_EMBEDDING_MODEL);
 }
 
-export function getEmbeddingProviderOptions(): Record<string, unknown> {
+export function getEmbeddingProviderOptions(): EmbeddingProviderOptions {
   if (useGateway()) return {};
   return { google: { outputDimensionality: RAG_EMBEDDING_DIMENSION } };
 }
