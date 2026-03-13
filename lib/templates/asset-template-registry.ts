@@ -83,6 +83,20 @@ const TEMPLATE_REGISTRY: Record<TemplateType, AssetTemplateDefinition> = {
     supports: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
     googleDestination: 'docs',
   },
+  generated_image_asset: {
+    templateType: 'generated_image_asset',
+    label: 'Generated Image',
+    brand: DEFAULT_BRAND_TOKENS,
+    supports: ['download'],
+    googleDestination: 'drive',
+  },
+  generated_video_asset: {
+    templateType: 'generated_video_asset',
+    label: 'Generated Video',
+    brand: DEFAULT_BRAND_TOKENS,
+    supports: ['download'],
+    googleDestination: 'drive',
+  },
   one_pager_doc: {
     templateType: 'one_pager_doc',
     label: 'One-Pager',

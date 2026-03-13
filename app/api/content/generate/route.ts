@@ -23,6 +23,8 @@ const CHANNEL_IDS = [
   'ad_brief',
   'demo_script',
   'video',
+  'generated_image',
+  'generated_video',
   'one_pager',
   'talk_track',
   'champion_enablement',
@@ -44,6 +46,8 @@ const GenerateSchema = z.object({
   contentType: z.string().optional(),
   senderRole: z.string().optional(),
   tone: z.string().optional(),
+  mediaAspectRatio: z.string().optional(),
+  mediaDurationSeconds: z.number().int().min(1).max(8).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -97,6 +101,8 @@ export async function POST(req: NextRequest) {
       senderRole: input.senderRole,
       tone: input.tone,
       userContext: input.userContext,
+      mediaAspectRatio: input.mediaAspectRatio,
+      mediaDurationSeconds: input.mediaDurationSeconds,
       signalContext: signal
         ? {
             title: signal.title,
@@ -130,6 +136,7 @@ export async function POST(req: NextRequest) {
       destinationTargets: config.destinationTargets,
       templateType: config.templateType,
       assetPackage,
+      media: result.media,
       variants: result.variants?.map((variant) => ({
         contentId: crypto.randomUUID(),
         label: variant.label,

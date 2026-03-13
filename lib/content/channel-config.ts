@@ -19,6 +19,8 @@ export type ChannelId =
   | 'ad_brief'
   | 'demo_script'
   | 'video'
+  | 'generated_image'
+  | 'generated_video'
   | 'one_pager'
   | 'talk_track'
   | 'champion_enablement'
@@ -30,6 +32,7 @@ export type ChannelMode = 'one_to_one' | 'broadcast';
 export type ContextTier = 'light' | 'standard' | 'deep';
 export type OutputMode = 'text' | 'object';
 export type DeliveryMode = 'direct_draft' | 'asset_package';
+export type GenerationKind = 'text' | 'image' | 'video';
 export type TemplateType =
   | 'email_message'
   | 'linkedin_message'
@@ -41,6 +44,8 @@ export type TemplateType =
   | 'ad_brief_doc'
   | 'demo_runbook'
   | 'video_script_package'
+  | 'generated_image_asset'
+  | 'generated_video_asset'
   | 'one_pager_doc'
   | 'talk_track_sheet'
   | 'champion_kit'
@@ -53,6 +58,7 @@ export type DestinationTarget =
   | 'gmail_draft'
   | 'pptx_download'
   | 'html_preview'
+  | 'download'
   | 'copy';
 export type RendererKind =
   | 'text'
@@ -64,6 +70,8 @@ export type RendererKind =
   | 'ad_brief'
   | 'demo_script'
   | 'video'
+  | 'image_asset'
+  | 'video_asset'
   | 'one_pager'
   | 'talk_track'
   | 'champion_enablement'
@@ -87,6 +95,7 @@ export interface ChannelConfig {
   contextTier: ContextTier;
   modelTier: 'fast' | 'full';
   maxOutputTokens: number;
+  generationKind: GenerationKind;
   outputMode: OutputMode;
   renderer: RendererKind;
   gatewayModel?: string;
@@ -648,6 +657,20 @@ const CHANNEL_TIERS: Record<
   },
   demo_script: { contextTier: 'deep', modelTier: 'full' },
   video: { contextTier: 'standard', modelTier: 'fast' },
+  generated_image: {
+    contextTier: 'standard',
+    modelTier: 'fast',
+    gatewayModel:
+      process.env.GATEWAY_IMAGE_MODEL ?? 'google/gemini-3-pro-image',
+    modelHint: 'visual',
+  },
+  generated_video: {
+    contextTier: 'standard',
+    modelTier: 'full',
+    gatewayModel:
+      process.env.GATEWAY_VIDEO_MODEL ?? 'google/veo-3.1-generate-001',
+    modelHint: 'visual',
+  },
   one_pager: { contextTier: 'deep', modelTier: 'full' },
   talk_track: { contextTier: 'standard', modelTier: 'fast' },
   champion_enablement: { contextTier: 'deep', modelTier: 'full' },
@@ -663,6 +686,7 @@ const emailConfig: ChannelConfig = {
   deliveryMode: 'direct_draft',
   templateType: 'email_message',
   destinationTargets: ['gmail_draft', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'email',
   ...CHANNEL_TIERS.email,
@@ -692,6 +716,7 @@ const linkedinInmailConfig: ChannelConfig = {
   deliveryMode: 'direct_draft',
   templateType: 'linkedin_message',
   destinationTargets: ['copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'linkedin_inmail',
   ...CHANNEL_TIERS.linkedin_inmail,
@@ -721,6 +746,7 @@ const linkedinPostConfig: ChannelConfig = {
   deliveryMode: 'direct_draft',
   templateType: 'linkedin_post',
   destinationTargets: ['copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'linkedin_post',
   ...CHANNEL_TIERS.linkedin_post,
@@ -749,6 +775,7 @@ const slackConfig: ChannelConfig = {
   deliveryMode: 'direct_draft',
   templateType: 'slack_message',
   destinationTargets: ['copy'],
+  generationKind: 'text',
   outputMode: 'text',
   renderer: 'text',
   ...CHANNEL_TIERS.slack,
@@ -772,6 +799,7 @@ const smsConfig: ChannelConfig = {
   deliveryMode: 'direct_draft',
   templateType: 'sms_message',
   destinationTargets: ['copy'],
+  generationKind: 'text',
   outputMode: 'text',
   renderer: 'text',
   ...CHANNEL_TIERS.sms,
@@ -796,6 +824,7 @@ const salesPageConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'sales_page_html',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'sales_page',
   ...CHANNEL_TIERS.sales_page,
@@ -820,6 +849,7 @@ const presentationConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'presentation_deck',
   destinationTargets: ['pptx_download', 'google_slides', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'presentation',
   ...CHANNEL_TIERS.presentation,
@@ -844,6 +874,7 @@ const adBriefConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'ad_brief_doc',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'ad_brief',
   ...CHANNEL_TIERS.ad_brief,
@@ -866,6 +897,7 @@ const demoScriptConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'demo_runbook',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'demo_script',
   ...CHANNEL_TIERS.demo_script,
@@ -888,6 +920,7 @@ const videoConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'video_script_package',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'video',
   ...CHANNEL_TIERS.video,
@@ -903,6 +936,60 @@ Channel: Video Script for ${companyName}
   formatOutput: formatVideo,
 };
 
+const generatedImageConfig: ChannelConfig = {
+  id: 'generated_image',
+  label: 'Generated Image',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  deliveryMode: 'direct_draft',
+  templateType: 'generated_image_asset',
+  destinationTargets: ['download'],
+  generationKind: 'image',
+  outputMode: 'text',
+  renderer: 'image_asset',
+  ...CHANNEL_TIERS.generated_image,
+  maxOutputTokens: 800,
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: Generated Image for ${companyName}
+- Generate a single polished marketing or sales image.
+- Ground the visual in the account context, value props, and buying group needs.
+- Prioritize clarity, realism, and brand-safe composition.
+- Avoid adding unreadable fine text inside the image.
+- If the request implies a slide, social graphic, ad concept, or hero image, translate that into one strong visual direction.`,
+  buildUserPrompt: () =>
+    'Generate a single image concept from the account context. The result should be one finished image, not a written brief.',
+  parseOutput: parseTextBody,
+  formatOutput: (value) => stringValue(value.body).trim(),
+};
+
+const generatedVideoConfig: ChannelConfig = {
+  id: 'generated_video',
+  label: 'Generated Video',
+  mode: 'broadcast',
+  group: 'sales_asset',
+  deliveryMode: 'direct_draft',
+  templateType: 'generated_video_asset',
+  destinationTargets: ['download'],
+  generationKind: 'video',
+  outputMode: 'text',
+  renderer: 'video_asset',
+  ...CHANNEL_TIERS.generated_video,
+  maxOutputTokens: 1200,
+  buildInstruction: (companyName: string) => `
+=== OUTPUT FORMAT (STRICT) ===
+Channel: Generated Video for ${companyName}
+- Generate a short finished video, not a script.
+- Use cinematic but practical B2B visuals that fit the account context.
+- Keep motion smooth and easy to follow.
+- Avoid dense on-screen text, logos you cannot verify, or jarring scene changes.
+- Favor one clear idea or scene progression over too many concepts.`,
+  buildUserPrompt: () =>
+    'Generate a short video from the account context. The result should be a finished video asset, not a written script.',
+  parseOutput: parseTextBody,
+  formatOutput: (value) => stringValue(value.body).trim(),
+};
+
 const onePagerConfig: ChannelConfig = {
   id: 'one_pager',
   label: 'One-Pager',
@@ -911,6 +998,7 @@ const onePagerConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'one_pager_doc',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'one_pager',
   ...CHANNEL_TIERS.one_pager,
@@ -934,6 +1022,7 @@ const talkTrackConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'talk_track_sheet',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'talk_track',
   ...CHANNEL_TIERS.talk_track,
@@ -956,6 +1045,7 @@ const championEnablementConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'champion_kit',
   destinationTargets: ['google_slides', 'google_docs', 'google_drive_file', 'gmail_draft', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'champion_enablement',
   ...CHANNEL_TIERS.champion_enablement,
@@ -979,6 +1069,7 @@ const mapConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'map_timeline',
   destinationTargets: ['html_preview', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'map',
   ...CHANNEL_TIERS.map,
@@ -1002,6 +1093,7 @@ const qbrEbrScriptConfig: ChannelConfig = {
   deliveryMode: 'asset_package',
   templateType: 'qbr_report',
   destinationTargets: ['google_slides', 'google_docs', 'google_drive_file', 'copy'],
+  generationKind: 'text',
   outputMode: 'object',
   renderer: 'qbr_ebr_script',
   ...CHANNEL_TIERS.qbr_ebr_script,
@@ -1029,6 +1121,8 @@ const CHANNEL_CONFIGS: Record<ChannelId, ChannelConfig> = {
   ad_brief: adBriefConfig,
   demo_script: demoScriptConfig,
   video: videoConfig,
+  generated_image: generatedImageConfig,
+  generated_video: generatedVideoConfig,
   one_pager: onePagerConfig,
   talk_track: talkTrackConfig,
   champion_enablement: championEnablementConfig,
@@ -1096,6 +1190,8 @@ export function playContentTypeToChannel(contentType: string): ChannelId {
     ad_brief: 'ad_brief',
     demo_script: 'demo_script',
     video: 'video',
+    generated_image: 'generated_image',
+    generated_video: 'generated_video',
     one_pager: 'one_pager',
     talk_track: 'talk_track',
     champion_enablement: 'champion_enablement',

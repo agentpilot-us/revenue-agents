@@ -502,7 +502,7 @@ ${channelInstruction}`;
     userContext ?? ''
   }`.toLowerCase();
   if (
-    channel === 'video' &&
+    (channel === 'video' || channel === 'generated_video') &&
     /(2 ?min|2-minute|3 ?min|3-minute|long-form|long form|detailed video|multi-minute)/.test(
       videoRequestText,
     )

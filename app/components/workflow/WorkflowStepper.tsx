@@ -101,6 +101,8 @@ const CHANNEL_LABELS: Record<string, { label: string; color: string; bg: string 
   sales_page: { label: 'Sales Page', color: '#fbbf24', bg: 'rgba(245,158,11,0.08)' },
   briefing: { label: 'Briefing', color: '#fb7185', bg: 'rgba(244,63,94,0.08)' },
   video: { label: 'Video', color: '#f472b6', bg: 'rgba(236,72,153,0.08)' },
+  generated_image: { label: 'Generated Image', color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
+  generated_video: { label: 'Generated Video', color: '#f97316', bg: 'rgba(249,115,22,0.08)' },
   gift: { label: 'Gift', color: '#fb923c', bg: 'rgba(249,115,22,0.08)' },
   event: { label: 'Event', color: '#818cf8', bg: 'rgba(99,102,241,0.08)' },
   content: { label: 'Content', color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
@@ -115,6 +117,8 @@ const CONTENT_TYPE_ICONS: Record<string, string> = {
   presentation: '📊',
   sms: '📱',
   sales_page: '🌐',
+  generated_image: '🖼',
+  generated_video: '🎞',
 };
 
 type Props = {

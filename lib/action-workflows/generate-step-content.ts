@@ -103,7 +103,7 @@ export async function generateStepContent(input: GenerateStepContentInput) {
         : undefined,
     };
     const context = await buildContentContext(generationInput);
-    const { raw, parsed } = await generateOneContent(generationInput);
+    const { raw, parsed, media } = await generateOneContent(generationInput);
     const assetPackage = await buildAssetPackage({
       contextInput: generationInput,
       context,
@@ -113,6 +113,7 @@ export async function generateStepContent(input: GenerateStepContentInput) {
     const generatedContent = {
       ...parsed,
       raw,
+      media,
       deliveryMode: context.channelConfig.deliveryMode,
       templateType: context.channelConfig.templateType,
       destinationTargets: context.channelConfig.destinationTargets,

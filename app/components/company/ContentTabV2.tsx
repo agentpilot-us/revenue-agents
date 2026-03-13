@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { buildContentUrl } from '@/lib/urls/content';
+import { buildContentUrl, type ContentChannel } from '@/lib/urls/content';
 import ContactSelector from '@/app/components/workflow/ContactSelector';
 
 type DepartmentOption = {
@@ -69,12 +69,17 @@ const CHANNEL_ICONS: Record<string, string> = {
   ad_brief: '\ud83d\udcf0',
   demo_script: '\ud83c\udfac',
   video: '\ud83c\udfa5',
+  generated_image: '\ud83d\uddbc',
+  generated_video: '\ud83c\udf9e',
   one_pager: '\ud83d\udcc4',
   talk_track: '\ud83c\udf99',
   champion_enablement: '\ud83c\udfc6',
   map: '\ud83d\uddfa',
   qbr_ebr_script: '\ud83d\udccb',
 };
+
+const MEDIA_ASPECT_RATIOS = ['1:1', '4:3', '16:9', '9:16'] as const;
+const VIDEO_DURATIONS = [4, 6, 8] as const;
 
 const SENDER_ROLES = [
   { id: 'ae', label: 'Account Executive' },
@@ -117,6 +122,16 @@ type GeneratedState = {
   selectedVariantId?: string;
 };
 
+type MediaAsset = {
+  assetKind: 'image' | 'video';
+  base64: string;
+  mimeType: string;
+  filename: string;
+  promptUsed?: string;
+  aspectRatio?: string;
+  durationSeconds?: number;
+};
+
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -127,6 +142,53 @@ function toStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string')
     : [];
+}
+
+function toMediaAsset(value: unknown): MediaAsset | null {
+  const record = toRecord(value);
+  const assetKind =
+    record.assetKind === 'image' || record.assetKind === 'video'
+      ? record.assetKind
+      : null;
+  const base64 = typeof record.base64 === 'string' ? record.base64 : '';
+  const mimeType = typeof record.mimeType === 'string' ? record.mimeType : '';
+  const filename = typeof record.filename === 'string' ? record.filename : '';
+
+  if (!assetKind || !base64 || !mimeType || !filename) {
+    return null;
+  }
+
+  return {
+    assetKind,
+    base64,
+    mimeType,
+    filename,
+    promptUsed:
+      typeof record.promptUsed === 'string' ? record.promptUsed : undefined,
+    aspectRatio:
+      typeof record.aspectRatio === 'string' ? record.aspectRatio : undefined,
+    durationSeconds:
+      typeof record.durationSeconds === 'number'
+        ? record.durationSeconds
+        : undefined,
+  };
+}
+
+function getMediaAsset(data: Record<string, unknown>): MediaAsset | null {
+  return toMediaAsset(data.media) ?? toMediaAsset(data);
+}
+
+function dataUrlForMedia(media: MediaAsset): string {
+  return `data:${media.mimeType};base64,${media.base64}`;
+}
+
+function downloadMediaAsset(media: MediaAsset) {
+  const a = document.createElement('a');
+  a.href = dataUrlForMedia(media);
+  a.download = media.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function toSlides(value: unknown): SlideItem[] {
@@ -341,6 +403,53 @@ function StructuredOutput({
   renderer: string;
   data: Record<string, unknown>;
 }) {
+  const media = getMediaAsset(data);
+
+  if (renderer === 'image_asset' && media?.assetKind === 'image') {
+    return (
+      <div className="p-5 space-y-4">
+        <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/40">
+          <img
+            src={dataUrlForMedia(media)}
+            alt="Generated asset preview"
+            className="w-full h-auto max-h-[520px] object-contain bg-zinc-950"
+          />
+        </div>
+        <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-500">
+          <span>{media.mimeType}</span>
+          {media.aspectRatio && <span>{media.aspectRatio}</span>}
+          <span>{media.filename}</span>
+        </div>
+        {media.promptUsed && (
+          <SectionCard title="Generation Prompt">{media.promptUsed}</SectionCard>
+        )}
+      </div>
+    );
+  }
+
+  if (renderer === 'video_asset' && media?.assetKind === 'video') {
+    return (
+      <div className="p-5 space-y-4">
+        <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-black">
+          <video
+            controls
+            src={dataUrlForMedia(media)}
+            className="w-full h-auto max-h-[520px]"
+          />
+        </div>
+        <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-500">
+          <span>{media.mimeType}</span>
+          {media.aspectRatio && <span>{media.aspectRatio}</span>}
+          {media.durationSeconds && <span>{media.durationSeconds}s</span>}
+          <span>{media.filename}</span>
+        </div>
+        {media.promptUsed && (
+          <SectionCard title="Generation Prompt">{media.promptUsed}</SectionCard>
+        )}
+      </div>
+    );
+  }
+
   if (renderer === 'email' || renderer === 'linkedin_inmail') {
     return (
       <div className="p-5 space-y-4">
@@ -692,6 +801,8 @@ export function ContentTabV2({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [downloadingPptx, setDownloadingPptx] = useState(false);
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<string>('16:9');
+  const [mediaDurationSeconds, setMediaDurationSeconds] = useState<number>(6);
   const [userContext, setUserContext] = useState('');
   const [contextTouched, setContextTouched] = useState(false);
   const [regenerationFeedback, setRegenerationFeedback] = useState('');
@@ -734,6 +845,14 @@ export function ContentTabV2({
   const selectedOutputData = selectedOutput?.data ?? {};
   const selectedOutputRaw = selectedOutput?.raw ?? '';
   const selectedRenderer = generated?.renderer ?? selectedChannel;
+  const selectedMedia = useMemo(
+    () => getMediaAsset(selectedOutputData),
+    [selectedOutputData],
+  );
+  const isMediaOutput =
+    selectedRenderer === 'image_asset' || selectedRenderer === 'video_asset';
+  const isGeneratedImageChannel = selectedChannel === 'generated_image';
+  const isGeneratedVideoChannel = selectedChannel === 'generated_video';
   const isAssetPackage =
     (generated?.deliveryMode ?? currentChannel?.deliveryMode) === 'asset_package';
   const selectedAssetPackage = useMemo(() => {
@@ -816,6 +935,13 @@ export function ContentTabV2({
           contentType: selectedContentType || undefined,
           senderRole: senderRole || undefined,
           tone: tone || undefined,
+          mediaAspectRatio:
+            isGeneratedImageChannel || isGeneratedVideoChannel
+              ? mediaAspectRatio
+              : undefined,
+          mediaDurationSeconds: isGeneratedVideoChannel
+            ? mediaDurationSeconds
+            : undefined,
         }),
       });
       if (!res.ok) {
@@ -832,7 +958,7 @@ export function ContentTabV2({
       const url = buildContentUrl({
         companyId,
         divisionId: selectedDivisionId ?? undefined,
-        channel: selectedChannel as 'email' | 'linkedin_inmail',
+        channel: selectedChannel as ContentChannel,
         contactId: selectedContacts[0],
         triggerId: signalId,
       });
@@ -872,6 +998,13 @@ export function ContentTabV2({
           tone: tone || undefined,
           feedback: regenerationFeedback.trim() || undefined,
           previousOutput: selectedOutputRaw || undefined,
+          mediaAspectRatio:
+            isGeneratedImageChannel || isGeneratedVideoChannel
+              ? mediaAspectRatio
+              : undefined,
+          mediaDurationSeconds: isGeneratedVideoChannel
+            ? mediaDurationSeconds
+            : undefined,
         }),
       });
       if (!res.ok) {
@@ -1294,6 +1427,60 @@ export function ContentTabV2({
           )}
         </div>
 
+        {(isGeneratedImageChannel || isGeneratedVideoChannel) && (
+          <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
+              Media Settings
+            </div>
+            <div className="flex flex-col gap-4">
+              <div>
+                <div className="text-[10px] font-semibold tracking-wider uppercase text-gray-400/60 dark:text-gray-600 mb-2">
+                  Aspect Ratio
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MEDIA_ASPECT_RATIOS.map((ratio) => (
+                    <button
+                      key={ratio}
+                      type="button"
+                      onClick={() => setMediaAspectRatio(ratio)}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                        mediaAspectRatio === ratio
+                          ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                          : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                      }`}
+                    >
+                      {ratio}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {isGeneratedVideoChannel && (
+                <div>
+                  <div className="text-[10px] font-semibold tracking-wider uppercase text-gray-400/60 dark:text-gray-600 mb-2">
+                    Duration
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {VIDEO_DURATIONS.map((seconds) => (
+                      <button
+                        key={seconds}
+                        type="button"
+                        onClick={() => setMediaDurationSeconds(seconds)}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                          mediaDurationSeconds === seconds
+                            ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
+                            : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
+                        }`}
+                      >
+                        {seconds}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Content Intent ───────────────────────────────── */}
         <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
           <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
@@ -1521,6 +1708,30 @@ export function ContentTabV2({
               >
                 {'\u21bb'} Regenerate
               </button>
+              {isMediaOutput && selectedMedia && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => downloadMediaAsset(selectedMedia)}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-violet-500/25 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all"
+                  >
+                    {selectedMedia.assetKind === 'video'
+                      ? 'Download Video'
+                      : 'Download Image'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void navigator.clipboard.writeText(
+                        selectedMedia.promptUsed ?? selectedOutputRaw,
+                      )
+                    }
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 dark:border-zinc-700 text-gray-600 dark:text-gray-400 hover:text-violet-400 hover:border-violet-500/30 transition-all"
+                  >
+                    Copy Prompt
+                  </button>
+                </>
+              )}
               {isAssetPackage && (
                 <>
                   {destinationTargets.includes('html_preview') && (
@@ -1610,7 +1821,7 @@ export function ContentTabV2({
                   {'\u2709'} Create Gmail Draft
                 </button>
               )}
-              {!isAssetPackage && (
+              {!isAssetPackage && !isMediaOutput && (
                 <button
                   type="button"
                   onClick={() => void navigator.clipboard.writeText(selectedOutputRaw)}

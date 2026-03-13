@@ -9,6 +9,8 @@ export type ContentChannel =
   | 'ad_brief'
   | 'demo_script'
   | 'video'
+  | 'generated_image'
+  | 'generated_video'
   | 'one_pager'
   | 'talk_track'
   | 'champion_enablement'

@@ -45,6 +45,7 @@ export interface ContentIntent {
 const ALL_CHANNELS: ChannelId[] = [
   'email', 'linkedin_inmail', 'linkedin_post', 'slack', 'sms',
   'sales_page', 'presentation', 'ad_brief', 'demo_script', 'video',
+  'generated_image', 'generated_video',
   'one_pager', 'talk_track', 'champion_enablement', 'map', 'qbr_ebr_script',
 ];
 
@@ -53,7 +54,7 @@ const MESSAGING_CHANNELS: ChannelId[] = [
 ];
 
 const RICH_CONTENT_CHANNELS: ChannelId[] = [
-  'presentation', 'video', 'demo_script', 'ad_brief', 'one_pager',
+  'presentation', 'video', 'generated_image', 'generated_video', 'demo_script', 'ad_brief', 'one_pager',
   'talk_track', 'champion_enablement', 'map', 'qbr_ebr_script',
 ];
 
@@ -85,6 +86,8 @@ const INTENT_SNIPPETS: Record<Exclude<ContentIntentId, 'custom'>, { generic: str
     channels: {
       presentation: 'Create an intro deck (3-5 slides): who we are, how we can help this account, one case study in the same industry, and a suggested demo or next step. Keep slides visual and concise.',
       video: 'Intro video script: who we are, how we can help this account, one proof point, clear CTA. Keep it under 90 seconds.',
+      generated_image: 'Create one polished visual that quickly communicates relevance for this account. Favor one strong concept over a collage of ideas.',
+      generated_video: 'Create a short account-specific video with one clear narrative arc and a practical B2B visual style.',
       demo_script: 'Intro demo: hook on their pain, quick product walkthrough showing core value for this account, one proof point, clear next step.',
       ad_brief: 'Intro ad brief: capture attention with the account pain, position our value, one proof point, strong CTA.',
       sales_page: 'Intro sales page: compelling headline for this account, 3-5 value props, one case study, clear CTA.',
@@ -106,6 +109,8 @@ const INTENT_SNIPPETS: Record<Exclude<ContentIntentId, 'custom'>, { generic: str
     channels: {
       presentation: 'New feature presentation: what is new, how it helps this target account specifically, one before/after or metric, suggested next step. 3-5 slides.',
       video: 'New feature video: what changed, why it matters for this account, quick walkthrough, clear CTA. Keep it under 2 minutes.',
+      generated_image: 'Create one launch-ready product visual or campaign image that makes the new feature immediately legible.',
+      generated_video: 'Create a short product-update video focused on the new capability and why it matters to this account.',
       demo_script: 'New feature demo: show the new capability, tie it to this account use case, compare before/after, clear ask.',
       ad_brief: 'New feature ad brief: lead with the update, tie to account pain, one proof point, strong CTA.',
     },
@@ -135,6 +140,7 @@ const INTENT_SNIPPETS: Record<Exclude<ContentIntentId, 'custom'>, { generic: str
     channels: {
       presentation: 'Onboarding deck: welcome, implementation phases, key milestones, support contacts, 30/60/90 day goals.',
       video: 'Onboarding video: welcome message, what to expect, first 3 steps to get started, support resources. Keep under 3 minutes.',
+      generated_video: 'Create a short onboarding-style explainer video that highlights time-to-value, first steps, and confidence-building visuals.',
     },
   },
   competitive_displacement: {
@@ -215,6 +221,7 @@ export function buildContentModelSummaryForAI(): string {
     email: 'Email', linkedin_inmail: 'LinkedIn InMail', linkedin_post: 'LinkedIn Post',
     slack: 'Slack DM', sms: 'Text/SMS', sales_page: 'Sales Page',
     presentation: 'Presentation', ad_brief: 'Ad Brief', demo_script: 'Demo Script', video: 'Video Script',
+    generated_image: 'Generated Image', generated_video: 'Generated Video',
   };
   for (const [ch, intents] of Object.entries(channelGroups)) {
     const label = channelLabels[ch] || ch;

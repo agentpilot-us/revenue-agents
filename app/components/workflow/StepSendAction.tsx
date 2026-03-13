@@ -24,6 +24,60 @@ const t = {
   redBg: 'rgba(239,68,68,0.08)',
 };
 
+type MediaAsset = {
+  assetKind: 'image' | 'video';
+  base64: string;
+  mimeType: string;
+  filename: string;
+  promptUsed?: string;
+};
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toMediaAsset(value: unknown): MediaAsset | null {
+  const record = toRecord(value);
+  const assetKind =
+    record.assetKind === 'image' || record.assetKind === 'video'
+      ? record.assetKind
+      : null;
+  const base64 = typeof record.base64 === 'string' ? record.base64 : '';
+  const mimeType = typeof record.mimeType === 'string' ? record.mimeType : '';
+  const filename = typeof record.filename === 'string' ? record.filename : '';
+
+  if (!assetKind || !base64 || !mimeType || !filename) return null;
+
+  return {
+    assetKind,
+    base64,
+    mimeType,
+    filename,
+    promptUsed:
+      typeof record.promptUsed === 'string' ? record.promptUsed : undefined,
+  };
+}
+
+function getMediaAsset(content: Record<string, unknown> | null): MediaAsset | null {
+  if (!content) return null;
+  return toMediaAsset(content.media) ?? toMediaAsset(content);
+}
+
+function dataUrlForMedia(media: MediaAsset): string {
+  return `data:${media.mimeType};base64,${media.base64}`;
+}
+
+function downloadMediaAsset(media: MediaAsset) {
+  const a = document.createElement('a');
+  a.href = dataUrlForMedia(media);
+  a.download = media.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 type Props = {
   workflowId: string;
   step: WorkflowStep;
@@ -60,6 +114,8 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
 
   const channel = step.channel || step.contentType || 'email';
   const content = (step.editedContent || step.generatedContent) as Record<string, unknown> | null;
+  const media = getMediaAsset(content);
+  const isMediaAsset = !!media;
   const deliveryMode =
     content?.deliveryMode === 'asset_package' ? 'asset_package' : 'direct_draft';
   const destinationTargets = Array.isArray(content?.destinationTargets)
@@ -123,7 +179,7 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
   const isEmailChannel = channel === 'email' || channel === 'sms';
   const isLinkedInChannel = channel === 'linkedin' || channel === 'linkedin_inmail' || channel === 'linkedin_post';
   const isAdBrief = channel === 'ad_brief' || step.contentType === 'ad_brief';
-  const isOtherCopyable = !isEmailChannel && !isLinkedInChannel && !isAdBrief && channel !== 'presentation';
+  const isOtherCopyable = !isEmailChannel && !isLinkedInChannel && !isAdBrief && channel !== 'presentation' && !isMediaAsset;
 
   const handleCopyGeneric = async () => {
     const text =
@@ -472,6 +528,25 @@ export default function StepSendAction({ workflowId, step, onSent }: Props) {
             }}
           >
             Download PPTX
+          </button>
+        )}
+
+        {deliveryMode !== 'asset_package' && isMediaAsset && media && (
+          <button
+            type="button"
+            onClick={() => downloadMediaAsset(media)}
+            style={{
+              padding: '10px 20px',
+              borderRadius: 8,
+              background: t.blueBg,
+              border: `1px solid ${t.blueBorder}`,
+              color: t.blue,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {media.assetKind === 'video' ? 'Download Video' : 'Download Image'}
           </button>
         )}
 

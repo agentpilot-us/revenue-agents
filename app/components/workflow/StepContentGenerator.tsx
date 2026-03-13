@@ -27,7 +27,54 @@ const CHANNEL_HINT: Record<string, string> = {
   presentation: 'Presentation outline will appear here',
   sms: 'Text message will appear here',
   briefing: 'Briefing document will appear here',
+  generated_image: 'Generated image preview will appear here',
+  generated_video: 'Generated video preview will appear here',
 };
+
+type MediaAsset = {
+  assetKind: 'image' | 'video';
+  base64: string;
+  mimeType: string;
+  filename: string;
+  promptUsed?: string;
+};
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toMediaAsset(value: unknown): MediaAsset | null {
+  const record = toRecord(value);
+  const assetKind =
+    record.assetKind === 'image' || record.assetKind === 'video'
+      ? record.assetKind
+      : null;
+  const base64 = typeof record.base64 === 'string' ? record.base64 : '';
+  const mimeType = typeof record.mimeType === 'string' ? record.mimeType : '';
+  const filename = typeof record.filename === 'string' ? record.filename : '';
+
+  if (!assetKind || !base64 || !mimeType || !filename) return null;
+
+  return {
+    assetKind,
+    base64,
+    mimeType,
+    filename,
+    promptUsed:
+      typeof record.promptUsed === 'string' ? record.promptUsed : undefined,
+  };
+}
+
+function getMediaAsset(content: Record<string, unknown> | null): MediaAsset | null {
+  if (!content) return null;
+  return toMediaAsset(content.media) ?? toMediaAsset(content);
+}
+
+function dataUrlForMedia(media: MediaAsset): string {
+  return `data:${media.mimeType};base64,${media.base64}`;
+}
 
 type Props = {
   workflowId: string;
@@ -43,11 +90,14 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
   const [saving, setSaving] = useState(false);
 
   const content = (step.editedContent || step.generatedContent) as Record<string, unknown> | null;
+  const media = getMediaAsset(content);
+  const isMedia = !!media;
   const hasContent =
     content &&
     (typeof content.body === 'string' ||
       typeof content.raw === 'string' ||
-      typeof content.subject === 'string');
+      typeof content.subject === 'string' ||
+      isMedia);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -170,7 +220,7 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
   if (!hasContent) return null;
 
   // Edit mode
-  if (editMode) {
+  if (editMode && !isMedia) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {step.contentType === 'email' && (
@@ -296,44 +346,97 @@ export default function StepContentGenerator({ workflowId, step, onGenerated }: 
           </p>
         </div>
       )}
-      <div
-        style={{
-          whiteSpace: 'pre-wrap',
-          fontSize: 13,
-          lineHeight: 1.7,
-          color: t.text2,
-          padding: '12px 14px',
-          borderRadius: 8,
-          background: 'rgba(15,23,42,0.4)',
-          border: `1px solid ${t.border}`,
-          maxHeight: 320,
-          overflowY: 'auto',
-        }}
-      >
-        {typeof content!.body === 'string'
-          ? content!.body
-          : typeof content!.raw === 'string'
-            ? content!.raw
-            : ''}
-      </div>
+      {isMedia && media ? (
+        <div
+          style={{
+            padding: '12px 14px',
+            borderRadius: 8,
+            background: 'rgba(15,23,42,0.4)',
+            border: `1px solid ${t.border}`,
+          }}
+        >
+          {media.assetKind === 'image' ? (
+            <img
+              src={dataUrlForMedia(media)}
+              alt="Generated workflow asset"
+              style={{
+                display: 'block',
+                width: '100%',
+                maxHeight: 320,
+                objectFit: 'contain',
+                borderRadius: 8,
+                background: '#020617',
+              }}
+            />
+          ) : (
+            <video
+              controls
+              src={dataUrlForMedia(media)}
+              style={{
+                display: 'block',
+                width: '100%',
+                maxHeight: 320,
+                borderRadius: 8,
+                background: '#020617',
+              }}
+            />
+          )}
+          {media.promptUsed && (
+            <p
+              style={{
+                margin: '10px 0 0',
+                fontSize: 11,
+                lineHeight: 1.6,
+                color: t.text3,
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {media.promptUsed}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            whiteSpace: 'pre-wrap',
+            fontSize: 13,
+            lineHeight: 1.7,
+            color: t.text2,
+            padding: '12px 14px',
+            borderRadius: 8,
+            background: 'rgba(15,23,42,0.4)',
+            border: `1px solid ${t.border}`,
+            maxHeight: 320,
+            overflowY: 'auto',
+          }}
+        >
+          {typeof content!.body === 'string'
+            ? content!.body
+            : typeof content!.raw === 'string'
+              ? content!.raw
+              : ''}
+        </div>
+      )}
       {step.status !== 'sent' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <button
-            type="button"
-            onClick={handleStartEdit}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 6,
-              background: 'transparent',
-              border: `1px solid ${t.borderMed}`,
-              color: t.text2,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Edit
-          </button>
+          {!isMedia && (
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 6,
+                background: 'transparent',
+                border: `1px solid ${t.borderMed}`,
+                color: t.text2,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+          )}
           <button
             type="button"
             onClick={handleGenerate}

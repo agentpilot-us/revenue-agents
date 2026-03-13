@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateObject, generateText } from 'ai';
-import { getChatModel } from '@/lib/llm/get-model';
 import { buildContentContext } from '@/lib/content/build-content-context';
 import { CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
 import { getChannelConfig, type ChannelId } from '@/lib/content/channel-config';
 import { buildAssetPackage } from '@/lib/content/build-asset-package';
+import { generateOneContent } from '@/lib/plays/generate-content';
 
 const CHANNEL_IDS = [
   'email',
@@ -20,6 +19,8 @@ const CHANNEL_IDS = [
   'ad_brief',
   'demo_script',
   'video',
+  'generated_image',
+  'generated_video',
   'one_pager',
   'talk_track',
   'champion_enablement',
@@ -44,6 +45,8 @@ const RegenerateSchema = z.object({
   tone: z.string().optional(),
   feedback: z.string().max(500).optional(),
   previousOutput: z.string().max(10000).optional(),
+  mediaAspectRatio: z.string().optional(),
+  mediaDurationSeconds: z.number().int().min(1).max(8).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -105,105 +108,35 @@ export async function POST(req: NextRequest) {
         : undefined,
       activeActionIndex: input.activeActionIndex,
     });
-
-    const messages =
-      input.feedback && input.previousOutput
-        ? [
-            { role: 'user' as const, content: ctx.userPrompt },
-            { role: 'assistant' as const, content: input.previousOutput },
-            {
-              role: 'user' as const,
-              content: `Please revise the content above based on this feedback: "${input.feedback}"\n\nKeep the same format and structure. Only change what the feedback asks for.`,
-            },
-          ]
-        : [{ role: 'user' as const, content: ctx.userPrompt }];
-    const model = getChatModel(
-      ctx.effectiveModelTier,
-      ctx.modelHint,
-      ctx.gatewayModel,
-    );
     const config = getChannelConfig(input.channel);
-
-    if (config.outputMode === 'object' && config.outputSchema) {
-      const { object } = await generateObject({
-        model,
-        schema: config.outputSchema,
-        maxOutputTokens: ctx.maxOutputTokens,
-        system: ctx.systemPrompt,
-        messages,
-      });
-
-      const parsed = object as Record<string, unknown>;
-      const raw = config.formatOutput(parsed);
-      const assetPackage = await buildAssetPackage({
-        contextInput: {
-          companyId: input.companyId,
-          userId: session.user.id,
-          channel: input.channel as ChannelId,
-          divisionId: input.divisionId,
-          contacts,
-          motion: input.motion,
-          playId: input.playId,
-          contentType: input.contentType,
-          contentIntent: input.contentIntent,
-          senderRole: input.senderRole,
-          tone: input.tone,
-          userContext: input.userContext,
-          signalContext: signal
-            ? {
-                title: signal.title,
-                summary: signal.summary,
-              }
-            : undefined,
-          activeActionIndex: input.activeActionIndex,
-        },
-        context: ctx,
-        generation: { raw, parsed },
-      });
-
-      return NextResponse.json({
-        contentId: input.contentId,
-        raw,
-        renderer: config.renderer,
-        deliveryMode: config.deliveryMode,
-        destinationTargets: config.destinationTargets,
-        templateType: config.templateType,
-        assetPackage,
-        ...parsed,
-      });
-    }
-
-    const { text } = await generateText({
-      model,
-      maxOutputTokens: ctx.maxOutputTokens,
-      system: ctx.systemPrompt,
-      messages,
-    });
-
-    const raw = text.trim();
-    const parsed = config.parseOutput(raw);
+    const generationInput = {
+      companyId: input.companyId,
+      userId: session.user.id,
+      channel: input.channel as ChannelId,
+      divisionId: input.divisionId,
+      contacts,
+      motion: input.motion,
+      playId: input.playId,
+      contentType: input.contentType,
+      contentIntent: input.contentIntent,
+      senderRole: input.senderRole,
+      tone: input.tone,
+      userContext: input.userContext,
+      feedback: input.feedback,
+      previousOutput: input.previousOutput,
+      mediaAspectRatio: input.mediaAspectRatio,
+      mediaDurationSeconds: input.mediaDurationSeconds,
+      signalContext: signal
+        ? {
+            title: signal.title,
+            summary: signal.summary,
+          }
+        : undefined,
+      activeActionIndex: input.activeActionIndex,
+    };
+    const { raw, parsed, media } = await generateOneContent(generationInput);
     const assetPackage = await buildAssetPackage({
-      contextInput: {
-        companyId: input.companyId,
-        userId: session.user.id,
-        channel: input.channel as ChannelId,
-        divisionId: input.divisionId,
-        contacts,
-        motion: input.motion,
-        playId: input.playId,
-        contentType: input.contentType,
-        contentIntent: input.contentIntent,
-        senderRole: input.senderRole,
-        tone: input.tone,
-        userContext: input.userContext,
-        signalContext: signal
-          ? {
-              title: signal.title,
-              summary: signal.summary,
-            }
-          : undefined,
-        activeActionIndex: input.activeActionIndex,
-      },
+      contextInput: generationInput,
       context: ctx,
       generation: { raw, parsed },
     });
@@ -216,6 +149,7 @@ export async function POST(req: NextRequest) {
       destinationTargets: config.destinationTargets,
       templateType: config.templateType,
       assetPackage,
+      media,
       ...parsed,
     });
   } catch (error) {

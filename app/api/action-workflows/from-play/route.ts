@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
         content: 'email',
         sales_page: 'sales_page',
         video: 'video',
+        generated_image: 'generated_image',
+        generated_video: 'generated_video',
         demo: 'demo_script',
         gift: 'email',
         event: 'email',
