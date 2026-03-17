@@ -37,7 +37,7 @@ export function MyCompanySignalsRefresh() {
         disabled={loading}
         className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-accent disabled:opacity-60"
       >
-        {loading ? 'Refreshing…' : 'Refresh My Company signals'}
+        {loading ? 'Checking…' : 'Check for New Signals'}
       </button>
       {lastResult && (
         <span className="text-[11px] text-muted-foreground">

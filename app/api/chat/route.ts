@@ -15,7 +15,7 @@ import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
 import { gatherStrategyContext } from '@/lib/plays/recommend-account-strategy';
 import { loadFullPlanContext } from '@/lib/agents/plan-context';
 import { executePlanWorkflow, type PlanType, type PlanProgress } from '@/lib/agents/plan-workflow';
-import { createExaMCPClient, getExaTools } from '@/lib/exa/mcp-client';
+import { createWebSearchMCPClient, getWebSearchTools } from '@/lib/exa/mcp-client';
 import type { MCPClient } from '@ai-sdk/mcp';
 import { getMessagingContextForAgent } from '@/lib/messaging-frameworks';
 import { getCompanyResearchPromptBlock } from '@/lib/research/company-research-prompt';
@@ -1720,13 +1720,13 @@ Work step-by-step and explain what you're doing.`;
       }
     }
 
-    // Connect Exa MCP for real-time search, company research, people search
-    let exaMcpClient: MCPClient | null = null;
+    // Connect web search MCP for real-time search, company research, people search
+    let webSearchMcpClient: MCPClient | null = null;
     if (!isDemoMode) {
-      exaMcpClient = await createExaMCPClient();
-      if (exaMcpClient) {
-        const exaTools = await getExaTools(exaMcpClient);
-        Object.assign(playTools, exaTools);
+      webSearchMcpClient = await createWebSearchMCPClient();
+      if (webSearchMcpClient) {
+        const webSearchTools = await getWebSearchTools(webSearchMcpClient);
+        Object.assign(playTools, webSearchTools);
       }
     }
 
@@ -1736,8 +1736,8 @@ Work step-by-step and explain what you're doing.`;
     // Enhanced system prompt with safety instructions
     const safeSystemPrompt = `${systemPrompt}
 
-${exaMcpClient ? `EXA SEARCH TOOLS:
-You have access to Exa search tools for real-time research:
+${webSearchMcpClient ? `WEB SEARCH TOOLS:
+You have access to web search tools for real-time research:
 - web_search_advanced_exa: Search the web with advanced filtering (category, domain, date)
 - company_research_exa: Research a specific company (structured data: employees, revenue, tech stack)
 - people_search_exa: Find people by role, company, or expertise (LinkedIn profiles)
@@ -1805,8 +1805,8 @@ SECURITY INSTRUCTIONS:
           .catch(() => {});
       },
       onFinish: async () => {
-        if (exaMcpClient) {
-          await exaMcpClient.close().catch(() => {});
+        if (webSearchMcpClient) {
+          await webSearchMcpClient.close().catch(() => {});
         }
       },
     });

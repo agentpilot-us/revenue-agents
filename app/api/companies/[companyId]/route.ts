@@ -72,7 +72,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    // Clean up Exa Webset before deleting the company
+    // Clean up webset before deleting the company
     if (company.exaWebsetId) {
       await deleteWebset(company.exaWebsetId).catch(() => {});
     }

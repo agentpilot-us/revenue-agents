@@ -281,7 +281,7 @@ export async function GET(
       });
     }
 
-    // Account signals from Exa (no status filter — Activity tab shows all)
+    // Account signals from web intelligence (no status filter — Activity tab shows all)
     const accountSignals = await prisma.accountSignal.findMany({
       where: {
         companyId,

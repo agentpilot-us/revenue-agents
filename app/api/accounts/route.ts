@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Trigger Exa enrichment in background (signals + contact discovery)
+    // Trigger enrichment in background (signals + contact discovery)
     void enrichCompanyWithExa(company.id).catch((e) => {
-      console.error('Exa enrichment error:', e);
+      console.error('Enrichment error:', e);
     });
 
     return NextResponse.json({

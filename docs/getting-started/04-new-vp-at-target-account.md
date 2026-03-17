@@ -16,7 +16,7 @@ You've completed [Chapter 1](./01-setting-up-your-command-center.md). Kohl's is 
 
 Open Kohl's company page and click the **Signals** tab.
 
-The signals tab shows recent events detected at the account. AgentPilot monitors your target accounts using Exa — scanning news, financial filings, press releases, and job postings.
+The signals tab shows recent events detected at the account. AgentPilot monitors your target accounts using web intelligence — scanning news, financial filings, press releases, and job postings.
 
 You'll see a signal card:
 
@@ -133,7 +133,7 @@ For the LinkedIn message, copy it and paste it directly into LinkedIn (AgentPilo
 Here's how the pieces fit together under the hood:
 
 ```
-Signal detected (Exa monitoring)
+Signal detected (web monitoring)
     ↓
 Signal classified (type, relevance score, suggested play)
     ↓
@@ -158,7 +158,7 @@ The system also surfaces high-relevance signals in the **Next Best Actions** car
 
 A VP hire at a target account turned into personalized outreach in under 5 minutes:
 
-1. **Signal detection** — Exa found the news before you did
+1. **Signal detection** — The system found the news before you did
 2. **Relevance scoring** — The system rated it 9/10 because Kohl's Marketing is a target buying group
 3. **Play suggestion** — It recommended New Buying Group based on the signal type
 4. **Context loading** — It pulled company research, product fit, existing stack, and active objections

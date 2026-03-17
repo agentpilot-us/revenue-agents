@@ -1,6 +1,6 @@
 /**
- * Exa post-create enrichment: run company research + contact discovery after company creation.
- * Persists AccountSignals and Contacts; updates company exaEnrichmentCompletedAt.
+ * Post-create enrichment: run company research + contact discovery after company creation.
+ * Persists AccountSignals and Contacts; updates company enrichment completion timestamps.
  */
 
 import Exa from 'exa-js';
@@ -48,7 +48,7 @@ function inferDepartmentFromTitle(title: string | null): string | null {
 }
 
 /**
- * Parse "Name - Title" or "Title at Company" or "Name" from Exa result title/text.
+ * Parse "Name - Title" or "Title at Company" or "Name" from search result title/text.
  */
 function parseNameAndTitle(
   title: string | null,
@@ -102,8 +102,8 @@ function guessEmail(firstName: string, lastName: string, domain: string | null):
 }
 
 /**
- * Run Exa enrichment for a company: signals (news/exec/financial) + people (LinkedIn).
- * Call after company create; runs async. Sets exaEnrichmentStartedAt, then exaEnrichmentCompletedAt.
+ * Run web enrichment for a company: signals (news/exec/financial) + people (LinkedIn).
+ * Call after company create; runs async. Sets enrichment started/completed timestamps.
  */
 export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCompanyResult> {
   const company = await prisma.company.findUnique({
@@ -172,10 +172,10 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
       signalsFound++;
     }
   } catch (err) {
-    console.warn('Exa enrich company signals error:', err);
+    console.warn('Enrich company signals error:', err);
   }
 
-  // 2. Find decision makers via Exa people/LinkedIn search
+  // 2. Find decision makers via people/LinkedIn search
   if (exa) {
     try {
       const domainFilter = company.domain
@@ -225,16 +225,16 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
         contactsFound++;
       }
     } catch (err) {
-      console.warn('Exa enrich company contacts error:', err);
+      console.warn('Enrich company contacts error:', err);
     }
   }
 
-  // Create persistent Exa Webset for ongoing signal monitoring
+  // Create persistent webset for ongoing signal monitoring
   let exaWebsetId: string | null = null;
   try {
     exaWebsetId = await createCompanyWebset(company.name, company.industry);
   } catch (err) {
-    console.warn('Exa Webset creation error during enrichment:', err);
+    console.warn('Webset creation error during enrichment:', err);
   }
 
   await prisma.company.update({

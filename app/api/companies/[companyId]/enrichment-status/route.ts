@@ -1,6 +1,6 @@
 /**
  * GET /api/companies/[companyId]/enrichment-status
- * Poll after company creation to see when Exa enrichment (signals + contacts) is complete.
+ * Poll after company creation to see when enrichment (signals + contacts) is complete.
  */
 
 import { NextResponse } from 'next/server';

@@ -802,7 +802,7 @@ function AccountSignalsTab({
       <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
         <h2 className="text-lg font-semibold text-card-foreground mb-1">Monitoring for This Account</h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Account-specific EXA searches supplement your default monitoring rules (managed in My Company).
+          Account-specific web intelligence searches supplement your default monitoring rules (managed in My Company).
         </p>
         <AccountSignalConfigs companyId={companyId} />
       </div>

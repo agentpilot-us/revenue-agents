@@ -56,7 +56,7 @@ export default function NewCompanyPage() {
         return;
       }
 
-      // If no background research (e.g. no EXA_API_KEY), redirect to intelligence
+      // If no background research (e.g. no web search API key), redirect to intelligence
       if (data.status !== 'researching') {
         router.push(`/dashboard/companies/${companyId}?tab=overview`);
         router.refresh();

@@ -1,6 +1,6 @@
 /**
- * Cron: fetch account signals via Exa for all user companies.
- * Processes companies in batches of 5 with 1s delay to respect Exa rate limits.
+ * Cron: fetch account signals via web search for all user companies.
+ * Processes companies in batches of 5 with 1s delay to respect rate limits.
  * Dedup by (companyId, url); type-based skip for earnings_call/acquisition within 7 days.
  */
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         if (!uid) return;
         processed++;
         try {
-          // Pass the previous hash so we can skip the LLM call when Exa results haven't changed
+          // Pass the previous hash so we can skip the LLM call when search results haven't changed
           const existingSignals = company.lastSignalHash
             ? await prisma.accountSignal.findMany({
                 where: { companyId: company.id, userId: uid },

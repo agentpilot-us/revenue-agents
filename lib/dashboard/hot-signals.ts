@@ -294,7 +294,7 @@ export async function getHotSignals(
     });
   }
 
-  // Account signals from Exa (realtime news, earnings, executive) — status new, score >= 7, last 48h
+  // Account signals from web intelligence (realtime news, earnings, executive) — status new, score >= 7, last 48h
   const accountSignals = await prisma.accountSignal.findMany({
     where: {
       userId,

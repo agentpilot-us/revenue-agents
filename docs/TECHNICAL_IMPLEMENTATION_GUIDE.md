@@ -16,7 +16,7 @@ Plays depend on:
 - **CRON jobs** — Including play-specific crons: timeline triggers, CRM field gates, action-workflow triggers (see [§4](#4-cron-jobs)).
 - **Integrations (by use case):**
   - **Salesforce** — Account/Contact/Opportunity ingest; activity and segment push; phase gates (CRM_FIELD).
-  - **Exa** — Account signals (news, executive changes, earnings) used by signal-based plays and dashboard.
+  - **Web search** — Account signals (news, executive changes, earnings) used by signal-based plays and dashboard.
   - **Apollo** — Contact discovery and enrichment.
   - **Resend** — Outbound email (plays, sequences, alerts).
   - **Cal.com** — Meeting booking and Meeting Prep play triggers.
@@ -82,13 +82,13 @@ Goal: daily/periodic sync, segment push-back, campaign leads, and correct field 
 | **Slack**        | Optional            | Alert webhooks | User-configurable webhook URL in Settings → Alerts; EXTERNAL_SERVICES § Slack |
 | **Resend**       | Yes                 | Transactional and outreach email | `RESEND_API_KEY`, `RESEND_FROM`; EXTERNAL_SERVICES § Resend |
 | **Apollo**       | Recommended         | Contact discovery, enrichment | `APOLLO_API_KEY`; EXTERNAL_SERVICES § Apollo |
-| **Exa**          | Recommended         | Account signals for plays and dashboard | `EXA_API_KEY`; see [§3.1](#31-exa-configuration) |
+| **Web search**   | Recommended         | Account signals for plays and dashboard | `EXA_API_KEY`; see [§3.1](#31-web-search-configuration) |
 | **Cal.com**      | Recommended         | Meeting booking; Meeting Prep play triggers | `CAL_*` env vars; EXTERNAL_SERVICES § Cal.com |
 | **Stripe**       | Yes (billing)       | Subscriptions | EXTERNAL_SERVICES § Stripe |
 | **Firecrawl**    | Optional            | Content Library “Import from URL”, site crawl | `FIRECRAWL_API_KEY` |
 | **Vercel**       | Yes (hosting)       | Hosting, crons, optional sales page deploy | `VERCEL_ACCESS_TOKEN` optional |
 
-### 3.1 Exa Configuration
+### 3.1 Web search configuration
 
 - **Env:** `EXA_API_KEY` (or fallback `EXASEARCH_API_KEY`). If neither is set, cron skips signal fetching.
 - **Powers:** Account signals (news, earnings, executive changes, product launches) via `lib/signals/fetch-account-signals.ts` and `lib/exa/enrich-company.ts`; used by signal-based plays and dashboard.
@@ -112,7 +112,7 @@ All cron routes expect `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET` 
 | `/api/cron/calculate-engagement` | 02:00 UTC daily | Engagement scoring |
 | `/api/cron/aggregate-analytics` | 01:00 UTC daily | Dashboard analytics |
 | `/api/cron/content-library/run-schedules` | 03:00 UTC daily | Scheduled content syncs |
-| `/api/cron/fetch-account-signals` | Every 6 hours | Exa-based account signals |
+| `/api/cron/fetch-account-signals` | Every 6 hours | Web-based account signals |
 | `/api/cron/send-alert-digest` | 14:00 UTC daily | Alert digest emails |
 | `/api/cron/process-scheduled-actions` | Every 15 min | Deferred tasks (emails, sequence steps) |
 | `/api/cron/advance-sequences` | Hourly | Multi-step sequence progression |
@@ -241,7 +241,7 @@ The Operations Guide’s SF → AgentPilot tables reference fields that **do not
 - **PlayRun completed → Task:** Doc says push a Task “On PlayRun status → COMPLETED”. No automatic push on PlayRun completion in code; only Task on email/meeting execute.
 - **Contact research saved → Task/Note:** Doc says push on `research_company` via chat. Not implemented.
 - **Objection recorded → Opportunity Note / custom field:** Doc says push on `record_objection` via chat. Not implemented.
-- **SignalConfigRule entries per account:** Doc says Exa cron “Builds search queries from SignalConfigRule entries per account.” Actual signal config uses **CustomSignalConfig** and company/Exa websets; see `lib/signals/fetch-account-signals.ts` and `lib/exa/websets.ts`.
+- **SignalConfigRule entries per account:** Doc says cron “Builds search queries from SignalConfigRule entries per account.” Actual signal config uses **CustomSignalConfig** and company websets; see `lib/signals/fetch-account-signals.ts` and `lib/exa/websets.ts`.
 - **ContentTemplate.modelTier** and **ModelTier (SONNET/HAIKU):** Schema has `ContentTemplate.modelTier` and enum `ModelTier { HAIKU, SONNET }`. Actual LLM routing in `get-model.ts` uses tiers `full` / `fast` / `extraction` and can use Gemini or Anthropic; mapping from SONNET/HAIKU to provider models is in content generation path.
 
 ---
@@ -254,7 +254,7 @@ The Operations Guide’s SF → AgentPilot tables reference fields that **do not
 - [ ] **Email:** `RESEND_API_KEY`, `RESEND_FROM`.
 - [ ] **Cron:** `CRON_SECRET` set; all required crons (including play-timeline-triggers, play-crm-field-gates, action-workflow-triggers) registered in `vercel.json` and enabled in Vercel.
 - [ ] **Salesforce:** Access token or OAuth configured; optional `SALESFORCE_ACCOUNT_SEGMENT_FIELD`, `SALESFORCE_CONTACT_SEGMENT_FIELD`. Sync strategy decided (when to pull Account/Contact/Opportunity; when to push Task/segment).
-- [ ] **Exa:** `EXA_API_KEY` if account signals and signal-based plays are used.
+- [ ] **Web search:** `EXA_API_KEY` if account signals and signal-based plays are used.
 - [ ] **Apollo:** `APOLLO_API_KEY` for contact discovery/enrichment.
 - [ ] **Cal.com:** `CAL_*` for meeting booking and Meeting Prep plays.
 - [ ] **Content Library:** Upload/import and scrape paths deployed with extraction; `CONTENT_LIBRARY_PRODUCT_ORIGIN` set if using health recommendations.

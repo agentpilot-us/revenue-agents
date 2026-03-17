@@ -1,8 +1,8 @@
 /**
- * Fetch realtime account signals via Exa (news, financial, executive) and classify with one LLM call per company.
- * When Exa's publishedDate is missing we use cron run time so signals still surface in the 48h dashboard window.
+ * Fetch realtime account signals via web search (news, financial, executive) and classify with one LLM call per company.
+ * When publishedDate is missing we use cron run time so signals still surface in the 48h dashboard window.
  *
- * Cost optimization: hashes sorted Exa result URLs and compares to previous run's hash.
+ * Cost optimization: hashes sorted result URLs and compares to previous run's hash.
  * If results are identical (no new news), skips the LLM classification call entirely.
  */
 
@@ -174,10 +174,10 @@ export type FetchSignalsResult = {
 };
 
 /**
- * One LLM call per company: classify all Exa results in a single generateObject.
+ * One LLM call per company: classify all web search results in a single generateObject.
  * Only return signals with relevanceScore >= RELEVANCE_PERSIST_MIN (stored in DB; dashboard filters >= 7).
  *
- * Pass previousUrlHash to skip the LLM call when Exa returns the same set of results.
+ * Pass previousUrlHash to skip the LLM call when the search returns the same set of results.
  * When skipped, returns { signals: previousSignals, urlHash, skippedLlm: true }.
  */
 export async function fetchAccountSignals(
@@ -196,7 +196,7 @@ export async function fetchAccountSignals(
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
   const sinceStr = since.toISOString().split('T')[0];
 
-  // Run 3 standard Exa searches in parallel
+  // Run 3 standard web searches in parallel
   const [newsRes, financialRes, execRes] = await Promise.all([
     exa.search(
       `${companyName} ${industry ?? ''} announcement news product launch`.trim(),
@@ -233,7 +233,7 @@ export async function fetchAccountSignals(
     ...normalizeExaResults(execRes as { results?: ExaResult[] }),
   ].filter((r) => r.url && (r.title || r.url));
 
-  // Run custom Exa queries and track which results came from which config
+  // Run custom web queries and track which results came from which config
   const customResultMap = new Map<string, ExaResult[]>();
   if (customQueries?.length) {
     const customResults = await Promise.all(
@@ -348,8 +348,8 @@ Use the exact URL from the raw results for each signal. For publishedAt use the 
 }
 
 /**
- * Classify pre-fetched results (e.g. from an Exa Webset) using the same LLM
- * pipeline as ad-hoc signals. Skips the Exa search step entirely.
+ * Classify pre-fetched results (e.g. from a webset) using the same LLM
+ * pipeline as ad-hoc signals. Skips the web search step entirely.
  */
 export async function classifyPreFetchedSignals(
   companyName: string,

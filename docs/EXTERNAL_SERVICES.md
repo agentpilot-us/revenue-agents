@@ -15,7 +15,7 @@ Every third-party service Revenue-Agents depends on, what it powers, how to conf
 | [Resend](#resend) | Email | **Yes** | Transactional email, magic-link auth, outreach |
 | [Stripe](#stripe) | Payments | **Yes** | Subscriptions, checkout, billing |
 | [Perplexity](#perplexity) | Research | Recommended | Company research, financial signals |
-| [Exa](#exa) | Research | Recommended | Account signals, news, executive changes |
+| [Web search](#web-search) | Research | Recommended | Account signals, news, executive changes |
 | [Firecrawl](#firecrawl) | Scraping | Optional | Content Library import, site crawling |
 | [Apollo](#apollo) | Enrichment | Recommended | Contact discovery, enrichment |
 | [Cal.com](#calcom) | Scheduling | Recommended | Meeting booking, calendar integration |
@@ -146,7 +146,7 @@ PERPLEXITY_API_KEY="pplx-..."
 
 **Key files:** `lib/tools/perplexity.ts`, `lib/signals/fetch-financial-signals.ts`, `lib/research/research-company.ts`
 
-### Exa
+### Web search
 
 Powers real-time account signal monitoring (news, earnings, executive changes, product launches).
 
@@ -160,8 +160,8 @@ The app also checks `EXASEARCH_API_KEY` as a fallback. Cron jobs skip signal fet
 
 **Setup:**
 
-1. Go to [Exa](https://exa.ai/)
-2. Create an API key
+1. Obtain a web search API key (e.g. from your provider).
+2. Set `EXA_API_KEY` in your environment.
 
 **Key files:** `lib/exa/enrich-company.ts`, `lib/exa/websets.ts`, `lib/exa/mcp-client.ts`, `lib/signals/fetch-account-signals.ts`
 

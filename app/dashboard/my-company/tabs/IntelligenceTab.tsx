@@ -22,7 +22,7 @@ export function IntelligenceTab({ signals, companyProducts, eventSummaries }: Pr
           </h2>
           {signals.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No signals detected yet. Use the button below to pull in Exa-based
+              No signals detected yet. Use the button below to pull in web-based
               activity for your company.
             </p>
           ) : (
@@ -51,10 +51,10 @@ export function IntelligenceTab({ signals, companyProducts, eventSummaries }: Pr
       <div className="space-y-6">
         <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground mb-3">
-            Default Monitoring Rules
+            Signal Monitoring Rules
           </h2>
           <p className="text-xs text-muted-foreground mb-3">
-            These EXA searches apply across all target accounts unless supplemented with account-specific rules.
+            These searches run automatically across all target accounts to detect strategic signals. Account-specific rules can be added in each account&apos;s Strategic Account Plan.
           </p>
           <SignalConfigPanel />
         </section>

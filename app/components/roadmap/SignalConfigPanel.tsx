@@ -18,9 +18,13 @@ type Props = {
 };
 
 const SIGNAL_TYPES = [
-  { value: 'exa_search', label: 'Exa Search' },
+  { value: 'exa_search', label: 'Web Intelligence Search' },
   { value: 'date_trigger', label: 'Date Trigger' },
 ];
+
+function getTypeLabel(type: string): string {
+  return SIGNAL_TYPES.find((t) => t.value === type)?.label ?? type.replace(/_/g, ' ');
+}
 
 export function SignalConfigPanel({ companyId, hideEmptyMessage }: Props) {
   const [configs, setConfigs] = useState<SignalConfig[]>([]);
@@ -178,7 +182,7 @@ export function SignalConfigPanel({ companyId, hideEmptyMessage }: Props) {
             </button>
             <div className="min-w-0">
               <span className="text-xs font-medium">{cfg.name}</span>
-              <span className="text-xs text-muted-foreground ml-2">({cfg.type.replace('_', ' ')})</span>
+              <span className="text-xs text-muted-foreground ml-2">({getTypeLabel(cfg.type)})</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
