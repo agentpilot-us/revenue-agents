@@ -8,7 +8,7 @@ import type {
   DestinationTarget,
   TemplateType,
 } from '@/lib/content/channel-config';
-import type { GenerateContentOutput } from '@/lib/plays/generate-content';
+import type { GenerateContentOutput } from '@/lib/content/generate-content';
 
 export type AssetPackage = {
   channel: ChannelId;

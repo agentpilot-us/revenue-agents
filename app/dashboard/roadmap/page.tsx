@@ -10,6 +10,8 @@ import BuyingGroupIntelligence from '@/app/components/roadmap/BuyingGroupIntelli
 import { ActivePlaybooksPanel } from '@/app/components/roadmap/ActivePlaybooksPanel';
 import ConfigurationPanel from '@/app/components/roadmap/ConfigurationPanel';
 import SAPTabs from '@/app/components/roadmap/SAPTabs';
+import { SetupButton } from '@/app/components/roadmap/SetupButton';
+import { SetupHealthBar } from '@/app/components/roadmap/SetupHealthBar';
 
 /**
  * /dashboard/roadmap — Company-scoped Strategic Account Plan
@@ -218,7 +220,7 @@ export default async function RoadmapPage({
       return { total, engaged };
     }),
 
-    prisma.actionWorkflow.groupBy({
+    prisma.playRun.groupBy({
       by: ['status'],
       where: { companyId, userId: session.user.id },
       _count: { id: true },
@@ -227,7 +229,7 @@ export default async function RoadmapPage({
       let total = 0;
       for (const r of results) {
         total += r._count.id;
-        if (r.status === 'completed') completed += r._count.id;
+        if (r.status === 'COMPLETED') completed += r._count.id;
       }
       return { completed, total };
     }),
@@ -321,7 +323,10 @@ export default async function RoadmapPage({
               {company.name}
             </h1>
           </div>
-          <SeedRoadmapConfigButton hasNoSignalRules={roadmap.signalRules.length === 0} companyId={companyId} />
+          <div className="flex items-center gap-2">
+            <SetupButton companyId={companyId} roadmapId={roadmap.id} />
+            <SeedRoadmapConfigButton hasNoSignalRules={roadmap.signalRules.length === 0} companyId={companyId} />
+          </div>
         </div>
 
         {/* ═══ Hero: Objective + Health + Metrics ═══ */}
@@ -338,6 +343,9 @@ export default async function RoadmapPage({
           actionsTotal={workflowCounts.total}
           daysSinceLastTouch={daysSinceLastTouch}
         />
+
+        {/* ═══ Setup Health ═══ */}
+        <SetupHealthBar companyId={companyId} roadmapId={roadmap.id} />
 
         {/* ═══ Coverage Dashboard ═══ */}
         <CoverageDashboard companyId={companyId} />

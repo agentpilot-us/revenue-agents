@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { assembleWorkflow } from '@/lib/action-workflows/assemble';
-import { resolveTemplateForContext } from '@/lib/action-workflows/resolve-template';
 
+/** GET: Legacy list of ActionWorkflows. Prefer play-runs and My Day for new flows. */
 export async function GET(req: NextRequest) {
   try {
     const session = await auth();
@@ -44,103 +43,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const {
-      companyId,
-      templateId: rawTemplateId,
-      roadmapPlanId,
-      accountSignalId,
-      targetDivisionId,
-      targetContactId,
-      title,
-      description,
-    } = body;
-
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId is required' },
-        { status: 400 },
-      );
-    }
-
-    let templateId = rawTemplateId;
-
-    // Unified template resolution via shared resolver
-    if (!templateId) {
-      let signalType: string | undefined;
-      if (accountSignalId) {
-        const signal = await prisma.accountSignal.findUnique({
-          where: { id: accountSignalId },
-          select: { type: true },
-        });
-        signalType = signal?.type;
-      }
-
-      const company = await prisma.company.findFirst({
-        where: { id: companyId, userId: session.user.id },
-        select: { industry: true },
-      });
-      let deptLabel: string | undefined;
-      let deptType: string | undefined;
-      if (targetDivisionId) {
-        const dept = await prisma.companyDepartment.findFirst({
-          where: { id: targetDivisionId },
-          select: { customName: true, type: true },
-        });
-        deptLabel = dept?.customName ?? undefined;
-        deptType = dept?.type ?? undefined;
-      }
-      templateId = await resolveTemplateForContext({
-        userId: session.user.id,
-        companyId,
-        signalType,
-        signalId: accountSignalId,
-        roadmapPlanId,
-        companyIndustry: company?.industry ?? undefined,
-        departmentLabel: deptLabel,
-        departmentType: deptType,
-      });
-    }
-
-    if (!templateId) {
-      return NextResponse.json(
-        { error: 'No playbook template available. Create one first.' },
-        { status: 400 },
-      );
-    }
-
-    const workflow = await assembleWorkflow({
-      userId: session.user.id,
-      companyId,
-      templateId,
-      roadmapPlanId,
-      accountSignalId,
-      targetDivisionId,
-      targetContactId,
-      title,
-      description,
-    });
-
-    return NextResponse.json({ workflow }, { status: 201 });
-  } catch (error) {
-    console.error('POST /api/action-workflows error:', error);
-    const err = error as Error & { code?: string; existingWorkflowId?: string };
-    if (err.code === 'DUPLICATE_ENROLLMENT') {
-      return NextResponse.json(
-        { error: err.message, existingWorkflowId: err.existingWorkflowId },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create workflow' },
-      { status: 500 },
-    );
-  }
+export async function POST(_req: NextRequest) {
+  return NextResponse.json(
+    {
+      error: 'ActionWorkflow creation is deprecated. Use POST /api/play-runs with playTemplateId instead.',
+      migration: 'PlayRun',
+    },
+    { status: 410 },
+  );
 }

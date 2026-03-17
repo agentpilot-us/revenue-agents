@@ -1,9 +1,8 @@
 /**
  * Contact Pulse — lightweight, read-only activity intelligence derived
- * from existing Activity, ActionWorkflowStep, and EventAttendance data.
+ * from Activity, ContactTouch, PlayAction, and EventAttendance.
  *
- * No new tables or writes — everything is computed from actions the AE
- * already takes through the platform.
+ * Pending steps and engagement use PlayAction/ContactTouch (new play system).
  */
 
 import { prisma } from '@/lib/db';
@@ -220,13 +219,21 @@ export async function getContactPulse(
           actionWorkflowStep: { select: { channel: true } },
         },
       }),
-      prisma.actionWorkflowStep.count({
-        where: {
-          contactId,
-          status: { in: ['pending', 'ready'] },
-          createdAt: { lte: threeDaysAgo },
-        },
-      }),
+      // Pending PlayActions for this contact (by email) in ACTIVE runs, created 3+ days ago
+      (async () => {
+        if (!contact.email) return 0;
+        const count = await prisma.playAction.count({
+          where: {
+            status: 'PENDING',
+            contactEmail: contact.email,
+            phaseRun: {
+              playRun: { status: 'ACTIVE' },
+            },
+            createdAt: { lte: threeDaysAgo },
+          },
+        });
+        return count;
+      })(),
       prisma.eventAttendance.findMany({
         where: { contactId },
         select: { eventName: true, rsvpStatus: true },
@@ -279,7 +286,7 @@ export async function getContactPulse(
       type: a.type,
       summary: a.summary,
       date: a.createdAt.toISOString(),
-      channel: a.actionWorkflowStep?.channel ?? null,
+      channel: a.actionWorkflowStep?.channel ?? null, // PlayAction-origin activities have no step; channel can be from ContactTouch if needed later
       opened: !!a.emailOpenedAt,
       clicked: !!a.emailClickedAt,
     })),
@@ -477,36 +484,59 @@ export async function getNeedsAttentionContacts(
   const sevenDaysAgo = new Date(Date.now() - 7 * MS_PER_DAY);
   const fourteenDaysAgo = new Date(Date.now() - 14 * MS_PER_DAY);
 
-  // Contacts with pending workflow steps older than 3 days (follow_up_due)
-  const pendingStepContacts = await prisma.actionWorkflowStep.findMany({
+  // Contacts with pending PlayActions older than 3 days (follow_up_due) in ACTIVE runs
+  const pendingPlayActions = await prisma.playAction.findMany({
     where: {
-      status: { in: ['pending', 'ready'] },
+      status: 'PENDING',
       createdAt: { lte: threeDaysAgo },
-      contactId: { not: null },
-      workflow: { userId, status: { in: ['pending', 'in_progress'] } },
-    },
-    select: {
-      contactId: true,
-      contact: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          title: true,
-          email: true,
-          companyId: true,
-          lastContactedAt: true,
-          lastEmailOpenedAt: true,
-          lastEmailRepliedAt: true,
-          totalEmailsSent: true,
-          isResponsive: true,
-          isDormant: true,
-          company: { select: { name: true } },
-        },
+      contactEmail: { not: null },
+      phaseRun: {
+        playRun: { userId, status: 'ACTIVE' },
       },
     },
-    distinct: ['contactId'],
+    select: {
+      contactEmail: true,
+      phaseRun: { select: { playRun: { select: { companyId: true } } } },
+    },
   });
+  const emails = [...new Set(pendingPlayActions.map((a) => a.contactEmail).filter(Boolean))] as string[];
+  const companyIds = [...new Set(pendingPlayActions.map((a) => a.phaseRun.playRun.companyId))];
+  const contactsByEmail = await prisma.contact.findMany({
+    where: {
+      company: { userId },
+      companyId: { in: companyIds },
+      email: { in: emails },
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      title: true,
+      email: true,
+      companyId: true,
+      lastContactedAt: true,
+      lastEmailOpenedAt: true,
+      lastEmailRepliedAt: true,
+      totalEmailsSent: true,
+      isResponsive: true,
+      isDormant: true,
+      company: { select: { name: true } },
+    },
+  });
+  const pendingCountByContactId: Record<string, number> = {};
+  for (const a of pendingPlayActions) {
+    const contact = contactsByEmail.find((c) => c.email === a.contactEmail);
+    if (contact) {
+      pendingCountByContactId[contact.id] = (pendingCountByContactId[contact.id] ?? 0) + 1;
+    }
+  }
+  const pendingStepContacts = contactsByEmail
+    .filter((c) => (pendingCountByContactId[c.id] ?? 0) > 0)
+    .map((c) => ({
+      contactId: c.id,
+      contact: c,
+      pendingCount: pendingCountByContactId[c.id] ?? 0,
+    }));
 
   // Contacts who opened but didn't reply (3+ days ago) — awaiting_reply
   const awaitingReply = await prisma.contact.findMany({
@@ -588,8 +618,8 @@ export async function getNeedsAttentionContacts(
     });
   };
 
-  for (const step of pendingStepContacts) {
-    if (step.contact) addContact(step.contact, 'follow_up_due', 1);
+  for (const item of pendingStepContacts) {
+    if (item.contact) addContact(item.contact, 'follow_up_due', item.pendingCount);
   }
   for (const c of awaitingReply) {
     addContact(c, 'awaiting_reply', 0);
@@ -602,7 +632,7 @@ export async function getNeedsAttentionContacts(
 }
 
 /**
- * Play activity summary for the analytics page.
+ * Play activity summary for the analytics page (PlayRun + PlayAction).
  */
 export async function getPlayActivitySummary(opts: {
   userId: string;
@@ -610,41 +640,37 @@ export async function getPlayActivitySummary(opts: {
   startDate: Date;
   endDate: Date;
 }): Promise<PlayActivitySummaryData> {
-  const where: Record<string, unknown> = {
+  const runWhere: Record<string, unknown> = {
     userId: opts.userId,
     createdAt: { gte: opts.startDate, lte: opts.endDate },
   };
-  if (opts.companyId) where.companyId = opts.companyId;
+  if (opts.companyId) runWhere.companyId = opts.companyId;
 
-  const [workflows, steps] = await Promise.all([
-    prisma.actionWorkflow.findMany({
-      where: where as any,
+  const [runs, actions] = await Promise.all([
+    prisma.playRun.findMany({
+      where: runWhere as any,
       select: { status: true },
     }),
-    prisma.actionWorkflowStep.findMany({
+    prisma.playAction.findMany({
       where: {
-        workflow: where as any,
+        phaseRun: { playRun: runWhere as any },
       },
-      select: { status: true, channel: true },
+      select: { status: true, actionType: true },
     }),
   ]);
 
-  const playsStarted = workflows.length;
-  const playsInProgress = workflows.filter(
-    (w) => w.status === 'in_progress' || w.status === 'pending',
-  ).length;
-  const playsCompleted = workflows.filter((w) => w.status === 'completed').length;
+  const playsStarted = runs.length;
+  const playsInProgress = runs.filter((r) => r.status === 'ACTIVE').length;
+  const playsCompleted = runs.filter((r) => r.status === 'COMPLETED').length;
 
-  const totalSteps = steps.length;
-  const completedSteps = steps.filter(
-    (s) => s.status === 'completed' || s.status === 'sent',
-  ).length;
+  const totalSteps = actions.length;
+  const completedSteps = actions.filter((s) => s.status === 'EXECUTED').length;
   const completionRate = totalSteps > 0 ? completedSteps / totalSteps : 0;
 
   const channelCounts: Record<string, number> = {};
-  for (const s of steps) {
-    if (s.status === 'completed' || s.status === 'sent') {
-      const ch = s.channel || 'other';
+  for (const a of actions) {
+    if (a.status === 'EXECUTED') {
+      const ch = a.actionType === 'SEND_EMAIL' ? 'email' : a.actionType === 'SEND_LINKEDIN' ? 'linkedin' : 'other';
       channelCounts[ch] = (channelCounts[ch] || 0) + 1;
     }
   }

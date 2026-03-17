@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { assembleWorkflow } from '@/lib/action-workflows/assemble';
+import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
 
 export async function POST(
   _req: NextRequest,
@@ -61,71 +61,48 @@ export async function POST(
       },
     });
 
-    // Auto-create workflows for matching accounts
-    const workflowIds = await autoCreateEventWorkflows(userId, attendance.eventName);
+    const playRunIds = await autoCreateEventPlayRuns(userId, eventName);
 
-    return NextResponse.json({ ok: true, signalId: signal.id, workflowsCreated: workflowIds.length });
+    return NextResponse.json({ ok: true, signalId: signal.id, playRunsCreated: playRunIds.length });
   } catch (error) {
     console.error('POST /api/my-company/events/[eventName]/activate error:', error);
     return NextResponse.json({ error: 'Failed to activate event trigger' }, { status: 500 });
   }
 }
 
-async function autoCreateEventWorkflows(userId: string, eventName: string): Promise<string[]> {
-  const template = await prisma.playbookTemplate.findFirst({
+async function autoCreateEventPlayRuns(userId: string, eventName: string): Promise<string[]> {
+  const template = await prisma.playTemplate.findFirst({
     where: {
       userId,
+      status: 'ACTIVE',
       OR: [
-        { triggerType: 'event' },
+        { triggerType: 'SIGNAL' },
         { name: { contains: 'Event Invite', mode: 'insensitive' } },
         { name: { contains: 'Event', mode: 'insensitive' } },
       ],
     },
-    select: {
-      id: true,
-      targetDepartmentTypes: true,
-      targetIndustries: true,
-    },
-    orderBy: { priority: 'desc' },
+    select: { id: true },
   });
   if (!template) return [];
 
-  const targetDepts = (template.targetDepartmentTypes as string[]) ?? [];
-  const targetIndustries = (template.targetIndustries as string[]) ?? [];
-
   const companies = await prisma.company.findMany({
-    where: {
-      userId,
-      ...(targetIndustries.length > 0 && { industry: { in: targetIndustries, mode: 'insensitive' } }),
-    },
-    select: {
-      id: true,
-      name: true,
-      departments: { select: { id: true, type: true } },
-    },
+    where: { userId },
+    select: { id: true, name: true },
   });
 
-  const workflowIds: string[] = [];
-
+  const playRunIds: string[] = [];
   for (const company of companies) {
-    const hasDeptMatch = targetDepts.length === 0 ||
-      company.departments.some((d) => d.type && targetDepts.includes(d.type));
-
-    if (!hasDeptMatch) continue;
-
     try {
-      const workflow = await assembleWorkflow({
+      const playRun = await createPlayRunFromTemplate({
         userId,
         companyId: company.id,
-        templateId: template.id,
+        playTemplateId: template.id,
         title: `${eventName} — ${company.name}`,
-        description: `Event invite workflow for ${company.name}`,
       });
-      workflowIds.push(workflow.id);
+      playRunIds.push(playRun.id);
     } catch {
-      console.warn(`Skipped workflow for ${company.name}: assembly failed`);
+      console.warn(`Skipped play run for ${company.name}: create failed`);
     }
   }
-
-  return workflowIds;
+  return playRunIds;
 }

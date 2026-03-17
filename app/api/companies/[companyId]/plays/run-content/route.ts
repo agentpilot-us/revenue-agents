@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateOneContent } from '@/lib/plays/generate-content';
-import { buildPlayPromptFromSignal } from '@/lib/plays/play-prompt-from-signal';
+import { generateOneContent } from '@/lib/content/generate-content';
 
 export const maxDuration = 60;
 
@@ -115,12 +114,7 @@ export async function POST(
       };
     }
 
-    let prompt = buildPlayPromptFromSignal({
-      playId: runParams.playId,
-      signalTitle: runParams.signalTitle,
-      signalSummary: runParams.signalSummary ?? null,
-      segmentName: runParams.segmentName ?? null,
-    });
+    let prompt = `Signal: ${runParams.signalTitle}${runParams.signalSummary ? ` — ${runParams.signalSummary}` : ''}${runParams.segmentName ? `\nTarget segment: ${runParams.segmentName}` : ''}`;
 
     // Event invite: inject event landing page URL so email and LinkedIn include the link (same as feature release workflow)
     if (runParams.playId === 'event_invite') {

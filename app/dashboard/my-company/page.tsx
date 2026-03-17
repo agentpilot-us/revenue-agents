@@ -27,17 +27,6 @@ export default async function MyCompanyPage() {
     redirect('/dashboard/company-setup');
   }
 
-  type DocRow = { id: string; title: string; description?: string | null; url?: string | null };
-  const internalDoc = (prisma as { internalDocument?: { findMany: (args: unknown) => Promise<DocRow[]> } })
-    .internalDocument;
-  const documentsPromise: Promise<DocRow[]> = internalDoc
-    ? internalDoc.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      })
-    : Promise.resolve([]);
-
   const primaryCompany = await prisma.company.findFirst({
     where: { userId },
     orderBy: { createdAt: 'asc' },
@@ -50,7 +39,6 @@ export default async function MyCompanyPage() {
     roadmapCount,
     productCount,
     signalCount,
-    documents,
     products,
     events,
     recentSignals,
@@ -62,7 +50,6 @@ export default async function MyCompanyPage() {
     prisma.adaptiveRoadmap.count({ where: { userId } }),
     prisma.companyProduct.count({ where: { company: { userId } } }),
     prisma.accountSignal.count({ where: { company: { userId } } }),
-    documentsPromise,
     prisma.companyProduct.findMany({
       where: { company: { userId } },
       select: {
@@ -147,7 +134,6 @@ export default async function MyCompanyPage() {
   return (
     <MyCompanyClient
       profile={profileData}
-      documents={documents}
       health={{ companyCount, contactCount, roadmapCount, productCount, signalCount }}
       companyProducts={serializedProducts}
       eventSummaries={eventSummaries}

@@ -2,29 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import type { PlayTemplateCatalogItem } from './PlayCatalog';
 
 type TemplateStep = {
   order: number;
   name: string | null;
   label: string | null;
   description: string | null;
-  channel: string | null;
-  phase: string | null;
-  targetPersona: string | null;
-  dayOffset: number | null;
-};
-
-type PlaybookTemplate = {
-  id: string;
-  name: string;
-  description: string | null;
-  triggerType: string | null;
-  stepCount: number;
-  targetDepartmentTypes: string[] | null;
-  targetPersonas: string[] | null;
-  expectedOutcome: string | null;
-  priority: number;
-  steps?: TemplateStep[];
+  channel?: string | null;
+  phase?: string | null;
+  targetPersona?: string | null;
+  dayOffset?: number | null;
 };
 
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -70,9 +58,11 @@ const t = {
 };
 
 type CompanyOption = { id: string; name: string };
+type DivisionOption = { id: string; label: string };
+type ContactOption = { id: string; name: string; email: string | null };
 
 type Props = {
-  template: PlaybookTemplate;
+  template: PlayTemplateCatalogItem;
   onClose: () => void;
   companyId?: string;
   companyName?: string;
@@ -82,23 +72,55 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
   const router = useRouter();
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
+  const [divisions, setDivisions] = useState<DivisionOption[]>([]);
+  const [contacts, setContacts] = useState<ContactOption[]>([]);
+  const [selectedDivisionId, setSelectedDivisionId] = useState('');
+  const [selectedContactId, setSelectedContactId] = useState('');
   const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [loadingDivisions, setLoadingDivisions] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [steps, setSteps] = useState<TemplateStep[]>(template.steps ?? []);
-  const [loadingSteps, setLoadingSteps] = useState(!template.steps?.length);
+  const [steps, setSteps] = useState<TemplateStep[]>([]);
+  const [loadingSteps, setLoadingSteps] = useState(true);
 
   const needsCompanyPicker = !companyId;
 
   useEffect(() => {
-    if (template.steps?.length) return;
     setLoadingSteps(true);
-    fetch(`/api/playbooks/templates/${template.id}`)
+    fetch(`/api/play-templates/${template.id}`)
       .then((r) => r.json())
-      .then((data) => setSteps(data.template?.steps ?? []))
+      .then((data) => {
+        const phases = data.phases ?? [];
+        const stepList: TemplateStep[] = [];
+        phases.forEach((ph: { name: string; orderIndex: number; contentTemplates?: { name: string }[] }, idx: number) => {
+          const contentNames = (ph.contentTemplates ?? []).map((c: { name: string }) => c.name);
+          if (contentNames.length > 0) {
+            contentNames.forEach((name, i) => {
+              stepList.push({
+                order: stepList.length + 1,
+                name,
+                label: name,
+                description: ph.name,
+                phase: ph.name,
+                dayOffset: null,
+              });
+            });
+          } else {
+            stepList.push({
+              order: idx + 1,
+              name: ph.name,
+              label: ph.name,
+              description: ph.name,
+              phase: ph.name,
+              dayOffset: null,
+            });
+          }
+        });
+        setSteps(stepList);
+      })
       .catch(() => {})
       .finally(() => setLoadingSteps(false));
-  }, [template.id, template.steps]);
+  }, [template.id]);
 
   useEffect(() => {
     if (!needsCompanyPicker) return;
@@ -114,33 +136,86 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       .finally(() => setLoadingCompanies(false));
   }, [needsCompanyPicker]);
 
+  const targetCompanyId = companyId || selectedCompanyId;
+
+  useEffect(() => {
+    if (!targetCompanyId) {
+      setDivisions([]);
+      setContacts([]);
+      return;
+    }
+    setLoadingDivisions(true);
+    setSelectedDivisionId('');
+    setSelectedContactId('');
+    fetch(`/api/companies/${targetCompanyId}/departments`)
+      .then((r) => r.json())
+      .then((data) => {
+        const depts = Array.isArray(data.departments) ? data.departments : Array.isArray(data) ? data : [];
+        setDivisions(
+          depts.map((d: { id: string; customName?: string | null; type?: string }) => ({
+            id: d.id,
+            label: d.customName || (d.type ?? '').replace(/_/g, ' '),
+          })),
+        );
+      })
+      .catch(() => setDivisions([]))
+      .finally(() => setLoadingDivisions(false));
+  }, [targetCompanyId]);
+
+  useEffect(() => {
+    if (!targetCompanyId || !selectedDivisionId) {
+      setContacts([]);
+      setSelectedContactId('');
+      return;
+    }
+    fetch(`/api/companies/${targetCompanyId}/contacts?departmentId=${selectedDivisionId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const list = Array.isArray(data.contacts) ? data.contacts : Array.isArray(data) ? data : [];
+        setContacts(
+          list.map((c: { id: string; firstName?: string | null; lastName?: string | null; email?: string | null }) => ({
+            id: c.id,
+            name: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown',
+            email: c.email ?? null,
+          })),
+        );
+      })
+      .catch(() => setContacts([]));
+  }, [targetCompanyId, selectedDivisionId]);
+
   const handleStart = useCallback(async () => {
-    const targetCompanyId = companyId || selectedCompanyId;
-    if (!targetCompanyId) return;
+    const cid = companyId || selectedCompanyId;
+    if (!cid) return;
     setStarting(true);
     setError(null);
     try {
-      const res = await fetch('/api/action-workflows/from-play', {
+      const payload: Record<string, string> = {
+        companyId: cid,
+        playTemplateId: template.id,
+      };
+      if (selectedContactId) payload.targetContactId = selectedContactId;
+
+      const res = await fetch('/api/play-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId: targetCompanyId,
-          templateId: template.id,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Failed to start play');
       }
       const data = await res.json();
-      router.push(
-        `/dashboard/companies/${targetCompanyId}/plays/execute/${data.workflowId}`,
-      );
+      const playRunId = data.playRunId ?? data.playRun?.id;
+      if (playRunId) {
+        router.push(`/dashboard/companies/${cid}/plays/run/${playRunId}`);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start play');
       setStarting(false);
     }
-  }, [companyId, selectedCompanyId, template.id, router]);
+  }, [companyId, selectedCompanyId, selectedContactId, template.id, router]);
 
   const selectedCompanyName =
     companyName || companies.find((c) => c.id === selectedCompanyId)?.name;
@@ -271,17 +346,14 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
           </div>
 
           {/* Metadata */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {template.expectedOutcome && (
-              <MetaBlock label="Expected Outcome" value={template.expectedOutcome} />
-            )}
-            {template.targetPersonas && (template.targetPersonas as string[]).length > 0 && (
-              <MetaBlock label="Target Personas" value={(template.targetPersonas as string[]).join(', ')} />
-            )}
-            {template.targetDepartmentTypes && (template.targetDepartmentTypes as string[]).length > 0 && (
-              <MetaBlock label="Departments" value={(template.targetDepartmentTypes as string[]).map((d) => d.replace(/_/g, ' ')).join(', ')} />
-            )}
-          </div>
+          {(template as { expectedOutcome?: string; targetPersonas?: string[]; targetDepartmentTypes?: string[] }).expectedOutcome && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+              <MetaBlock
+                label="Expected Outcome"
+                value={(template as { expectedOutcome?: string }).expectedOutcome!}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -307,6 +379,46 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
                   ))}
                 </select>
               )}
+            </div>
+          )}
+
+          {(targetCompanyId && !loadingDivisions && divisions.length > 0) && (
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: t.text4, marginBottom: 4 }}
+              >
+                Division <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+              </label>
+              <select
+                value={selectedDivisionId}
+                onChange={(e) => setSelectedDivisionId(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: `1px solid ${t.borderMed}`, color: t.text1, fontSize: 13, outline: 'none' }}
+              >
+                <option value="">All divisions</option>
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {(selectedDivisionId && contacts.length > 0) && (
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: t.text4, marginBottom: 4 }}
+              >
+                Primary Contact <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+              </label>
+              <select
+                value={selectedContactId}
+                onChange={(e) => setSelectedContactId(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: `1px solid ${t.borderMed}`, color: t.text1, fontSize: 13, outline: 'none' }}
+              >
+                <option value="">Auto-assign</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.email ? ` (${c.email})` : ''}</option>
+                ))}
+              </select>
             </div>
           )}
 

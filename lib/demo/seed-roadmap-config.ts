@@ -1,92 +1,66 @@
 /**
- * Default seed for Adaptive Roadmap: signal rules, action mappings, and conditions.
- * Used when creating a new demo roadmap or when the user has none (e.g. "Load example config").
+ * Default seed for Adaptive Roadmap: conditions and (new play system) SignalPlayMappings
+ * and AccountPlayActivations. No longer creates RoadmapSignalRule or RoadmapActionMapping.
  */
 
 import { prisma } from '@/lib/db';
 
 export async function seedDefaultRoadmapConfig(roadmapId: string): Promise<void> {
-  const existingRules = await prisma.roadmapSignalRule.count({
+  const roadmap = await prisma.adaptiveRoadmap.findUnique({
+    where: { id: roadmapId },
+    select: { userId: true },
+  });
+  if (!roadmap) return;
+
+  const existingConditions = await prisma.roadmapCondition.count({
     where: { roadmapId },
   });
-  if (existingRules > 0) return;
 
-  // —— Signal rules ——
-  const ruleEarnings = await prisma.roadmapSignalRule.create({
-    data: {
-      roadmapId,
-      name: 'Earnings call — strategic priorities',
-      category: 'earnings_call',
-      description:
-        'Earnings calls or financial reports mentioning strategic initiatives, capex, or new investments.',
-      keywords: ['earnings', 'strategic', 'investment', 'initiative', 'growth'],
-      sources: ['news', 'financial_report'],
-      priorityWeight: 2,
-    },
+  // —— New play system: SignalPlayMapping + AccountPlayActivation (idempotent) ——
+  const templates = await prisma.playTemplate.findMany({
+    where: { userId: roadmap.userId, status: 'ACTIVE' },
+    select: { id: true },
+    take: 6,
   });
+  const firstTemplateId = templates[0]?.id;
+  if (firstTemplateId) {
+    const signalTypes = ['earnings_call', 'job_posting_signal', 'product_announcement'];
+    for (const signalType of signalTypes) {
+      await prisma.signalPlayMapping.upsert({
+        where: {
+          userId_signalType_playTemplateId: {
+            userId: roadmap.userId,
+            signalType,
+            playTemplateId: firstTemplateId,
+          },
+        },
+        create: {
+          userId: roadmap.userId,
+          signalType,
+          playTemplateId: firstTemplateId,
+          autoActivate: false,
+        },
+        update: {},
+      });
+    }
+    for (const t of templates.slice(0, 3)) {
+      await prisma.accountPlayActivation.upsert({
+        where: {
+          roadmapId_playTemplateId: { roadmapId, playTemplateId: t.id },
+        },
+        create: {
+          roadmapId,
+          playTemplateId: t.id,
+          isActive: true,
+        },
+        update: {},
+      });
+    }
+  }
 
-  const ruleJobs = await prisma.roadmapSignalRule.create({
-    data: {
-      roadmapId,
-      name: 'Job posting — key roles',
-      category: 'job_posting_signal',
-      description: 'New job postings for leadership or key technical roles in target areas.',
-      keywords: ['hiring', 'director', 'VP', 'lead', 'head of'],
-      sources: ['job_boards', 'linkedin'],
-      priorityWeight: 1,
-    },
-  });
+  // —— Conditions & modifiers (only if none exist) ——
+  if (existingConditions > 0) return;
 
-  const ruleProduct = await prisma.roadmapSignalRule.create({
-    data: {
-      roadmapId,
-      name: 'Product or partnership announcement',
-      category: 'product_announcement',
-      description: 'Press or blog posts about product launches or new partnerships.',
-      keywords: ['launch', 'partnership', 'announcement', 'release'],
-      sources: ['news', 'blog'],
-      priorityWeight: 1,
-    },
-  });
-
-  // —— Action mappings (linked to rules) ——
-  const mappingEarnings = await prisma.roadmapActionMapping.create({
-    data: {
-      roadmapId,
-      signalRuleId: ruleEarnings.id,
-      signalCategory: 'earnings_call',
-      actionType: 'generate_email',
-      autonomyLevel: 'draft_review',
-      promptHint:
-        'Draft a short executive briefing email that ties the account’s stated priorities to our solution.',
-    },
-  });
-
-  const mappingJobs = await prisma.roadmapActionMapping.create({
-    data: {
-      roadmapId,
-      signalRuleId: ruleJobs.id,
-      signalCategory: 'job_posting_signal',
-      actionType: 'generate_email',
-      autonomyLevel: 'draft_review',
-      promptHint:
-        'Draft a concise outreach email congratulating on the new role and connecting our value prop to their focus area.',
-    },
-  });
-
-  await prisma.roadmapActionMapping.create({
-    data: {
-      roadmapId,
-      signalRuleId: ruleProduct.id,
-      signalCategory: 'product_announcement',
-      actionType: 'research_account',
-      autonomyLevel: 'notify_only',
-      promptHint:
-        'Summarize how this announcement might create an opening for our solution; suggest next step.',
-    },
-  });
-
-  // —— Conditions & modifiers ——
   await prisma.roadmapCondition.create({
     data: {
       roadmapId,

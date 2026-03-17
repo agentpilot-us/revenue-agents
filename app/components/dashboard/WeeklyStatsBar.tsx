@@ -102,6 +102,11 @@ export default function WeeklyStatsBar({ momentum }: Props) {
         thisWeek={momentum.thisWeek.signalsThisWeek}
         lastWeek={momentum.lastWeek.signalsThisWeek}
       />
+      <StatCell
+        label="Plays Completed"
+        thisWeek={momentum.thisWeek.playsCompleted}
+        lastWeek={momentum.lastWeek.playsCompleted}
+      />
     </div>
   );
 }

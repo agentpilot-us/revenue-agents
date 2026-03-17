@@ -73,6 +73,8 @@ type Props = {
   companyId: string;
   companyName: string;
   initialDivisionId?: string;
+  /** When custom create is disabled, call to switch to Play Catalog tab. */
+  onSwitchToCatalog?: () => void;
 };
 
 type AISuggestion = {
@@ -90,7 +92,7 @@ type AISuggestion = {
   reasoning: string;
 };
 
-export default function CustomPlayBuilder({ companyId, companyName, initialDivisionId }: Props) {
+export default function CustomPlayBuilder({ companyId, companyName, initialDivisionId, onSwitchToCatalog }: Props) {
   const router = useRouter();
   const [targetDivisionId, setTargetDivisionId] = useState<string>(initialDivisionId ?? '');
   const [buyingGroups, setBuyingGroups] = useState<BuyingGroupOption[]>([]);
@@ -191,40 +193,42 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
     setError(null);
 
     try {
-      const customSteps = steps.map((s, idx) => ({
-        order: idx + 1,
-        label: s.label,
-        description: s.description || s.label,
-        channel: s.channel,
-        contentIntent: s.contentIntent || undefined,
-        contentType: s.contentType || undefined,
-        sellingMotion: s.sellingMotion || undefined,
-      }));
-
-      const res = await fetch('/api/action-workflows/from-play', {
+      // New play system: run plays from Play Catalog only. Custom steps no longer create workflows.
+      const templatesRes = await fetch('/api/play-templates');
+      const templatesData = await templatesRes.json();
+      const templates = templatesData.templates || [];
+      const firstTemplate = templates[0];
+      if (!firstTemplate?.id) {
+        setError('No play templates available. Add plays in Play Catalog first.');
+        setCreating(false);
+        return;
+      }
+      const res = await fetch('/api/play-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId,
+          playTemplateId: firstTemplate.id,
           title: playName,
-          description: playDescription || undefined,
-          targetDivisionId: targetDivisionId || undefined,
-          customSteps,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to create play');
+        throw new Error(data.error || 'Failed to create play run');
       }
-
-      await res.json();
-      router.push('/dashboard');
+      const data = await res.json();
+      const runId = data.playRunId ?? data.playRun?.id;
+      if (runId) {
+        router.push(`/dashboard/companies/${companyId}/plays/run/${runId}`);
+      } else {
+        onSwitchToCatalog?.();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create play');
+    } finally {
       setCreating(false);
     }
-  }, [playName, playDescription, steps, companyId, targetDivisionId, router]);
+  }, [playName, companyId, router, onSwitchToCatalog]);
 
   const isValid = playName.trim() && steps.every((s) => s.label.trim());
   const showBuilder = manualMode || suggestion;

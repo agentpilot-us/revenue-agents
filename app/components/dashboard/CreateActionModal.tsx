@@ -42,10 +42,11 @@ export default function CreateActionModal({ open, onClose, onCreated }: Props) {
     if (!open) return;
     Promise.all([
       fetch('/api/companies').then((r) => r.json()),
-      fetch('/api/playbooks/templates').then((r) => r.json()),
+      fetch('/api/play-templates').then((r) => r.json()),
     ]).then(([compData, tmplData]) => {
       setCompanies(compData.companies || compData || []);
-      setTemplates(tmplData.templates || tmplData || []);
+      const list = tmplData.templates || tmplData || [];
+      setTemplates(list.map((t: { id: string; name: string; triggerType?: string | null }) => ({ id: t.id, name: t.name, triggerType: t.triggerType ?? null })));
     });
   }, [open]);
 
@@ -84,41 +85,61 @@ export default function CreateActionModal({ open, onClose, onCreated }: Props) {
 
     try {
       if (mode === 'bulk' && selectedContacts.size > 0) {
-        const res = await fetch('/api/action-workflows/bulk-event-invite', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId: selectedCompany,
-            templateId: selectedTemplate,
-            contactIds: [...selectedContacts],
-          }),
-        });
-        if (!res.ok) {
+        const contactIds = [...selectedContacts];
+        let firstRunId: string | null = null;
+        for (const contactId of contactIds) {
+          const res = await fetch('/api/play-runs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyId: selectedCompany,
+              playTemplateId: selectedTemplate,
+              targetContactId: contactId,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'Failed to create');
+          }
           const data = await res.json();
-          throw new Error(data.error || 'Failed to create');
+          if (!firstRunId) firstRunId = data.playRunId ?? data.playRun?.id;
+        }
+        onCreated();
+        onClose();
+        setSelectedCompany('');
+        setSelectedTemplate('');
+        setSelectedContacts(new Set());
+        setMode('single');
+        if (firstRunId && typeof window !== 'undefined') {
+          window.location.href = `/dashboard/companies/${selectedCompany}/plays/run/${firstRunId}`;
         }
       } else {
-        const res = await fetch('/api/action-workflows', {
+        const res = await fetch('/api/play-runs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             companyId: selectedCompany,
-            templateId: selectedTemplate,
+            playTemplateId: selectedTemplate,
           }),
         });
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || 'Failed to create');
         }
+        const data = await res.json();
+        const runId = data.playRunId ?? data.playRun?.id;
+        onCreated();
+        onClose();
+        setSelectedCompany('');
+        setSelectedTemplate('');
+        setSelectedContacts(new Set());
+        setMode('single');
+        if (runId && typeof window !== 'undefined') {
+          window.location.href = `/dashboard/companies/${selectedCompany}/plays/run/${runId}`;
+        }
       }
-      onCreated();
-      onClose();
-      setSelectedCompany('');
-      setSelectedTemplate('');
-      setSelectedContacts(new Set());
-      setMode('single');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error creating workflow');
+      setError(err instanceof Error ? err.message : 'Error creating play run');
     } finally {
       setCreating(false);
     }

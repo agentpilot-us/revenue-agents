@@ -22,9 +22,8 @@ type Template = {
   name: string;
   triggerType: string;
   description: string | null;
-  _count: { steps: number };
-  targetDepartmentTypes: string[] | null;
-  expectedOutcome: string | null;
+  phaseCount?: number;
+  _count?: { steps: number };
 };
 
 type Division = {
@@ -70,7 +69,7 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
   const fetchTemplates = useCallback(async () => {
     setLoadingTemplates(true);
     try {
-      const res = await fetch('/api/playbooks/templates');
+      const res = await fetch('/api/play-templates');
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates ?? []);
@@ -125,7 +124,7 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
     }
   };
 
-  const totalWorkflows = selectedTemplateIds.size * Math.max(selectedDivisionIds.size, 1);
+  const totalRuns = selectedTemplateIds.size;
 
   return (
     <div
@@ -296,7 +295,7 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
                           {isSelected ? '✓' : ''}
                         </span>
                         <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{tmpl.name}</span>
-                        <span style={{ fontSize: 10, color: t.text3 }}>{tmpl._count.steps} steps</span>
+                        <span style={{ fontSize: 10, color: t.text3 }}>{(tmpl.phaseCount ?? tmpl._count?.steps ?? 0)} phases</span>
                       </div>
                       {tmpl.description && (
                         <p style={{ fontSize: 11, color: t.text3, margin: '4px 0 0 24px', lineHeight: 1.4 }}>
@@ -359,12 +358,12 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
 
             <div style={{ padding: 16, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${t.border}` }}>
               <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>
-                Plays ({selectedTemplateIds.size}) → {totalWorkflows} workflow{totalWorkflows !== 1 ? 's' : ''} will be created
+                Plays ({selectedTemplateIds.size}) → {totalRuns} run{totalRuns !== 1 ? 's' : ''} will be created
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {templates.filter((t2) => selectedTemplateIds.has(t2.id)).map((t2) => (
                   <div key={t2.id} style={{ fontSize: 12, color: t.text1, display: 'flex', gap: 6 }}>
-                    <span style={{ color: t.green }}>✓</span> {t2.name} ({t2._count.steps} steps)
+                    <span style={{ color: t.green }}>✓</span> {t2.name} ({(t2.phaseCount ?? t2._count?.steps ?? 0)} phases)
                   </div>
                 ))}
               </div>

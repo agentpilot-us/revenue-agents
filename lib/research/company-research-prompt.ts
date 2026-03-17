@@ -648,6 +648,14 @@ export async function getCompanyResearchPromptBlock(
     lines.push(co.businessOverview);
   }
 
+  if (co.researchData && typeof co.researchData === 'object' && co.researchData !== null && 'lastSummary' in co.researchData) {
+    const summary = (co.researchData as { lastSummary?: string }).lastSummary;
+    if (summary) {
+      lines.push('\nLatest Research:');
+      lines.push(summary);
+    }
+  }
+
   if (co.keyInitiatives) {
     const initiatives = co.keyInitiatives as string[] | null;
     if (Array.isArray(initiatives) && initiatives.length > 0) {

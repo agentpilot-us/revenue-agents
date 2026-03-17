@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         signalRule: { select: { id: true, name: true, category: true } },
         template: { select: { id: true, name: true, triggerType: true } },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ priorityWeight: 'asc' }, { createdAt: 'asc' }],
     });
 
     return NextResponse.json({ mappings });

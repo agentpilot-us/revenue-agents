@@ -80,6 +80,24 @@ export async function POST(req: NextRequest) {
       }),
     );
 
+    await Promise.all(
+      contactsWithEmail.map((contact) =>
+        prisma.activity.create({
+          data: {
+            type: 'EMAIL_SENT',
+            summary: `Ad-hoc email to ${[contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email}`,
+            subject: input.subject ?? 'Draft from AgentPilot',
+            content: input.body,
+            companyId: input.companyId,
+            companyDepartmentId: input.divisionId ?? null,
+            contactId: contact.id,
+            userId: session.user.id,
+            agentUsed: 'content_tab',
+          },
+        }),
+      ),
+    );
+
     return NextResponse.json({
       ok: true,
       channel: input.channel,

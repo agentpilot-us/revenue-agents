@@ -11,14 +11,6 @@ type DepartmentOption = {
   type: string;
 };
 
-type ContentTypeItem = {
-  id: string;
-  label: string;
-  stage: string;
-  channelIds: string[];
-  motions: string[];
-};
-
 type Props = {
   companyId: string;
   companyName: string;
@@ -45,19 +37,6 @@ type ChannelItem = {
   intents: { id: string; label: string }[];
 };
 
-type PlayItem = {
-  id: string;
-  label: string;
-  description: string;
-};
-
-type MotionItem = {
-  id: string;
-  label: string;
-  description: string;
-  stageContext: string;
-};
-
 const CHANNEL_ICONS: Record<string, string> = {
   email: '\u2709',
   linkedin_inmail: 'in',
@@ -77,9 +56,6 @@ const CHANNEL_ICONS: Record<string, string> = {
   map: '\ud83d\uddfa',
   qbr_ebr_script: '\ud83d\udccb',
 };
-
-const MEDIA_ASPECT_RATIOS = ['1:1', '4:3', '16:9', '9:16'] as const;
-const VIDEO_DURATIONS = [4, 6, 8] as const;
 
 const SENDER_ROLES = [
   { id: 'ae', label: 'Account Executive' },
@@ -747,25 +723,15 @@ function StructuredOutput({
   );
 }
 
-function getSuggestionChips(motionId: string, intentId: string): string[] {
-  const byMotion: Record<string, string[]> = {
-    new_logo: ['Set up intro meeting', 'Share relevant case study', 'Congratulate on recent news', 'Invite to upcoming webinar'],
-    upsell: ['Show new feature value', 'Reference their usage data', 'Propose upgrade path', 'Share expansion ROI'],
-    cross_sell: ['Introduce new product line', 'Connect to existing workflow', 'Share cross-sell case study'],
-    renewal: ['Highlight value delivered', 'Share usage metrics', 'Discuss roadmap alignment', 'Address upcoming renewal'],
-    customer_success: ['Check in on adoption', 'Share best practices', 'Celebrate a milestone', 'Recommend next training'],
-  };
+function getSuggestionChips(intentId: string): string[] {
   const byIntent: Record<string, string[]> = {
+    introduction: ['Set up intro meeting', 'Congratulate on recent news', 'Invite to upcoming webinar'],
     competitive_displacement: ['Compare key differentiators', 'Migration support details', 'Switching success story'],
     event_invite: ['Invite to webinar', 'Invite to in-person event', 'Share event agenda'],
+    follow_up: ['Reference last conversation', 'Share relevant case study', 'Propose next steps'],
+    value_reinforcement: ['Highlight value delivered', 'Share usage metrics', 'Discuss roadmap alignment'],
   };
-  return byIntent[intentId] ?? byMotion[motionId] ?? ['Set up a meeting', 'Share a case study', 'Reference recent news'];
-}
-
-function defaultMotion(primaryMotion: string | null | undefined, accountType: string | null | undefined): string {
-  if (primaryMotion) return primaryMotion;
-  if (accountType === 'customer') return 'renewal';
-  return 'new_logo';
+  return byIntent[intentId] ?? ['Set up a meeting', 'Share a case study', 'Reference recent news'];
 }
 
 export function ContentTabV2({
@@ -774,21 +740,12 @@ export function ContentTabV2({
   initialDepartmentId,
   signalId,
   initialType,
-  accountType,
-  primaryMotion,
 }: Props) {
   const router = useRouter();
-  const defaultMotionValue = defaultMotion(primaryMotion ?? null, accountType ?? null);
 
   const [channels, setChannels] = useState<ChannelItem[]>([]);
-  const [motions, setMotions] = useState<MotionItem[]>([]);
-  const [contentTypes, setContentTypes] = useState<ContentTypeItem[]>([]);
-  const [playsByMotion, setPlaysByMotion] = useState<Record<string, PlayItem[]>>({});
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState<string | null>(initialDepartmentId ?? null);
-  const [selectedMotion, setSelectedMotion] = useState<string>(defaultMotionValue);
-  const [selectedPlayId, setSelectedPlayId] = useState<string>('');
-  const [selectedContentType, setSelectedContentType] = useState<string>('');
   const [selectedChannel, setSelectedChannel] = useState<string>(initialType || 'email');
   const [selectedIntent, setSelectedIntent] = useState<string>('introduction');
   const [senderRole, setSenderRole] = useState<string>('ae');
@@ -801,46 +758,24 @@ export function ContentTabV2({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [downloadingPptx, setDownloadingPptx] = useState(false);
-  const [mediaAspectRatio, setMediaAspectRatio] = useState<string>('16:9');
-  const [mediaDurationSeconds, setMediaDurationSeconds] = useState<number>(6);
   const [userContext, setUserContext] = useState('');
   const [contextTouched, setContextTouched] = useState(false);
   const [regenerationFeedback, setRegenerationFeedback] = useState('');
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
 
   useEffect(() => {
-    setSelectedMotion(defaultMotionValue);
-  }, [defaultMotionValue, primaryMotion, accountType]);
-
-  useEffect(() => {
-    const url = selectedMotion ? `/api/content/channels?motion=${encodeURIComponent(selectedMotion)}` : '/api/content/channels';
-    fetch(url)
+    fetch('/api/content/channels')
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.channels)) setChannels(data.channels);
         if (data.defaultContentIntent) setSelectedIntent(data.defaultContentIntent);
-        if (Array.isArray(data.motions)) setMotions(data.motions);
-        if (Array.isArray(data.contentTypes)) setContentTypes(data.contentTypes);
-      })
-      .catch(() => {});
-  }, [selectedMotion]);
-
-  useEffect(() => {
-    fetch('/api/content/plays')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.plays && typeof data.plays === 'object') {
-          setPlaysByMotion(data.plays as Record<string, PlayItem[]>);
-        }
       })
       .catch(() => {});
   }, []);
 
   const currentChannel = channels.find((c) => c.id === selectedChannel);
-  const plays = playsByMotion[selectedMotion] ?? [];
   const availableIntents = currentChannel?.intents ?? [{ id: 'introduction', label: 'Introduction' }, { id: 'custom', label: 'Other / Custom' }];
   const outreachChannels = channels.filter((c) => c.group === 'outreach');
-  const salesAssetChannels = channels.filter((c) => c.group === 'sales_asset');
   const selectedOutput = useMemo(() => getSelectedOutput(generated), [generated]);
   const selectedOutputData = selectedOutput?.data ?? {};
   const selectedOutputRaw = selectedOutput?.raw ?? '';
@@ -851,8 +786,6 @@ export function ContentTabV2({
   );
   const isMediaOutput =
     selectedRenderer === 'image_asset' || selectedRenderer === 'video_asset';
-  const isGeneratedImageChannel = selectedChannel === 'generated_image';
-  const isGeneratedVideoChannel = selectedChannel === 'generated_video';
   const isAssetPackage =
     (generated?.deliveryMode ?? currentChannel?.deliveryMode) === 'asset_package';
   const selectedAssetPackage = useMemo(() => {
@@ -894,15 +827,6 @@ export function ContentTabV2({
     }
   }, [selectedChannel, availableIntents, selectedIntent]);
 
-  useEffect(() => {
-    if (plays.length === 0) {
-      if (selectedPlayId) setSelectedPlayId('');
-      return;
-    }
-    if (selectedPlayId && plays.some((play) => play.id === selectedPlayId)) return;
-    setSelectedPlayId('');
-  }, [plays, selectedPlayId]);
-
   const handleSelectionChange = useCallback(
     (contactIds: string[], divisionId: string | null) => {
       setSelectedContacts(contactIds);
@@ -930,18 +854,8 @@ export function ContentTabV2({
           triggerId: signalId,
           userContext: userContext.trim() || undefined,
           contentIntent: selectedIntent || undefined,
-          motion: selectedMotion || undefined,
-          playId: selectedPlayId || undefined,
-          contentType: selectedContentType || undefined,
           senderRole: senderRole || undefined,
           tone: tone || undefined,
-          mediaAspectRatio:
-            isGeneratedImageChannel || isGeneratedVideoChannel
-              ? mediaAspectRatio
-              : undefined,
-          mediaDurationSeconds: isGeneratedVideoChannel
-            ? mediaDurationSeconds
-            : undefined,
         }),
       });
       if (!res.ok) {
@@ -991,20 +905,10 @@ export function ContentTabV2({
           triggerId: signalId,
           userContext: userContext.trim() || undefined,
           contentIntent: selectedIntent || undefined,
-          motion: selectedMotion || undefined,
-          playId: selectedPlayId || undefined,
-          contentType: selectedContentType || undefined,
           senderRole: senderRole || undefined,
           tone: tone || undefined,
           feedback: regenerationFeedback.trim() || undefined,
           previousOutput: selectedOutputRaw || undefined,
-          mediaAspectRatio:
-            isGeneratedImageChannel || isGeneratedVideoChannel
-              ? mediaAspectRatio
-              : undefined,
-          mediaDurationSeconds: isGeneratedVideoChannel
-            ? mediaDurationSeconds
-            : undefined,
         }),
       });
       if (!res.ok) {
@@ -1245,7 +1149,7 @@ export function ContentTabV2({
       ? `Generate ${channelLabel}`
       : `Generate ${channelLabel} for ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''}`;
 
-  const chips = getSuggestionChips(selectedMotion, selectedIntent);
+  const chips = getSuggestionChips(selectedIntent);
   const showContextHint = !contextTouched && !userContext.trim();
 
   return (
@@ -1261,104 +1165,14 @@ export function ContentTabV2({
       {/* Main content builder card */}
       <div className="bg-white dark:bg-zinc-900/70 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
 
-        {/* ── Selling Motion ─────────────────────────────────── */}
-        {motions.length > 0 && (
-          <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
-            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
-              Selling Motion
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {motions.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  title={m.description}
-                  onClick={() => {
-                    setSelectedMotion(m.id);
-                    setSelectedContentType('');
-                    setIsGenerated(false);
-                    setGenerated(null);
-                  }}
-                  className={`group relative px-3.5 py-2 rounded-xl text-left border transition-all duration-150 ${
-                    selectedMotion === m.id
-                      ? 'bg-violet-500/10 border-violet-500/30 shadow-[0_0_0_1px_rgba(139,92,246,0.15)]'
-                      : 'bg-transparent border-gray-200 dark:border-zinc-700/60 hover:border-violet-500/20 hover:bg-violet-500/5'
-                  }`}
-                >
-                  <span className={`text-xs font-semibold block ${
-                    selectedMotion === m.id ? 'text-violet-400' : 'text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {m.label}
-                  </span>
-                  <span className="text-[10px] text-gray-400 dark:text-gray-600 block mt-0.5 leading-tight">
-                    {m.stageContext}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Content Goal (pills replacing dropdown) ──────── */}
-        {contentTypes.length > 0 && (
-          <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
-            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
-              Content Goal <span className="font-normal normal-case tracking-normal text-gray-400/60">(optional)</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedContentType('');
-                  setIsGenerated(false);
-                  setGenerated(null);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                  selectedContentType === ''
-                    ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
-                    : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
-                }`}
-              >
-                Any
-              </button>
-              {contentTypes.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedContentType(t.id);
-                    if (t.channelIds?.length) {
-                      setSelectedChannel(t.channelIds[0]);
-                    }
-                    setIsGenerated(false);
-                    setGenerated(null);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                    selectedContentType === t.id
-                      ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
-                      : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Channels (grouped: Outreach / Sales Assets) ──── */}
-        <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
+        {/* ── Channel ──────────────────────────────────────── */}
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
           <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
             Channel
           </div>
-
-          {outreachChannels.length > 0 && (
-            <div className="mb-3">
-              <div className="text-[9px] font-semibold tracking-wider uppercase text-gray-400/50 dark:text-gray-600 mb-1.5">
-                Outreach
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {outreachChannels.map((ch) => (
+          <div className="flex flex-wrap gap-1.5">
+            {outreachChannels.length > 0
+              ? outreachChannels.map((ch) => (
                   <button
                     key={ch.id}
                     type="button"
@@ -1378,108 +1192,18 @@ export function ContentTabV2({
                       {ch.label}
                     </span>
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {salesAssetChannels.length > 0 && (
-            <div>
-              <div className="text-[9px] font-semibold tracking-wider uppercase text-gray-400/50 dark:text-gray-600 mb-1.5">
-                Sales Assets
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {salesAssetChannels.map((ch) => (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedChannel(ch.id);
-                      setIsGenerated(false);
-                      setGenerated(null);
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-left border transition-all duration-150 ${
-                      selectedChannel === ch.id
-                        ? 'bg-violet-500/10 border-violet-500/25 shadow-[0_0_0_1px_rgba(139,92,246,0.1)]'
-                        : 'bg-transparent border-gray-200 dark:border-zinc-700/50 hover:border-violet-500/20 hover:bg-violet-500/5'
-                    }`}
-                  >
-                    <span className="text-sm opacity-70">{CHANNEL_ICONS[ch.id] ?? '\ud83d\udcc4'}</span>
-                    <span className={`text-[11px] font-semibold ${selectedChannel === ch.id ? 'text-violet-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                      {ch.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {channels.length === 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-left border bg-violet-500/10 border-violet-500/25"
-              >
-                <span className="text-sm opacity-70">{'\u2709'}</span>
-                <span className="text-[11px] font-semibold text-violet-400">Email</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {(isGeneratedImageChannel || isGeneratedVideoChannel) && (
-          <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
-            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
-              Media Settings
-            </div>
-            <div className="flex flex-col gap-4">
-              <div>
-                <div className="text-[10px] font-semibold tracking-wider uppercase text-gray-400/60 dark:text-gray-600 mb-2">
-                  Aspect Ratio
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {MEDIA_ASPECT_RATIOS.map((ratio) => (
-                    <button
-                      key={ratio}
-                      type="button"
-                      onClick={() => setMediaAspectRatio(ratio)}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                        mediaAspectRatio === ratio
-                          ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
-                          : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
-                      }`}
-                    >
-                      {ratio}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {isGeneratedVideoChannel && (
-                <div>
-                  <div className="text-[10px] font-semibold tracking-wider uppercase text-gray-400/60 dark:text-gray-600 mb-2">
-                    Duration
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VIDEO_DURATIONS.map((seconds) => (
-                      <button
-                        key={seconds}
-                        type="button"
-                        onClick={() => setMediaDurationSeconds(seconds)}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                          mediaDurationSeconds === seconds
-                            ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
-                            : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 dark:text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
-                        }`}
-                      >
-                        {seconds}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                ))
+              : (
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-left border bg-violet-500/10 border-violet-500/25"
+                >
+                  <span className="text-sm opacity-70">{'\u2709'}</span>
+                  <span className="text-[11px] font-semibold text-violet-400">Email</span>
+                </button>
               )}
-            </div>
           </div>
-        )}
+        </div>
 
         {/* ── Content Intent ───────────────────────────────── */}
         <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
@@ -1506,42 +1230,6 @@ export function ContentTabV2({
             Uses account research, division context, and your value props; optimized for 1:1 outreach.
           </p>
         </div>
-
-        {plays.length > 0 && (
-          <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">
-            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-gray-400 dark:text-gray-500 mb-2.5">
-              Play <span className="font-normal normal-case tracking-normal text-gray-400/60">(optional)</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedPlayId('')}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                  selectedPlayId === ''
-                    ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
-                    : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
-                }`}
-              >
-                None
-              </button>
-              {plays.map((play) => (
-                <button
-                  key={play.id}
-                  type="button"
-                  title={play.description}
-                  onClick={() => setSelectedPlayId(play.id)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                    selectedPlayId === play.id
-                      ? 'bg-violet-500/10 border-violet-500/25 text-violet-400'
-                      : 'bg-transparent border-gray-200 dark:border-zinc-700/50 text-gray-500 hover:border-violet-500/20 hover:text-gray-300'
-                  }`}
-                >
-                  {play.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── Sender Role + Tone ───────────────────────────── */}
         <div className="px-6 pt-4 pb-4 border-b border-gray-100 dark:border-zinc-800/80">

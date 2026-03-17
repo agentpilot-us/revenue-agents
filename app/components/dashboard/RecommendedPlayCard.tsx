@@ -19,7 +19,9 @@ const t = {
 };
 
 export type RecommendedPlayItem = {
-  playbookActivationId: string;
+  accountPlayActivationId?: string;
+  /** PlayTemplate id for POST /api/play-runs */
+  playTemplateId?: string;
   templateId: string;
   templateName: string;
   triggerType: string | null;

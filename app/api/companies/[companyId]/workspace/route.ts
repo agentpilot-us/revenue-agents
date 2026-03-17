@@ -22,6 +22,7 @@ export async function GET(
       departments,
       contacts,
       workflows,
+      playRuns,
       signals,
       recentActivities,
       companyProducts,
@@ -93,6 +94,18 @@ export async function GET(
         orderBy: [{ urgencyScore: 'desc' }],
       }),
 
+      prisma.playRun.findMany({
+        where: { companyId, userId, status: 'ACTIVE' },
+        orderBy: { activatedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          activatedAt: true,
+          playTemplate: { select: { name: true } },
+          _count: { select: { phaseRuns: true } },
+        },
+      }),
+
       prisma.accountSignal.findMany({
         where: { companyId, publishedAt: { gte: thirtyDaysAgo } },
         orderBy: { publishedAt: 'desc' },
@@ -143,6 +156,7 @@ export async function GET(
       departments,
       contacts,
       workflows,
+      playRuns,
       signals,
       recentActivities,
       companyProducts,

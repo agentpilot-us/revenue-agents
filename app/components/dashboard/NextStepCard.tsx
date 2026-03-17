@@ -47,13 +47,17 @@ export type NextStepItem = {
   signalTitle: string | null;
   totalSteps: number;
   completedSteps: number;
+  runId?: string;
+  source?: 'workflow' | 'play_run' | 'sequence';
 };
 
 type Props = {
   item: NextStepItem;
   variant: 'continue' | 'followup';
-  onDoThis: (companyId: string, workflowId: string) => void;
+  onDoThis: (companyId: string, workflowOrRunId: string, source?: 'workflow' | 'play_run' | 'sequence') => void;
   onSkip?: (stepId: string, workflowId: string) => void;
+  source?: 'workflow' | 'play_run' | 'sequence';
+  runId?: string;
 };
 
 function actionVerb(stepType: string, contentType: string | null, channel: string | null): string {
@@ -107,7 +111,10 @@ function contactLine(contact: NextStepItem['contact']): string | null {
   return contact.title ? `${name}, ${contact.title}` : name;
 }
 
-export default function NextStepCard({ item, variant, onDoThis, onSkip }: Props) {
+export default function NextStepCard({ item, variant, onDoThis, onSkip, source, runId }: Props) {
+  const isPlayRun = runId ?? item.runId;
+  const targetId = isPlayRun ?? item.workflowId;
+  const doThisSource = item.source ?? (isPlayRun ? ('play_run' as const) : ('workflow' as const));
   const verb = actionVerb(item.stepType, item.contentType, item.channel);
   const prompt = shortPromptLabel(item.promptHint);
   const due = variant === 'followup' ? dueLabel(item.dueAt) : null;
@@ -233,7 +240,7 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip }: Props)
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <button
           type="button"
-          onClick={() => onDoThis(item.companyId, item.workflowId)}
+          onClick={() => onDoThis(item.companyId, targetId, doThisSource)}
           style={{
             padding: '7px 16px',
             borderRadius: 8,
@@ -250,7 +257,7 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip }: Props)
         >
           Do This
         </button>
-        {onSkip && (
+        {onSkip && !isPlayRun && (
           <button
             type="button"
             onClick={() => onSkip(item.stepId, item.workflowId)}

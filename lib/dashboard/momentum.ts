@@ -16,6 +16,7 @@ export type WeekMetrics = {
   replies: number;
   meetingsBooked: number;
   signalsThisWeek: number;
+  playsCompleted: number;
 };
 
 export type MomentumWeekComparison = {
@@ -38,6 +39,8 @@ export async function getMomentumWeekComparison(
     lastWeekVisits,
     thisWeekSignals,
     lastWeekSignals,
+    thisWeekPlaysCompleted,
+    lastWeekPlaysCompleted,
   ] = await Promise.all([
     prisma.activity.findMany({
       where: {
@@ -77,6 +80,20 @@ export async function getMomentumWeekComparison(
         createdAt: { gte: lastWeekStart, lt: thisWeekStart },
       },
     }),
+    prisma.playRun.count({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        completedAt: { gte: thisWeekStart },
+      },
+    }),
+    prisma.playRun.count({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        completedAt: { gte: lastWeekStart, lt: thisWeekStart },
+      },
+    }),
   ]);
 
   const countByType = (list: { type: string }[]) => {
@@ -99,11 +116,13 @@ export async function getMomentumWeekComparison(
     ...countByType(thisWeekActivities),
     pageViews: thisWeekVisits,
     signalsThisWeek: thisWeekSignals,
+    playsCompleted: thisWeekPlaysCompleted,
   };
   const lastWeek = {
     ...countByType(lastWeekActivities),
     pageViews: lastWeekVisits,
     signalsThisWeek: lastWeekSignals,
+    playsCompleted: lastWeekPlaysCompleted,
   };
 
   return { thisWeek, lastWeek };

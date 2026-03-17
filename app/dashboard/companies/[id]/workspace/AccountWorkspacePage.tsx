@@ -108,6 +108,7 @@ export default function AccountWorkspacePage({ companyId }: Props) {
           companyId={companyId}
           activeWorkflowId={workflowParam}
           workflows={(data.workflows as never[]) || []}
+          playRuns={(data.playRuns as never[]) || []}
           onRefresh={fetchData}
         />
 

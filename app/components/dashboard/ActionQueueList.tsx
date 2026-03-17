@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import NextStepCard, { type NextStepItem } from './NextStepCard';
 import ActionCard, { type ActionCardWorkflow } from './ActionCard';
+import PlayRunCard, { type PlayRunCardRun } from './PlayRunCard';
 import RecommendedPlayCard, { type RecommendedPlayItem } from './RecommendedPlayCard';
 import CampaignCard, { type CampaignCardData, type CampaignThread } from './CampaignCard';
 
@@ -49,15 +50,20 @@ export type FollowUpStepItem = {
   companyName: string;
   templateName: string | null;
   signalTitle: string | null;
+  source?: 'workflow' | 'play_run' | 'sequence';
+  runId?: string;
 };
 
 type Props = {
   workflows: ActionCardWorkflow[];
+  playRuns?: PlayRunCardRun[];
   followUpSteps?: FollowUpStepItem[];
+  followUpStepsFromPlayRuns?: FollowUpStepItem[];
+  sequenceFollowUps?: FollowUpStepItem[];
   recommendedPlays?: RecommendedPlayItem[];
   onDismiss: (id: string) => void;
   onSnooze: (id: string) => void;
-  onWorkThis: (companyId: string, workflowId: string) => void;
+  onWorkThis: (companyId: string, workflowOrRunId: string, source?: 'workflow' | 'play_run' | 'sequence') => void;
   onSkipStep?: (stepId: string, workflowId: string) => void;
   onStartRecommendedPlay?: (play: RecommendedPlayItem) => void;
   onDismissRecommendedPlay?: (play: RecommendedPlayItem) => void;
@@ -162,7 +168,10 @@ function SectionHeader({
 
 export default function ActionQueueList({
   workflows,
+  playRuns = [],
   followUpSteps = [],
+  followUpStepsFromPlayRuns = [],
+  sequenceFollowUps = [],
   recommendedPlays = [],
   onDismiss,
   onSnooze,
@@ -172,7 +181,7 @@ export default function ActionQueueList({
   onDismissRecommendedPlay,
   onCreateAction,
 }: Props) {
-  const { continueItems, yourPlays, queued, campaigns } = useMemo(() => {
+  const { continueItems, continueFromPlayRuns, yourPlays, queued, campaigns, playRunCards } = useMemo(() => {
     const cont: NextStepItem[] = [];
     const plays: ActionCardWorkflow[] = [];
     const q: ActionCardWorkflow[] = [];
@@ -226,12 +235,48 @@ export default function ActionQueueList({
         q.push(wf);
       }
     }
-    return { continueItems: cont, yourPlays: plays, queued: q, campaigns: Array.from(campMap.values()) };
-  }, [workflows]);
+
+    const contFromRuns: NextStepItem[] = [];
+    const allFollowUps = [...followUpStepsFromPlayRuns, ...sequenceFollowUps];
+    for (const step of allFollowUps) {
+      const runId = step.runId ?? step.id;
+      contFromRuns.push({
+        stepId: step.id,
+        stepOrder: step.stepOrder,
+        stepType: step.stepType,
+        contentType: step.contentType,
+        channel: step.channel,
+        promptHint: step.promptHint,
+        dueAt: step.dueAt,
+        status: step.status,
+        contact: step.contact,
+        division: step.division,
+        workflowId: runId,
+        workflowTitle: step.workflowTitle,
+        companyId: step.companyId,
+        companyName: step.companyName,
+        templateName: step.templateName,
+        signalTitle: step.signalTitle,
+        totalSteps: 0,
+        completedSteps: 0,
+        runId,
+        source: step.source ?? 'play_run',
+      });
+    }
+
+    return {
+      continueItems: cont,
+      continueFromPlayRuns: contFromRuns,
+      yourPlays: plays,
+      queued: q,
+      campaigns: Array.from(campMap.values()),
+      playRunCards: playRuns,
+    };
+  }, [workflows, playRuns, followUpStepsFromPlayRuns, sequenceFollowUps]);
 
   const followUpItems: NextStepItem[] = useMemo(
     () =>
-      followUpSteps.map((step) => ({
+      followUpSteps.filter((s) => s.source !== 'play_run').map((step) => ({
         stepId: step.id,
         stepOrder: step.stepOrder,
         stepType: step.stepType,
@@ -254,13 +299,19 @@ export default function ActionQueueList({
     [followUpSteps],
   );
 
+  const allContinueItems = useMemo(
+    () => [...continueFromPlayRuns, ...continueItems],
+    [continueFromPlayRuns, continueItems],
+  );
+
   const hasContent =
     campaigns.length > 0 ||
-    continueItems.length > 0 ||
+    allContinueItems.length > 0 ||
     followUpItems.length > 0 ||
     recommendedPlays.length > 0 ||
     yourPlays.length > 0 ||
-    queued.length > 0;
+    queued.length > 0 ||
+    playRunCards.length > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -287,15 +338,15 @@ export default function ActionQueueList({
         </div>
       )}
 
-      {/* Section 2: Continue — next step in active workflows */}
+      {/* Section 2: Continue — next step in active workflows / play runs */}
       <div>
         <SectionHeader
           title="Continue"
-          count={continueItems.length}
+          count={allContinueItems.length}
           countColor={t.blue}
           countBg={t.blueBg}
           countBorder={t.blueBorder}
-          subtitle={continueItems.length > 0 ? 'Your next action for each active play.' : undefined}
+          subtitle={allContinueItems.length > 0 ? 'Your next action for each active play.' : undefined}
           action={
             <button
               type="button"
@@ -316,7 +367,7 @@ export default function ActionQueueList({
           }
         />
 
-        {continueItems.length === 0 ? (
+        {allContinueItems.length === 0 && playRunCards.length === 0 ? (
           <div
             style={{
               padding: 24,
@@ -331,18 +382,41 @@ export default function ActionQueueList({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {continueItems.map((item) => (
+            {allContinueItems.map((item) => (
               <NextStepCard
-                key={item.stepId}
+                key={item.source === 'sequence' ? `seq-${item.stepId}` : (item.runId ? `run-${item.stepId}` : item.stepId)}
                 item={item}
                 variant="continue"
                 onDoThis={onWorkThis}
-                onSkip={onSkipStep}
+                onSkip={item.source === 'sequence' ? undefined : onSkipStep}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Play runs — active runs from play system */}
+      {playRunCards.length > 0 && (
+        <div>
+          <SectionHeader
+            title="Action Queue"
+            count={playRunCards.length}
+            countColor={t.blue}
+            countBg={t.blueBg}
+            countBorder={t.blueBorder}
+            subtitle="Plays in progress. Work this to open the run on the account."
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {playRunCards.map((run) => (
+              <PlayRunCard
+                key={run.id}
+                run={run}
+                onWorkThis={(companyId, runId) => onWorkThis(companyId, runId, 'play_run')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Your Plays — user-created plays, not yet started */}
       {yourPlays.length > 0 && (

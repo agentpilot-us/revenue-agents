@@ -100,8 +100,12 @@ model User {
   actionWorkflows         ActionWorkflow[]
   accountCampaigns        AccountCampaign[]
 
+  // Aggressive play system (governed templates + signal mapping)
+  playTemplates          PlayTemplate[]
+  playGovernance         PlayGovernance?
+  signalPlayMappings     SignalPlayMapping[]
+
   // My Company intelligence hub
-  internalDocuments      InternalDocument[]
   myCompanySheetConfig   MyCompanySheetConfig?
 
   // Salesforce OAuth tokens (per-user)
@@ -195,6 +199,10 @@ model Company {
   customSignalConfigs  CustomSignalConfig[]
   actionWorkflows      ActionWorkflow[]
   accountCampaigns     AccountCampaign[]
+
+  // Aggressive play system (runs + touch log)
+  playRuns             PlayRun[]
+  contactTouches       ContactTouch[]
 
   // Workflow: Account Intelligence → Contact List → Launch Outreach
   workflowStep                   Int? // 1, 2, or 3
@@ -1093,27 +1101,6 @@ model CompanyProduct {
   @@index([status])
 }
 
-// Internal document store for "My Company" intelligence hub
-model InternalDocument {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  title       String
-  description String? @db.Text
-  source      String? // upload | url | note | integration
-  url         String?
-
-  tags     String[]
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
 // Google Sheets configuration for My Company outbound sync
 model MyCompanySheetConfig {
   id String @id @default(cuid())
@@ -1615,6 +1602,7 @@ model AdaptiveRoadmap {
   conditions          RoadmapCondition[]
   plans               RoadmapPlan[]
   playbookActivations PlaybookActivation[]
+  accountPlayActivations AccountPlayActivation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1741,6 +1729,8 @@ model RoadmapActionMapping {
 
   templateId String?
   template   PlaybookTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  priorityWeight Int @default(0)
 
   plans RoadmapPlan[]
 
@@ -2160,4 +2150,475 @@ model ScheduledAction {
   @@index([userId])
   @@index([companyId])
   @@index([parentPlanId])
+}
+
+// =============================================================================
+// AGGRESSIVE PLAY SYSTEM — single run model, content-first, phases + gates
+// =============================================================================
+// Replaces PlaybookRun + ActionWorkflow with PlayRun → PlayPhaseRun → PlayAction.
+// Account = Company (target account). Tenant = User.
+
+// ----- Enums -----
+enum PlayScope {
+  COMPANY
+  ACCOUNT
+}
+
+enum PlayCategory {
+  RENEWAL
+  ENGAGEMENT
+  LAUNCH
+  EXPANSION
+  COMPETITIVE
+  PROSPECTING
+}
+
+enum PlayTriggerType {
+  TIMELINE
+  MANUAL
+  SIGNAL
+}
+
+enum PlayTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum PhaseGateType {
+  MANUAL
+  CRM_FIELD
+  CONTENT_SENT
+  AUTO
+}
+
+enum PlayContentType {
+  EMAIL
+  LINKEDIN_MSG
+  DECK
+  BRIEF
+  PROPOSAL
+  BATTLE_CARD
+  INTERNAL_NOTE
+  SLACK_MSG
+  CHAMPION_ENABLEMENT
+  EBR_DECK
+}
+
+enum ContentChannel {
+  EMAIL
+  LINKEDIN
+  SLACK
+  INTERNAL
+  CRM
+}
+
+enum ModelTier {
+  HAIKU
+  SONNET
+}
+
+enum PlayRunStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  AT_RISK
+}
+
+enum PhaseRunStatus {
+  NOT_STARTED
+  ACTIVE
+  COMPLETED
+  SKIPPED
+  OVERDUE
+}
+
+enum ActionType {
+  SEND_EMAIL
+  SEND_LINKEDIN
+  SCHEDULE_MEETING
+  MAKE_CALL
+  REVIEW_BRIEF
+  REVIEW_DECK
+  INTERNAL_ALIGN
+  CRM_UPDATE
+  ESCALATE
+}
+
+enum ActionPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ActionStatus {
+  PENDING
+  REVIEWED
+  EDITED
+  EXECUTED
+  SKIPPED
+  BLOCKED
+  GENERATING
+  FAILED
+}
+
+enum ContactRole {
+  ECONOMIC_BUYER
+  CHAMPION
+  TECHNICAL_EVALUATOR
+  END_USER
+  EXECUTIVE_SPONSOR
+  PROCUREMENT
+  LEGAL
+  OTHER
+}
+
+enum TouchChannel {
+  EMAIL
+  LINKEDIN
+  CALL
+  MEETING
+  SLACK
+  OTHER
+}
+
+enum GenerationStatus {
+  SUCCESS
+  FAILED
+  TIMEOUT
+  RATE_LIMITED
+}
+
+// ----- Play templates (PMM-governed blueprints) -----
+model PlayTemplate {
+  id              String              @id @default(cuid())
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?             @db.Text
+  slug            String
+
+  scope           PlayScope
+  category        PlayCategory
+  status          PlayTemplateStatus   @default(DRAFT)
+
+  triggerType     PlayTriggerType
+  anchorField     String?
+  anchorOffsetDays Int?
+  signalTypes     String[]
+
+  contactCooldownDays Int?
+  maxTouchesPerWeek   Int?
+
+  phases          PlayPhaseTemplate[]
+  runs            PlayRun[]
+  signalPlayMappings SignalPlayMapping[]
+  accountPlayActivations AccountPlayActivation[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId, status, scope])
+}
+
+model PlayPhaseTemplate {
+  id              String              @id @default(cuid())
+  playTemplateId  String
+  playTemplate    PlayTemplate        @relation(fields: [playTemplateId], references: [id], onDelete: Cascade)
+
+  orderIndex      Int
+  name            String
+  description     String?             @db.Text
+  offsetDays      Int?
+
+  gateType        PhaseGateType       @default(MANUAL)
+  gateConfig      Json?
+
+  contentTemplates ContentTemplate[]
+  phaseRuns       PlayPhaseRun[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([playTemplateId, orderIndex])
+  @@index([playTemplateId])
+}
+
+model ContentTemplate {
+  id                  String          @id @default(cuid())
+  userId              String
+
+  name                String
+  description         String?         @db.Text
+
+  phaseTemplateId     String?
+  phaseTemplate       PlayPhaseTemplate? @relation(fields: [phaseTemplateId], references: [id], onDelete: SetNull)
+
+  contentType         PlayContentType
+  channel             ContentChannel?
+
+  modelTier           ModelTier       @default(SONNET)
+  promptTemplate      String          @db.Text
+  systemInstructions  String?         @db.Text
+
+  governanceRules     String?         @db.Text
+  approvedMessaging   String?         @db.Text
+  prohibitedContent   String?         @db.Text
+
+  contextSources      String[]
+  targetPersona       String?
+
+  timesGenerated      Int             @default(0)
+  timesEdited         Int             @default(0)
+  timesSent           Int             @default(0)
+  avgEditDistance     Float?
+
+  actions             PlayAction[]
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([phaseTemplateId])
+}
+
+// ----- Play runs (account-level instances) -----
+model PlayRun {
+  id              String              @id @default(cuid())
+
+  playTemplateId  String
+  playTemplate    PlayTemplate        @relation(fields: [playTemplateId], references: [id])
+  companyId       String
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId          String
+
+  status          PlayRunStatus        @default(ACTIVE)
+
+  anchorDate      DateTime?
+  currentPhaseIdx Int                  @default(0)
+
+  phaseRuns       PlayPhaseRun[]
+
+  activatedAt     DateTime            @default(now())
+  completedAt     DateTime?
+  pausedAt        DateTime?
+  cancelledAt     DateTime?
+  cancelReason    String?             @db.Text
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([companyId, status])
+  @@index([userId, status])
+  @@index([playTemplateId])
+}
+
+model PlayPhaseRun {
+  id                  String          @id @default(cuid())
+
+  playRunId           String
+  playRun             PlayRun         @relation(fields: [playRunId], references: [id], onDelete: Cascade)
+  phaseTemplateId     String
+  phaseTemplate       PlayPhaseTemplate @relation(fields: [phaseTemplateId], references: [id])
+
+  status              PhaseRunStatus  @default(NOT_STARTED)
+  targetDate          DateTime?
+  activatedAt         DateTime?
+  completedAt         DateTime?
+
+  gateCompleted       Boolean         @default(false)
+  gateCompletedAt     DateTime?
+
+  actions             PlayAction[]
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@unique([playRunId, phaseTemplateId])
+  @@index([playRunId, status])
+}
+
+model PlayAction {
+  id                  String          @id @default(cuid())
+
+  phaseRunId          String
+  phaseRun            PlayPhaseRun    @relation(fields: [phaseRunId], references: [id], onDelete: Cascade)
+  contentTemplateId   String?
+  contentTemplate     ContentTemplate? @relation(fields: [contentTemplateId], references: [id])
+
+  title               String
+  actionType          ActionType
+  priority            ActionPriority  @default(MEDIUM)
+
+  generatedContent    String?         @db.Text
+  generatedSubject    String?
+  modelUsed           ModelTier?
+  tokensUsed          Int?
+  generatedAt         DateTime?
+  contextSnapshot     Json?
+
+  contactName         String?
+  contactEmail        String?
+  contactTitle        String?
+  contactRole         ContactRole?
+
+  status              ActionStatus    @default(PENDING)
+  reviewedAt          DateTime?
+  editedContent       String?         @db.Text
+  editedSubject       String?
+  executedAt          DateTime?
+  skippedAt           DateTime?
+  skipReason          String?
+
+  suggestedDate       DateTime?
+  dueDate             DateTime?
+
+  cooldownWarning     String?         @db.Text
+  alternateContact    String?         @db.Text
+
+  contactTouch        ContactTouch?
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([phaseRunId, status])
+  @@index([status])
+}
+
+model ContactTouch {
+  id              String              @id @default(cuid())
+
+  companyId       String
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  contactName     String
+  contactEmail    String?
+  contactTitle    String?
+
+  playActionId    String?             @unique
+  playAction      PlayAction?         @relation(fields: [playActionId], references: [id])
+  playRunId       String?
+  playName        String?
+  phaseName       String?
+
+  channel         TouchChannel
+  touchDate       DateTime            @default(now())
+  subject         String?
+
+  opened          Boolean?
+  replied         Boolean?
+  openedAt        DateTime?
+  repliedAt       DateTime?
+
+  createdAt       DateTime            @default(now())
+
+  @@index([companyId, contactEmail, touchDate])
+  @@index([companyId, touchDate])
+  @@index([contactEmail, touchDate])
+}
+
+model PlayGovernance {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  maxDiscountPct          Float     @default(15)
+  multiYearDiscountPct    Float     @default(5)
+  earlyRenewalDiscountPct Float     @default(5)
+  earlyRenewalWindowDays  Int       @default(60)
+
+  defaultCooldownDays     Int       @default(7)
+  maxWeeklyTouchesPerContact Int    @default(2)
+  maxWeeklyTouchesPerAccount Int    @default(5)
+
+  competitiveRules        Json?
+
+  valueNarrative          String?   @db.Text
+  renewalMessaging        String?   @db.Text
+  expansionMessaging      String?   @db.Text
+  companyBoilerplate      String?   @db.Text
+
+  expansionSkus           Json?
+
+  brandVoice              String?   @db.Text
+  emailSignatureTemplate  String?   @db.Text
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+model SignalPlayMapping {
+  id              String              @id @default(cuid())
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  signalType      String
+  signalSource    String?
+
+  playTemplateId  String
+  playTemplate    PlayTemplate        @relation(fields: [playTemplateId], references: [id], onDelete: Cascade)
+  autoActivate    Boolean             @default(false)
+  priority        ActionPriority      @default(MEDIUM)
+
+  conditions      Json?
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([userId, signalType, playTemplateId])
+  @@index([userId, signalType])
+}
+
+model ContentGenerationLog {
+  id                  String          @id @default(cuid())
+  userId              String
+
+  playActionId        String?
+  contentTemplateId   String?
+  contentTemplateName String?
+
+  modelTier           ModelTier
+  modelId             String?
+  promptTokens        Int
+  completionTokens    Int
+  totalTokens         Int
+  cachedTokens        Int             @default(0)
+  estimatedCost       Float?
+
+  contextSources      String[]
+  contextTokens       Int?
+
+  status              GenerationStatus
+  durationMs          Int?
+  errorMessage        String?
+
+  wasEdited           Boolean?
+  editDistance        Float?
+
+  createdAt           DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([contentTemplateId, createdAt])
+  @@index([modelTier, createdAt])
+}
+
+model AccountPlayActivation {
+  id             String        @id @default(cuid())
+  roadmapId      String
+  roadmap        AdaptiveRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  playTemplateId String
+  playTemplate   PlayTemplate  @relation(fields: [playTemplateId], references: [id], onDelete: Cascade)
+  isActive       Boolean       @default(true)
+  customConfig   Json?
+  activatedAt    DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([roadmapId, playTemplateId])
+  @@index([roadmapId])
+  @@index([playTemplateId])
 }

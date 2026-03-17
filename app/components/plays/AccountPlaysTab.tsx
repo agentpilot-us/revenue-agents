@@ -5,38 +5,22 @@ import { useRouter } from 'next/navigation';
 import PlayCatalog from './PlayCatalog';
 import CustomPlayBuilder from './CustomPlayBuilder';
 
-type WorkflowSummary = {
+type PlayRunSummary = {
   id: string;
   title: string;
-  description: string | null;
   status: string;
   createdAt: string;
-  outcome: string | null;
-  outcomeNote: string | null;
-  completedAt: string | null;
-  templateId: string | null;
-  targetDivision: { id: string; customName: string | null; type: string } | null;
-  _count: { steps: number };
-  completedSteps: number;
+  updatedAt: string;
+  templateId: string;
+  templateName: string;
+  phaseCount: number;
 };
-
-type TemplateStats = Record<string, { total: number; outcomes: Record<string, number> }>;
 
 type SavedTemplate = {
   id: string;
   name: string;
   description: string | null;
-  stepCount: number;
-  stats: { total: number; outcomes: Record<string, number> } | null;
-};
-
-const OUTCOME_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  meeting_booked: { label: 'Meeting Booked', color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
-  pipeline_created: { label: 'Pipeline Created', color: '#22c55e', bg: 'rgba(34,197,94,0.08)' },
-  reply_received: { label: 'Got a Reply', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  deferred: { label: 'Deferred', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  no_response: { label: 'No Response', color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
-  not_interested: { label: 'Not Interested', color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
+  phaseCount: number;
 };
 
 const t = {
@@ -77,41 +61,40 @@ type Props = {
 export default function AccountPlaysTab({ companyId, companyName, initialSubTab, initialDivisionId }: Props) {
   const router = useRouter();
   const [subTab, setSubTab] = useState<SubTab>(initialSubTab ?? 'active');
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [templateStats, setTemplateStats] = useState<TemplateStats>({});
+  const [playRuns, setPlayRuns] = useState<PlayRunSummary[]>([]);
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`/api/companies/${companyId}/action-workflows`)
-        .then((r) => (r.ok ? r.json() : { workflows: [], templateStats: {} })),
-      fetch('/api/playbooks/templates')
-        .then((r) => (r.ok ? r.json() : { templates: [] })),
-    ]).then(([wfData, tmplData]) => {
-      setWorkflows(wfData.workflows || []);
-      setTemplateStats(wfData.templateStats || {});
-      const templates: SavedTemplate[] = (tmplData.templates || [])
-        .filter((tmpl: { isBuiltIn: boolean }) => !tmpl.isBuiltIn)
-        .map((tmpl: { id: string; name: string; description: string | null; stepCount: number }) => ({
+      fetch(`/api/companies/${companyId}/play-runs`).then((r) =>
+        r.ok ? r.json() : { playRuns: [] },
+      ),
+      fetch('/api/play-templates').then((r) =>
+        r.ok ? r.json() : { templates: [] },
+      ),
+    ]).then(([runData, tmplData]) => {
+      setPlayRuns(runData.playRuns || []);
+      const templates: SavedTemplate[] = (tmplData.templates || []).map(
+        (tmpl: { id: string; name: string; description: string | null; phaseCount: number }) => ({
           id: tmpl.id,
           name: tmpl.name,
           description: tmpl.description,
-          stepCount: tmpl.stepCount,
-          stats: wfData.templateStats?.[tmpl.id] ?? null,
-        }));
+          phaseCount: tmpl.phaseCount ?? 0,
+        }),
+      );
       setSavedTemplates(templates);
     }).finally(() => setLoading(false));
   }, [companyId]);
 
-  const activeWorkflows = useMemo(
-    () => workflows.filter((w) => w.status !== 'completed' && w.status !== 'cancelled'),
-    [workflows],
+  const activePlayRuns = useMemo(
+    () => playRuns.filter((r) => r.status === 'ACTIVE'),
+    [playRuns],
   );
-  const completedWorkflows = useMemo(
-    () => workflows.filter((w) => w.status === 'completed'),
-    [workflows],
+  const completedPlayRuns = useMemo(
+    () => playRuns.filter((r) => r.status === 'COMPLETED'),
+    [playRuns],
   );
 
   return (
@@ -137,7 +120,7 @@ export default function AccountPlaysTab({ companyId, companyName, initialSubTab,
               }}
             >
               {st.label}
-              {st.id === 'active' && !loading && activeWorkflows.length > 0 && (
+              {st.id === 'active' && !loading && activePlayRuns.length > 0 && (
                 <span
                   style={{
                     marginLeft: 6,
@@ -148,7 +131,7 @@ export default function AccountPlaysTab({ companyId, companyName, initialSubTab,
                     color: t.blue,
                   }}
                 >
-                  {activeWorkflows.length}
+                  {activePlayRuns.length}
                 </span>
               )}
             </button>
@@ -161,7 +144,7 @@ export default function AccountPlaysTab({ companyId, companyName, initialSubTab,
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {loading ? (
             <p style={{ fontSize: 13, color: t.text3, padding: 24 }}>Loading plays...</p>
-          ) : activeWorkflows.length === 0 && completedWorkflows.length === 0 && savedTemplates.length === 0 ? (
+          ) : activePlayRuns.length === 0 && completedPlayRuns.length === 0 && savedTemplates.length === 0 ? (
             <div
               style={{
                 padding: 40,
@@ -196,10 +179,10 @@ export default function AccountPlaysTab({ companyId, companyName, initialSubTab,
             </div>
           ) : (
             <>
-              {activeWorkflows.length > 0 && (
-                <WorkflowSection
+              {activePlayRuns.length > 0 && (
+                <PlayRunSection
                   title="In Progress"
-                  workflows={activeWorkflows}
+                  playRuns={activePlayRuns}
                   companyId={companyId}
                   router={router}
                 />
@@ -214,9 +197,9 @@ export default function AccountPlaysTab({ companyId, companyName, initialSubTab,
                 />
               )}
 
-              {completedWorkflows.length > 0 && (
-                <CompletedWorkflowSection
-                  workflows={completedWorkflows}
+              {completedPlayRuns.length > 0 && (
+                <CompletedPlayRunSection
+                  playRuns={completedPlayRuns}
                   companyId={companyId}
                   router={router}
                 />
@@ -239,14 +222,14 @@ export default function AccountPlaysTab({ companyId, companyName, initialSubTab,
   );
 }
 
-function WorkflowSection({
+function PlayRunSection({
   title,
-  workflows,
+  playRuns,
   companyId,
   router,
 }: {
   title: string;
-  workflows: WorkflowSummary[];
+  playRuns: PlayRunSummary[];
   companyId: string;
   router: ReturnType<typeof useRouter>;
 }) {
@@ -262,32 +245,19 @@ function WorkflowSection({
           marginBottom: 8,
         }}
       >
-        {title} ({workflows.length})
+        {title} ({playRuns.length})
       </h4>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {workflows.map((w) => {
-          const statusColor =
-            w.status === 'completed'
-              ? t.green
-              : w.status === 'pending'
-                ? t.yellow
-                : t.blue;
-          const statusBg =
-            w.status === 'completed'
-              ? t.greenBg
-              : w.status === 'pending'
-                ? t.yellowBg
-                : t.blueBg;
-          const divName = w.targetDivision
-            ? (w.targetDivision.customName || w.targetDivision.type.replace(/_/g, ' '))
-            : null;
+        {playRuns.map((r) => {
+          const statusColor = r.status === 'COMPLETED' ? t.green : t.blue;
+          const statusBg = r.status === 'COMPLETED' ? t.greenBg : t.blueBg;
 
           return (
             <button
-              key={w.id}
+              key={r.id}
               type="button"
               onClick={() =>
-                router.push(`/dashboard/companies/${companyId}/plays/execute/${w.id}`)
+                router.push(`/dashboard/companies/${companyId}/plays/run/${r.id}`)
               }
               style={{
                 padding: '12px 16px',
@@ -310,34 +280,16 @@ function WorkflowSection({
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: t.text1, margin: 0 }}>
-                  {w.title}
+                  {r.title}
                 </p>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                  {divName && (
-                    <span style={{ fontSize: 10, color: t.text4 }}>
-                      {divName}
-                    </span>
-                  )}
-                  {w.description && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: t.text3,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {divName ? '· ' : ''}{w.description}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 10, color: t.text4 }}>
+                    {r.templateName} · {r.phaseCount} phases
+                  </span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                <span style={{ fontSize: 10, color: t.text4 }}>
-                  {w.completedSteps}/{w._count.steps} steps
-                </span>
                 <span
                   style={{
                     fontSize: 10,
@@ -349,7 +301,7 @@ function WorkflowSection({
                     textTransform: 'capitalize',
                   }}
                 >
-                  {w.status}
+                  {r.status.toLowerCase()}
                 </span>
               </div>
             </button>
@@ -360,36 +312,15 @@ function WorkflowSection({
   );
 }
 
-function CompletedWorkflowSection({
-  workflows,
+function CompletedPlayRunSection({
+  playRuns,
   companyId,
   router,
 }: {
-  workflows: WorkflowSummary[];
+  playRuns: PlayRunSummary[];
   companyId: string;
   router: ReturnType<typeof useRouter>;
 }) {
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-
-  const handleSaveAsTemplate = async (w: WorkflowSummary, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavingId(w.id);
-    try {
-      const res = await fetch('/api/playbooks/templates/from-workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflowId: w.id }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      setSavedIds((prev) => new Set(prev).add(w.id));
-    } catch {
-      // silently fail
-    } finally {
-      setSavingId(null);
-    }
-  };
-
   return (
     <div>
       <h4
@@ -402,21 +333,17 @@ function CompletedWorkflowSection({
           marginBottom: 8,
         }}
       >
-        Play History ({workflows.length})
+        Play History ({playRuns.length})
       </h4>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {workflows.map((w) => {
-          const outcomeConf = w.outcome ? OUTCOME_CONFIG[w.outcome] : null;
-          const divName = w.targetDivision
-            ? (w.targetDivision.customName || w.targetDivision.type.replace(/_/g, ' '))
-            : null;
-          const completedDate = w.completedAt
-            ? new Date(w.completedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+        {playRuns.map((r) => {
+          const completedDate = r.updatedAt
+            ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
             : null;
 
           return (
             <div
-              key={w.id}
+              key={r.id}
               style={{
                 borderRadius: 10,
                 background: t.surface,
@@ -426,7 +353,7 @@ function CompletedWorkflowSection({
               <button
                 type="button"
                 onClick={() =>
-                  router.push(`/dashboard/companies/${companyId}/plays/execute/${w.id}`)
+                  router.push(`/dashboard/companies/${companyId}/plays/run/${r.id}`)
                 }
                 style={{
                   padding: '12px 16px',
@@ -442,82 +369,18 @@ function CompletedWorkflowSection({
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: t.text1, margin: 0 }}>
-                    {w.title}
+                    {r.title}
                   </p>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 3, flexWrap: 'wrap' }}>
-                    {divName && (
-                      <span style={{ fontSize: 10, color: t.text4 }}>{divName}</span>
-                    )}
                     {completedDate && (
                       <span style={{ fontSize: 10, color: t.text4 }}>
-                        {divName ? '·' : ''} Completed {completedDate}
+                        Completed {completedDate}
                       </span>
                     )}
-                    {outcomeConf && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: '1px 7px',
-                          borderRadius: 4,
-                          background: outcomeConf.bg,
-                          color: outcomeConf.color,
-                        }}
-                      >
-                        {outcomeConf.label}
-                      </span>
-                    )}
+                    <span style={{ fontSize: 10, color: t.text4 }}>{r.templateName}</span>
                   </div>
-                  {w.outcomeNote && (
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: t.text3,
-                        margin: '4px 0 0',
-                        fontStyle: 'italic',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      &ldquo;{w.outcomeNote}&rdquo;
-                    </p>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  <span style={{ fontSize: 10, color: t.text4 }}>
-                    {w.completedSteps}/{w._count.steps} steps
-                  </span>
                 </div>
               </button>
-
-              <div style={{ padding: '0 16px 10px', display: 'flex', justifyContent: 'flex-end' }}>
-                {savedIds.has(w.id) ? (
-                  <span style={{ fontSize: 11, color: t.green, fontWeight: 500 }}>
-                    Saved to Play Library
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => handleSaveAsTemplate(w, e)}
-                    disabled={savingId === w.id}
-                    style={{
-                      padding: '4px 12px',
-                      borderRadius: 6,
-                      background: 'rgba(34,197,94,0.08)',
-                      border: '1px solid rgba(34,197,94,0.25)',
-                      color: t.green,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: savingId === w.id ? 'not-allowed' : 'pointer',
-                      opacity: savingId === w.id ? 0.6 : 1,
-                    }}
-                  >
-                    {savingId === w.id ? 'Saving...' : 'Save as Play Template'}
-                  </button>
-                )}
-              </div>
             </div>
           );
         })}
@@ -538,17 +401,20 @@ function SavedTemplatesSection({
   const [startingId, setStartingId] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleRunAgain = async (templateId: string) => {
-    setStartingId(templateId);
+  const handleRunAgain = async (playTemplateId: string) => {
+    setStartingId(playTemplateId);
     try {
-      const res = await fetch('/api/action-workflows/from-play', {
+      const res = await fetch('/api/play-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId, templateId }),
+        body: JSON.stringify({ companyId, playTemplateId }),
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      router.push(`/dashboard/companies/${companyId}/plays/execute/${data.workflowId}`);
+      const runId = data.playRunId ?? data.playRun?.id;
+      if (runId) {
+        router.push(`/dashboard/companies/${companyId}/plays/run/${runId}`);
+      }
     } catch {
       setStartingId(null);
     }
@@ -569,17 +435,7 @@ function SavedTemplatesSection({
         Saved Templates ({templates.length})
       </h4>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {templates.map((tmpl) => {
-          const outcomeEntries = tmpl.stats
-            ? Object.entries(tmpl.stats.outcomes)
-                .filter(([, count]) => count > 0)
-                .map(([key, count]) => {
-                  const conf = OUTCOME_CONFIG[key];
-                  return conf ? `${count} ${conf.label.toLowerCase()}` : `${count} ${key}`;
-                })
-            : [];
-
-          return (
+        {templates.map((tmpl) => (
             <div
               key={tmpl.id}
               style={{
@@ -598,18 +454,8 @@ function SavedTemplatesSection({
                 </p>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 3, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, color: t.purple, fontWeight: 600 }}>
-                    {tmpl.stepCount} steps
+                    {tmpl.phaseCount} phases
                   </span>
-                  {tmpl.stats && (
-                    <span style={{ fontSize: 10, color: t.text4 }}>
-                      · Run {tmpl.stats.total} time{tmpl.stats.total !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                  {outcomeEntries.length > 0 && (
-                    <span style={{ fontSize: 10, color: t.text3 }}>
-                      · {outcomeEntries.join(', ')}
-                    </span>
-                  )}
                 </div>
                 {tmpl.description && (
                   <p
@@ -648,8 +494,7 @@ function SavedTemplatesSection({
                 {startingId === tmpl.id ? 'Starting...' : `Run for ${companyName}`}
               </button>
             </div>
-          );
-        })}
+        ))}
       </div>
     </div>
   );

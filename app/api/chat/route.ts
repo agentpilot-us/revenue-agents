@@ -1,5 +1,6 @@
 import { streamText, tool, convertToModelMessages, stepCountIs, type Tool } from 'ai';
 import { z } from 'zod';
+import type { PlayTriggerType } from '@prisma/client';
 import { getChatModel, type ModelTier } from '@/lib/llm/get-model';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
@@ -9,9 +10,9 @@ import { sanitizeInput, wasInputModified } from '@/lib/security/input-sanitizati
 import { detectPII } from '@/lib/security/pii-detection';
 import { detectPromptInjection } from '@/lib/security/prompt-injection';
 import { logSecurityEvent, getIPAddress } from '@/lib/security/audit';
-import { expansion } from '@/lib/plays/expansion';
-import { getSuggestedPlays } from '@/lib/plays/engine';
-import { executePlay } from '@/lib/plays/execute-play';
+import { expansion } from '@/lib/agents/plays/expansion';
+import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
+import { gatherStrategyContext } from '@/lib/plays/recommend-account-strategy';
 import { loadFullPlanContext } from '@/lib/agents/plan-context';
 import { executePlanWorkflow, type PlanType, type PlanProgress } from '@/lib/agents/plan-workflow';
 import { createExaMCPClient, getExaTools } from '@/lib/exa/mcp-client';
@@ -597,6 +598,10 @@ When drafting emails or messages:
       ? `\nWhen the user mentions a customer concern, objection, or pushback (e.g. pricing worry, implementation concern, cost), use record_objection to persist it for this account so content generation can address it proactively.`
       : '';
 
+    const recommendStrategyNarrativeBlock = accountId
+      ? `\nWhen you call recommend_account_strategy and receive results, present your analysis as a strategic narrative in this order: (1) Current footprint — what they own (products, ARR, contract/renewal dates) and how it relates to the target product (upgrade_path, complementary). (2) Product fit — why the target product maps to this account based on product relationships and their use case. (3) Department-by-department — for each relevant buying group, state coverage (contacts, value prop), whether there is an active play, and last contact; highlight gaps (no contacts or no plays). (4) Timing — cite specific recent signals that create urgency or opportunity. (5) Constraints — note any recorded decisions or objections that affect approach. (6) Recommended plays — list 2–3 specific plays in priority order with target department and suggested contact where relevant; explain why each. End by offering to start the top-priority play (e.g. "Want me to start the Executive Intro play for Fleet Management?").`
+      : '';
+
     const systemPrompt = `${expansion.buildSystemPrompt({
       companyName: company?.name,
       companyDomain: company?.domain ?? undefined,
@@ -634,7 +639,7 @@ ${contactsList}
 ${accountId ? '\nYou are in the context of this target company. Use the ACCOUNT INTELLIGENCE section below when finding contacts, recommending who to contact, drafting outreach, or answering questions about this account.' : '\nNo account is selected. If the user asks about departments or contacts, ask them to open a company from the dashboard.'}
 
 When the user asks "what departments does [company] have?": call list_departments with the Current company ID. Only use discover_departments if the user wants AI research for additional departments.
-${campaignInstructionsBlock}${deployInstructionsBlock}${activityInstructionsBlock}${researchIngestBlock}${objectionCaptureBlock}
+${campaignInstructionsBlock}${deployInstructionsBlock}${activityInstructionsBlock}${researchIngestBlock}${objectionCaptureBlock}${recommendStrategyNarrativeBlock}
 ${productKnowledgeSection}
 ${industryPlaybookSection}
 ${contentLibraryProductsSection}
@@ -792,7 +797,7 @@ Work step-by-step and explain what you're doing.`;
           });
           if (!res.ok) throw new Error(res.error);
           if (accountIdForTools && ctx?.userId) {
-            await (prisma as unknown as { activity: { create: (args: unknown) => Promise<unknown> } }).activity.create({
+            await prisma.activity.create({
               data: {
                 type: 'Research',
                 summary: `Research completed for ${params.companyName ?? params.query}`,
@@ -800,6 +805,15 @@ Work step-by-step and explain what you're doing.`;
                 companyId: accountIdForTools,
                 userId: ctx.userId,
                 agentUsed: 'expansion',
+              },
+            });
+            await prisma.company.update({
+              where: { id: accountIdForTools },
+              data: {
+                researchData: {
+                  lastSummary: res.summary,
+                  lastResearchAt: new Date().toISOString(),
+                } as object,
               },
             });
           }
@@ -1503,22 +1517,17 @@ Work step-by-step and explain what you're doing.`;
         },
       }),
 
-      run_play: toolWithSchema({
+      run_workflow: toolWithSchema({
         description:
-          'Run a play for a specific buying group. Use when the rep says "run the event invite play for AV Engineering" or "create a re-engagement page for the IT segment".',
+          'Run a play from the play catalog for a buying group. Creates a PlayRun. ' +
+          'Use when the rep says "run the event invite play for AV Engineering" or "start a re-engagement workflow for the IT segment".',
         inputSchema: z.object({
-          playId: z.enum([
-            'new_buying_group',
-            'event_invite',
-            'feature_release',
-            're_engagement',
-            'champion_enablement',
-          ]),
+          templateName: z.string().optional().describe('Name or trigger type of the play template to run (e.g. "New C-Suite Executive", "event_invite")'),
+          signalType: z.string().optional().describe('Signal type to match a template for (e.g. "earnings_call", "executive_hire")'),
           segmentName: z.string().describe('Which buying group to run the play for'),
-          ctaUrl: z.string().url().optional(),
         }),
         execute: async (
-          params: { playId: string; segmentName: string; ctaUrl?: string },
+          params: { templateName?: string; signalType?: string; segmentName: string },
           opts?: { experimental_context?: ChatContext }
         ) => {
           const ctx = opts?.experimental_context;
@@ -1530,13 +1539,11 @@ Work step-by-step and explain what you're doing.`;
               companyId: ctx.accountId,
               customName: { contains: params.segmentName, mode: 'insensitive' },
             },
-            include: {
-              contacts: { select: { id: true } },
-              activities: {
-                select: { createdAt: true },
-                take: 1,
-                orderBy: { createdAt: 'desc' },
-              },
+            select: {
+              id: true,
+              customName: true,
+              type: true,
+              contacts: { select: { id: true, firstName: true, lastName: true, email: true, title: true }, take: 1 },
             },
           });
           if (!dept) {
@@ -1544,40 +1551,106 @@ Work step-by-step and explain what you're doing.`;
               `Segment "${params.segmentName}" not found. Call list_departments to see available segments.`
             );
           }
-          const suggestions = await getSuggestedPlays(ctx.accountId, ctx.userId);
-          const match = suggestions.find(
-            (s) => s.play.id === params.playId && s.segment.id === dept.id
-          );
-          const segmentName = dept.customName ?? dept.type.replace(/_/g, ' ');
-          const lastActivity = dept.activities[0]?.createdAt;
-          const daysSinceActivity = lastActivity
-            ? Math.floor(
-                (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
-              )
+
+          let playTemplateId: string | undefined;
+
+          if (params.templateName) {
+            const tmpl = await prisma.playTemplate.findFirst({
+              where: {
+                userId: ctx.userId,
+                status: 'ACTIVE',
+                OR: [
+                  { name: { contains: params.templateName, mode: 'insensitive' } },
+                  { slug: params.templateName },
+                  { triggerType: { equals: params.templateName as PlayTriggerType } },
+                ],
+              },
+              select: { id: true },
+            });
+            playTemplateId = tmpl?.id;
+          }
+
+          if (!playTemplateId && params.signalType) {
+            const byTrigger = await prisma.playTemplate.findFirst({
+              where: {
+                userId: ctx.userId,
+                status: 'ACTIVE',
+                triggerType: { equals: params.signalType as PlayTriggerType },
+              },
+              select: { id: true },
+            });
+            playTemplateId = byTrigger?.id;
+          }
+
+          if (!playTemplateId) {
+            const fallback = await prisma.playTemplate.findFirst({
+              where: { userId: ctx.userId, status: 'ACTIVE' },
+              select: { id: true },
+            });
+            playTemplateId = fallback?.id ?? undefined;
+          }
+
+          if (!playTemplateId) {
+            throw new Error('No matching play template found. Check the Play Catalog for available templates.');
+          }
+
+          const firstContact = dept.contacts[0];
+          const targetContact = firstContact
+            ? {
+                name: [firstContact.firstName, firstContact.lastName].filter(Boolean).join(' ') || 'Unknown',
+                email: firstContact.email,
+                title: firstContact.title,
+              }
             : null;
-          const context = match?.context ?? {
-            accountName: ctx.companyName ?? '',
-            accountDomain: ctx.companyDomain ?? '',
-            accountIndustry: ctx.industry ?? null,
-            segment: {
-              id: dept.id,
-              name: segmentName,
-              valueProp: dept.valueProp,
-              contactCount: dept.contacts.length,
-              lastActivityDays: daysSinceActivity,
-            },
-          };
-          const result = await executePlay({
-            playId: params.playId as Parameters<typeof executePlay>[0]['playId'],
-            companyId: ctx.accountId,
+
+          const playRun = await createPlayRunFromTemplate({
             userId: ctx.userId,
-            context,
-            ctaUrl: params.ctaUrl,
+            companyId: ctx.accountId,
+            playTemplateId,
+            targetContact,
           });
+
+          const [phaseCount, template] = await Promise.all([
+            prisma.playPhaseRun.count({ where: { playRunId: playRun.id } }),
+            prisma.playTemplate.findUnique({ where: { id: playRun.playTemplateId }, select: { name: true } }),
+          ]);
+          const runTitle = template?.name ?? 'Play';
+
           return {
-            ...result,
-            message: `Play executed. Sales page ready at ${result.previewUrl}. Draft email subject: "${result.email.subject}"`,
+            playRunId: playRun.id,
+            title: runTitle,
+            phaseCount,
+            message: `Play run created: "${runTitle}" with ${phaseCount} phases. View it on My Day or open the run page.`,
           };
+        },
+      }),
+
+      recommend_account_strategy: toolWithSchema({
+        description:
+          'Analyze this account and recommend the best strategy for pushing a specific product or expanding the relationship. Returns buying group analysis, coverage gaps, signal context, and recommended plays with reasoning. Use when the user asks how to push, sell, expand, or introduce a product into this account.',
+        inputSchema: z.object({
+          productSlug: z
+            .string()
+            .optional()
+            .describe('Product to focus on (e.g. data-cloud). Omit for all expansion opportunities.'),
+          focusDepartment: z
+            .string()
+            .optional()
+            .describe('Department/segment to focus on if the user mentioned one.'),
+        }),
+        execute: async (
+          params: { productSlug?: string; focusDepartment?: string },
+          opts?: { experimental_context?: ChatContext }
+        ) => {
+          const ctx = opts?.experimental_context;
+          if (!ctx?.accountId || !ctx?.userId) {
+            throw new Error('Account context required. Open a company first.');
+          }
+          const context = await gatherStrategyContext(ctx.accountId, ctx.userId, {
+            productSlug: params.productSlug,
+            focusDepartment: params.focusDepartment,
+          });
+          return context;
         },
       }),
 

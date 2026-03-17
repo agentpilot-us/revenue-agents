@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateOneContent } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/content/generate-content';
 import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
 import type { PageType } from '@/lib/campaigns/build-sales-page-prompt';
 import {

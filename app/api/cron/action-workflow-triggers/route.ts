@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
 import { createEngagementWorkflow } from '@/lib/action-workflows/engagement-trigger';
 
 /**
  * Cron: runs every 15-60 minutes.
  * Two jobs:
- *   1. Meeting Prep — finds meetings/events within 24h and creates prep workflows
- *   2. Engagement Catch-All — finds recent high-value visits without workflows
+ *   1. Meeting Prep — finds meetings/events within 24h and creates PlayRuns
+ *   2. Engagement Catch-All — finds recent high-value visits and creates PlayRuns via createEngagementWorkflow
  *
  * Secure with CRON_SECRET (Bearer token in Authorization header).
  */
@@ -80,82 +81,59 @@ async function createMeetingPrepWorkflows(now: Date, horizon: Date): Promise<num
     if (isNaN(meetingDate.getTime())) continue;
     if (meetingDate < now || meetingDate > horizon) continue;
 
-    // Dedup: check if a meeting prep workflow already exists
-    const existing = await prisma.actionWorkflow.findFirst({
-      where: {
-        userId: meeting.userId,
-        companyId: meeting.companyId,
-        accountContext: { path: ['meetingActivityId'], equals: meeting.id },
-      },
-      select: { id: true },
-    });
-    if (existing) continue;
-
     const contactName = meeting.contact
       ? `${meeting.contact.firstName ?? ''} ${meeting.contact.lastName ?? ''}`.trim()
       : null;
     const companyName = meeting.company?.name ?? 'Unknown';
     const hoursUntil = Math.round((meetingDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+    const title = `Meeting Prep: ${contactName || companyName} in ${hoursUntil}h`;
 
-    await prisma.actionWorkflow.create({
+    const existingSignal = await prisma.accountSignal.findFirst({
+      where: {
+        userId: meeting.userId,
+        companyId: meeting.companyId,
+        type: 'internal_meeting_prep',
+        metadata: { path: ['meetingActivityId'], equals: meeting.id },
+      },
+      select: { id: true },
+    });
+    if (existingSignal) {
+      const existingRun = await prisma.playRun.findFirst({
+        where: { accountSignalId: existingSignal.id },
+        select: { id: true },
+      });
+      if (existingRun) continue;
+    }
+
+    const signal = existingSignal ?? await prisma.accountSignal.create({
       data: {
         userId: meeting.userId,
         companyId: meeting.companyId,
-        targetContactId: meeting.contactId || undefined,
-        targetDivisionId: meeting.companyDepartmentId || undefined,
-        title: `Meeting Prep: ${contactName || companyName} in ${hoursUntil}h`,
-        description: meeting.summary,
-        status: 'pending',
-        urgencyScore: hoursUntil <= 4 ? 180 : hoursUntil <= 12 ? 160 : 140,
-        signalContext: {
-          source: 'meeting_prep',
-          meetingDate: meetingDate.toISOString(),
-          hoursUntil,
-          contactName,
-          contactTitle: meeting.contact?.title,
-        },
-        accountContext: {
-          meetingActivityId: meeting.id,
-          companyName,
-          triggerType: 'meeting_prep',
-        },
-        steps: {
-          create: [
-            {
-              stepOrder: 1,
-              stepType: 'generate_content',
-              contentType: 'talking_points',
-              channel: 'task',
-              contactId: meeting.contactId || undefined,
-              divisionId: meeting.companyDepartmentId || undefined,
-              promptHint: `Prepare a meeting brief for ${contactName || 'this contact'} at ${companyName}. Include: their role and likely priorities, recent signals or news about the company, relevant product fit, active objections to address, and 3-5 suggested talking points. The meeting is in ${hoursUntil} hours.`,
-              status: 'pending',
-            },
-            {
-              stepOrder: 2,
-              stepType: 'generate_content',
-              contentType: 'talking_points',
-              channel: 'task',
-              contactId: meeting.contactId || undefined,
-              divisionId: meeting.companyDepartmentId || undefined,
-              promptHint: 'Generate a list of discovery questions tailored to this contact and their division. Focus on uncovering pain points that map to our product capabilities.',
-              status: 'pending',
-            },
-            {
-              stepOrder: 3,
-              stepType: 'generate_content',
-              contentType: 'email',
-              channel: 'email',
-              contactId: meeting.contactId || undefined,
-              divisionId: meeting.companyDepartmentId || undefined,
-              promptHint: 'Draft a brief follow-up email template to send after the meeting. Include placeholders for key takeaways and next steps.',
-              status: 'pending',
-            },
-          ],
-        },
+        type: 'internal_meeting_prep',
+        title,
+        summary: meeting.summary ?? '',
+        url: '',
+        publishedAt: new Date(),
+        relevanceScore: 7,
+        metadata: { meetingActivityId: meeting.id } as object,
       },
+      select: { id: true },
     });
-    created++;
+
+    const template = await prisma.playTemplate.findFirst({
+      where: { userId: meeting.userId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (template) {
+      await createPlayRunFromTemplate({
+        userId: meeting.userId,
+        companyId: meeting.companyId,
+        playTemplateId: template.id,
+        accountSignalId: signal.id,
+        title,
+      });
+      created++;
+    }
   }
 
   // 2. EventAttendance records where eventDate is within 24h
@@ -186,69 +164,56 @@ async function createMeetingPrepWorkflows(now: Date, horizon: Date): Promise<num
     const contact = event.contact;
     if (!contact?.company) continue;
 
-    const existing = await prisma.actionWorkflow.findFirst({
+    const contactName = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || 'Attendee';
+    const hoursUntil = Math.round((event.eventDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+    const title = `Event Prep: ${contactName} attending ${event.eventName}`;
+
+    const existingSignal = await prisma.accountSignal.findFirst({
       where: {
         userId: contact.company.userId,
         companyId: contact.companyId,
-        accountContext: { path: ['eventAttendanceId'], equals: event.id },
+        type: 'internal_event_prep',
+        metadata: { path: ['eventAttendanceId'], equals: event.id },
       },
       select: { id: true },
     });
-    if (existing) continue;
+    if (existingSignal) {
+      const existingRun = await prisma.playRun.findFirst({
+        where: { accountSignalId: existingSignal.id },
+        select: { id: true },
+      });
+      if (existingRun) continue;
+    }
 
-    const contactName = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() || 'Attendee';
-    const hoursUntil = Math.round((event.eventDate.getTime() - now.getTime()) / (1000 * 60 * 60));
-
-    await prisma.actionWorkflow.create({
+    const signal = existingSignal ?? await prisma.accountSignal.create({
       data: {
         userId: contact.company.userId,
         companyId: contact.companyId,
-        targetContactId: contact.id,
-        targetDivisionId: contact.companyDepartmentId || undefined,
-        title: `Event Prep: ${contactName} attending ${event.eventName}`,
-        description: `${contactName} (${contact.title ?? 'Unknown title'}) at ${contact.company.name} is attending ${event.eventName} in ${hoursUntil} hours. Prepare your approach.`,
-        status: 'pending',
-        urgencyScore: hoursUntil <= 6 ? 170 : 145,
-        signalContext: {
-          source: 'event_prep',
-          eventName: event.eventName,
-          eventDate: event.eventDate.toISOString(),
-          hoursUntil,
-          contactName,
-          contactTitle: contact.title,
-        },
-        accountContext: {
-          eventAttendanceId: event.id,
-          companyName: contact.company.name,
-          triggerType: 'event_prep',
-        },
-        steps: {
-          create: [
-            {
-              stepOrder: 1,
-              stepType: 'generate_content',
-              contentType: 'talking_points',
-              channel: 'task',
-              contactId: contact.id,
-              divisionId: contact.companyDepartmentId || undefined,
-              promptHint: `Prepare a brief on ${contactName} before ${event.eventName}. Cover: their role and priorities, their division's use cases for our products, recent signals, and 3-5 conversation starters for the event.`,
-              status: 'pending',
-            },
-            {
-              stepOrder: 2,
-              stepType: 'generate_content',
-              contentType: 'email',
-              channel: 'email',
-              contactId: contact.id,
-              divisionId: contact.companyDepartmentId || undefined,
-              promptHint: `Draft a post-event follow-up email template for ${contactName} after ${event.eventName}. Reference shared context from the event and propose a concrete next step.`,
-              status: 'pending',
-            },
-          ],
-        },
+        type: 'internal_event_prep',
+        title,
+        summary: `${contactName} at ${contact.company.name} attending ${event.eventName} in ${hoursUntil}h`,
+        url: '',
+        publishedAt: new Date(),
+        relevanceScore: 7,
+        metadata: { eventAttendanceId: event.id } as object,
       },
+      select: { id: true },
     });
-    created++;
+
+    const template = await prisma.playTemplate.findFirst({
+      where: { userId: contact.company.userId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (template) {
+      await createPlayRunFromTemplate({
+        userId: contact.company.userId,
+        companyId: contact.companyId,
+        playTemplateId: template.id,
+        accountSignalId: signal.id,
+        title,
+      });
+      created++;
+    }
   }
 
   return created;

@@ -97,28 +97,38 @@ export default function PhasedPlanBoard({ companyId, roadmapId, plans }: Props) 
     try {
       const pp = plan.previewPayload;
       const playId = (pp?.playId as string) || (pp?.triggerSignalType as string) || undefined;
-      const body: Record<string, unknown> = {
-        companyId,
-        title: (pp?.title as string) || plan.target?.name || 'New Action',
-        description: (pp?.description as string) || undefined,
-      };
-      if (playId) body.playId = playId;
-      if (plan.signalId) body.accountSignalId = plan.signalId;
-      if (plan.target?.companyDepartmentId) {
-        body.targetDivisionId = plan.target.companyDepartmentId;
+      const title = (pp?.title as string) || plan.target?.name || 'New Action';
+
+      // Resolve playTemplateId: fetch templates and match by playId (triggerType/slug/name), or use first
+      const templatesRes = await fetch('/api/play-templates');
+      const templatesData = await templatesRes.json();
+      const templates = templatesData.templates || [];
+      const match = playId
+        ? templates.find(
+            (t: { triggerType?: string | null; slug?: string | null; name?: string }) =>
+              t.triggerType === playId || t.slug === playId || (t.name && t.name.toLowerCase().includes(playId.toLowerCase())),
+          )
+        : templates[0];
+      const playTemplateId = match?.id;
+      if (!playTemplateId) {
+        setWorkingId(null);
+        return;
       }
 
-      // Use new activity-catalog-based workflow assembly
-      const res = await fetch('/api/action-workflows/from-play', {
+      const res = await fetch('/api/play-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          companyId,
+          playTemplateId,
+          title,
+          accountSignalId: plan.signalId || undefined,
+        }),
       });
-
       if (res.ok) {
         const data = await res.json();
-        const workflowId = data.workflowId ?? data.workflow?.id;
-        router.push(`/dashboard/companies/${companyId}/plays/execute/${workflowId}`);
+        const runId = data.playRunId ?? data.playRun?.id;
+        router.push(`/dashboard/companies/${companyId}/plays/run/${runId}`);
       }
     } finally {
       setWorkingId(null);

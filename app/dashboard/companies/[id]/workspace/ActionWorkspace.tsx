@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import WorkflowStepper, { type Workflow } from '@/app/components/workflow/WorkflowStepper';
 
 const t = {
@@ -29,10 +30,18 @@ type WorkflowSummary = {
   steps: Array<{ id: string; status: string; stepType: string; contentType: string | null }>;
 };
 
+type PlayRunSummary = {
+  id: string;
+  activatedAt: string;
+  playTemplate: { name: string };
+  _count: { phaseRuns: number };
+};
+
 type Props = {
   companyId: string;
   activeWorkflowId: string | null;
   workflows: WorkflowSummary[];
+  playRuns?: PlayRunSummary[];
   onRefresh: () => void;
 };
 
@@ -40,8 +49,10 @@ export default function ActionWorkspace({
   companyId,
   activeWorkflowId,
   workflows,
+  playRuns = [],
   onRefresh,
 }: Props) {
+  const router = useRouter();
   const [activeWorkflow, setActiveWorkflow] = useState<Workflow | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +60,11 @@ export default function ActionWorkspace({
     async (wfId: string) => {
       setLoading(true);
       try {
+        const runRes = await fetch(`/api/play-runs/${wfId}`);
+        if (runRes.ok) {
+          router.push(`/dashboard/companies/${companyId}/plays/run/${wfId}`);
+          return;
+        }
         const res = await fetch(`/api/action-workflows/${wfId}`);
         if (res.ok) {
           const data = await res.json();
@@ -58,7 +74,7 @@ export default function ActionWorkspace({
         setLoading(false);
       }
     },
-    [],
+    [companyId, router],
   );
 
   useEffect(() => {
@@ -104,6 +120,8 @@ export default function ActionWorkspace({
     );
   }
 
+  const hasItems = playRuns.length > 0 || workflows.length > 0;
+
   return (
     <div>
       <h2
@@ -116,7 +134,7 @@ export default function ActionWorkspace({
       >
         Next Best Actions
       </h2>
-      {workflows.length === 0 ? (
+      {!hasItems ? (
         <div
           style={{
             padding: 30,
@@ -132,6 +150,29 @@ export default function ActionWorkspace({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {playRuns.map((run) => (
+            <button
+              key={run.id}
+              type="button"
+              onClick={() => loadWorkflow(run.id)}
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                borderRadius: 10,
+                background: t.surface,
+                border: `1px solid ${t.border}`,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>
+                {run.playTemplate.name}
+              </div>
+              <div style={{ fontSize: 10, color: t.text4, marginTop: 6 }}>
+                Play run · {run._count.phaseRuns} phase(s)
+              </div>
+            </button>
+          ))}
           {workflows.map((wf) => {
             const completed = wf.steps.filter(
               (s) => s.status === 'sent' || s.status === 'skipped',

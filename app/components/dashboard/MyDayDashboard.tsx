@@ -25,8 +25,11 @@ type AccountForCampaign = {
   departments: Array<{ id: string; name: string; type: string; contactCount: number }>;
 };
 
+type PlayRunCardRun = import('./PlayRunCard').PlayRunCardRun;
+
 type MyDayData = {
   workflows: ActionCardWorkflow[];
+  playRuns?: PlayRunCardRun[];
   momentum: MomentumWeekComparison;
   hotSignals: HotSignalItem[];
   companyTriggers: CompanyTriggerItem[];
@@ -37,6 +40,8 @@ type MyDayData = {
   }>;
   recommendedPlays?: RecommendedPlayItem[];
   followUpSteps?: FollowUpStepItem[];
+  followUpStepsFromPlayRuns?: FollowUpStepItem[];
+  sequenceFollowUps?: FollowUpStepItem[];
 };
 
 export default function MyDayDashboard() {
@@ -78,40 +83,38 @@ export default function MyDayDashboard() {
   }, []);
 
   const handleDismiss = async (id: string) => {
-    await fetch(`/api/action-workflows/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'dismissed' }),
-    });
+    // Legacy workflows no longer in My Day; no-op for backward compat
     fetchData();
   };
 
   const handleSnooze = async (id: string) => {
-    const snoozeUntil = new Date();
-    snoozeUntil.setDate(snoozeUntil.getDate() + 1);
-    await fetch(`/api/action-workflows/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'snoozed', snoozeUntil: snoozeUntil.toISOString() }),
-    });
+    // Legacy workflows no longer in My Day; no-op for backward compat
     fetchData();
   };
 
-  const handleWorkThis = (companyId: string, workflowId: string) => {
-    router.push(`/dashboard/companies/${companyId}/plays/execute/${workflowId}`);
+  const handleWorkThis = (
+    companyId: string,
+    workflowOrRunId: string,
+    source?: 'workflow' | 'play_run' | 'sequence',
+  ) => {
+    if (source === 'sequence') {
+      router.push(`/dashboard/companies/${companyId}`);
+      return;
+    }
+    router.push(`/dashboard/companies/${companyId}/plays/run/${workflowOrRunId}`);
   };
 
   const handleSkipStep = useCallback(
-    async (stepId: string, workflowId: string) => {
+    async (stepId: string, runId: string) => {
       try {
-        await fetch(`/api/action-workflows/${workflowId}/steps/${stepId}`, {
+        const res = await fetch(`/api/play-runs/${runId}/actions/${stepId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'skipped' }),
+          body: JSON.stringify({ status: 'SKIPPED' }),
         });
-        fetchData();
+        if (res.ok) fetchData();
       } catch (err) {
-        console.error('Failed to skip step:', err);
+        console.error('Failed to skip action:', err);
       }
     },
     [fetchData],
@@ -133,20 +136,24 @@ export default function MyDayDashboard() {
   const handleStartRecommendedPlay = useCallback(
     async (play: RecommendedPlayItem) => {
       try {
-        const res = await fetch('/api/action-workflows', {
+        const playTemplateId = play.playTemplateId ?? play.templateId;
+        const res = await fetch('/api/play-runs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             companyId: play.companyId,
-            templateId: play.templateId,
-            targetDivisionId: play.targetDivision?.id,
+            playTemplateId,
+            targetContactId: undefined,
           }),
         });
         if (res.ok) {
-          const { workflow } = await res.json();
-          router.push(
-            `/dashboard/companies/${play.companyId}/plays/execute/${workflow.id}`,
-          );
+          const data = await res.json();
+          const runId = data.playRunId ?? data.playRun?.id;
+          if (runId) {
+            router.push(`/dashboard/companies/${play.companyId}/plays/run/${runId}`);
+          } else {
+            router.push('/dashboard');
+          }
         }
       } catch (err) {
         console.error('Failed to start recommended play:', err);
@@ -259,7 +266,10 @@ export default function MyDayDashboard() {
       {/* Section 4: Action Queue + Recommended Plays */}
       <ActionQueueList
         workflows={data.workflows}
+        playRuns={data.playRuns ?? []}
         followUpSteps={data.followUpSteps ?? []}
+        followUpStepsFromPlayRuns={data.followUpStepsFromPlayRuns ?? []}
+        sequenceFollowUps={data.sequenceFollowUps ?? []}
         recommendedPlays={visibleRecommended}
         onDismiss={handleDismiss}
         onSnooze={handleSnooze}

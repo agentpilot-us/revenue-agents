@@ -689,52 +689,46 @@ export async function seedDemoRoadmapForCompany(
         },
       });
 
-      // Simple rules/action mappings for the demo flow
-      const ruleEarnings = await prisma.roadmapSignalRule.create({
-        data: {
-          roadmapId: roadmap.id,
-          name: 'Earnings call — AV & digital factory',
-          category: 'earnings_call',
-          description: 'GM mentions investment in AV and digital manufacturing.',
-          keywords: ['earnings', 'autonomous', 'digital factory', 'Ultium'],
-          sources: ['news', 'financial_report'],
-          priorityWeight: 2,
-        },
+      // New play system: SignalPlayMapping + AccountPlayActivation for demo
+      const playTemplates = await prisma.playTemplate.findMany({
+        where: { userId: session.user.id, status: 'ACTIVE' },
+        select: { id: true },
+        take: 3,
       });
-      const mappingEarnings = await prisma.roadmapActionMapping.create({
-        data: {
-          roadmapId: roadmap.id,
-          signalRuleId: ruleEarnings.id,
-          signalCategory: 'earnings_call',
-          actionType: 'generate_email',
-          autonomyLevel: 'draft_review',
-          promptHint:
-            'Draft an executive briefing email for the relevant GM division summarizing how NVIDIA can support the investments mentioned.',
-        },
-      });
-
-      const ruleJobs = await prisma.roadmapSignalRule.create({
-        data: {
-          roadmapId: roadmap.id,
-          name: 'Job posting — simulation & digital twins',
-          category: 'job_posting_signal',
-          description: 'New GM job postings for simulation and digital twin leadership.',
-          keywords: ['simulation', 'digital twin'],
-          sources: ['job_boards'],
-          priorityWeight: 1,
-        },
-      });
-      const mappingJobs = await prisma.roadmapActionMapping.create({
-        data: {
-          roadmapId: roadmap.id,
-          signalRuleId: ruleJobs.id,
-          signalCategory: 'job_posting_signal',
-          actionType: 'generate_email',
-          autonomyLevel: 'draft_review',
-          promptHint:
-            'Draft a short outreach email connecting NVIDIA Omniverse and GPU-accelerated simulation to the focus of this new role.',
-        },
-      });
+      const firstPlayTemplateId = playTemplates[0]?.id;
+      if (firstPlayTemplateId) {
+        for (const signalType of ['earnings_call', 'job_posting_signal']) {
+          await prisma.signalPlayMapping.upsert({
+            where: {
+              userId_signalType_playTemplateId: {
+                userId: session.user.id,
+                signalType,
+                playTemplateId: firstPlayTemplateId,
+              },
+            },
+            create: {
+              userId: session.user.id,
+              signalType,
+              playTemplateId: firstPlayTemplateId,
+              autoActivate: false,
+            },
+            update: {},
+          });
+        }
+        for (const t of playTemplates) {
+          await prisma.accountPlayActivation.upsert({
+            where: {
+              roadmapId_playTemplateId: { roadmapId: roadmap.id, playTemplateId: t.id },
+            },
+            create: {
+              roadmapId: roadmap.id,
+              playTemplateId: t.id,
+              isActive: true,
+            },
+            update: {},
+          });
+        }
+      }
 
       // Attach one plan to Vehicle Engineering & Simulation and one to AV/ADAS
       const vEngTarget = await prisma.roadmapTarget.findFirst({
@@ -749,19 +743,18 @@ export async function seedDemoRoadmapForCompany(
           data: {
             roadmapId: roadmap.id,
             signalId: earnings.id,
-            signalRuleId: ruleEarnings.id,
-            actionMappingId: mappingEarnings.id,
             targetId: vEngTarget.id,
             status: 'pending',
             autonomyLevel: 'draft_review',
             previewPayload: {
+              playId: 'earnings_call',
               subject: 'GM earnings: proposal to accelerate Ultium engineering timelines',
               bodyPreview:
                 'GM’s latest earnings call highlighted increased investment in AV and digital factories. Here’s a tailored briefing for Vehicle Engineering & Simulation on how NVIDIA Omniverse and GPU-accelerated CAE/CFD can compress Ultium development by up to 50%.',
             },
             matchInfo: {
               matchedKeywords: ['earnings', 'autonomous', 'digital factory'],
-              ruleName: ruleEarnings.name,
+              ruleName: 'Earnings call — AV & digital factory',
               confidence: 0.9,
             },
           },
@@ -773,8 +766,6 @@ export async function seedDemoRoadmapForCompany(
           data: {
             roadmapId: roadmap.id,
             signalId: earnings.id,
-            signalRuleId: ruleEarnings.id,
-            actionMappingId: mappingEarnings.id,
             targetId: avTarget.id,
             status: 'pending',
             autonomyLevel: 'draft_review',
@@ -785,7 +776,7 @@ export async function seedDemoRoadmapForCompany(
             },
             matchInfo: {
               matchedKeywords: ['earnings', 'autonomous'],
-              ruleName: ruleEarnings.name,
+              ruleName: 'Earnings call — AV & digital factory',
               confidence: 0.9,
             },
           },
@@ -797,19 +788,18 @@ export async function seedDemoRoadmapForCompany(
           data: {
             roadmapId: roadmap.id,
             signalId: jobs.id,
-            signalRuleId: ruleJobs.id,
-            actionMappingId: mappingJobs.id,
             targetId: vEngTarget.id,
             status: 'pending',
             autonomyLevel: 'draft_review',
             previewPayload: {
+              playId: 'job_posting_signal',
               subject: 'Congrats on the new Simulation & Digital Twins leadership role',
               bodyPreview:
                 'Saw GM is hiring a Director for Simulation & Digital Twins. This is a perfect moment to show how other OEMs are using NVIDIA Omniverse and GPU-accelerated simulation to hit aggressive EV timelines while cutting physical test costs by ~40%.',
             },
             matchInfo: {
               matchedKeywords: ['simulation', 'digital twin'],
-              ruleName: ruleJobs.name,
+              ruleName: 'Job posting — simulation & digital twins',
               confidence: 0.85,
             },
           },

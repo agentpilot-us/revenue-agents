@@ -2,27 +2,27 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AccountPlaysTab from '@/app/components/plays/AccountPlaysTab';
+import { RecommendPlaysModal } from '@/app/components/roadmap/RecommendPlaysModal';
+import { PlayCustomizationDrawer } from '@/app/components/roadmap/PlayCustomizationDrawer';
+import { SignalPreviewModal } from '@/app/components/roadmap/SignalPreviewModal';
 
 type TemplateOption = {
   id: string;
   name: string;
   description: string | null;
+  slug: string | null;
+  category: string | null;
   triggerType: string;
-  isBuiltIn: boolean;
-  expectedOutcome: string | null;
-  priority: number;
-  targetDepartmentTypes: string[] | null;
-  targetPersonas: string[] | null;
-  _count: { steps: number };
+  phaseCount: number;
 };
 
 type Activation = {
   id: string;
-  templateId: string;
+  playTemplateId: string;
   isActive: boolean;
   customConfig: Record<string, unknown> | null;
   activatedAt: string;
-  template: TemplateOption;
+  playTemplate: TemplateOption;
 };
 
 type AutonLevel = 'notify' | 'draft_review' | 'auto_execute';
@@ -55,13 +55,16 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
   const [allTemplates, setAllTemplates] = useState<TemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
+  const [showRecommend, setShowRecommend] = useState(false);
+  const [customizingActivation, setCustomizingActivation] = useState<Activation | null>(null);
+  const [showSignalPreview, setShowSignalPreview] = useState(false);
   const [adding, setAdding] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       const [actRes, tmplRes] = await Promise.all([
-        fetch(`/api/roadmap/playbook-activations?roadmapId=${roadmapId}`),
-        fetch('/api/playbooks/templates'),
+        fetch(`/api/roadmap/account-play-activations?roadmapId=${roadmapId}`),
+        fetch('/api/play-templates'),
       ]);
 
       if (actRes.ok) {
@@ -70,7 +73,16 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
       }
       if (tmplRes.ok) {
         const data = await tmplRes.json();
-        setAllTemplates(data.templates ?? []);
+        const list = (data.templates ?? []).map((t: { id: string; name: string; description?: string | null; slug?: string | null; category?: string | null; triggerType: string; phaseCount?: number }) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description ?? null,
+          slug: t.slug ?? null,
+          category: t.category ?? null,
+          triggerType: t.triggerType ?? 'MANUAL',
+          phaseCount: t.phaseCount ?? 0,
+        }));
+        setAllTemplates(list);
       }
     } finally {
       setLoading(false);
@@ -81,16 +93,16 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
     fetchData();
   }, [fetchData]);
 
-  const activeIds = new Set(activations.map((a) => a.templateId));
+  const activeIds = new Set(activations.map((a) => a.playTemplateId));
   const available = allTemplates.filter((t) => !activeIds.has(t.id));
 
-  const handleActivate = async (templateId: string) => {
+  const handleActivate = async (playTemplateId: string) => {
     setAdding(true);
     try {
-      await fetch('/api/roadmap/playbook-activations', {
+      await fetch('/api/roadmap/account-play-activations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roadmapId, templateId }),
+        body: JSON.stringify({ roadmapId, playTemplateId }),
       });
       setShowPicker(false);
       await fetchData();
@@ -100,13 +112,13 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
   };
 
   const handleRemove = async (activationId: string) => {
-    await fetch(`/api/roadmap/playbook-activations/${activationId}`, { method: 'DELETE' });
+    await fetch(`/api/roadmap/account-play-activations/${activationId}`, { method: 'DELETE' });
     await fetchData();
   };
 
   const handleAutonomyChange = async (activationId: string, current: Activation, level: AutonLevel) => {
     const newConfig = { ...(current.customConfig ?? {}), autonomyLevel: level };
-    await fetch(`/api/roadmap/playbook-activations/${activationId}`, {
+    await fetch(`/api/roadmap/account-play-activations/${activationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customConfig: newConfig }),
@@ -130,13 +142,29 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
             ? 'No plays approved for this account yet.'
             : `${activations.length} play${activations.length === 1 ? '' : 's'} approved`}
         </p>
-        <button
-          type="button"
-          onClick={() => setShowPicker(!showPicker)}
-          className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          {showPicker ? 'Cancel' : '+ Add Play'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSignalPreview(true)}
+            className="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors"
+          >
+            Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRecommend(true)}
+            className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+          >
+            Recommend
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPicker(!showPicker)}
+            className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            {showPicker ? 'Cancel' : '+ Add Play'}
+          </button>
+        </div>
       </div>
 
       {showPicker && (
@@ -168,12 +196,7 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
                       <p className="text-[11px] text-muted-foreground line-clamp-2">{t.description}</p>
                     )}
                     <div className="text-[10px] text-muted-foreground/70 mt-1">
-                      {t._count?.steps ?? 0} steps
-                      {t.targetDepartmentTypes && (t.targetDepartmentTypes as string[]).length > 0 && (
-                        <span className="ml-2">
-                          &middot; Targets: {(t.targetDepartmentTypes as string[]).slice(0, 3).join(', ')}
-                        </span>
-                      )}
+                      {t.phaseCount} phases
                     </div>
                   </button>
                 );
@@ -185,11 +208,9 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
 
       <div className="space-y-3">
         {activations.map((act) => {
-          const t = act.template;
+          const t = act.playTemplate;
           const colorCls = TRIGGER_COLORS[t.triggerType ?? ''] ?? 'bg-card/60 text-muted-foreground border-border';
           const autonomy = ((act.customConfig as Record<string, unknown>)?.autonomyLevel as AutonLevel) ?? 'draft_review';
-          const deptTypes = (t.targetDepartmentTypes ?? []) as string[];
-          const personas = (t.targetPersonas ?? []) as string[];
 
           return (
             <div
@@ -202,11 +223,11 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{t.name}</span>
                     <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${colorCls}`}>
-                      {t.triggerType ?? 'manual'}
+                      {t.triggerType ?? 'MANUAL'}
                     </span>
-                    {t.priority > 0 && (
-                      <span className="text-[9px] font-medium text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                        Priority {t.priority}
+                    {act.customConfig && !!(act.customConfig as Record<string, unknown>).stepOverrides && (
+                      <span className="text-[9px] font-medium text-violet-400/80 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded">
+                        Customized
                       </span>
                     )}
                   </div>
@@ -214,31 +235,31 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
                     <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{t.description}</p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemove(act.id)}
-                  className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 shrink-0 rounded hover:bg-red-500/10 transition-colors"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCustomizingActivation(act)}
+                    className="text-[10px] text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/10 transition-colors"
+                  >
+                    Customize
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(act.id)}
+                    className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
 
               {/* Details row */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-                <span>{t._count?.steps ?? 0} steps</span>
-                {deptTypes.length > 0 && (
-                  <span>Targets: {deptTypes.map((d) => d.replace(/_/g, ' ')).join(', ')}</span>
-                )}
-                {personas.length > 0 && (
-                  <span>Personas: {personas.join(', ')}</span>
+                <span>{t.phaseCount} phases</span>
+                {t.category && (
+                  <span>Category: {t.category.replace(/_/g, ' ')}</span>
                 )}
               </div>
-
-              {t.expectedOutcome && (
-                <p className="text-[11px] text-emerald-400/80 bg-emerald-500/5 border border-emerald-500/10 rounded px-2.5 py-1.5">
-                  Expected: {t.expectedOutcome}
-                </p>
-              )}
 
               {/* Autonomy level selector */}
               <div>
@@ -271,6 +292,36 @@ export function ActivePlaybooksPanel({ roadmapId, companyId, companyName, initia
           <h3 className="text-sm font-semibold text-foreground mb-4">Play Execution</h3>
           <AccountPlaysTab companyId={companyId} companyName={companyName} initialSubTab={initialPlayMode} initialDivisionId={initialDivisionId} />
         </div>
+      )}
+
+      {showRecommend && (
+        <RecommendPlaysModal
+          roadmapId={roadmapId}
+          onActivate={handleActivate}
+          onClose={() => setShowRecommend(false)}
+        />
+      )}
+
+      {showSignalPreview && (
+        <SignalPreviewModal
+          roadmapId={roadmapId}
+          onClose={() => setShowSignalPreview(false)}
+        />
+      )}
+
+      {customizingActivation && companyId && (
+        <PlayCustomizationDrawer
+          activationId={customizingActivation.id}
+          playTemplateId={customizingActivation.playTemplateId}
+          templateName={customizingActivation.playTemplate.name}
+          companyId={companyId}
+          currentConfig={customizingActivation.customConfig as Record<string, unknown> | null}
+          onSave={() => {
+            setCustomizingActivation(null);
+            fetchData();
+          }}
+          onClose={() => setCustomizingActivation(null)}
+        />
       )}
     </div>
   );

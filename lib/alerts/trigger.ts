@@ -62,7 +62,7 @@ export async function checkAndTriggerAlerts(visit: VisitForAlerts): Promise<void
     });
   }
 
-  // Create ActionWorkflows for high-value engagement alerts
+  // Create PlayRuns for high-value engagement alerts (via createEngagementWorkflow)
   const workflowAlertTypes = new Set([
     'HIGH_VALUE_VISITOR',
     'EXECUTIVE_VISIT',

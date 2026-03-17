@@ -6,7 +6,7 @@ import { buildContentContext } from '@/lib/content/build-content-context';
 import { CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
 import { getChannelConfig, type ChannelId } from '@/lib/content/channel-config';
 import { buildAssetPackage } from '@/lib/content/build-asset-package';
-import { generateOneContent } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/content/generate-content';
 
 const CHANNEL_IDS = [
   'email',

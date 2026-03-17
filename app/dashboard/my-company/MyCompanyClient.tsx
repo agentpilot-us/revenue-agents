@@ -16,13 +16,6 @@ export type ProfileData = {
   keyInitiatives: string[];
 };
 
-export type DocRow = {
-  id: string;
-  title: string;
-  description?: string | null;
-  url?: string | null;
-};
-
 export type HealthData = {
   companyCount: number;
   contactCount: number;
@@ -69,7 +62,6 @@ export type CatalogProductItem = {
 
 type Props = {
   profile: ProfileData;
-  documents: DocRow[];
   health: HealthData;
   companyProducts: CompanyProduct[];
   eventSummaries: EventSummary[];
@@ -80,7 +72,6 @@ type Props = {
 
 export function MyCompanyClient({
   profile,
-  documents,
   health,
   companyProducts,
   eventSummaries,
@@ -105,7 +96,6 @@ export function MyCompanyClient({
             {activeTab === 'Profile' && (
               <ProfileTab
                 profile={profile}
-                documents={documents}
                 health={health}
               />
             )}

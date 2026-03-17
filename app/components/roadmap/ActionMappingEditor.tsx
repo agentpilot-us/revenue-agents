@@ -150,8 +150,11 @@ export function ActionMappingEditor({ roadmapId }: Props) {
   };
 
   const handleSave = async () => {
-    if (!formActionType.trim()) return;
+    if (!formTemplateId && !formActionType.trim()) return;
     setSaving(true);
+    const effectiveActionType = formActionType.trim()
+      || templates.find((tt) => tt.id === formTemplateId)?.name
+      || 'play_rule';
     try {
       if (editingId) {
         await fetch(`/api/roadmap/action-mappings/${editingId}`, {
@@ -159,7 +162,7 @@ export function ActionMappingEditor({ roadmapId }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             signalCategory: formCategory,
-            actionType: formActionType,
+            actionType: effectiveActionType,
             autonomyLevel: formAutonomy,
             templateId: formTemplateId || null,
           }),
@@ -171,7 +174,7 @@ export function ActionMappingEditor({ roadmapId }: Props) {
           body: JSON.stringify({
             roadmapId,
             signalCategory: formCategory,
-            actionType: formActionType,
+            actionType: effectiveActionType,
             autonomyLevel: formAutonomy,
             templateId: formTemplateId || null,
           }),
@@ -198,6 +201,29 @@ export function ActionMappingEditor({ roadmapId }: Props) {
     await fetchMappings();
   };
 
+  const handleReorder = async (index: number, direction: 'up' | 'down') => {
+    const swapIdx = direction === 'up' ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= mappings.length) return;
+    const a = mappings[index];
+    const b = mappings[swapIdx];
+    const newMappings = [...mappings];
+    newMappings[index] = b;
+    newMappings[swapIdx] = a;
+    setMappings(newMappings);
+    await Promise.all([
+      fetch(`/api/roadmap/action-mappings/${a.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priorityWeight: swapIdx }),
+      }),
+      fetch(`/api/roadmap/action-mappings/${b.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priorityWeight: index }),
+      }),
+    ]);
+  };
+
   const autonomyLabel = (level: string) =>
     AUTONOMY_LEVELS.find((a) => a.value === level);
 
@@ -214,33 +240,53 @@ export function ActionMappingEditor({ roadmapId }: Props) {
         <p className="text-muted-foreground text-sm">No action mappings defined yet.</p>
       )}
 
-      {mappings.map((m) => {
+      {mappings.map((m, idx) => {
         const al = autonomyLabel(m.autonomyLevel);
         return (
           <div
             key={m.id}
             className="flex items-center justify-between rounded-lg border border-border bg-card/60 p-3"
           >
-            <div className="min-w-0 space-y-0.5">
-              <div className="text-xs">
-                <span className="font-medium">{m.actionType}</span>
-                {m.signalCategory && (
-                  <span className="text-muted-foreground ml-2">
-                    {categoryLabel(m.signalCategory)}
-                  </span>
-                )}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleReorder(idx, 'up')}
+                  disabled={idx === 0}
+                  className="text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none"
+                  title="Move up"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReorder(idx, 'down')}
+                  disabled={idx === mappings.length - 1}
+                  className="text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-20 leading-none"
+                  title="Move down"
+                >
+                  ▼
+                </button>
               </div>
-              {m.template && (
-                <div className="text-[10px] text-blue-400">
-                  Play: {m.template.name}
-                </div>
-              )}
-              <div className="text-[10px] text-muted-foreground">
-                autonomy:{' '}
+              <span className="text-[10px] text-muted-foreground w-4 text-center">{idx + 1}</span>
+            </div>
+            <div className="min-w-0 space-y-0.5 flex-1 ml-2">
+              <div className="text-xs font-medium">
+                {m.template ? m.template.name : m.actionType}
+              </div>
+              <div className="text-[10px] text-muted-foreground flex items-center gap-2">
+                {m.signalCategory && (
+                  <span>When: {categoryLabel(m.signalCategory)}</span>
+                )}
                 <span className={al?.color ?? 'text-amber-400'}>
                   {al?.label ?? m.autonomyLevel}
                 </span>
               </div>
+              {m.template && m.actionType && (
+                <div className="text-[10px] text-muted-foreground">
+                  {m.actionType}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button
@@ -265,6 +311,34 @@ export function ActionMappingEditor({ roadmapId }: Props) {
       {showForm && (
         <div className="rounded-lg border border-border bg-card/60 p-4 space-y-3">
           <div>
+            <label className="block text-xs font-medium mb-1">Play Template</label>
+            <select
+              value={formTemplateId}
+              onChange={(e) => {
+                const tid = e.target.value;
+                setFormTemplateId(tid);
+                if (tid) {
+                  const tmpl = templates.find((tt) => tt.id === tid);
+                  if (tmpl && !formActionType.trim()) {
+                    setFormActionType(tmpl.name);
+                  }
+                }
+              }}
+              className="w-full text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">Auto-resolve (based on signal type)</option>
+              {templates.map((tt) => (
+                <option key={tt.id} value={tt.id}>
+                  {tt.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Select a play to run, or leave as auto-resolve to let the system pick based on signal type.
+            </p>
+          </div>
+
+          <div>
             <label className="block text-xs font-medium mb-1">Signal Category</label>
             <select
               value={formCategory}
@@ -282,33 +356,16 @@ export function ActionMappingEditor({ roadmapId }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1">Action Type</label>
+            <label className="block text-xs font-medium mb-1">
+              Action Label {formTemplateId ? '(optional)' : '(required)'}
+            </label>
             <input
               type="text"
               value={formActionType}
               onChange={(e) => setFormActionType(e.target.value)}
-              placeholder="e.g. New Leader Introduction, Contract Expansion"
+              placeholder={formTemplateId ? 'Auto-filled from template' : 'e.g. generate_email, research_account'}
               className="w-full text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium mb-1">Playbook Template</label>
-            <select
-              value={formTemplateId}
-              onChange={(e) => setFormTemplateId(e.target.value)}
-              className="w-full text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">Auto-resolve (based on signal type)</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Select a specific play template, or leave as auto-resolve to let the system pick based on signal type.
-            </p>
           </div>
 
           <div>
@@ -330,7 +387,7 @@ export function ActionMappingEditor({ roadmapId }: Props) {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || !formActionType.trim()}
+              disabled={saving || (!formTemplateId && !formActionType.trim())}
               className="text-xs font-medium bg-blue-600 text-white px-4 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
               {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}

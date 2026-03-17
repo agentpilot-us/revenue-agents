@@ -395,7 +395,7 @@ export function PlaybooksTab() {
           <h2 className="text-lg font-semibold">Play Templates</h2>
           <p className="text-sm text-muted-foreground">
             {templates.length} playbooks across {Object.keys(grouped).length} categories.
-            These templates inform how ActionWorkflows get assembled when triggers fire.
+            Play templates define phases and actions; when signals or triggers fire, PlayRuns are created from these templates.
           </p>
         </div>
         <button

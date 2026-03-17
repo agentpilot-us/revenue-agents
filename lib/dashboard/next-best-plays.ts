@@ -1,8 +1,8 @@
 /**
  * Deterministic next-best-play recommender.
  *
- * Scores approved plays (PlaybookActivation) against current account state
- * to recommend which play an AE should run next — no LLM call needed.
+ * Scores approved plays (AccountPlayActivation + PlayTemplate) against current
+ * account state to recommend which play an AE should run next — no LLM call needed.
  *
  * Scoring factors:
  *   - Coverage gaps (divisions with few contacts or low engagement)
@@ -15,7 +15,9 @@
 import { prisma } from '@/lib/db';
 
 export type RecommendedPlay = {
-  playbookActivationId: string;
+  accountPlayActivationId: string;
+  /** PlayTemplate id — use for POST /api/play-runs */
+  playTemplateId: string;
   templateId: string;
   templateName: string;
   triggerType: string | null;
@@ -55,29 +57,25 @@ export async function getNextBestPlays(
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-
-  const [roadmap, company, recentActivities, recentWorkflows, recentSignals, recentOutcomes] =
+  const [roadmap, company, recentActivities, recentPlayRuns, recentSignals] =
     await Promise.all([
       prisma.adaptiveRoadmap.findFirst({
         where: { userId, companyId },
         include: {
-          playbookActivations: {
+          accountPlayActivations: {
             where: { isActive: true },
             include: {
-              template: {
+              playTemplate: {
                 select: {
                   id: true,
                   name: true,
                   triggerType: true,
-                  priority: true,
-                  expectedOutcome: true,
-                  targetDepartmentTypes: true,
+                  category: true,
                   description: true,
-                  steps: {
-                    orderBy: { order: 'asc' as const },
+                  phases: {
+                    orderBy: { orderIndex: 'asc' },
                     take: 5,
-                    select: { label: true, name: true, channel: true },
+                    select: { name: true },
                   },
                 },
               },
@@ -114,16 +112,15 @@ export async function getNextBestPlays(
         orderBy: { createdAt: 'desc' },
       }),
 
-      prisma.actionWorkflow.findMany({
+      prisma.playRun.findMany({
         where: {
           userId,
           companyId,
           createdAt: { gte: sevenDaysAgo },
-          status: { in: ['pending', 'in_progress', 'completed'] },
+          status: { in: ['ACTIVE', 'COMPLETED'] },
         },
         select: {
-          templateId: true,
-          targetDivisionId: true,
+          playTemplateId: true,
           createdAt: true,
         },
       }),
@@ -140,27 +137,15 @@ export async function getNextBestPlays(
         take: 10,
       }),
 
-      prisma.actionWorkflow.findMany({
-        where: {
-          userId,
-          companyId,
-          outcome: { not: null },
-          outcomeAt: { gte: fourteenDaysAgo },
-        },
-        select: {
-          outcome: true,
-          targetDivisionId: true,
-          outcomeAt: true,
-        },
-      }),
     ]);
 
-  if (!roadmap || roadmap.playbookActivations.length === 0) return [];
+  const activations = roadmap?.accountPlayActivations ?? [];
+  if (!roadmap || activations.length === 0) return [];
 
   const divisionStates = buildDivisionStates(
     roadmap.targets,
     recentActivities,
-    recentWorkflows,
+    recentPlayRuns.map((r) => ({ templateId: r.playTemplateId, targetDivisionId: null, createdAt: r.createdAt })),
   );
 
   const signalTypes = new Set(recentSignals.map((s) => s.type));
@@ -168,22 +153,12 @@ export async function getNextBestPlays(
 
   const scored: RecommendedPlay[] = [];
 
-  for (const activation of roadmap.playbookActivations) {
-    const tmpl = activation.template;
-    const targetDepts = (tmpl.targetDepartmentTypes ?? []) as string[];
+  for (const activation of activations) {
+    const tmpl = activation.playTemplate;
+    const stepPreview = tmpl.phases.map((p) => p.name).slice(0, 4);
+    const stepCount = tmpl.phases.length;
 
-    const matchingDivisions = divisionStates.filter((div) => {
-      if (targetDepts.length === 0) return true;
-      return targetDepts.some(
-        (td) =>
-          td.toLowerCase() === div.type.toLowerCase() ||
-          div.name.toLowerCase().includes(td.toLowerCase().replace(/_/g, ' ')),
-      );
-    });
-
-    const divisions = matchingDivisions.length > 0 ? matchingDivisions : divisionStates;
-
-    for (const div of divisions) {
+    for (const div of divisionStates) {
       let score = 0;
       const reasons: string[] = [];
 
@@ -215,11 +190,9 @@ export async function getNextBestPlays(
         reasons.push(`Signal match: ${matchingSignal?.title ?? tmpl.triggerType.replace(/_/g, ' ')}`);
       }
 
-      // 4. Recency penalty — don't re-suggest same play/division combo this week
-      const recentSameCombo = recentWorkflows.filter(
-        (wf) => wf.templateId === tmpl.id && wf.targetDivisionId === div.id,
-      );
-      if (recentSameCombo.length > 0) {
+      // 4. Recency penalty — don't re-suggest same play this week
+      const recentSamePlay = recentPlayRuns.filter((r) => r.playTemplateId === tmpl.id);
+      if (recentSamePlay.length > 0) {
         score -= 50;
       }
 
@@ -232,12 +205,12 @@ export async function getNextBestPlays(
         score += 10;
       }
 
-      // 6. Template priority boost
-      score += Math.min(tmpl.priority, 10) * 2;
+      // 6. Category/priority boost (PlayTemplate has category, no priority field — use fixed boost)
+      score += 10;
 
       // 7. Objective alignment (keyword match)
       if (dealObjective && tmpl.description) {
-        const descLower = tmpl.description.toLowerCase();
+        const descLower = (tmpl.description ?? '').toLowerCase();
         const objectiveWords = dealObjective.split(/\s+/).filter((w) => w.length > 3);
         const matches = objectiveWords.filter((w) => descLower.includes(w)).length;
         if (matches > 0) {
@@ -251,39 +224,16 @@ export async function getNextBestPlays(
         score += 10;
       }
 
-      // 9. Outcome-based adjustments
-      const divOutcomes = recentOutcomes.filter((o) => o.targetDivisionId === div.id);
-      for (const o of divOutcomes) {
-        if (o.outcome === 'meeting_booked') {
-          score -= 20;
-          reasons.push('Meeting already booked — hold off');
-        } else if (o.outcome === 'not_interested') {
-          score -= 40;
-          reasons.push('Previously marked not interested');
-        } else if (o.outcome === 'no_response') {
-          score += 15;
-          reasons.push('No response last time — try different approach');
-        } else if (o.outcome === 'pipeline_created') {
-          score -= 30;
-          reasons.push('Pipeline created — focus on nurturing');
-        }
-      }
-
       if (score <= 0) continue;
 
-      const stepPreview = tmpl.steps
-        .map((s: { label: string | null; name: string | null; channel: string | null }) =>
-          s.label || s.name || s.channel || 'Step',
-        )
-        .slice(0, 4);
-
       scored.push({
-        playbookActivationId: activation.id,
+        accountPlayActivationId: activation.id,
+        playTemplateId: tmpl.id,
         templateId: tmpl.id,
         templateName: tmpl.name,
         triggerType: tmpl.triggerType,
-        priority: tmpl.priority,
-        expectedOutcome: tmpl.expectedOutcome,
+        priority: 10,
+        expectedOutcome: null,
         score,
         reasons: reasons.slice(0, 3),
         targetDivision: {
@@ -294,7 +244,7 @@ export async function getNextBestPlays(
           estimatedOpportunity: div.estimatedOpportunity,
           stage: div.stage,
         },
-        stepCount: tmpl.steps.length,
+        stepCount,
         stepPreview,
       });
     }

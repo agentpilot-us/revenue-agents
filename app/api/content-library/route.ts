@@ -3,6 +3,19 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import type { ContentType } from '@prisma/client';
 import { calculateContentHash } from '@/lib/content-library/content-hash';
+import { ingestContentLibraryChunks } from '@/lib/content-library-rag';
+
+/** Build a single text block from ContentLibrary row for RAG chunking. */
+function textForChunking(title: string, content: unknown): string {
+  const parts: string[] = [title];
+  if (content != null && typeof content === 'object' && !Array.isArray(content)) {
+    for (const v of Object.values(content)) {
+      if (typeof v === 'string' && v.trim()) parts.push(v.trim());
+      else if (Array.isArray(v)) parts.push(v.map((x) => (typeof x === 'string' ? x : String(x))).join(' '));
+    }
+  }
+  return parts.join('\n\n');
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -115,6 +128,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const text = textForChunking(title ?? '', content);
+    if (text.trim()) {
+      ingestContentLibraryChunks(contentItem.id, text).catch((err) => {
+        console.error('[content-library] Ingest chunks after create failed:', err);
+      });
+    }
+
     return NextResponse.json({ content: contentItem }, { status: 201 });
   } catch (error) {
     console.error('Content creation error:', error);
@@ -167,6 +187,15 @@ export async function PATCH(req: NextRequest) {
       where: { id },
       data: updates,
     });
+
+    const title = (updates.title as string) ?? existing.title;
+    const contentPayload = (updates.content as unknown) ?? existing.content;
+    const text = textForChunking(title, contentPayload);
+    if (text.trim()) {
+      ingestContentLibraryChunks(contentItem.id, text).catch((err) => {
+        console.error('[content-library] Ingest chunks after update failed:', err);
+      });
+    }
 
     return NextResponse.json({ content: contentItem });
   } catch (error) {

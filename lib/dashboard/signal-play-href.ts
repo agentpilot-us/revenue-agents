@@ -2,8 +2,8 @@
  * buildSignalPlayHref
  *
  * Builds the URL for "Run [play]" CTAs on the dashboard.
- * Points to /plays/run which now assembles an ActionWorkflow from the
- * activity catalog and redirects to /plays/execute/[workflowId].
+ * Points to /plays/run (query params); the run page creates a PlayRun and
+ * redirects to /plays/run/[runId].
  *
  * Usage in signal cards, next-best-actions, hot signals panel:
  *

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { resolveTemplateForContext } from '@/lib/action-workflows/resolve-template';
 
 /**
  * GET /api/signals/[signalId]/preview-play
  *
- * Resolves the matched PlaybookTemplate for a signal without creating a workflow.
- * Returns template name, priority, timing, and step summaries for UI preview.
+ * Resolves the matched PlayTemplate for a signal via SignalPlayMapping (no run created).
+ * Returns template name and phases for UI preview; would create PlayRun.
  */
 export async function GET(
   _req: NextRequest,
@@ -37,20 +36,35 @@ export async function GET(
     return NextResponse.json({ error: 'Signal not found' }, { status: 404 });
   }
 
-  const company = await prisma.company.findFirst({
-    where: { id: signal.companyId, userId: session.user.id },
-    select: { industry: true },
+  const signalTypeNorm = signal.type.trim().toLowerCase();
+  const mappings = await prisma.signalPlayMapping.findMany({
+    where: {
+      userId: signal.userId,
+      playTemplate: { status: 'ACTIVE' },
+    },
+    include: {
+      playTemplate: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          triggerType: true,
+          phases: {
+            orderBy: { orderIndex: 'asc' },
+            select: { name: true, orderIndex: true },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
   });
 
-  const templateId = await resolveTemplateForContext({
-    userId: session.user.id,
-    companyId: signal.companyId,
-    signalType: signal.type,
-    signalId: signal.id,
-    companyIndustry: company?.industry ?? undefined,
+  const matching = mappings.find((m) => {
+    const t = m.signalType.trim().toLowerCase();
+    return t === signalTypeNorm || signalTypeNorm.includes(t) || t.includes(signalTypeNorm);
   });
 
-  if (!templateId) {
+  if (!matching) {
     return NextResponse.json({
       matched: false,
       signal: {
@@ -62,45 +76,12 @@ export async function GET(
     });
   }
 
-  const template = await prisma.playbookTemplate.findUnique({
-    where: { id: templateId },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      triggerType: true,
-      priority: true,
-      timingConfig: true,
-      expectedOutcome: true,
-      steps: {
-        orderBy: { order: 'asc' },
-        select: {
-          id: true,
-          order: true,
-          name: true,
-          description: true,
-          channel: true,
-          assetTypes: true,
-          promptHint: true,
-        },
-      },
-    },
-  });
-
-  if (!template) {
-    return NextResponse.json({ matched: false });
-  }
-
-  const timingConfig = template.timingConfig as Record<string, unknown> | null;
-  const validWindowDays = timingConfig?.validWindowDays as number | undefined;
-  let timingWindow: string | undefined;
-  if (validWindowDays) {
-    const weeks = Math.ceil(validWindowDays / 7);
-    timingWindow = weeks <= 1 ? 'Week 1' : `Week 1\u2013${weeks}`;
-  }
+  const template = matching.playTemplate;
+  const phases = template.phases.map((p) => ({ order: p.orderIndex, name: p.name }));
 
   return NextResponse.json({
     matched: true,
+    wouldCreate: 'PlayRun',
     signal: {
       id: signal.id,
       type: signal.type,
@@ -113,15 +94,7 @@ export async function GET(
       name: template.name,
       description: template.description,
       triggerType: template.triggerType,
-      priority: template.priority,
-      timingWindow,
-      expectedOutcome: template.expectedOutcome,
-      steps: template.steps.map((s) => ({
-        order: s.order,
-        name: s.name,
-        description: s.description,
-        channel: s.channel,
-      })),
+      phases,
     },
   });
 }

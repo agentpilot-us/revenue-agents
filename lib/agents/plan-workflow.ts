@@ -12,15 +12,11 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { generateObject, generateText } from 'ai';
-import { z } from 'zod';
+import { generateText } from 'ai';
 import { getChatModel } from '@/lib/llm/get-model';
 import { getOutboundProvider } from '@/lib/email';
-import { executePlay, type ExecutePlayResult } from '@/lib/plays/execute-play';
-import { generateOneContent } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/content/generate-content';
 import { generateSalesPageSections } from '@/lib/campaigns/generate-sales-page';
-import { SECTION_TYPES_INSTRUCTION } from '@/lib/plays/constants';
-import { salesPageSectionSchema } from '@/lib/campaigns/sales-page-schema';
 import type { PlanContext } from './plan-context';
 import { nanoid } from 'nanoid';
 import crypto from 'crypto';
@@ -123,24 +119,10 @@ function getStepDefinitions(planType: PlanType): Pick<PlanStep, 'id' | 'label'>[
   }
 }
 
-// ---------------------------------------------------------------------------
-// Map plan type to play ID for the existing execute-play system
-// ---------------------------------------------------------------------------
-
-function planTypeToPlayId(planType: PlanType): string {
-  switch (planType) {
-    case 'expand_existing': return 'new_buying_group';
-    case 'new_buying_group': return 'new_buying_group';
-    case 'event_invite': return 'event_invite';
-    case 're_engagement': return 're_engagement';
-    case 'champion_enablement': return 'champion_enablement';
-  }
-}
-
 function planTypeToPageType(planType: PlanType): string {
   switch (planType) {
-    case 'expand_existing': return 'sales_page';
-    case 'new_buying_group': return 'sales_page';
+    case 'expand_existing': return 'account_intro';
+    case 'new_buying_group': return 'account_intro';
     case 'event_invite': return 'event_invite';
     case 're_engagement': return 'account_intro';
     case 'champion_enablement': return 'account_intro';
@@ -205,40 +187,74 @@ export async function* executePlanWorkflow(
   markStep('generate_page', 'running');
   yield progress();
 
-  let playResult: ExecutePlayResult | null = null;
+  let pageHeadline = '';
+  let pageSlug = '';
+  let pagePreviewUrl = '';
   try {
-    const playId = planTypeToPlayId(planType);
-    const segmentForPlay = ctx.segment ?? {
-      id: 'default',
-      name: ctx.company.name,
-      valueProp: null,
-      contactCount: ctx.contacts.length,
-    };
-
-    playResult = await executePlay({
-      playId: playId as Parameters<typeof executePlay>[0]['playId'],
+    const pageType = planTypeToPageType(planType);
+    const pageResult = await generateSalesPageSections({
       companyId: ctx.company.id,
       userId: ctx.userId,
-      context: {
-        accountName: ctx.company.name,
-        accountDomain: ctx.company.domain ?? '',
-        accountIndustry: ctx.company.industry,
-        segment: {
-          id: segmentForPlay.id,
-          name: segmentForPlay.name,
-          valueProp: segmentForPlay.valueProp,
-          contactCount: segmentForPlay.contactCount,
-          lastActivityDays: null,
-        },
+      pageType: pageType as Parameters<typeof generateSalesPageSections>[0]['pageType'],
+      departmentId: ctx.segment?.id,
+    });
+
+    if (!pageResult.ok) throw new Error(pageResult.error);
+
+    const page = pageResult.data;
+    pageHeadline = page.headline;
+
+    const slugBase = `${ctx.company.id}-${planType}-${Date.now()}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'plan';
+    let slug = slugBase;
+    let suffix = 0;
+    let existing = await prisma.segmentCampaign.findUnique({
+      where: { userId_slug: { userId: ctx.userId, slug } },
+    });
+    while (existing) {
+      suffix += 1;
+      slug = `${slugBase}-${suffix}`;
+      existing = await prisma.segmentCampaign.findUnique({
+        where: { userId_slug: { userId: ctx.userId, slug } },
+      });
+    }
+
+    const baseUrlForSlug = process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    const url = `${baseUrlForSlug}/go/${slug}`;
+
+    const campaign = await prisma.segmentCampaign.create({
+      data: {
+        userId: ctx.userId,
+        companyId: ctx.company.id,
+        departmentId: ctx.segment?.id,
+        slug,
+        title: `${planType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} — ${ctx.segment?.name ?? ctx.company.name}`,
+        description: null,
+        type: 'landing_page',
+        url,
+        pageType,
+        headline: page.headline,
+        subheadline: page.subheadline ?? null,
+        body: null,
+        ctaLabel: page.ctaLabel ?? null,
+        ctaUrl: page.ctaUrl ?? null,
+        sections: page.sections?.length ? (page.sections as Prisma.InputJsonValue) : Prisma.JsonNull,
+        isMultiDepartment: false,
       },
     });
 
+    pageSlug = campaign.slug;
+    pagePreviewUrl = `/go/${slug}`;
     artifacts.playResult = {
-      campaignId: playResult.campaignId,
-      slug: playResult.slug,
-      previewUrl: playResult.previewUrl,
+      campaignId: campaign.id,
+      slug: pageSlug,
+      previewUrl: pagePreviewUrl,
     };
-    markStep('generate_page', 'completed', `Sales page generated: ${playResult.previewUrl}`);
+    markStep('generate_page', 'completed', `Sales page generated: ${pagePreviewUrl}`);
   } catch (err) {
     markStep('generate_page', 'failed', err instanceof Error ? err.message : 'Generation failed');
     yield progress();
@@ -259,7 +275,7 @@ export async function* executePlanWorkflow(
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-  salesPageUrl = `${baseUrl}${playResult.previewUrl}`;
+  salesPageUrl = `${baseUrl}${pagePreviewUrl}`;
   artifacts.salesPageUrl = salesPageUrl;
   markStep('publish_page', 'completed', `Live at ${salesPageUrl}`);
   yield progress();
@@ -268,8 +284,29 @@ export async function* executePlanWorkflow(
   markStep('generate_email', 'running');
   yield progress();
 
-  let emailSubject = playResult.email.subject;
-  let emailBody = playResult.email.body;
+  let emailSubject = '';
+  let emailBody = '';
+
+  try {
+    const emailResult = await generateOneContent({
+      companyId: ctx.company.id,
+      userId: ctx.userId,
+      channel: 'email',
+      contacts: ctx.primaryContact ? [{
+        firstName: ctx.primaryContact.name?.split(' ')[0],
+        lastName: ctx.primaryContact.name?.split(' ').slice(1).join(' '),
+        title: ctx.primaryContact.title,
+      }] : [],
+      divisionId: ctx.segment?.id,
+      userContext: `Write an intro email for the "${pageHeadline}" landing page at ${salesPageUrl}. Keep it under 100 words with a soft CTA.`,
+    });
+    const emailData = emailResult.parsed;
+    emailSubject = typeof emailData.subject === 'string' ? emailData.subject : `${pageHeadline}`;
+    emailBody = typeof emailData.body === 'string' ? emailData.body : emailResult.raw;
+  } catch {
+    emailSubject = pageHeadline;
+    emailBody = `I put together something for your team — take a look when you get a chance: ${salesPageUrl}`;
+  }
 
   // If product context is available, enhance the email
   if (ctx.product && ctx.productFraming) {

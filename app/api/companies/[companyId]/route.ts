@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { deleteWebset } from '@/lib/exa/websets';
 
-const PATCH_ALLOWED = ['dealObjective', 'accountType', 'primaryMotion'] as const;
+const PATCH_ALLOWED = ['dealObjective', 'accountType', 'primaryMotion', 'name', 'domain', 'industry', 'size'] as const;
 
 export async function PATCH(
   req: NextRequest,

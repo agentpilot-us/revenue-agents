@@ -37,7 +37,7 @@ export async function assembleWorkflow(input: AssembleWorkflowInput) {
   } = input;
   let { targetDivisionId, targetContactId } = input;
 
-  const [template, company, signal, existingProducts, signals] = await Promise.all([
+  const [template, company, signal, existingProducts, signals, activation] = await Promise.all([
     prisma.playbookTemplate.findUnique({
       where: { id: templateId },
       include: { steps: { orderBy: { order: 'asc' } } },
@@ -63,6 +63,10 @@ export async function assembleWorkflow(input: AssembleWorkflowInput) {
       orderBy: { publishedAt: 'desc' },
       take: 20,
       select: { type: true, publishedAt: true, relevanceScore: true },
+    }),
+    prisma.playbookActivation.findFirst({
+      where: { templateId, roadmap: { companyId, userId } },
+      select: { customConfig: true },
     }),
   ]);
 
@@ -92,6 +96,27 @@ export async function assembleWorkflow(input: AssembleWorkflowInput) {
     accountContext.event = eventContext;
   }
 
+  // Apply activation-level targeting defaults
+  const activationConfig = (activation?.customConfig ?? {}) as {
+    stepOverrides?: Array<{
+      stepOrder: number;
+      promptHint?: string;
+      targetDivisionId?: string;
+      targetPersona?: string;
+      channel?: string;
+    }>;
+    targetContactIds?: string[];
+    targetDivisionIds?: string[];
+    notes?: string;
+  };
+
+  if (!targetContactId && activationConfig.targetContactIds?.length) {
+    targetContactId = activationConfig.targetContactIds[0];
+  }
+  if (!targetDivisionId && activationConfig.targetDivisionIds?.length) {
+    targetDivisionId = activationConfig.targetDivisionIds[0];
+  }
+
   // Auto-resolve contact from signal for person-specific signal types
   if (signal && !targetContactId) {
     const resolved = await resolveContactFromSignal(signal, companyId);
@@ -102,6 +127,10 @@ export async function assembleWorkflow(input: AssembleWorkflowInput) {
       }
     }
   }
+
+  const stepOverridesMap = new Map(
+    (activationConfig.stepOverrides ?? []).map((o) => [o.stepOrder, o])
+  );
 
   const activeObjections = parseObjections(company.activeObjections);
 
@@ -163,17 +192,20 @@ export async function assembleWorkflow(input: AssembleWorkflowInput) {
       signalContext: signalContext ?? undefined,
       accountContext: accountContext as import('@prisma/client').Prisma.InputJsonValue,
       steps: {
-        create: template.steps.map((step) => ({
-          stepOrder: step.order,
-          stepType: mapStepType(step),
-          contentType: mapContentType(step),
-          channel: step.channel || undefined,
-          contactId: targetContactId || undefined,
-          divisionId: targetDivisionId || undefined,
-          promptHint: step.promptHint || undefined,
-          dueAt: computeDueAt(step.dayOffset),
-          status: 'pending',
-        })),
+        create: template.steps.map((step) => {
+          const ov = stepOverridesMap.get(step.order);
+          return {
+            stepOrder: step.order,
+            stepType: mapStepType(step),
+            contentType: mapContentType(step),
+            channel: ov?.channel || step.channel || undefined,
+            contactId: targetContactId || undefined,
+            divisionId: ov?.targetDivisionId || targetDivisionId || undefined,
+            promptHint: mergePromptHints(step.promptHint, ov?.promptHint),
+            dueAt: computeDueAt(step.dayOffset),
+            status: 'pending',
+          };
+        }),
       },
     },
     include: { steps: { orderBy: { stepOrder: 'asc' } } },
@@ -218,6 +250,16 @@ function mapContentType(step: {
   if (channel === 'ad_brief') return 'ad_brief';
 
   return undefined;
+}
+
+function mergePromptHints(
+  templateHint: string | null | undefined,
+  overrideHint: string | undefined,
+): string | undefined {
+  if (!templateHint && !overrideHint) return undefined;
+  if (!templateHint) return overrideHint;
+  if (!overrideHint) return templateHint;
+  return `${templateHint}\n\nAccount-specific: ${overrideHint}`;
 }
 
 function computeDueAt(dayOffset: number | null | undefined): Date {

@@ -29,6 +29,7 @@ export async function PATCH(
     if (body.autonomyLevel !== undefined) data.autonomyLevel = body.autonomyLevel;
     if (body.promptHint !== undefined) data.promptHint = body.promptHint;
     if (body.templateId !== undefined) data.templateId = body.templateId || null;
+    if (body.priorityWeight !== undefined) data.priorityWeight = body.priorityWeight;
 
     const updated = await prisma.roadmapActionMapping.update({
       where: { id: mappingId },

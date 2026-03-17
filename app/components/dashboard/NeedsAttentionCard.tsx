@@ -16,6 +16,23 @@ type AttentionContact = {
   pendingSteps: number;
 };
 
+type OverduePhase = {
+  phaseRunId: string;
+  playRunId: string;
+  companyId: string;
+  companyName: string;
+  phaseName: string;
+  playName: string;
+  targetDate: string;
+};
+
+type AtRiskPlay = {
+  playRunId: string;
+  companyId: string;
+  companyName: string;
+  playName: string;
+};
+
 const FLAG_CONFIG: Record<string, { label: string; color: string; bg: string; priority: number }> = {
   hot_lead: { label: 'Hot lead', color: '#22c55e', bg: 'rgba(34,197,94,0.1)', priority: 0 },
   awaiting_reply: { label: 'Awaiting reply', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', priority: 1 },
@@ -38,23 +55,34 @@ const t = {
 export default function NeedsAttentionCard() {
   const router = useRouter();
   const [contacts, setContacts] = useState<AttentionContact[]>([]);
+  const [overduePhases, setOverduePhases] = useState<OverduePhase[]>([]);
+  const [atRiskPlays, setAtRiskPlays] = useState<AtRiskPlay[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/dashboard/needs-attention')
-      .then((r) => (r.ok ? r.json() : { contacts: [] }))
-      .then((d) => setContacts(d.contacts || []))
+      .then((r) => (r.ok ? r.json() : Promise.resolve({ contacts: [], overduePhases: [], atRiskPlays: [] })))
+      .then((d: { contacts?: AttentionContact[]; overduePhases?: OverduePhase[]; atRiskPlays?: AtRiskPlay[] }) => {
+        setContacts(d.contacts || []);
+        setOverduePhases(d.overduePhases || []);
+        setAtRiskPlays(d.atRiskPlays || []);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return null;
-  if (contacts.length === 0) return null;
+  const hasContacts = contacts.length > 0;
+  const hasOverdue = overduePhases.length > 0;
+  const hasAtRisk = atRiskPlays.length > 0;
+  if (!hasContacts && !hasOverdue && !hasAtRisk) return null;
 
   const sorted = [...contacts].sort((a, b) => {
     const aPri = Math.min(...a.flags.map((f) => FLAG_CONFIG[f]?.priority ?? 99));
     const bPri = Math.min(...b.flags.map((f) => FLAG_CONFIG[f]?.priority ?? 99));
     return aPri - bPri;
   });
+
+  const totalItems = contacts.length + overduePhases.length + atRiskPlays.length;
 
   return (
     <div
@@ -71,12 +99,95 @@ export default function NeedsAttentionCard() {
             Needs Attention
           </h3>
           <p style={{ fontSize: 11, color: t.text4, margin: '2px 0 0' }}>
-            {contacts.length} contact{contacts.length !== 1 ? 's' : ''} need follow-up
+            {totalItems} item{totalItems !== 1 ? 's' : ''} need follow-up
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Overdue play phases */}
+      {hasOverdue && (
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: t.text4, margin: '0 0 6px', textTransform: 'uppercase' }}>
+            Overdue phases
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {overduePhases.slice(0, 5).map((p) => (
+              <button
+                key={p.phaseRunId}
+                type="button"
+                onClick={() =>
+                  router.push(`/dashboard/companies/${p.companyId}/plays/run/${p.playRunId}`)
+                }
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Overdue</span>
+                <span style={{ fontSize: 12, color: t.text1 }}>{p.playName}</span>
+                <span style={{ fontSize: 10, color: t.text4 }}>· {p.phaseName}</span>
+                <span style={{ fontSize: 10, color: t.text4 }}>{p.companyName}</span>
+              </button>
+            ))}
+          </div>
+          {overduePhases.length > 5 && (
+            <p style={{ fontSize: 10, color: t.text4, margin: '4px 0 0' }}>+ {overduePhases.length - 5} more</p>
+          )}
+        </div>
+      )}
+
+      {/* At-risk plays */}
+      {hasAtRisk && (
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: t.text4, margin: '0 0 6px', textTransform: 'uppercase' }}>
+            At-risk plays
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {atRiskPlays.slice(0, 5).map((r) => (
+              <button
+                key={r.playRunId}
+                type="button"
+                onClick={() =>
+                  router.push(`/dashboard/companies/${r.companyId}/plays/run/${r.playRunId}`)
+                }
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.2)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>At risk</span>
+                <span style={{ fontSize: 12, color: t.text1 }}>{r.playName}</span>
+                <span style={{ fontSize: 10, color: t.text4 }}>{r.companyName}</span>
+              </button>
+            ))}
+          </div>
+          {atRiskPlays.length > 5 && (
+            <p style={{ fontSize: 10, color: t.text4, margin: '4px 0 0' }}>+ {atRiskPlays.length - 5} more</p>
+          )}
+        </div>
+      )}
+
+      {/* Contacts */}
+      {hasContacts && (
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 600, color: t.text4, margin: '0 0 6px', textTransform: 'uppercase' }}>
+            Contacts
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {sorted.slice(0, 8).map((c) => {
           const primaryFlag = c.flags
             .map((f) => FLAG_CONFIG[f])
@@ -173,12 +284,13 @@ export default function NeedsAttentionCard() {
             </button>
           );
         })}
-      </div>
-
-      {contacts.length > 8 && (
-        <p style={{ fontSize: 10, color: t.text4, margin: '8px 0 0', textAlign: 'center' }}>
-          + {contacts.length - 8} more
-        </p>
+          </div>
+          {contacts.length > 8 && (
+            <p style={{ fontSize: 10, color: t.text4, margin: '8px 0 0', textAlign: 'center' }}>
+              + {contacts.length - 8} more
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

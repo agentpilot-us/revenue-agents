@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { generateOneContent } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/content/generate-content';
 import { CONTENT_INTENT_IDS } from '@/lib/content/content-intents';
 import {
   channelSupportsVariants,

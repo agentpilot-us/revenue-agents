@@ -1,13 +1,12 @@
 // app/dashboard/companies/[id]/plays/run/page.tsx
 //
-// Resolves playId/signalId → PlaybookTemplate, assembles a workflow via the
-// template path, and redirects to the execute page.
-// Falls back to PlayRunClient if no template can be resolved.
+// Resolves playId/signalId/templateId → PlayTemplate, creates a PlayRun, and
+// redirects to the run page. Falls back to PlayRunClient (catalog picker) if no template.
 
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { assembleWorkflow } from '@/lib/action-workflows/assemble';
+import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
 import { PlayRunClient } from './PlayRunClient';
 
 type SearchParams = {
@@ -40,13 +39,11 @@ export default async function PlayRunPage({
   });
   if (!company) redirect('/dashboard');
 
-  // Resolve a PlaybookTemplate to use
-  let templateId = sp.templateId;
+  // Resolve PlayTemplate: templateId, or playId/suggestedPlay → name/slug/triggerType, or first ACTIVE
+  let playTemplateId = sp.templateId;
 
-  if (!templateId) {
+  if (!playTemplateId) {
     const nameHint = sp.playId;
-
-    // If there's a signal, check its suggestedPlay
     let signalHint: string | null = null;
     if (sp.signalId) {
       const signal = await prisma.accountSignal.findFirst({
@@ -55,46 +52,42 @@ export default async function PlayRunPage({
       });
       signalHint = signal?.suggestedPlay ?? null;
     }
-
     const searchTerm = nameHint || signalHint;
     if (searchTerm) {
-      const template = await prisma.playbookTemplate.findFirst({
+      const template = await prisma.playTemplate.findFirst({
         where: {
           userId: session.user.id,
+          status: 'ACTIVE',
           OR: [
             { name: { contains: searchTerm, mode: 'insensitive' } },
+            { slug: searchTerm },
             { triggerType: searchTerm },
           ],
         },
         select: { id: true },
-        orderBy: { priority: 'desc' },
       });
-      templateId = template?.id;
+      playTemplateId = template?.id ?? null;
     }
-
-    // Fallback to highest-priority template
-    if (!templateId) {
-      const fallback = await prisma.playbookTemplate.findFirst({
-        where: { userId: session.user.id },
+    if (!playTemplateId) {
+      const fallback = await prisma.playTemplate.findFirst({
+        where: { userId: session.user.id, status: 'ACTIVE' },
         select: { id: true },
-        orderBy: { priority: 'desc' },
       });
-      templateId = fallback?.id;
+      playTemplateId = fallback?.id ?? null;
     }
   }
 
-  if (templateId) {
+  if (playTemplateId) {
     try {
-      const workflow = await assembleWorkflow({
+      const playRun = await createPlayRunFromTemplate({
         userId: session.user.id,
         companyId,
-        templateId,
-        accountSignalId: sp.signalId || undefined,
-        targetDivisionId: sp.segmentId || undefined,
+        playTemplateId,
+        accountSignalId: sp.signalId ?? null,
       });
-      redirect(`/dashboard/companies/${companyId}/plays/execute/${workflow.id}`);
+      redirect(`/dashboard/companies/${companyId}/plays/run/${playRun.id}`);
     } catch (e) {
-      console.error('Failed to assemble workflow from template, falling back to legacy:', e);
+      console.error('Failed to create play run from template, falling back to catalog:', e);
     }
   }
 

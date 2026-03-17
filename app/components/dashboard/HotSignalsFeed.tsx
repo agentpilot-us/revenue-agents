@@ -196,38 +196,30 @@ export default function HotSignalsFeed({
     async (signalId: string, companyId: string) => {
       setWorking(signalId);
       try {
-        const signalRes = await fetch(`/api/signals/${signalId}`);
-        const signalData = signalRes.ok ? await signalRes.json() : null;
-        const signalType = signalData?.source?.type;
-
-        const res = await fetch('/api/action-workflows/from-play', {
+        const res = await fetch(`/api/signals/${signalId}/start-play`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyId,
-            accountSignalId: signalId,
-            signalType,
-          }),
         });
         const data = await res.json();
 
-        if (res.ok || res.status === 409) {
-          const workflowId = data.workflowId ?? data.workflow?.id ?? data.existingWorkflowId;
-          if (workflowId) {
-            await fetch(`/api/signals/${signalId}/dismiss`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'acted' }),
-            }).catch(() => {});
+        if (res.ok) {
+          const playRunId = data.playRunId;
+          if (playRunId) {
             setActedSignalIds((prev) => new Set(prev).add(signalId));
             onRefresh();
-            window.location.href = `/dashboard/companies/${companyId}/plays/execute/${workflowId}`;
+            window.location.href = `/dashboard/companies/${companyId}/plays/run/${playRunId}`;
             return;
           }
         }
-        console.error('from-play failed:', res.status, data);
+        if (res.status === 404) {
+          setActedSignalIds((prev) => new Set(prev).add(signalId));
+          onRefresh();
+        }
+        if (!res.ok && res.status !== 404) {
+          console.error('start-play failed:', res.status, data);
+        }
       } catch (err) {
-        console.error('Failed to create workflow from signal:', err);
+        console.error('Failed to start play from signal:', err);
       } finally {
         setWorking(null);
       }
@@ -273,7 +265,7 @@ export default function HotSignalsFeed({
     if (!bulkTrigger || selectedAccounts.size === 0) return;
     setBulkCreating(true);
     try {
-      const tmplRes = await fetch('/api/playbooks/templates');
+      const tmplRes = await fetch('/api/play-templates');
       const tmplData = await tmplRes.json();
       const templates = tmplData.templates || tmplData || [];
 
@@ -281,15 +273,15 @@ export default function HotSignalsFeed({
       const templateMatch = templates.find(
         (tmpl: { name: string }) =>
           triggerKind === 'event'
-            ? tmpl.name.toLowerCase().includes('event invite')
-            : tmpl.name.toLowerCase().includes('feature') || tmpl.name.toLowerCase().includes('product announcement'),
+            ? tmpl.name.toLowerCase().includes('event') || tmpl.name.toLowerCase().includes('invite')
+            : tmpl.name.toLowerCase().includes('feature') || tmpl.name.toLowerCase().includes('product'),
       );
       if (!templateMatch) {
-        console.error('No matching template found for trigger kind:', triggerKind);
+        console.error('No matching play template found for trigger kind:', triggerKind);
         return;
       }
 
-      let lastWorkflowId: string | null = null;
+      let lastRunId: string | null = null;
       let lastCompanyId: string | null = null;
 
       for (const companyId of selectedAccounts) {
@@ -298,26 +290,19 @@ export default function HotSignalsFeed({
         );
         if (!acct) continue;
 
-        const res = await fetch('/api/action-workflows/from-play', {
+        const res = await fetch('/api/play-runs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             companyId,
-            playId: triggerKind === 'event' ? 'event_invite' : 'feature_release',
+            playTemplateId: templateMatch.id,
             title: `${bulkTrigger.title}: ${acct.companyName}`,
-            description: bulkTrigger.description ?? undefined,
-            eventContext: {
-              eventId: bulkTrigger.id,
-              eventTitle: bulkTrigger.title,
-              eventDate: bulkTrigger.eventDate,
-              daysUntil: bulkTrigger.daysUntil,
-            },
           }),
         });
 
         if (res.ok) {
           const data = await res.json();
-          lastWorkflowId = data.workflowId ?? data.workflow?.id;
+          lastRunId = data.playRunId ?? data.playRun?.id;
           lastCompanyId = companyId;
         }
       }
@@ -325,13 +310,13 @@ export default function HotSignalsFeed({
       setBulkTrigger(null);
       setSelectedAccounts(new Set());
 
-      if (lastWorkflowId && lastCompanyId) {
-        window.location.href = `/dashboard/companies/${lastCompanyId}/plays/execute/${lastWorkflowId}`;
+      if (lastRunId && lastCompanyId) {
+        window.location.href = `/dashboard/companies/${lastCompanyId}/plays/run/${lastRunId}`;
       } else {
         onRefresh();
       }
     } catch (err) {
-      console.error('Trigger workflow creation failed:', err);
+      console.error('Trigger play creation failed:', err);
     } finally {
       setBulkCreating(false);
     }

@@ -1,6 +1,23 @@
 import Link from 'next/link';
-import type { NextBestActionItem } from '@/lib/dashboard';
 import { dash } from '@/app/dashboard/dashboard-classes';
+
+type NextBestActionItem = {
+  companyId: string;
+  departmentId?: string | null;
+  departmentName?: string;
+  playId?: string | null;
+  label: string;
+  ctaLabel: string;
+  ctaHref: string;
+  secondaryCtaLabel?: string;
+  secondaryCtaHref?: string;
+  situationSummary?: string;
+  recommendation?: string;
+  objectiveLine?: string;
+  urgency?: string;
+  stage?: string | null;
+  divisionTargetId?: string | null;
+};
 
 type LaunchPlaysProps = { actions: NextBestActionItem[] };
 

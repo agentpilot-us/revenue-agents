@@ -82,26 +82,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Auto-spawn workflows from templateIds x divisionIds if provided
-    let workflowCount = 0;
+    // Auto-spawn PlayRuns from templateIds (PlayTemplate IDs). One run per template.
+    let playRunsCreated = 0;
     if (templateIds && templateIds.length > 0) {
-      const { assembleWorkflow } = await import('@/lib/action-workflows/assemble');
-      const divisions = divisionIds?.length ? divisionIds : [undefined];
-
-      for (const templateId of templateIds) {
-        for (const divisionId of divisions) {
-          try {
-            await assembleWorkflow({
-              userId: session.user.id,
-              companyId,
-              templateId,
-              targetDivisionId: divisionId,
-              campaignId: campaign.id,
-            });
-            workflowCount++;
-          } catch (err) {
-            console.error(`Failed to assemble workflow for template ${templateId}:`, err);
-          }
+      const { createPlayRunFromTemplate } = await import('@/lib/plays/create-play-run');
+      for (const playTemplateId of templateIds) {
+        try {
+          await createPlayRunFromTemplate({
+            userId: session.user.id,
+            companyId,
+            playTemplateId,
+          });
+          playRunsCreated++;
+        } catch (err) {
+          console.error(`Failed to create play run for template ${playTemplateId}:`, err);
         }
       }
     }
@@ -122,7 +116,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ campaign: full, workflowsCreated: workflowCount }, { status: 201 });
+    return NextResponse.json(
+      { campaign: full, playRunsCreated, workflowsCreated: 0 },
+      { status: 201 },
+    );
   } catch (error) {
     console.error('POST /api/account-campaigns error:', error);
     return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 });

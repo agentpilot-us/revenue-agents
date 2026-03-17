@@ -36,7 +36,6 @@ import {
   getContentTypePromptSnippet,
   type MotionId,
 } from '@/lib/content/content-matrix';
-import { getPlayPrompt } from '@/lib/content/play-prompts';
 
 export type ContentContextInput = {
   companyId: string;
@@ -409,8 +408,6 @@ export async function buildContentContext(
     ? `The user provided this specific context for the outreach: "${userContext.trim()}". Incorporate this intent into the content.\n`
     : '';
 
-  const playPrompt = playId ? getPlayPrompt(motion || '', playId) : '';
-  const playLine = playPrompt ? `\n${playPrompt}\n` : '';
 
   const signalLine = signalContext
     ? `\nTriggering signal: ${signalContext.title || ''} — ${
@@ -468,7 +465,7 @@ export async function buildContentContext(
   const channelInstruction = channelConfig.buildInstruction(company.name);
 
   const systemPrompt = `You are a B2B sales content writer.
-${aeIdentityLine}${senderRoleLine}${requestedToneLine}${intentLine}${matrixLine}${actionLine}${userContextLine}${toneLine}${landminesLine}${divisionIntelLine}${playLine}${signalLine}${eventLine}
+${aeIdentityLine}${senderRoleLine}${requestedToneLine}${intentLine}${matrixLine}${actionLine}${userContextLine}${toneLine}${landminesLine}${divisionIntelLine}${signalLine}${eventLine}
 The user is creating ${channelConfig.label} content for the target account "${company.name}".
 ${departmentContext}${recipientsSection}
 ${dealContextLine}${productFramingLine}${existingStackLine}

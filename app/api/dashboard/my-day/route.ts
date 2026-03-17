@@ -18,52 +18,45 @@ export async function GET() {
 
     const now = new Date();
 
-    const [workflows, companies, momentum, recentActivities, hotSignalsRaw, companyEvents, catalogProducts, followUpStepsRaw] =
-      await Promise.all([
-        prisma.actionWorkflow.findMany({
-          where: {
-            userId,
-            status: { in: ['pending', 'in_progress', 'snoozed', 'active'] },
-            OR: [
-              { snoozeUntil: null },
-              { snoozeUntil: { lte: new Date() } },
-            ],
-          },
+    const [
+      playRunsRaw,
+      companies,
+      momentum,
+      recentActivities,
+      hotSignalsRaw,
+      companyEvents,
+      catalogProducts,
+    ] = await Promise.all([
+        prisma.playRun.findMany({
+          where: { userId, status: 'ACTIVE' },
           include: {
-            company: {
-              select: { id: true, name: true, industry: true, domain: true },
-            },
-            campaign: { select: { id: true, name: true, motion: true, status: true, phase: true } },
-            template: { select: { id: true, name: true, triggerType: true } },
-            accountSignal: { select: { id: true, title: true, type: true } },
-            targetDivision: {
-              select: { id: true, customName: true, type: true },
-            },
-            targetContact: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                title: true,
-              },
-            },
-            steps: {
-              orderBy: { stepOrder: 'asc' },
-              select: {
-                id: true,
-                status: true,
-                stepType: true,
-                promptHint: true,
-                contentType: true,
-                channel: true,
-                dueAt: true,
-                contact: {
-                  select: { id: true, firstName: true, lastName: true, title: true },
+            company: { select: { id: true, name: true, industry: true } },
+            playTemplate: { select: { id: true, name: true, slug: true } },
+            phaseRuns: {
+              include: {
+                phaseTemplate: { select: { id: true, name: true, orderIndex: true } },
+                actions: {
+                  select: {
+                    id: true,
+                    title: true,
+                    status: true,
+                    actionType: true,
+                    contactName: true,
+                    contactEmail: true,
+                    contactTitle: true,
+                    generatedContent: true,
+                    generatedSubject: true,
+                    cooldownWarning: true,
+                    alternateContact: true,
+                    dueDate: true,
+                    suggestedDate: true,
+                    contentTemplate: { select: { id: true, name: true, contentType: true } },
+                  },
                 },
               },
             },
           },
-          orderBy: [{ urgencyScore: 'desc' }, { createdAt: 'desc' }],
+          orderBy: { activatedAt: 'desc' },
           take: 30,
         }),
 
@@ -85,8 +78,8 @@ export async function GET() {
                 _count: { select: { contacts: true } },
               },
             },
-            actionWorkflows: {
-              where: { status: { in: ['pending', 'in_progress'] } },
+            playRuns: {
+              where: { status: 'ACTIVE' },
               select: { id: true },
             },
           },
@@ -168,69 +161,76 @@ export async function GET() {
             updatedAt: true,
           },
         }),
-
-        // Follow-up steps: pending steps whose dueAt has arrived
-        prisma.actionWorkflowStep.findMany({
-          where: {
-            status: 'pending',
-            dueAt: { lte: now },
-            workflow: {
-              userId,
-              status: { in: ['in_progress'] },
-            },
-          },
-          orderBy: { dueAt: 'asc' },
-          take: 20,
-          select: {
-            id: true,
-            stepOrder: true,
-            stepType: true,
-            contentType: true,
-            channel: true,
-            promptHint: true,
-            dueAt: true,
-            status: true,
-            contact: {
-              select: { id: true, firstName: true, lastName: true, title: true },
-            },
-            division: {
-              select: { id: true, customName: true, type: true },
-            },
-            workflow: {
-              select: {
-                id: true,
-                title: true,
-                companyId: true,
-                company: { select: { id: true, name: true } },
-                template: { select: { id: true, name: true } },
-                accountSignal: { select: { title: true } },
-              },
-            },
-          },
-        }),
       ]);
 
-    const accountHealth = companies.map((c) => ({
-      id: c.id,
-      name: c.name,
-      domain: c.domain,
-      industry: c.industry,
-      contactCount: c._count.contacts,
-      departmentCount: c._count.departments,
-      openActions: c.actionWorkflows.length,
-      health:
-        c.actionWorkflows.length > 3
-          ? 'red'
-          : c.actionWorkflows.length > 1
-            ? 'yellow'
-            : 'green',
-      departments: c.departments.map((d) => ({
-        id: d.id,
-        type: d.type,
-        customName: d.customName,
-        contactCount: d._count.contacts,
-      })),
-    }));
+    const playRuns = playRunsRaw.map((run) => {
+      const sortedPhases = [...run.phaseRuns].sort(
+        (a, b) => a.phaseTemplate.orderIndex - b.phaseTemplate.orderIndex,
+      );
+      return { ...run, phaseRuns: sortedPhases };
+    });
+
+    const allPlayRunActions: Array<{
+      actionId: string;
+      runId: string;
+      companyId: string;
+      companyName: string;
+      playName: string;
+      phaseName: string;
+      title: string;
+      status: string;
+      actionType: string;
+      contactName: string | null;
+      contactEmail: string | null;
+      dueDate: Date | null;
+      orderKey: number;
+    }> = [];
+    playRuns.forEach((run) => {
+      let orderKey = 0;
+      run.phaseRuns.forEach((pr) => {
+        pr.actions.forEach((a) => {
+          allPlayRunActions.push({
+            actionId: a.id,
+            runId: run.id,
+            companyId: run.companyId,
+            companyName: run.company.name,
+            playName: run.playTemplate.name,
+            phaseName: pr.phaseTemplate.name,
+            title: a.title,
+            status: a.status,
+            actionType: a.actionType,
+            contactName: a.contactName,
+            contactEmail: a.contactEmail,
+            dueDate: a.dueDate,
+            orderKey: orderKey++,
+          });
+        });
+      });
+    });
+    const nextPlayRunSteps = allPlayRunActions.filter(
+      (a) => a.status === 'PENDING' || a.status === 'REVIEWED' || a.status === 'EDITED',
+    );
+
+    const accountHealth = companies.map((c) => {
+      const openCount = (c as { playRuns?: { id: string }[] }).playRuns?.length ?? 0;
+      return {
+        id: c.id,
+        name: c.name,
+        domain: c.domain,
+        industry: c.industry,
+        contactCount: c._count.contacts,
+        departmentCount: c._count.departments,
+        openActions: openCount,
+        health:
+          openCount > 3 ? 'red' : openCount > 1 ? 'yellow' : 'green',
+        departments: c.departments.map((d) => ({
+          id: d.id,
+          type: d.type,
+          customName: d.customName,
+          contactCount: d._count.contacts,
+        })),
+      };
+    });
 
     // Build hot signals with division resolution
     const hotSignals = hotSignalsRaw.map((s) => ({
@@ -339,35 +339,99 @@ export async function GET() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 8);
 
-    // Shape follow-up steps for the client
-    const followUpSteps = followUpStepsRaw.map((step) => ({
-      id: step.id,
-      stepOrder: step.stepOrder,
-      stepType: step.stepType,
-      contentType: step.contentType,
-      channel: step.channel,
-      promptHint: step.promptHint,
-      dueAt: step.dueAt,
-      status: step.status,
-      contact: step.contact,
-      division: step.division,
-      workflowId: step.workflow.id,
-      workflowTitle: step.workflow.title,
-      companyId: step.workflow.companyId,
-      companyName: step.workflow.company?.name ?? 'Unknown',
-      templateName: step.workflow.template?.name ?? null,
-      signalTitle: step.workflow.accountSignal?.title ?? null,
+    // Follow-up steps from play runs only (legacy workflow steps removed)
+    const followUpStepsFromPlayRuns = nextPlayRunSteps.slice(0, 20).map((a, i) => ({
+      id: a.actionId,
+      stepOrder: i + 1,
+      stepType: a.actionType,
+      contentType: a.actionType === 'SEND_EMAIL' ? 'email' : null,
+      channel: a.actionType === 'SEND_EMAIL' ? 'email' : null,
+      promptHint: a.title,
+      dueAt: a.dueDate,
+      status: a.status,
+      contact: a.contactName
+        ? {
+            id: '',
+            firstName: a.contactName.split(' ')[0] ?? null,
+            lastName: a.contactName.split(' ').slice(1).join(' ') || null,
+            title: null,
+          }
+        : null,
+      division: null,
+      workflowId: '',
+      workflowTitle: a.playName,
+      companyId: a.companyId,
+      companyName: a.companyName,
+      templateName: a.playName,
+      signalTitle: null,
+      source: 'play_run' as const,
+      runId: a.runId,
+    }));
+
+    // Sequence follow-ups: enrollments with next touch due in next 24h
+    const twentyFourHoursFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const sequenceEnrollments = await prisma.contactSequenceEnrollment.findMany({
+      where: {
+        userId,
+        status: 'active',
+        nextTouchDueAt: { lte: twentyFourHoursFromNow, not: null },
+      },
+      include: {
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            title: true,
+            companyId: true,
+            company: { select: { id: true, name: true } },
+          },
+        },
+        sequence: { select: { id: true, name: true } },
+      },
+      orderBy: { nextTouchDueAt: 'asc' },
+      take: 20,
+    });
+    const sequenceFollowUps = sequenceEnrollments.map((e, i) => ({
+      id: e.id,
+      stepOrder: i + 1,
+      stepType: 'sequence',
+      contentType: 'email' as string | null,
+      channel: 'email' as string | null,
+      promptHint: `Next touch: ${e.sequence.name}`,
+      dueAt: e.nextTouchDueAt?.toISOString() ?? null,
+      status: 'PENDING',
+      contact: e.contact
+        ? {
+            id: e.contact.id,
+            firstName: e.contact.firstName,
+            lastName: e.contact.lastName,
+            title: e.contact.title,
+          }
+        : null,
+      division: null,
+      workflowId: e.sequenceId,
+      workflowTitle: e.sequence.name,
+      companyId: e.contact.companyId,
+      companyName: e.contact.company.name,
+      templateName: e.sequence.name,
+      signalTitle: null,
+      source: 'sequence' as const,
+      runId: e.id,
     }));
 
     return NextResponse.json({
-      workflows,
+      workflows: [],
+      playRuns,
       accountHealth,
       momentum,
       recentActivities,
       hotSignals,
       companyTriggers,
       recommendedPlays,
-      followUpSteps,
+      followUpSteps: [],
+      followUpStepsFromPlayRuns,
+      sequenceFollowUps,
     });
   } catch (error) {
     console.error('GET /api/dashboard/my-day error:', error);

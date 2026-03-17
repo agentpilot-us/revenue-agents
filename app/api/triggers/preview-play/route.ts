@@ -5,8 +5,8 @@ import { prisma } from '@/lib/db';
 /**
  * GET /api/triggers/preview-play?triggerType=event
  *
- * Resolves the matched PlaybookTemplate for a company trigger type (event/product).
- * Returns template name, priority, timing, and step summaries for UI preview.
+ * Resolves the matched PlayTemplate for a company trigger type (event/product).
+ * Returns template name and phases; would create PlayRun.
  */
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -14,34 +14,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const triggerType = req.nextUrl.searchParams.get('triggerType') ?? 'event';
+  const triggerTypeParam = req.nextUrl.searchParams.get('triggerType') ?? 'event';
 
-  const template = await prisma.playbookTemplate.findFirst({
+  const template = await prisma.playTemplate.findFirst({
     where: {
       userId: session.user.id,
+      status: 'ACTIVE',
       OR: [
-        { triggerType },
-        { name: { contains: triggerType === 'event' ? 'Event Invite' : 'Product', mode: 'insensitive' } },
+        { triggerType: 'SIGNAL' },
+        { name: { contains: triggerTypeParam === 'event' ? 'Event Invite' : 'Product', mode: 'insensitive' } },
+        { name: { contains: 'Event', mode: 'insensitive' } },
       ],
     },
-    orderBy: { priority: 'desc' },
     select: {
       id: true,
       name: true,
       description: true,
       triggerType: true,
-      priority: true,
-      timingConfig: true,
-      expectedOutcome: true,
-      steps: {
-        orderBy: { order: 'asc' },
-        select: {
-          id: true,
-          order: true,
-          name: true,
-          description: true,
-          channel: true,
-        },
+      phases: {
+        orderBy: { orderIndex: 'asc' },
+        select: { name: true, orderIndex: true },
       },
     },
   });
@@ -50,30 +42,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ matched: false });
   }
 
-  const timingConfig = template.timingConfig as Record<string, unknown> | null;
-  const validWindowDays = timingConfig?.validWindowDays as number | undefined;
-  let timingWindow: string | undefined;
-  if (validWindowDays) {
-    const weeks = Math.ceil(validWindowDays / 7);
-    timingWindow = weeks <= 1 ? 'Week 1' : `Week 1\u2013${weeks}`;
-  }
+  const phases = template.phases.map((p) => ({ order: p.orderIndex, name: p.name }));
 
   return NextResponse.json({
     matched: true,
+    wouldCreate: 'PlayRun',
     template: {
       id: template.id,
       name: template.name,
       description: template.description,
       triggerType: template.triggerType,
-      priority: template.priority,
-      timingWindow,
-      expectedOutcome: template.expectedOutcome,
-      steps: template.steps.map((s) => ({
-        order: s.order,
-        name: s.name,
-        description: s.description,
-        channel: s.channel,
-      })),
+      phases,
     },
   });
 }

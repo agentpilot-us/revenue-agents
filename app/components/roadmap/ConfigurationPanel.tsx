@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { SalesMapEditor } from '@/app/dashboard/roadmap/SalesMapEditor';
 import { SignalConfigPanel } from '@/app/components/roadmap/SignalConfigPanel';
 import { OperationalLimitsEditor } from '@/app/components/roadmap/OperationalLimitsEditor';
+import { PlayRulesPanel } from '@/app/components/roadmap/PlayRulesPanel';
 
 const t = {
   surface: 'rgba(15,23,42,0.6)',
@@ -77,6 +78,7 @@ function AccordionSection({ title, count, defaultOpen, children }: { title: stri
 }
 
 export default function ConfigurationPanel({
+  roadmapId,
   roadmapType,
   objective,
   contentStrategy,
@@ -110,6 +112,12 @@ export default function ConfigurationPanel({
       <AccordionSection title="Signal Configuration">
         <SignalConfigPanel companyId={companyId} />
       </AccordionSection>
+
+      {roadmapId && (
+        <AccordionSection title="Play Rules">
+          <PlayRulesPanel roadmapId={roadmapId} />
+        </AccordionSection>
+      )}
 
       <AccordionSection title="Conditions &amp; Modifiers" count={conditions.length}>
         {conditions.length === 0 ? (

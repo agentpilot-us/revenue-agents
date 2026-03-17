@@ -1,10 +1,9 @@
 'use client';
 
 /**
- * @deprecated Use the new execute page at /plays/execute/[workflowId] instead.
- * This component is kept as a fallback when workflow assembly from the activity
- * catalog fails. New plays should flow through assembleWorkflowFromPlay →
- * PlayExecuteClient.
+ * Fallback when no template can be resolved from URL params (e.g. playId/signalId).
+ * Renders catalog picker and run-content flow. Canonical run experience is
+ * /dashboard/companies/[id]/plays/run/[runId] after creating a run via POST /api/play-runs or the run page server redirect.
  */
 
 import { useState, useEffect, useCallback } from 'react';

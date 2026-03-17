@@ -3,31 +3,19 @@
 import { useState, useMemo, useEffect } from 'react';
 import PlayDetailDrawer from './PlayDetailDrawer';
 
-type TemplateStep = {
-  order: number;
-  name: string | null;
-  label: string | null;
-  description: string | null;
-  channel: string | null;
-  phase: string | null;
-  targetPersona: string | null;
-  dayOffset: number | null;
-};
-
-type PlaybookTemplate = {
+/** New play system (PlayTemplate) catalog item from GET /api/play-templates */
+export type PlayTemplateCatalogItem = {
   id: string;
   name: string;
   description: string | null;
-  triggerType: string | null;
-  stepCount: number;
-  targetDepartmentTypes: string[] | null;
-  targetPersonas: string[] | null;
-  expectedOutcome: string | null;
-  priority: number;
-  steps?: TemplateStep[];
+  slug: string;
+  category: string;
+  triggerType: string;
+  scope?: string;
+  phaseCount: number;
 };
 
-type TriggerCategory = 'all' | 'signal' | 'event' | 'expansion' | 'renewal' | 'new_logo' | 'manual' | 'other';
+type TriggerCategory = 'all' | 'signal' | 'event' | 'expansion' | 'renewal' | 'new_logo' | 'manual' | 'competitive' | 'other';
 
 const CATEGORIES: { id: TriggerCategory; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -36,18 +24,20 @@ const CATEGORIES: { id: TriggerCategory; label: string }[] = [
   { id: 'expansion', label: 'Expansion' },
   { id: 'renewal', label: 'Renewal' },
   { id: 'new_logo', label: 'New Logo' },
+  { id: 'competitive', label: 'Competitive' },
   { id: 'manual', label: 'Manual' },
   { id: 'other', label: 'Other' },
 ];
 
 const CATEGORY_COLORS: Record<string, { color: string; bg: string; border: string }> = {
-  signal:    { color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.2)' },
-  event:     { color: '#818cf8', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)' },
-  expansion: { color: '#4ade80', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' },
-  renewal:   { color: '#fbbf24', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
-  new_logo:  { color: '#60a5fa', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
-  manual:    { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)' },
-  other:     { color: '#f472b6', bg: 'rgba(236,72,153,0.08)', border: 'rgba(236,72,153,0.2)' },
+  signal:      { color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.2)' },
+  event:       { color: '#818cf8', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)' },
+  expansion:   { color: '#4ade80', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' },
+  renewal:     { color: '#fbbf24', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
+  new_logo:    { color: '#60a5fa', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
+  competitive: { color: '#ec4899', bg: 'rgba(236,72,153,0.08)', border: 'rgba(236,72,153,0.2)' },
+  manual:      { color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)' },
+  other:       { color: '#f472b6', bg: 'rgba(236,72,153,0.08)', border: 'rgba(236,72,153,0.2)' },
 };
 
 const CHANNEL_ICONS: Record<string, string> = {
@@ -74,9 +64,10 @@ const t = {
 
 function resolveCategory(triggerType: string | null): TriggerCategory {
   if (!triggerType) return 'manual';
-  const known: TriggerCategory[] = ['signal', 'event', 'expansion', 'renewal', 'new_logo', 'manual'];
+  const known: TriggerCategory[] = ['signal', 'event', 'expansion', 'renewal', 'new_logo', 'manual', 'competitive'];
   if (known.includes(triggerType as TriggerCategory)) return triggerType as TriggerCategory;
-  if (['new_exec_intro', 'feature_release', 're_engagement', 'champion_development', 'competitive_displacement'].includes(triggerType)) return 'signal';
+  if (['competitive_displacement', 'competitor_detected'].includes(triggerType)) return 'competitive';
+  if (['new_exec_intro', 'feature_release', 're_engagement', 'champion_development'].includes(triggerType)) return 'signal';
   return 'other';
 }
 
@@ -87,14 +78,14 @@ type Props = {
 };
 
 export default function PlayCatalog({ companyId, companyName, compact = false }: Props) {
-  const [templates, setTemplates] = useState<PlaybookTemplate[]>([]);
+  const [templates, setTemplates] = useState<PlayTemplateCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<TriggerCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<PlaybookTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<PlayTemplateCatalogItem | null>(null);
 
   useEffect(() => {
-    fetch('/api/playbooks/templates')
+    fetch('/api/play-templates')
       .then((r) => r.json())
       .then((data) => setTemplates(data.templates ?? []))
       .catch(() => {})
@@ -112,7 +103,8 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
         (t) =>
           t.name.toLowerCase().includes(q) ||
           (t.description ?? '').toLowerCase().includes(q) ||
-          (t.triggerType ?? '').toLowerCase().includes(q),
+          (t.triggerType ?? '').toLowerCase().includes(q) ||
+          (t.category ?? '').toLowerCase().includes(q),
       );
     }
     return list;
@@ -236,7 +228,7 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
                   {tpl.triggerType?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) ?? 'Manual'}
                 </span>
                 <span style={{ fontSize: 10, color: t.text4 }}>
-                  {tpl.stepCount} steps
+                  {tpl.phaseCount} phase{tpl.phaseCount !== 1 ? 's' : ''}
                 </span>
               </div>
 
@@ -259,25 +251,6 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
                 {tpl.description ?? ''}
               </p>
 
-              {tpl.targetPersonas && (tpl.targetPersonas as string[]).length > 0 && (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 'auto' }}>
-                  {(tpl.targetPersonas as string[]).map((p) => (
-                    <span
-                      key={p}
-                      style={{
-                        fontSize: 10,
-                        padding: '2px 5px',
-                        borderRadius: 3,
-                        background: 'rgba(255,255,255,0.04)',
-                        color: t.text4,
-                        border: `1px solid ${t.border}`,
-                      }}
-                    >
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              )}
             </button>
           );
         })}

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { generateOneContent } from '@/lib/plays/generate-content';
+import { generateOneContent } from '@/lib/content/generate-content';
 import { buildContentContext } from '@/lib/content/build-content-context';
 import { buildAssetPackage } from '@/lib/content/build-asset-package';
 import {

@@ -76,16 +76,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ divisions: [] });
     }
 
-    const [activeWorkflows, activities, allActivities] = await Promise.all([
-      prisma.actionWorkflow.groupBy({
-        by: ['targetDivisionId'],
+    const [activeRunCount, activities, allActivities] = await Promise.all([
+      prisma.playRun.count({
         where: {
           userId: session.user.id,
           companyId,
-          targetDivisionId: { in: deptIds },
-          status: { in: ['pending', 'in_progress'] },
+          status: 'ACTIVE',
         },
-        _count: { id: true },
       }),
 
       prisma.activity.findMany({
@@ -113,9 +110,11 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const activeByDept = new Map(
-      activeWorkflows.map((w) => [w.targetDivisionId, w._count.id]),
-    );
+    // PlayRun is company-scoped; no per-division breakdown. Use total active runs for display.
+    const activeByDept = new Map<string, number>();
+    if (activeRunCount > 0 && deptIds.length > 0) {
+      activeByDept.set(deptIds[0], activeRunCount);
+    }
 
     const allActivityByDept = new Map(
       allActivities.map((a) => [a.companyDepartmentId, a._count.id]),
