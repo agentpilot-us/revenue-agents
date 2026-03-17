@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { JSON_NOT_NULL } from '@/lib/prisma-json';
 import { completePhaseAndAdvance } from '@/lib/plays/execute-action';
 
 function getNested(obj: Record<string, unknown> | null | undefined, path: string): unknown {
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     const phaseRuns = await prisma.playPhaseRun.findMany({
       where: {
         status: 'ACTIVE',
-        phaseTemplate: { gateType: 'CRM_FIELD', gateConfig: { not: null } },
+        phaseTemplate: { gateType: 'CRM_FIELD', gateConfig: JSON_NOT_NULL },
         playRun: { status: 'ACTIVE' },
       },
       include: {

@@ -6,8 +6,11 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
+import type { PlayTriggerType } from '@prisma/client';
 import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
 import { PlayRunClient } from './PlayRunClient';
+
+const PLAY_TRIGGER_VALUES: PlayTriggerType[] = ['TIMELINE', 'MANUAL', 'SIGNAL'];
 
 type SearchParams = {
   playId?: string;
@@ -54,6 +57,10 @@ export default async function PlayRunPage({
     }
     const searchTerm = nameHint || signalHint;
     if (searchTerm) {
+      const triggerMatch =
+        PLAY_TRIGGER_VALUES.includes(searchTerm.toUpperCase() as PlayTriggerType)
+          ? ({ triggerType: searchTerm.toUpperCase() as PlayTriggerType } as const)
+          : undefined;
       const template = await prisma.playTemplate.findFirst({
         where: {
           userId: session.user.id,
@@ -61,19 +68,19 @@ export default async function PlayRunPage({
           OR: [
             { name: { contains: searchTerm, mode: 'insensitive' } },
             { slug: searchTerm },
-            { triggerType: searchTerm },
+            ...(triggerMatch ? [triggerMatch] : []),
           ],
         },
         select: { id: true },
       });
-      playTemplateId = template?.id ?? null;
+      playTemplateId = template?.id ?? undefined;
     }
     if (!playTemplateId) {
       const fallback = await prisma.playTemplate.findFirst({
         where: { userId: session.user.id, status: 'ACTIVE' },
         select: { id: true },
       });
-      playTemplateId = fallback?.id ?? null;
+      playTemplateId = fallback?.id ?? undefined;
     }
   }
 

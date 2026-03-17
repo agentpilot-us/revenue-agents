@@ -46,7 +46,7 @@ function contentTypeToActionType(
 }
 
 export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
-  const { userId, companyId, playTemplateId, anchorDate, targetContact } = input;
+  const { userId, companyId, playTemplateId, anchorDate, targetContact, accountSignalId } = input;
 
   const template = await prisma.playTemplate.findFirst({
     where: { id: playTemplateId, userId },
@@ -72,6 +72,7 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
       playTemplateId: template.id,
       companyId,
       userId,
+      accountSignalId: accountSignalId ?? undefined,
       status: 'ACTIVE',
       anchorDate: anchorDate ?? undefined,
       currentPhaseIdx: 0,

@@ -1,35 +1,16 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { MyCompanyEditor } from '@/app/dashboard/my-company/MyCompanyEditor';
-import { MyCompanyDocumentsEditor } from '@/app/dashboard/my-company/MyCompanyDocumentsEditor';
-import type { ProfileData, DocRow, HealthData } from '@/app/dashboard/my-company/MyCompanyClient';
+import type { ProfileData, HealthData } from '@/app/dashboard/my-company/MyCompanyClient';
 
 type Props = {
   profile: ProfileData;
-  documents: DocRow[];
   health: HealthData;
 };
 
-export function ProfileTab({ profile, documents: initialDocs, health }: Props) {
-  const [documents, setDocuments] = useState(initialDocs);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const handleDeleteDoc = useCallback(async (id: string) => {
-    if (!confirm('Delete this document?')) return;
-    setDeletingId(id);
-    try {
-      const res = await fetch(`/api/my-company/documents/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setDocuments((prev) => prev.filter((d) => d.id !== id));
-      }
-    } finally {
-      setDeletingId(null);
-    }
-  }, []);
+export function ProfileTab({ profile, health }: Props) {
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)]">
-      <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
         <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground mb-3">
             Company profile
@@ -94,57 +75,6 @@ export function ProfileTab({ profile, documents: initialDocs, health }: Props) {
             ))}
           </dl>
         </section>
-      </div>
-
-      <div className="space-y-6">
-        <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground mb-3">
-            Internal documents
-          </h2>
-          {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No internal documents added yet. Register decks, briefs,
-              and playbooks that should inform content and triggers.
-            </p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {documents.map((d) => (
-                <li key={d.id} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">{d.title}</p>
-                    {d.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {d.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {d.url && (
-                      <a
-                        href={d.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Open
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteDoc(d.id)}
-                      disabled={deletingId === d.id}
-                      className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
-                    >
-                      {deletingId === d.id ? '...' : 'Delete'}
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <MyCompanyDocumentsEditor />
-        </section>
-      </div>
     </div>
   );
 }

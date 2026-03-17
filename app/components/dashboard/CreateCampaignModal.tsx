@@ -389,7 +389,7 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
                   cursor: creating ? 'not-allowed' : 'pointer',
                 }}
               >
-                {creating ? 'Creating...' : `Launch Campaign (${totalWorkflows} threads)`}
+                {creating ? 'Creating...' : `Launch Campaign (${totalRuns} run${totalRuns !== 1 ? 's' : ''})`}
               </button>
             </div>
           </div>

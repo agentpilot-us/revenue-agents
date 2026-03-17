@@ -78,11 +78,11 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
     }),
   ]);
 
-  const [arrResult] = await prisma.companyProduct.aggregate({
+  const arrResult = await prisma.companyProduct.aggregate({
     where: { companyId: signal.companyId },
     _sum: { arr: true },
   });
-  const totalArr = Number(arrResult?._sum?.arr ?? 0);
+  const totalArr = Number(arrResult._sum?.arr ?? 0);
   const conditionsContext: ConditionsContext = {
     accountTier: companyContext?.accountType ?? null,
     totalArr,

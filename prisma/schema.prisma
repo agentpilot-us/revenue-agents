@@ -257,11 +257,13 @@ model AccountSignal {
   relevanceScore Int      // 1-10
   suggestedPlay  String?  // new_buying_group | event_invite | feature_release | re_engagement | champion_enablement | null
   status         String   @default("new") // new | seen | acted
+  metadata       Json?    // e.g. { meetingActivityId }, { eventAttendanceId }, { visitId }, { messageId }
 
   createdAt DateTime @default(now())
 
   roadmapPlans    RoadmapPlan[]
   actionWorkflows ActionWorkflow[]
+  playRuns        PlayRun[]
 
   @@index([companyId, publishedAt])
   @@index([userId, status, relevanceScore])
@@ -2395,6 +2397,8 @@ model PlayRun {
   companyId       String
   company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userId          String
+  accountSignalId String?
+  accountSignal   AccountSignal?      @relation(fields: [accountSignalId], references: [id], onDelete: SetNull)
 
   status          PlayRunStatus        @default(ACTIVE)
 
@@ -2415,6 +2419,7 @@ model PlayRun {
   @@index([companyId, status])
   @@index([userId, status])
   @@index([playTemplateId])
+  @@index([accountSignalId])
 }
 
 model PlayPhaseRun {
