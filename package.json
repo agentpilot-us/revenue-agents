@@ -11,7 +11,10 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "cleanup:demo": "dotenv -e .env.local -- tsx prisma/cleanup-demo.ts"
+    "cleanup:demo": "dotenv -e .env.local -- tsx prisma/cleanup-demo.ts",
+    "cleanup:official-demo": "dotenv -e .env.local -- tsx prisma/cleanup-official-demo.ts",
+    "official-demo:set-live": "dotenv -e .env.local -- tsx prisma/set-official-demo-live.ts",
+    "seed:nvidia-gm": "dotenv -e .env.local -- tsx prisma/seed-nvidia-gm-demo.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.59",

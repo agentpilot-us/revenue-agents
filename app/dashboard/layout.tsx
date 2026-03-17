@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { DashboardNav } from '@/app/dashboard/DashboardNav';
 import { dash } from '@/app/dashboard/dashboard-classes';
+import { isDemoUser } from '@/lib/demo/context';
 
 export default async function DashboardLayout({
   children,
@@ -25,7 +26,9 @@ export default async function DashboardLayout({
     redirect('/suspended');
   }
 
-  const allowDemoSetup = process.env.ALLOW_DEMO_SETUP === 'true';
+  // Hide Demo setup and Waitlist for official demo accounts (e.g. demo-techinfra@agentpilot.us)
+  const allowDemoSetup =
+    process.env.ALLOW_DEMO_SETUP === 'true' && !isDemoUser(session.user);
 
   return (
     <div className={dash.page}>

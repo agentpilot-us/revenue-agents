@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { isDemoUser } from '@/lib/demo/context';
 import { enrichCompanyWithExa } from '@/lib/exa/enrich-company';
 
 export async function GET() {
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
         domain: domain?.trim() || null,
         industry: industry?.trim() || null,
         userId: session.user.id,
+        // Official demo users get live demos (real content, API/LLM); do not lock as frozen demo
+        ...(isDemoUser(session.user) && { isDemoAccount: false }),
       },
     });
 
