@@ -109,7 +109,7 @@ export function MyCompanyClient({
               <ContentLibraryTab />
             )}
             {activeTab === 'Playbooks' && (
-              <PlaybooksTab />
+              <PlaybooksTab catalogProducts={catalogProducts} />
             )}
             {activeTab === 'Messaging' && (
               <MessagingTab />

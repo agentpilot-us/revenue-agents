@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import PlaybookEditor from '@/app/components/playbooks/PlaybookEditor';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
+import { buttonVariants } from '@/components/ui/button';
 
 type IndustryPlaybookRow = {
   id: string;
@@ -195,7 +202,9 @@ function priorityBadge(priority: number) {
   return { label: 'Low', cls: 'bg-muted text-muted-foreground border-border' };
 }
 
-export function PlaybooksTab() {
+type CatalogProductOption = { id: string; name: string; slug: string };
+
+export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: CatalogProductOption[] } = {}) {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -277,6 +286,7 @@ export function PlaybooksTab() {
     return (
       <IndustryPlaybookEditor
         playbook={ip}
+        catalogProducts={catalogProducts}
         onSaved={() => { setEditingIpId(null); fetchIndustryPlaybooks(); }}
         onCancel={() => setEditingIpId(null)}
       />
@@ -286,6 +296,7 @@ export function PlaybooksTab() {
   if (creatingIp) {
     return (
       <IndustryPlaybookEditor
+        catalogProducts={catalogProducts}
         onSaved={() => { setCreatingIp(false); fetchIndustryPlaybooks(); }}
         onCancel={() => setCreatingIp(false)}
       />
@@ -544,10 +555,12 @@ export function PlaybooksTab() {
 
 function IndustryPlaybookEditor({
   playbook,
+  catalogProducts = [],
   onSaved,
   onCancel,
 }: {
   playbook?: IndustryPlaybookRow;
+  catalogProducts?: CatalogProductOption[];
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -556,9 +569,14 @@ function IndustryPlaybookEditor({
   const [overview, setOverview] = useState(playbook?.overview ?? '');
   const [buyingCommittee, setBuyingCommittee] = useState(playbook?.buyingCommittee ?? '');
   const [landmines, setLandmines] = useState((playbook?.landmines ?? []).join('\n'));
-  const [deptMapping, setDeptMapping] = useState(
-    playbook?.departmentProductMapping ?? [],
-  );
+  const [deptMapping, setDeptMapping] = useState(() => {
+    const raw = playbook?.departmentProductMapping ?? [];
+    return raw.map((row: { department: string; productIds?: string[]; typicalDealSize?: string }) => ({
+      department: row.department,
+      productIds: Array.isArray(row.productIds) ? row.productIds : [],
+      typicalDealSize: row.typicalDealSize ?? '',
+    }));
+  });
   const [valuePropsByDept, setValuePropsByDept] = useState(() => {
     const vp = playbook?.valuePropsByDepartment ?? {};
     return Object.entries(vp)
@@ -668,10 +686,10 @@ function IndustryPlaybookEditor({
         />
       </label>
 
-      {/* Department-Product Mapping */}
+      {/* Department Product & Opportunity Mapping */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Department &rarr; Product Mapping</span>
+          <span className="text-xs font-medium text-muted-foreground">Department Product &amp; Opportunity Mapping</span>
           <button
             type="button"
             onClick={() => setDeptMapping((prev) => [...prev, { department: '', productIds: [], typicalDealSize: '' }])}
@@ -681,9 +699,9 @@ function IndustryPlaybookEditor({
           </button>
         </div>
         {deptMapping.map((row, i) => (
-          <div key={i} className="flex items-start gap-2 rounded border border-border/40 bg-background/60 p-2.5">
+          <div key={i} className="flex flex-wrap items-start gap-2 rounded border border-border/40 bg-background/60 p-2.5">
             <input
-              className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs"
+              className="min-w-[140px] flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs"
               value={row.department}
               onChange={(e) => {
                 const next = [...deptMapping];
@@ -692,8 +710,56 @@ function IndustryPlaybookEditor({
               }}
               placeholder="Department name"
             />
+            <div className="flex min-w-[160px] flex-1 flex-wrap items-center gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                  type="button"
+                >
+                  <span className="text-xs">Products {row.productIds.length > 0 ? `(${row.productIds.length})` : ''}</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto" onCloseAutoFocus={(e) => e.preventDefault()}>
+                  {catalogProducts.length === 0 ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No catalog products. Add products in My Company → Products.</div>
+                  ) : (
+                    catalogProducts.map((p) => (
+                      <DropdownMenuCheckboxItem
+                        key={p.id}
+                        checked={row.productIds.includes(p.id)}
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          const next = [...deptMapping];
+                          const ids = next[i].productIds.includes(p.id)
+                            ? next[i].productIds.filter((id) => id !== p.id)
+                            : [...next[i].productIds, p.id];
+                          next[i] = { ...next[i], productIds: ids };
+                          setDeptMapping(next);
+                        }}
+                      >
+                        {p.name}
+                      </DropdownMenuCheckboxItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {row.productIds.length > 0 && (
+                <span className="flex flex-wrap gap-1">
+                  {row.productIds.map((id) => {
+                    const p = catalogProducts.find((c) => c.id === id);
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                      >
+                        {p?.name ?? id}
+                      </span>
+                    );
+                  })}
+                </span>
+              )}
+            </div>
             <input
-              className="w-32 rounded-md border border-border bg-background px-2 py-1 text-xs"
+              className="w-28 rounded-md border border-border bg-background px-2 py-1 text-xs"
               value={row.typicalDealSize ?? ''}
               onChange={(e) => {
                 const next = [...deptMapping];

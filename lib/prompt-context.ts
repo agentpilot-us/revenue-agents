@@ -137,7 +137,6 @@ export async function getIndustryPlaybookBlock(
 
   const mapping = playbook.departmentProductMapping as DeptProductMappingRow[] | null;
   if (Array.isArray(mapping) && mapping.length > 0) {
-    lines.push('Standard departments & product mapping:');
     const productIds = new Set<string>();
     mapping.forEach((row) => row.productIds?.forEach((id) => productIds.add(id)));
     const productNames: Record<string, string> = {};
@@ -148,12 +147,20 @@ export async function getIndustryPlaybookBlock(
       });
       products.forEach((p) => (productNames[p.id] = p.name));
     }
+    lines.push('Department → product mapping (approved products per buying group; use only these for recommendations):');
     mapping.forEach((row) => {
       const productNamesStr = (row.productIds ?? [])
         .map((id) => productNames[id] ?? id)
         .join(', ');
-      const dealSize = row.typicalDealSize ? ` — ${row.typicalDealSize}` : '';
-      lines.push(`- ${row.department}: ${productNamesStr || '—'}${dealSize}`);
+      const opportunity = row.typicalDealSize?.trim()
+        ? ` Estimated opportunity: ${row.typicalDealSize.trim()}.`
+        : '';
+      if (productNamesStr) {
+        lines.push(`- For the ${row.department} buying group, the approved products are: ${productNamesStr}.${opportunity}`);
+      } else {
+        const dealSize = row.typicalDealSize ? ` — ${row.typicalDealSize}` : '';
+        lines.push(`- ${row.department}: (no products mapped)${dealSize}`);
+      }
     });
   }
 
