@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         industry: industry?.trim() || null,
         userId: session.user.id,
         // Official demo users get live demos (real content, API/LLM); do not lock as frozen demo
-        ...(isDemoUser(session.user) && { isDemoAccount: false }),
+        ...(isDemoUser(session.user as { email?: string | null }) && { isDemoAccount: false }),
       },
     });
 
