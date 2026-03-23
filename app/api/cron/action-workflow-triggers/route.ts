@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
-import { createEngagementWorkflow } from '@/lib/action-workflows/engagement-trigger';
+import { createEngagementWorkflow } from '@/lib/plays/engagement-trigger';
 
 /**
  * Cron: runs every 15-60 minutes.

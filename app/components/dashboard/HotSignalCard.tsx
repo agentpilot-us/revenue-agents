@@ -180,7 +180,7 @@ export default function HotSignalCard(props: Props) {
         </div>
 
         {/* Matched template preview — suggested actions strip */}
-        {signal.matchedTemplate && signal.matchedTemplate.steps.length > 0 && (
+        {signal.matchedTemplate && (signal.matchedTemplate.steps?.length ?? 0) > 0 && (
           <SuggestedActionsStrip template={signal.matchedTemplate} />
         )}
 
@@ -302,7 +302,7 @@ export default function HotSignalCard(props: Props) {
       )}
 
       {/* Matched template preview — suggested actions strip */}
-      {trigger.matchedTemplate && trigger.matchedTemplate.steps.length > 0 && (
+      {trigger.matchedTemplate && (trigger.matchedTemplate.steps?.length ?? 0) > 0 && (
         <SuggestedActionsStrip template={trigger.matchedTemplate} />
       )}
 

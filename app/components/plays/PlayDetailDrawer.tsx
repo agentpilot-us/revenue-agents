@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
 import type { PlayTemplateCatalogItem } from './PlayCatalog';
+import { CONTENT_GENERATION_TYPE_KEYS } from '@/lib/plays/content-generation-types';
 
 type TemplateStep = {
   order: number;
@@ -13,6 +15,10 @@ type TemplateStep = {
   phase?: string | null;
   targetPersona?: string | null;
   dayOffset?: number | null;
+  contentTemplateId?: string | null;
+  contentGenerationType?: string | null;
+  requiresContact?: boolean;
+  isAutomatable?: boolean;
 };
 
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -66,15 +72,17 @@ type Props = {
   onClose: () => void;
   companyId?: string;
   companyName?: string;
+  /** Pre-select division when opening from deep link (e.g. /dashboard/plays?companyId=...&divisionId=...) */
+  initialDivisionId?: string;
 };
 
-export default function PlayDetailDrawer({ template, onClose, companyId, companyName }: Props) {
+export default function PlayDetailDrawer({ template, onClose, companyId, companyName, initialDivisionId }: Props) {
   const router = useRouter();
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
   const [divisions, setDivisions] = useState<DivisionOption[]>([]);
   const [contacts, setContacts] = useState<ContactOption[]>([]);
-  const [selectedDivisionId, setSelectedDivisionId] = useState('');
+  const [selectedDivisionId, setSelectedDivisionId] = useState(initialDivisionId || '');
   const [selectedContactId, setSelectedContactId] = useState('');
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [loadingDivisions, setLoadingDivisions] = useState(false);
@@ -82,8 +90,33 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<TemplateStep[]>([]);
   const [loadingSteps, setLoadingSteps] = useState(true);
+  const [patchingContentId, setPatchingContentId] = useState<string | null>(null);
 
   const needsCompanyPicker = !companyId;
+
+  const updateStepContentType = useCallback(
+    async (contentTemplateId: string, updates: { contentGenerationType?: string; requiresContact?: boolean; isAutomatable?: boolean }) => {
+      setPatchingContentId(contentTemplateId);
+      try {
+        const res = await fetch(`/api/content-templates/${contentTemplateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) return;
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.contentTemplateId === contentTemplateId
+              ? { ...s, ...updates }
+              : s,
+          ),
+        );
+      } finally {
+        setPatchingContentId(null);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     setLoadingSteps(true);
@@ -92,17 +125,31 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       .then((data) => {
         const phases = data.phases ?? [];
         const stepList: TemplateStep[] = [];
-        phases.forEach((ph: { name: string; orderIndex: number; contentTemplates?: { name: string }[] }, idx: number) => {
-          const contentNames = (ph.contentTemplates ?? []).map((c: { name: string }) => c.name);
-          if (contentNames.length > 0) {
-            contentNames.forEach((name, i) => {
+        phases.forEach((ph: {
+          name: string;
+          orderIndex: number;
+          contentTemplates?: Array<{
+            id: string;
+            name: string;
+            contentGenerationType?: string;
+            requiresContact?: boolean;
+            isAutomatable?: boolean;
+          }>;
+        }, idx: number) => {
+          const templates = ph.contentTemplates ?? [];
+          if (templates.length > 0) {
+            templates.forEach((c) => {
               stepList.push({
                 order: stepList.length + 1,
-                name,
-                label: name,
+                name: c.name,
+                label: c.name,
                 description: ph.name,
                 phase: ph.name,
                 dayOffset: null,
+                contentTemplateId: c.id,
+                contentGenerationType: c.contentGenerationType ?? 'custom_content',
+                requiresContact: c.requiresContact ?? false,
+                isAutomatable: c.isAutomatable ?? false,
               });
             });
           } else {
@@ -145,22 +192,25 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       return;
     }
     setLoadingDivisions(true);
-    setSelectedDivisionId('');
+    const preserveDivision = companyId && targetCompanyId === companyId && initialDivisionId;
+    setSelectedDivisionId(preserveDivision ? initialDivisionId : '');
     setSelectedContactId('');
     fetch(`/api/companies/${targetCompanyId}/departments`)
       .then((r) => r.json())
       .then((data) => {
         const depts = Array.isArray(data.departments) ? data.departments : Array.isArray(data) ? data : [];
-        setDivisions(
-          depts.map((d: { id: string; customName?: string | null; type?: string }) => ({
-            id: d.id,
-            label: d.customName || (d.type ?? '').replace(/_/g, ' '),
-          })),
-        );
+        const list = depts.map((d: { id: string; customName?: string | null; type?: string }) => ({
+          id: d.id,
+          label: d.customName || (d.type ?? '').replace(/_/g, ' '),
+        }));
+        setDivisions(list);
+        if (preserveDivision && list.some((d: { id: string; label: string }) => d.id === initialDivisionId)) {
+          setSelectedDivisionId(initialDivisionId);
+        }
       })
       .catch(() => setDivisions([]))
       .finally(() => setLoadingDivisions(false));
-  }, [targetCompanyId]);
+  }, [targetCompanyId, companyId, initialDivisionId]);
 
   useEffect(() => {
     if (!targetCompanyId || !selectedDivisionId) {
@@ -207,7 +257,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       const data = await res.json();
       const playRunId = data.playRunId ?? data.playRun?.id;
       if (playRunId) {
-        router.push(`/dashboard/companies/${cid}/plays/run/${playRunId}`);
+        router.push(myDayUrlAfterPlayStart(playRunId, cid));
       } else {
         router.push('/dashboard');
       }
@@ -337,6 +387,63 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
                         <p style={{ fontSize: 12, color: t.text3, margin: '2px 0 0' }}>
                           {step.description ?? ''}
                         </p>
+                        {step.contentTemplateId && (
+                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                            <label style={{ fontSize: 10, color: t.text4, fontWeight: 600, textTransform: 'uppercase' }}>
+                              Content type
+                            </label>
+                            <select
+                              value={step.contentGenerationType ?? 'custom_content'}
+                              onChange={(e) =>
+                                updateStepContentType(step.contentTemplateId!, {
+                                  contentGenerationType: e.target.value,
+                                })
+                              }
+                              disabled={patchingContentId === step.contentTemplateId}
+                              style={{
+                                fontSize: 11,
+                                padding: '4px 8px',
+                                borderRadius: 4,
+                                border: `1px solid ${t.borderMed}`,
+                                background: 'rgba(0,0,0,0.2)',
+                                color: t.text1,
+                                minWidth: 160,
+                              }}
+                            >
+                              {CONTENT_GENERATION_TYPE_KEYS.map((key) => (
+                                <option key={key} value={key}>
+                                  {key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                                </option>
+                              ))}
+                            </select>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: t.text3, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={step.requiresContact ?? false}
+                                onChange={(e) =>
+                                  updateStepContentType(step.contentTemplateId!, {
+                                    requiresContact: e.target.checked,
+                                  })
+                                }
+                                disabled={patchingContentId === step.contentTemplateId}
+                              />
+                              Requires contact
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: t.text3, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={step.isAutomatable ?? false}
+                                onChange={(e) =>
+                                  updateStepContentType(step.contentTemplateId!, {
+                                    isAutomatable: e.target.checked,
+                                  })
+                                }
+                                disabled={patchingContentId === step.contentTemplateId}
+                              />
+                              Automatable
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

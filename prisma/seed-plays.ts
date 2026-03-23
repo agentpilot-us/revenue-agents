@@ -7,16 +7,14 @@
 
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { normalizeDatabaseUrlForPg } from '@/lib/prisma-connection-string';
 
 function createPrisma(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error('DATABASE_URL is not set. Use: dotenv -e .env.local -- tsx prisma/seed-plays.ts');
   }
-  const normalized = connectionString
-    .replace(/sslmode=require\b/g, 'sslmode=verify-full')
-    .replace(/sslmode=prefer\b/g, 'sslmode=verify-full')
-    .replace(/sslmode=verify-ca\b/g, 'sslmode=verify-full');
+  const normalized = normalizeDatabaseUrlForPg(connectionString);
   const adapter = new PrismaPg({ connectionString: normalized });
   return new PrismaClient({ adapter, log: ['error', 'warn'] });
 }
@@ -397,6 +395,163 @@ Include: usage trends (last 6 months), open support tickets, stakeholder engagem
   });
   console.log('Play 6: Expansion / Cross-Sell.');
 
+  // 7. Additional play templates (catalog expansion; can grow to 20+)
+  const championDev = await prisma.playTemplate.upsert({
+    where: { userId_slug: { userId, slug: 'champion-development' } },
+    create: {
+      userId,
+      name: 'Champion Development',
+      description: 'Nurture and enable internal champions.',
+      slug: 'champion-development',
+      scope: 'ACCOUNT',
+      category: 'ENGAGEMENT',
+      status: 'ACTIVE',
+      triggerType: 'SIGNAL',
+      signalTypes: ['champion_development'],
+    },
+    update: {},
+  });
+  const championPhase0 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: championDev.id, orderIndex: 0 } },
+    create: { playTemplateId: championDev.id, orderIndex: 0, name: 'Outreach', offsetDays: 0, gateType: 'MANUAL' },
+    update: {},
+  });
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: championPhase0.id,
+    name: 'Champion Enablement Email',
+    contentType: 'EMAIL',
+    channel: 'EMAIL',
+    contentGenerationType: 'email',
+    modelTier: 'SONNET',
+    contextSources: ['crm_opportunity', 'usage_data'],
+    promptTemplate: 'Draft a short email to {{contact.name}} to strengthen champion relationship and share one enablement resource.',
+  });
+
+  const reEngage = await prisma.playTemplate.upsert({
+    where: { userId_slug: { userId, slug: 're-engagement' } },
+    create: {
+      userId,
+      name: 'Re-engagement',
+      description: 'Re-engage dormant or at-risk accounts.',
+      slug: 're-engagement',
+      scope: 'COMPANY',
+      category: 'ENGAGEMENT',
+      status: 'ACTIVE',
+      triggerType: 'SIGNAL',
+      signalTypes: ['re_engagement'],
+    },
+    update: {},
+  });
+  const reEngagePhase0 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: reEngage.id, orderIndex: 0 } },
+    create: { playTemplateId: reEngage.id, orderIndex: 0, name: 'Outreach', offsetDays: 0, gateType: 'MANUAL' },
+    update: {},
+  });
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: reEngagePhase0.id,
+    name: 'Re-engagement Email',
+    contentType: 'EMAIL',
+    channel: 'EMAIL',
+    contentGenerationType: 'email',
+    modelTier: 'SONNET',
+    contextSources: ['usage_data', 'crm_opportunity'],
+    promptTemplate: 'Write a friendly re-engagement email for {{account.name}} acknowledging time since last touch and offering one clear next step.',
+  });
+
+  const newLogo = await prisma.playTemplate.upsert({
+    where: { userId_slug: { userId, slug: 'new-logo-intro' } },
+    create: {
+      userId,
+      name: 'New Logo Intro',
+      description: 'Welcome and onboard new customers.',
+      slug: 'new-logo-intro',
+      scope: 'COMPANY',
+      category: 'ENGAGEMENT',
+      status: 'ACTIVE',
+      triggerType: 'SIGNAL',
+      signalTypes: ['new_logo'],
+    },
+    update: {},
+  });
+  const newLogoPhase0 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: newLogo.id, orderIndex: 0 } },
+    create: { playTemplateId: newLogo.id, orderIndex: 0, name: 'Welcome', offsetDays: 0, gateType: 'MANUAL' },
+    update: {},
+  });
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: newLogoPhase0.id,
+    name: 'Welcome Email',
+    contentType: 'EMAIL',
+    channel: 'EMAIL',
+    contentGenerationType: 'email',
+    modelTier: 'HAIKU',
+    contextSources: ['crm_opportunity'],
+    promptTemplate: 'Draft a concise welcome email for new customer {{account.name}}.',
+  });
+
+  const ebrPlay = await prisma.playTemplate.upsert({
+    where: { userId_slug: { userId, slug: 'executive-business-review' } },
+    create: {
+      userId,
+      name: 'Executive Business Review',
+      description: 'EBR prep and delivery.',
+      slug: 'executive-business-review',
+      scope: 'COMPANY',
+      category: 'ENGAGEMENT',
+      status: 'ACTIVE',
+      triggerType: 'MANUAL',
+      signalTypes: [],
+    },
+    update: {},
+  });
+  const ebrPhase0 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: ebrPlay.id, orderIndex: 0 } },
+    create: { playTemplateId: ebrPlay.id, orderIndex: 0, name: 'Prep & Send', offsetDays: 0, gateType: 'MANUAL' },
+    update: {},
+  });
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: ebrPhase0.id,
+    name: 'EBR Brief',
+    contentType: 'BRIEF',
+    contentGenerationType: 'executive_briefing',
+    modelTier: 'SONNET',
+    contextSources: ['crm_opportunity', 'usage_data', 'governance'],
+    promptTemplate: 'Create an executive business review brief for {{account.name}} with ROI, usage trends, and recommendations.',
+  });
+
+  const upsellPlay = await prisma.playTemplate.upsert({
+    where: { userId_slug: { userId, slug: 'upsell-motion' } },
+    create: {
+      userId,
+      name: 'Upsell Motion',
+      description: 'Targeted upsell to existing accounts.',
+      slug: 'upsell-motion',
+      scope: 'COMPANY',
+      category: 'EXPANSION',
+      status: 'ACTIVE',
+      triggerType: 'MANUAL',
+      signalTypes: [],
+    },
+    update: {},
+  });
+  const upsellPhase0 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: upsellPlay.id, orderIndex: 0 } },
+    create: { playTemplateId: upsellPlay.id, orderIndex: 0, name: 'Outreach', offsetDays: 0, gateType: 'MANUAL' },
+    update: {},
+  });
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: upsellPhase0.id,
+    name: 'Upsell Email',
+    contentType: 'EMAIL',
+    channel: 'EMAIL',
+    contentGenerationType: 'email',
+    modelTier: 'SONNET',
+    contextSources: ['crm_opportunity', 'usage_data'],
+    promptTemplate: 'Draft an upsell email for {{account.name}} highlighting one relevant product or tier.',
+  });
+
+  console.log('Plays 7–11: Champion Development, Re-engagement, New Logo Intro, EBR, Upsell.');
+
   // 8. Optional: seed a few SignalPlayMappings
   const signalTypes = ['exec_hire', 'product_launch', 'competitor_detected'];
   for (const signalType of signalTypes) {
@@ -417,7 +572,7 @@ Include: usage trends (last 6 months), open support tickets, stakeholder engagem
   }
   console.log('SignalPlayMappings created (exec_hire → Executive Intro, product_launch → Feature Launch, competitor_detected → Competitive).');
 
-  console.log('Done. 6 plays seeded.');
+  console.log('Done. 11 plays seeded (expand to 20+ as needed).');
 }
 
 async function createContentTemplate(
@@ -434,12 +589,16 @@ async function createContentTemplate(
     targetPersona?: string;
     governanceRules?: string;
     approvedMessaging?: string;
+    contentGenerationType?: string;
   }
 ) {
   const existing = await prisma.contentTemplate.findFirst({
     where: { userId, phaseTemplateId: data.phaseTemplateId, name: data.name },
   });
   if (existing) return;
+  const contentGenerationType =
+    data.contentGenerationType ??
+    (data.channel === 'EMAIL' ? 'email' : data.contentType === 'BRIEF' ? 'executive_briefing' : 'custom_content');
   await prisma.contentTemplate.create({
     data: {
       userId,
@@ -453,6 +612,7 @@ async function createContentTemplate(
       targetPersona: data.targetPersona ?? undefined,
       governanceRules: data.governanceRules ?? undefined,
       approvedMessaging: data.approvedMessaging ?? undefined,
+      contentGenerationType,
     },
   });
 }

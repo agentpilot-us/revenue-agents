@@ -10,7 +10,7 @@ import { fetchAccountSignals, classifyPreFetchedSignals, type CustomExaQuery } f
 import { TYPE_DEDUP_DAYS } from '@/lib/signals/constants';
 import { generateRenewalSignals } from '@/lib/signals/renewal-signals';
 import { fetchWebsetResults } from '@/lib/exa/websets';
-import { matchSignalToRoadmapRules } from '@/lib/action-workflows/match-signal';
+import { matchSignalToPlayMapping } from '@/lib/plays/match-signal-to-play-mapping';
 
 const BATCH_SIZE = 5;
 const DELAY_MS = 1000;
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
             created++;
 
             try {
-              await matchSignalToRoadmapRules({
+              await matchSignalToPlayMapping({
                 id: newSignal.id,
                 companyId: company.id,
                 userId: uid,

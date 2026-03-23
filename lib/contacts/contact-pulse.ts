@@ -216,7 +216,6 @@ export async function getContactPulse(
           createdAt: true,
           emailOpenedAt: true,
           emailClickedAt: true,
-          actionWorkflowStep: { select: { channel: true } },
         },
       }),
       // Pending PlayActions for this contact (by email) in ACTIVE runs, created 3+ days ago
@@ -286,7 +285,7 @@ export async function getContactPulse(
       type: a.type,
       summary: a.summary,
       date: a.createdAt.toISOString(),
-      channel: a.actionWorkflowStep?.channel ?? null, // PlayAction-origin activities have no step; channel can be from ContactTouch if needed later
+      channel: null,
       opened: !!a.emailOpenedAt,
       clicked: !!a.emailClickedAt,
     })),

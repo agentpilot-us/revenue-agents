@@ -49,7 +49,15 @@ export type NextStepItem = {
   completedSteps: number;
   runId?: string;
   source?: 'workflow' | 'play_run' | 'sequence';
+  whyNow?: string | null;
+  contentGenerationType?: string | null;
+  runStatus?: string;
+  divisionName?: string | null;
+  dayLabel?: string | null;
+  urgencyTier?: 'Overdue' | 'Today' | 'This Week' | 'Upcoming' | null;
 };
+
+export type HighlightPlayRunTarget = { runId: string; companyId?: string };
 
 type Props = {
   item: NextStepItem;
@@ -58,9 +66,22 @@ type Props = {
   onSkip?: (stepId: string, workflowId: string) => void;
   source?: 'workflow' | 'play_run' | 'sequence';
   runId?: string;
+  /** Post-start from catalog: scroll target + brief highlight on My Day */
+  highlightPlayRun?: HighlightPlayRunTarget | null;
 };
 
-function actionVerb(stepType: string, contentType: string | null, channel: string | null): string {
+function actionVerb(
+  stepType: string,
+  contentType: string | null,
+  channel: string | null,
+  contentGenerationType?: string | null,
+): string {
+  if (contentGenerationType === 'contact_research') return 'Research contacts';
+  if (contentGenerationType === 'meeting_talking_points' || contentGenerationType === 'meeting_agenda') return 'Prep meeting';
+  if (contentGenerationType === 'executive_briefing' || contentGenerationType === 'account_research_brief') return 'Generate brief';
+  if (contentGenerationType?.startsWith('linkedin_')) return 'Generate LinkedIn';
+  if (contentGenerationType === 'phone_call_script') return 'Generate call script';
+  if (contentGenerationType?.endsWith('_email')) return 'Generate email';
   if (stepType === 'generate_content') {
     if (contentType === 'email' || channel === 'email') return 'Draft email';
     if (contentType === 'linkedin_inmail' || channel === 'linkedin') return 'Draft LinkedIn message';
@@ -111,11 +132,22 @@ function contactLine(contact: NextStepItem['contact']): string | null {
   return contact.title ? `${name}, ${contact.title}` : name;
 }
 
-export default function NextStepCard({ item, variant, onDoThis, onSkip, source, runId }: Props) {
+export default function NextStepCard({
+  item,
+  variant,
+  onDoThis,
+  onSkip,
+  source,
+  runId,
+  highlightPlayRun,
+}: Props) {
   const isPlayRun = runId ?? item.runId;
   const targetId = isPlayRun ?? item.workflowId;
   const doThisSource = item.source ?? (isPlayRun ? ('play_run' as const) : ('workflow' as const));
-  const verb = actionVerb(item.stepType, item.contentType, item.channel);
+  const isProposed = item.runStatus === 'PROPOSED';
+  const verb = isProposed
+    ? 'Review plan'
+    : actionVerb(item.stepType, item.contentType, item.channel, item.contentGenerationType);
   const prompt = shortPromptLabel(item.promptHint);
   const due = variant === 'followup' ? dueLabel(item.dueAt) : null;
   const contact = contactLine(item.contact);
@@ -124,17 +156,29 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip, source, 
     : null;
 
   const isFollowUp = variant === 'followup';
+  const runFocusId =
+    item.runId && (item.source === 'play_run' || doThisSource === 'play_run') ? item.runId : undefined;
+  const isHighlighted =
+    !!highlightPlayRun &&
+    !!runFocusId &&
+    runFocusId === highlightPlayRun.runId &&
+    (!highlightPlayRun.companyId || item.companyId === highlightPlayRun.companyId);
 
   return (
     <div
+      data-myd-focus-run={runFocusId}
       style={{
         background: t.surface,
         borderRadius: 12,
-        border: `1px solid ${t.border}`,
+        border: `1px solid ${
+          isHighlighted ? 'rgba(59,130,246,0.85)' : isProposed ? t.amber : t.border
+        }`,
+        boxShadow: isHighlighted ? '0 0 0 2px rgba(59,130,246,0.35), 0 8px 24px rgba(37,99,235,0.15)' : undefined,
         padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
         gap: 14,
+        transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
       }}
     >
       {/* Left: action icon */}
@@ -158,6 +202,20 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip, source, 
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Action line */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {item.dayLabel && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: t.text3,
+                padding: '3px 6px',
+                background: 'rgba(255,255,255,0.06)',
+                borderRadius: 4,
+              }}
+            >
+              {item.dayLabel}
+            </span>
+          )}
           <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>
             {prompt ?? verb}
           </span>
@@ -184,7 +242,7 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip, source, 
           )}
         </div>
 
-        {/* Context line */}
+        {/* Account / division */}
         <div
           style={{
             fontSize: 11,
@@ -228,12 +286,33 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip, source, 
               {item.templateName}
             </span>
           )}
+          {item.divisionName && (
+            <span style={{ fontSize: 10, color: t.text4, flexShrink: 0 }}>
+              · {item.divisionName}
+            </span>
+          )}
           {progress && (
             <span style={{ color: t.text4, flexShrink: 0 }}>
               Step {item.stepOrder} of {item.totalSteps}
             </span>
           )}
         </div>
+        {item.whyNow && (
+          <div
+            style={{
+              fontSize: 11,
+              color: t.text4,
+              marginTop: 4,
+              fontStyle: 'italic',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={item.whyNow}
+          >
+            Why now: {item.whyNow}
+          </div>
+        )}
       </div>
 
       {/* Right: actions */}
@@ -255,7 +334,7 @@ export default function NextStepCard({ item, variant, onDoThis, onSkip, source, 
             whiteSpace: 'nowrap',
           }}
         >
-          Do This
+          Work This
         </button>
         {onSkip && !isPlayRun && (
           <button

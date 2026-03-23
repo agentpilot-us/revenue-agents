@@ -56,14 +56,18 @@ const PRIORITY_OPTIONS = [
 ] as const;
 
 type Props = {
-  roadmapId: string;
+  roadmapId?: string;
+  companyId?: string;
 };
 
-export function PlayRulesPanel({ roadmapId }: Props) {
+export function PlayRulesPanel({ roadmapId, companyId }: Props) {
   const [mappings, setMappings] = useState<SignalMapping[]>([]);
   const [activations, setActivations] = useState<AccountActivation[]>([]);
   const [playTemplates, setPlayTemplates] = useState<PlayTemplateOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewForMappingId, setPreviewForMappingId] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewText, setPreviewText] = useState<string | null>(null);
 
   const [showMappingForm, setShowMappingForm] = useState(false);
   const [mappingSignalType, setMappingSignalType] = useState('exec_hire');
@@ -83,6 +87,10 @@ export function PlayRulesPanel({ roadmapId }: Props) {
   }, []);
 
   const fetchActivations = useCallback(async () => {
+    if (!roadmapId) {
+      setActivations([]);
+      return;
+    }
     const res = await fetch(`/api/roadmap/account-play-activations?roadmapId=${roadmapId}`);
     if (res.ok) {
       const data = await res.json();
@@ -138,7 +146,52 @@ export function PlayRulesPanel({ roadmapId }: Props) {
     await fetchMappings();
   };
 
+  const handlePreviewMapping = async (signalType: string, mappingId: string) => {
+    if (!companyId) {
+      setPreviewText('Open Play Rules from a Strategic Account Plan (with a selected company) to test rules.');
+      setPreviewForMappingId(mappingId);
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewForMappingId(mappingId);
+    setPreviewText(null);
+    try {
+      const res = await fetch('/api/signal-play-mappings/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, signalType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPreviewText(data.error ?? 'Preview failed');
+        return;
+      }
+      const p = data.preview;
+      if (!p?.candidate) {
+        setPreviewText(
+          p?.reasonNoMatch ?? 'No matching play template (check signal type, conditions, and ACTIVE status).',
+        );
+        return;
+      }
+      const lines = [
+        `Account: ${data.companyName ?? companyId}`,
+        `Would run: ${p.candidate.playTemplateName} (${p.candidate.priority})`,
+        `Matching mappings: ${p.matchingMappingsCount}`,
+        `Conditions context: tier=${p.conditionsContext?.accountTier ?? '—'}, total ARR=${p.conditionsContext?.totalArr ?? 0}`,
+        p.activationNarrowed ? 'Activation filter: used activated templates for this plan.' : '',
+        p.activationBroadenedFallback ?
+          'Note: no activated template matched; same fallback as live path (global mapping still applies).'
+        : '',
+        'No PlayRun was created (dry run).',
+      ].filter(Boolean);
+      setPreviewText(lines.join('\n'));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const handleAddActivation = async (playTemplateId: string) => {
+    if (!roadmapId) return;
     setAddingActivation(true);
     try {
       const res = await fetch('/api/roadmap/account-play-activations', {
@@ -191,23 +244,39 @@ export function PlayRulesPanel({ roadmapId }: Props) {
           {mappings.map((m) => (
             <div
               key={m.id}
-              className="flex items-center justify-between rounded-lg border border-border bg-card/60 p-3"
+              className="rounded-lg border border-border bg-card/60 p-3 space-y-2"
             >
-              <div className="min-w-0 flex-1">
-                <span className="text-xs font-medium text-foreground">
-                  When &quot;{m.signalType.replace(/_/g, ' ')}&quot; → {m.playTemplate.name}
-                </span>
-                <span className="ml-2 text-[10px] text-muted-foreground">
-                  {m.priority}
-                </span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-medium text-foreground">
+                    When &quot;{m.signalType.replace(/_/g, ' ')}&quot; → {m.playTemplate.name}
+                  </span>
+                  <span className="ml-2 text-[10px] text-muted-foreground">
+                    {m.priority}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void handlePreviewMapping(m.signalType, m.id)}
+                    className="text-[10px] text-primary hover:text-primary/90 px-1.5 py-0.5"
+                  >
+                    {previewLoading && previewForMappingId === m.id ? '…' : 'Test rule'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMapping(m.id)}
+                    className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDeleteMapping(m.id)}
-                className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5 shrink-0"
-              >
-                Remove
-              </button>
+              {previewForMappingId === m.id && previewText && (
+                <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap bg-background/50 rounded p-2 border border-border/60">
+                  {previewText}
+                </pre>
+              )}
             </div>
           ))}
         </div>
@@ -279,9 +348,15 @@ export function PlayRulesPanel({ roadmapId }: Props) {
         )}
       </div>
 
-      {/* Activated plays for this account */}
+      {/* Activated plays for this account (roadmap-specific) */}
       <div>
         <h3 className="text-xs font-semibold text-foreground mb-1">Activated plays for this account</h3>
+        {!roadmapId ? (
+          <p className="text-[10px] text-muted-foreground">
+            Create a Strategic Account Plan (roadmap) to choose which plays can run for this account.
+          </p>
+        ) : (
+          <>
         <p className="text-[10px] text-muted-foreground mb-2">
           Only these plays can be started by signals for this Strategic Account Plan. Enable the plays you want to run here.
         </p>
@@ -355,6 +430,8 @@ export function PlayRulesPanel({ roadmapId }: Props) {
           >
             + Activate a play for this account
           </button>
+        )}
+          </>
         )}
       </div>
     </div>

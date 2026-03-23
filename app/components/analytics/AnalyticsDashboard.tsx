@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { dash } from '@/app/dashboard/dashboard-classes';
 import { NewContactsMetric } from './NewContactsMetric';
 import { LandingPagePerformance } from './LandingPagePerformance';
 import { EmailEngagement } from './EmailEngagement';
@@ -202,7 +203,7 @@ export function AnalyticsDashboard() {
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-slate-400">Loading analytics...</div>
+        <div className="text-muted-foreground">Loading analytics...</div>
       </div>
     );
   }
@@ -210,7 +211,7 @@ export function AnalyticsDashboard() {
   if (error && !data) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-red-400">Error: {error}</div>
+        <div className="text-destructive">Error: {error}</div>
       </div>
     );
   }
@@ -222,9 +223,9 @@ export function AnalyticsDashboard() {
   return (
     <div className="space-y-8">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4 p-4 bg-zinc-800/50 rounded-lg border border-slate-700">
+      <div className={`flex flex-wrap items-center gap-4 p-4 ${dash.card}`}>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-300 whitespace-nowrap">Account:</label>
+          <label className="text-sm text-muted-foreground whitespace-nowrap">Account:</label>
           <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="All accounts" />
@@ -241,7 +242,7 @@ export function AnalyticsDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-300 whitespace-nowrap">Start date:</label>
+          <label className="text-sm text-muted-foreground whitespace-nowrap">Start date:</label>
           <Input
             type="date"
             value={startDate}
@@ -251,7 +252,7 @@ export function AnalyticsDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-300 whitespace-nowrap">End date:</label>
+          <label className="text-sm text-muted-foreground whitespace-nowrap">End date:</label>
           <Input
             type="date"
             value={endDate}

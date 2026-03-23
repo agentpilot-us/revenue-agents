@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { defineConfig, env } from 'prisma/config';
+import { normalizeDatabaseUrlForPg } from './lib/prisma-connection-string';
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
@@ -7,6 +8,7 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: env('DATABASE_URL'),
+    // Same normalization as lib/db.ts (Neon: uselibpqcompat; others: verify-full)
+    url: normalizeDatabaseUrlForPg(env('DATABASE_URL')),
   },
 });

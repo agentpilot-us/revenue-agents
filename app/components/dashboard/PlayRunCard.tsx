@@ -31,6 +31,7 @@ export type PlayRunCardRun = {
       title: string;
       status: string;
       actionType: string;
+      suggestedDate?: string | null;
       contactName: string | null;
       cooldownWarning: string | null;
       alternateContact: string | null;
@@ -56,6 +57,27 @@ function actionLabel(actionType: string): string {
   return map[actionType] ?? actionType.replace(/_/g, ' ');
 }
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function runRefMs(actions: Array<{ suggestedDate?: string | null }>): number | null {
+  let earliest: number | null = null;
+  for (const a of actions) {
+    const sd = a.suggestedDate;
+    if (sd) {
+      const ms = new Date(sd).getTime();
+      if (earliest == null || ms < earliest) earliest = ms;
+    }
+  }
+  return earliest;
+}
+
+function dayLabelFor(suggestedDate: string | null | undefined, referenceMs: number | null): string | null {
+  if (!suggestedDate || referenceMs == null) return null;
+  const actionMs = new Date(suggestedDate).getTime();
+  const dayOffset = Math.round((actionMs - referenceMs) / ONE_DAY_MS);
+  return dayOffset >= 0 ? `Day ${dayOffset}` : null;
+}
+
 export default function PlayRunCard({ run, onWorkThis }: Props) {
   const allActions = run.phaseRuns.flatMap((pr) => pr.actions);
   const completed = allActions.filter(
@@ -66,6 +88,8 @@ export default function PlayRunCard({ run, onWorkThis }: Props) {
   const nextAction = allActions.find(
     (a) => a.status === 'PENDING' || a.status === 'REVIEWED' || a.status === 'EDITED',
   );
+  const refMs = runRefMs(allActions);
+  const nextDayLabel = nextAction ? dayLabelFor(nextAction.suggestedDate, refMs) : null;
   const hasCooldown = allActions.some((a) => a.cooldownWarning);
   const stepsSummary = allActions.slice(0, 4).map((a) => actionLabel(a.actionType));
 
@@ -138,20 +162,35 @@ export default function PlayRunCard({ run, onWorkThis }: Props) {
       </div>
 
       {nextAction && (
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '4px 10px',
-            borderRadius: 6,
-            background: nextAction.cooldownWarning ? t.amberBg : t.blueBg,
-            color: nextAction.cooldownWarning ? t.amber : t.blue,
-            display: 'inline-block',
-            alignSelf: 'flex-start',
-          }}
-        >
-          Next: {nextAction.title}
-          {nextAction.cooldownWarning && ' (check cooldown)'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {nextDayLabel && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: t.text3,
+                padding: '3px 6px',
+                background: 'rgba(255,255,255,0.06)',
+                borderRadius: 4,
+              }}
+            >
+              {nextDayLabel}
+            </span>
+          )}
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              padding: '4px 10px',
+              borderRadius: 6,
+              background: nextAction.cooldownWarning ? t.amberBg : t.blueBg,
+              color: nextAction.cooldownWarning ? t.amber : t.blue,
+              display: 'inline-block',
+            }}
+          >
+            Next: {nextAction.title}
+            {nextAction.cooldownWarning && ' (check cooldown)'}
+          </div>
         </div>
       )}
 

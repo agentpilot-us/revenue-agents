@@ -28,12 +28,14 @@ export default async function CompanyContactsPage({
       lastName: true,
       title: true,
       email: true,
+      linkedinUrl: true,
       companyDepartmentId: true,
       personaId: true,
       isResponsive: true,
       isDormant: true,
       enrichmentStatus: true,
       enrichedAt: true,
+      enrichedData: true,
       companyDepartment: {
         select: { id: true, type: true, customName: true },
       },
@@ -64,6 +66,7 @@ export default async function CompanyContactsPage({
     lastName: c.lastName,
     title: c.title,
     email: c.email,
+    linkedinUrl: c.linkedinUrl,
     companyDepartmentId: c.companyDepartmentId,
     departmentName: c.companyDepartment
       ? (c.companyDepartment.customName || c.companyDepartment.type)
@@ -73,6 +76,8 @@ export default async function CompanyContactsPage({
     isDormant: c.isDormant,
     enrichmentStatus: c.enrichmentStatus ?? null,
     enrichedAt: c.enrichedAt?.toISOString() ?? null,
+    enrichmentError:
+      (c.enrichedData as { error?: string } | null)?.error ?? null,
     activeEnrollments: c.contactSequenceEnrollments.map((e) => ({
       id: e.id,
       sequenceId: e.sequence.id,

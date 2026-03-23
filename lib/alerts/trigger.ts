@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { sendEmailAlert } from './channels/email';
 import { sendSlackAlert } from './channels/slack';
 import { sendWebhookAlert } from './channels/webhook';
-import { createEngagementWorkflow } from '@/lib/action-workflows/engagement-trigger';
+import { createEngagementWorkflow } from '@/lib/plays/engagement-trigger';
 
 type VisitForAlerts = {
   id: string;

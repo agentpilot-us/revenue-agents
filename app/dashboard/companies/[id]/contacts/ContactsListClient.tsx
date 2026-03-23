@@ -28,6 +28,7 @@ type ContactRow = {
   lastName: string | null;
   title: string | null;
   email: string | null;
+  linkedinUrl: string | null;
   companyDepartmentId: string | null;
   departmentName: string | null;
   personaName: string | null;
@@ -35,6 +36,7 @@ type ContactRow = {
   isDormant: boolean;
   enrichmentStatus: string | null;
   enrichedAt: string | null;
+  enrichmentError: string | null;
   crmSource: string | null;
 };
 
@@ -60,10 +62,12 @@ function CrmSourceBadge({ source }: { source: string | null }) {
 
 function EnrichmentCell({
   status,
+  enrichmentError,
   onEnrichNow,
   enriching,
 }: {
   status: string | null;
+  enrichmentError?: string | null;
   onEnrichNow?: () => void;
   enriching?: boolean;
 }) {
@@ -106,12 +110,32 @@ function EnrichmentCell({
   }
   if (status === 'failed') {
     return (
-      <div className="flex items-center gap-2">
-        <span className="text-red-500 text-sm">Failed</span>
-        {onEnrichNow && (
-          <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={onEnrichNow} disabled={enriching}>
-            Retry
-          </Button>
+      <div className="flex flex-col gap-1 min-w-0 max-w-[220px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-red-500 text-sm cursor-help">Failed</span>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                {enrichmentError ? (
+                  <p className="text-xs text-muted-foreground">{enrichmentError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Enrichment failed. Check server logs for details.</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          {onEnrichNow && (
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={onEnrichNow} disabled={enriching}>
+              Retry
+            </Button>
+          )}
+        </div>
+        {enrichmentError && (
+          <p className="text-xs text-red-500/90 truncate" title={enrichmentError}>
+            {enrichmentError}
+          </p>
         )}
       </div>
     );
@@ -143,7 +167,9 @@ export function ContactsListClient({
     enriched: number;
     failed: number;
   } | null>(null);
-  const pendingCount = initialContacts.filter((c) => c.enrichmentStatus === 'pending').length;
+  const pendingCount = initialContacts.filter(
+    (c) => c.enrichmentStatus === 'pending' || c.enrichmentStatus == null
+  ).length;
   const showEnrichmentBanner =
     (pendingCount > 0 || enriching) && !enrichmentBannerDismissed;
 
@@ -188,8 +214,19 @@ export function ContactsListClient({
   };
   const showColumn = (key: keyof typeof columnsHasData) => visibleColumns[key] !== false;
 
+  // Patches from enrichment API so the row updates with real email/LinkedIn immediately
+  const [enrichmentPatches, setEnrichmentPatches] = useState<Record<string, Partial<ContactRow>>>({});
+  const displayContacts = useMemo(
+    () =>
+      initialContacts.map((c) => ({
+        ...c,
+        ...enrichmentPatches[c.id],
+      })),
+    [initialContacts, enrichmentPatches]
+  );
+
   const filtered = useMemo(() => {
-    let list = initialContacts;
+    let list = displayContacts;
     if (search.trim()) {
       const q = search.toLowerCase().trim();
       list = list.filter(
@@ -197,6 +234,7 @@ export function ContactsListClient({
           (c.firstName?.toLowerCase().includes(q) ||
             c.lastName?.toLowerCase().includes(q) ||
             c.email?.toLowerCase().includes(q) ||
+            c.linkedinUrl?.toLowerCase().includes(q) ||
             c.title?.toLowerCase().includes(q) ||
             c.personaName?.toLowerCase().includes(q))
       );
@@ -210,7 +248,7 @@ export function ContactsListClient({
       list = list.filter((c) => c.isDormant);
     }
     return list;
-  }, [initialContacts, search, departmentFilter, statusFilter, departments]);
+  }, [displayContacts, search, departmentFilter, statusFilter, departments]);
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -233,17 +271,35 @@ export function ContactsListClient({
     ? `/dashboard/companies/${companyId}/launch-outreach?contacts=${Array.from(selectedIds).join(',')}`
     : `/dashboard/companies/${companyId}/launch-outreach`;
 
-  const handleEnrichPending = async () => {
+  const handleEnrichPending = async (contactId?: string) => {
     setEnriching(true);
     setEnrichmentBannerDismissed(false);
     try {
       const res = await fetch(`/api/companies/${companyId}/contacts/enrich-pending`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactId ? { contactIds: [contactId] } : {}),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         const processed = data?.processed ?? 0;
         const enriched = data?.enriched ?? 0;
+        const updated = data?.updatedContacts as Array<{ id: string; email: string | null; title: string | null; linkedinUrl: string | null; enrichmentStatus: string }> | undefined;
+        if (Array.isArray(updated) && updated.length > 0) {
+          setEnrichmentPatches((prev) => {
+            const next = { ...prev };
+            for (const u of updated) {
+              next[u.id] = {
+                ...next[u.id],
+                email: u.email,
+                title: u.title,
+                linkedinUrl: u.linkedinUrl,
+                enrichmentStatus: u.enrichmentStatus,
+              };
+            }
+            return next;
+          });
+        }
         if (processed > 0) {
           toast.success(
             enriched > 0
@@ -563,7 +619,7 @@ export function ContactsListClient({
       )}
       {pendingCount > 0 && !showEnrichmentBanner && (
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleEnrichPending} disabled={enriching}>
+          <Button variant="outline" size="sm" onClick={() => handleEnrichPending()} disabled={enriching}>
             {enriching ? 'Enriching…' : `Enrich pending (${pendingCount})`}
           </Button>
         </div>
@@ -637,7 +693,7 @@ export function ContactsListClient({
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" disabled={enriching} onClick={handleEnrichPending}>
+            <Button size="sm" variant="outline" disabled={enriching} onClick={() => handleEnrichPending()}>
               {enriching ? 'Enriching…' : 'Enrich all'}
             </Button>
             <Link href={launchOutreachUrl}>
@@ -711,8 +767,21 @@ export function ContactsListClient({
                   <span className="font-medium text-card-foreground">
                     {[c.firstName, c.lastName].filter(Boolean).join(' ').trim() || '—'}
                   </span>
-                  {c.email && (
+                  {c.email ? (
                     <div className="text-xs text-muted-foreground">{c.email}</div>
+                  ) : c.enrichmentStatus === 'complete' ? (
+                    <div className="text-xs text-muted-foreground italic">No email found</div>
+                  ) : null}
+                  {c.linkedinUrl && (
+                    <a
+                      href={c.linkedinUrl.startsWith('http') ? c.linkedinUrl : `https://${c.linkedinUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 hover:underline inline-flex items-center gap-1 mt-0.5"
+                    >
+                      <Linkedin className="h-3 w-3" />
+                      LinkedIn
+                    </a>
                   )}
                 </td>
                 <td className="px-4 py-2 text-sm text-card-foreground block md:table-cell md:py-2 md:align-middle before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Title">{c.title ?? '—'}</td>
@@ -724,7 +793,8 @@ export function ContactsListClient({
                   <td className="px-4 py-2 text-sm block md:table-cell md:py-2 before:content-[attr(data-label)] before:font-semibold before:text-muted-foreground before:block before:mb-1 md:before:content-none" data-label="Enrichment">
                     <EnrichmentCell
                       status={c.enrichmentStatus}
-                      onEnrichNow={handleEnrichPending}
+                      enrichmentError={c.enrichmentError}
+                      onEnrichNow={() => handleEnrichPending(c.id)}
                       enriching={enriching}
                     />
                   </td>

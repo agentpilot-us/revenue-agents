@@ -23,26 +23,13 @@ export async function GET(req: NextRequest) {
       },
       include: {
         company: { select: { id: true, name: true, industry: true } },
-        workflows: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            outcome: true,
-            targetDivision: { select: { id: true, customName: true, type: true } },
-            targetContact: { select: { id: true, firstName: true, lastName: true, title: true } },
-            template: { select: { id: true, name: true, triggerType: true } },
-            steps: {
-              orderBy: { stepOrder: 'asc' },
-              select: { id: true, status: true, stepType: true, channel: true, dueAt: true },
-            },
-          },
-        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ campaigns });
+    return NextResponse.json({
+      campaigns: campaigns.map((c) => ({ ...c, workflows: [] as unknown[] })),
+    });
   } catch (error) {
     console.error('GET /api/account-campaigns error:', error);
     return NextResponse.json({ error: 'Failed to fetch campaigns' }, { status: 500 });
@@ -104,20 +91,11 @@ export async function POST(req: NextRequest) {
       where: { id: campaign.id },
       include: {
         company: { select: { id: true, name: true } },
-        workflows: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            targetDivision: { select: { id: true, customName: true, type: true } },
-            template: { select: { id: true, name: true } },
-          },
-        },
       },
     });
 
     return NextResponse.json(
-      { campaign: full, playRunsCreated, workflowsCreated: 0 },
+      { campaign: full ? { ...full, workflows: [] } : full, playRunsCreated, workflowsCreated: 0 },
       { status: 201 },
     );
   } catch (error) {

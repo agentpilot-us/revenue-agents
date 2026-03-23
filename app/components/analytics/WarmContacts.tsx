@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { dash } from '@/app/dashboard/dashboard-classes';
 
 interface WarmContact {
   id: string;
@@ -21,13 +22,13 @@ interface Props {
 
 export function WarmContacts({ data }: Props) {
   return (
-    <div className="p-6 bg-zinc-800/50 border border-slate-700 rounded-lg">
+    <div className={dash.card}>
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-slate-100 mb-1">Warm Contacts</h2>
-        <p className="text-sm text-slate-400">
+        <h2 className={`text-xl font-semibold ${dash.sectionTitle} mb-1`}>Warm Contacts</h2>
+        <p className="text-sm text-muted-foreground">
           Contacts who have engaged with content (landing page visits, email opens/clicks)
         </p>
-        <p className="text-sm text-amber-400 mt-1">
+        <p className="text-sm text-primary mt-1">
           Total: <span className="font-semibold">{data.total}</span> warm contact
           {data.total !== 1 ? 's' : ''}
         </p>
@@ -39,18 +40,18 @@ export function WarmContacts({ data }: Props) {
             <Link
               key={contact.id}
               href={`/dashboard/companies/${contact.accountId}`}
-              className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-slate-700 hover:border-amber-500/50 hover:bg-zinc-900 transition-colors"
+              className={`flex items-center justify-between p-3 ${dash.cardTight} hover:bg-muted/50 transition-colors`}
             >
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-slate-200 truncate">{contact.name}</div>
-                <div className="text-xs text-slate-400 truncate mt-1">{contact.email}</div>
-                <div className="text-xs text-slate-500 mt-1">{contact.accountName}</div>
+                <div className="text-sm font-medium text-foreground truncate">{contact.name}</div>
+                <div className="text-xs text-muted-foreground truncate mt-1">{contact.email}</div>
+                <div className="text-xs text-muted-foreground mt-1">{contact.accountName}</div>
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-500">No warm contacts found</p>
+        <p className="text-sm text-muted-foreground">No warm contacts found</p>
       )}
     </div>
   );

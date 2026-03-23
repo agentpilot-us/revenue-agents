@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
 
 const t = {
   bg: '#0b1120',
@@ -111,7 +112,7 @@ export default function CreateActionModal({ open, onClose, onCreated }: Props) {
         setSelectedContacts(new Set());
         setMode('single');
         if (firstRunId && typeof window !== 'undefined') {
-          window.location.href = `/dashboard/companies/${selectedCompany}/plays/run/${firstRunId}`;
+          window.location.href = myDayUrlAfterPlayStart(firstRunId, selectedCompany);
         }
       } else {
         const res = await fetch('/api/play-runs', {
@@ -135,7 +136,7 @@ export default function CreateActionModal({ open, onClose, onCreated }: Props) {
         setSelectedContacts(new Set());
         setMode('single');
         if (runId && typeof window !== 'undefined') {
-          window.location.href = `/dashboard/companies/${selectedCompany}/plays/run/${runId}`;
+          window.location.href = myDayUrlAfterPlayStart(runId, selectedCompany);
         }
       }
     } catch (err) {

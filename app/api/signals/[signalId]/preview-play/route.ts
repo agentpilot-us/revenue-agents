@@ -78,6 +78,8 @@ export async function GET(
 
   const template = matching.playTemplate;
   const phases = template.phases.map((p) => ({ order: p.orderIndex, name: p.name }));
+  // HotSignalCard expects template.steps (order, name, channel); derive from phases so UI does not break
+  const steps = phases.map((p) => ({ order: p.order, name: p.name, channel: 'internal' as const }));
 
   return NextResponse.json({
     matched: true,
@@ -95,6 +97,9 @@ export async function GET(
       description: template.description,
       triggerType: template.triggerType,
       phases,
+      steps,
+      priority: 1,
+      timingWindow: undefined,
     },
   });
 }

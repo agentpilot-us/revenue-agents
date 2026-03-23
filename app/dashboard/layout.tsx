@@ -28,7 +28,7 @@ export default async function DashboardLayout({
 
   // Hide Demo setup and Waitlist for official demo accounts (e.g. demo-techinfra@agentpilot.us)
   const allowDemoSetup =
-    process.env.ALLOW_DEMO_SETUP === 'true' && !isDemoUser(session.user);
+    process.env.ALLOW_DEMO_SETUP === 'true' && !isDemoUser(session.user as { email?: string | null });
 
   return (
     <div className={dash.page}>

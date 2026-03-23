@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import PlayDetailDrawer from './PlayDetailDrawer';
 
 /** New play system (PlayTemplate) catalog item from GET /api/play-templates */
@@ -75,9 +76,19 @@ type Props = {
   companyId?: string;
   companyName?: string;
   compact?: boolean;
+  /** Pre-fill from URL (e.g. /dashboard/plays?companyId=...&divisionId=...) for deep link from SAP */
+  initialCompanyId?: string;
+  initialDivisionId?: string;
 };
 
-export default function PlayCatalog({ companyId, companyName, compact = false }: Props) {
+export default function PlayCatalog({
+  companyId: propCompanyId,
+  companyName,
+  compact = false,
+  initialCompanyId,
+  initialDivisionId,
+}: Props) {
+  const companyId = propCompanyId ?? initialCompanyId;
   const [templates, setTemplates] = useState<PlayTemplateCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<TriggerCategory>('all');
@@ -85,12 +96,13 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
   const [selectedTemplate, setSelectedTemplate] = useState<PlayTemplateCatalogItem | null>(null);
 
   useEffect(() => {
-    fetch('/api/play-templates')
+    const url = companyId ? `/api/play-templates?companyId=${encodeURIComponent(companyId)}` : '/api/play-templates';
+    fetch(url)
       .then((r) => r.json())
       .then((data) => setTemplates(data.templates ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [companyId]);
 
   const filtered = useMemo(() => {
     let list = templates;
@@ -110,6 +122,16 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
     return list;
   }, [templates, activeCategory, searchQuery]);
 
+  const returnTo = companyId
+    ? `/dashboard/plays?companyId=${encodeURIComponent(companyId)}`
+    : '/dashboard/plays';
+  const createTemplateHref = `/dashboard/my-company/play-templates/new?returnTo=${encodeURIComponent(returnTo)}${
+    companyId ? `&companyId=${encodeURIComponent(companyId)}` : ''
+  }`;
+  const customAiHref = companyId
+    ? `/dashboard/plays/custom?companyId=${encodeURIComponent(companyId)}`
+    : '';
+
   if (loading) {
     return <p style={{ fontSize: 13, color: t.text3, padding: 20 }}>Loading plays...</p>;
   }
@@ -117,13 +139,50 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
   return (
     <div>
       {!compact && (
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: t.text1, margin: 0 }}>
-            Play Catalog
-          </h1>
-          <p style={{ fontSize: 13, color: t.text3, margin: '4px 0 0' }}>
-            {templates.length} plays. Browse and start plays for your target accounts.
-          </p>
+        <div
+          style={{
+            marginBottom: 24,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: t.text1, margin: 0 }}>
+              Play Catalog
+            </h1>
+            <p style={{ fontSize: 13, color: t.text3, margin: '4px 0 0' }}>
+              {templates.length} plays. Browse and start plays for your target accounts.
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+            <Link
+              href={createTemplateHref}
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: t.blue,
+                textDecoration: 'none',
+              }}
+            >
+              + Create play
+            </Link>
+            {companyId && customAiHref && (
+              <Link
+                href={customAiHref}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: t.text2,
+                  textDecoration: 'none',
+                }}
+              >
+                Describe with AI…
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
@@ -268,6 +327,7 @@ export default function PlayCatalog({ companyId, companyName, compact = false }:
           onClose={() => setSelectedTemplate(null)}
           companyId={companyId}
           companyName={companyName}
+          initialDivisionId={initialDivisionId}
         />
       )}
     </div>

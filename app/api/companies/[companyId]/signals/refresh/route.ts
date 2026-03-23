@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { fetchAccountSignals, classifyPreFetchedSignals, type CustomExaQuery } from '@/lib/signals/fetch-account-signals';
 import { TYPE_DEDUP_DAYS } from '@/lib/signals/constants';
 import { fetchWebsetResults } from '@/lib/exa/websets';
-import { matchSignalToRoadmapRules } from '@/lib/action-workflows/match-signal';
+import { matchSignalToPlayMapping } from '@/lib/plays/match-signal-to-play-mapping';
 
 export const maxDuration = 120;
 
@@ -202,7 +202,7 @@ export async function POST(
         created++;
 
         try {
-          await matchSignalToRoadmapRules({
+          await matchSignalToPlayMapping({
             id: newSignal.id,
             companyId: company.id,
             userId,

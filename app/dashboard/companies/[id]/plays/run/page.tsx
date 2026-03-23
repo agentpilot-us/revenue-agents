@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import type { PlayTriggerType } from '@prisma/client';
 import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
 import { PlayRunClient } from './PlayRunClient';
 
 const PLAY_TRIGGER_VALUES: PlayTriggerType[] = ['TIMELINE', 'MANUAL', 'SIGNAL'];
@@ -92,7 +93,7 @@ export default async function PlayRunPage({
         playTemplateId,
         accountSignalId: sp.signalId ?? null,
       });
-      redirect(`/dashboard/companies/${companyId}/plays/run/${playRun.id}`);
+      redirect(myDayUrlAfterPlayStart(playRun.id, companyId));
     } catch (e) {
       console.error('Failed to create play run from template, falling back to catalog:', e);
     }

@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import PlaybookEditor from '@/app/components/playbooks/PlaybookEditor';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { AutonomyLevel } from '@prisma/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,17 +23,18 @@ type IndustryPlaybookRow = {
   valuePropsByDepartment: Record<string, unknown> | null;
 };
 
-type TemplateRow = {
+/** PlayTemplate row from GET /api/play-templates (governance only; no run here). */
+type PlayTemplateRow = {
   id: string;
   name: string;
   description: string | null;
+  slug: string;
+  category: string;
   triggerType: string;
-  isBuiltIn: boolean;
-  stepCount: number;
-  targetDepartmentTypes: string[] | null;
-  targetIndustries: string[] | null;
-  targetPersonas: string[] | null;
-  priority: number;
+  scope?: string;
+  phaseCount: number;
+  defaultAutonomyLevel: AutonomyLevel | null;
+  status?: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 };
 
 const TRIGGER_TYPE_TO_CATEGORY: Record<string, string> = {
@@ -204,13 +207,21 @@ function priorityBadge(priority: number) {
 
 type CatalogProductOption = { id: string; name: string; slug: string };
 
+const PLAY_CATEGORY_ORDER = ['RENEWAL', 'ENGAGEMENT', 'LAUNCH', 'EXPANSION', 'COMPETITIVE', 'PROSPECTING'];
+const AUTONOMY_OPTIONS: { value: AutonomyLevel; label: string }[] = [
+  { value: AutonomyLevel.NOTIFY_ONLY, label: 'Notify Only' },
+  { value: AutonomyLevel.DRAFT_REVIEW, label: 'Draft + Review' },
+  { value: AutonomyLevel.AUTO_EXECUTE, label: 'Auto-Execute' },
+];
+
 export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: CatalogProductOption[] } = {}) {
-  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [templates, setTemplates] = useState<PlayTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [filterText, setFilterText] = useState('');
+  const [patchingAutonomyId, setPatchingAutonomyId] = useState<string | null>(null);
+  const [cloningId, setCloningId] = useState<string | null>(null);
+  const router = useRouter();
 
   const [industryPlaybooks, setIndustryPlaybooks] = useState<IndustryPlaybookRow[]>([]);
   const [ipLoading, setIpLoading] = useState(true);
@@ -231,7 +242,7 @@ export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: Catal
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const res = await fetch('/api/playbooks/templates');
+      const res = await fetch('/api/play-templates?scope=governance');
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates ?? []);
@@ -246,10 +257,36 @@ export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: Catal
     fetchIndustryPlaybooks();
   }, [fetchTemplates, fetchIndustryPlaybooks]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this playbook?')) return;
-    await fetch(`/api/playbooks/templates/${id}`, { method: 'DELETE' });
-    await fetchTemplates();
+  const handleDuplicateTemplate = async (templateId: string) => {
+    setCloningId(templateId);
+    try {
+      const res = await fetch(`/api/play-templates/${templateId}/clone`, { method: 'POST' });
+      const data = (await res.json().catch(() => ({}))) as { templateId?: string; error?: string };
+      if (!res.ok) {
+        alert(data.error ?? 'Could not duplicate template.');
+        return;
+      }
+      if (data.templateId) {
+        router.push(`/dashboard/my-company/play-templates/${data.templateId}/edit`);
+      }
+      await fetchTemplates();
+    } finally {
+      setCloningId(null);
+    }
+  };
+
+  const handleDefaultAutonomyChange = async (templateId: string, value: string) => {
+    setPatchingAutonomyId(templateId);
+    try {
+      await fetch(`/api/play-templates/${templateId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultAutonomyLevel: value }),
+      });
+      await fetchTemplates();
+    } finally {
+      setPatchingAutonomyId(null);
+    }
   };
 
   const handleDeleteIp = async (id: string) => {
@@ -265,13 +302,14 @@ export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: Catal
           (t) =>
             t.name.toLowerCase().includes(lowerFilter) ||
             (t.description ?? '').toLowerCase().includes(lowerFilter) ||
-            t.triggerType.toLowerCase().includes(lowerFilter),
+            (t.triggerType ?? '').toLowerCase().includes(lowerFilter) ||
+            (t.category ?? '').toLowerCase().includes(lowerFilter),
         )
       : templates;
 
-    const groups: Record<string, TemplateRow[]> = {};
+    const groups: Record<string, PlayTemplateRow[]> = {};
     for (const t of filtered) {
-      const cat = TRIGGER_TYPE_TO_CATEGORY[t.triggerType] ?? 'Other';
+      const cat = t.category ?? 'Other';
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(t);
     }
@@ -300,43 +338,6 @@ export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: Catal
         onSaved={() => { setCreatingIp(false); fetchIndustryPlaybooks(); }}
         onCancel={() => setCreatingIp(false)}
       />
-    );
-  }
-
-  if (editingId) {
-    return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setEditingId(null)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          &larr; Back to Playbooks
-        </button>
-        <PlaybookEditor
-          templateId={editingId}
-          onSaved={() => { setEditingId(null); fetchTemplates(); }}
-          onCancel={() => setEditingId(null)}
-        />
-      </div>
-    );
-  }
-
-  if (creating) {
-    return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setCreating(false)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          &larr; Back to Playbooks
-        </button>
-        <PlaybookEditor
-          onSaved={() => { setCreating(false); fetchTemplates(); }}
-          onCancel={() => setCreating(false)}
-        />
-      </div>
     );
   }
 
@@ -399,155 +400,187 @@ export function PlaybooksTab({ catalogProducts = [] }: { catalogProducts?: Catal
         )}
       </section>
 
-      {/* Play Templates Section */}
+      {/* Play Templates (governance only: default autonomy, signal rules; run plays from Play Catalog) */}
       <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Play Templates</h2>
-          <p className="text-sm text-muted-foreground">
-            {templates.length} playbooks across {Object.keys(grouped).length} categories.
-            Play templates define phases and actions; when signals or triggers fire, PlayRuns are created from these templates.
-          </p>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Play Templates</h2>
+            <p className="text-sm text-muted-foreground">
+              Create and govern play templates. Run plays from the Play Catalog.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href="/dashboard/my-company/play-templates/new"
+              className="text-sm font-semibold text-primary hover:text-primary/90"
+            >
+              + Create Template
+            </Link>
+            <Link
+              href="/dashboard/plays"
+              className="text-sm font-medium text-blue-400 hover:text-blue-300"
+            >
+              Open Play Catalog →
+            </Link>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors shrink-0"
-        >
-          + Create Playbook
-        </button>
-      </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Filter playbooks..."
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          className="flex-1 text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        <button
-          type="button"
-          onClick={() => setCollapsed(Object.fromEntries(CATEGORY_ORDER.map((c) => [c, true])))}
-          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5"
-        >
-          Collapse All
-        </button>
-        <button
-          type="button"
-          onClick={() => setCollapsed({})}
-          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5"
-        >
-          Expand All
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading playbooks...</p>
-      ) : templates.length === 0 ? (
-        <div className="text-center py-12 rounded-lg border border-dashed border-border">
-          <p className="text-muted-foreground mb-2">No playbooks yet.</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Filter templates..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            className="flex-1 text-sm rounded-md border border-border bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
           <button
             type="button"
-            onClick={() => setCreating(true)}
-            className="text-sm text-blue-400 hover:text-blue-300"
+            onClick={() => setCollapsed(Object.fromEntries(PLAY_CATEGORY_ORDER.map((c) => [c, true])))}
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5"
           >
-            Create your first playbook
+            Collapse All
+          </button>
+          <button
+            type="button"
+            onClick={() => setCollapsed({})}
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5"
+          >
+            Expand All
           </button>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {CATEGORY_ORDER.filter((cat) => grouped[cat]?.length).map((cat) => {
-            const items = grouped[cat];
-            const isCollapsed = collapsed[cat] ?? false;
-            const colorCls = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS['Other'];
-            const icon = CATEGORY_ICONS[cat] ?? '📋';
 
-            return (
-              <div
-                key={cat}
-                className={`rounded-lg border ${colorCls} overflow-hidden`}
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading play templates...</p>
+        ) : templates.length === 0 ? (
+          <div className="text-center py-12 rounded-lg border border-dashed border-border">
+            <p className="text-muted-foreground mb-2">No play templates yet.</p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
+              <Link
+                href="/dashboard/my-company/play-templates/new"
+                className="text-sm font-semibold text-primary hover:text-primary/90"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleCollapse(cat)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                + Create Template
+              </Link>
+              <Link href="/dashboard/plays" className="text-sm text-blue-400 hover:text-blue-300">
+                Open Play Catalog →
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {[
+              ...PLAY_CATEGORY_ORDER.filter((cat) => grouped[cat]?.length),
+              ...Object.keys(grouped).filter((cat) => !PLAY_CATEGORY_ORDER.includes(cat)),
+            ].map((cat) => {
+              const items = grouped[cat];
+              const isCollapsed = collapsed[cat] ?? false;
+              const colorCls = CATEGORY_COLORS[cat] ?? 'border-border bg-card/60';
+              const icon = CATEGORY_ICONS[cat] ?? '📋';
+
+              return (
+                <div
+                  key={cat}
+                  className={`rounded-lg border ${colorCls} overflow-hidden`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{icon}</span>
-                    <span className="text-sm font-semibold">{cat}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleCollapse(cat)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{icon}</span>
+                      <span className="text-sm font-semibold">{cat.replace(/_/g, ' ')}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({items.length} template{items.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
                     <span className="text-xs text-muted-foreground">
-                      ({items.length} playbook{items.length !== 1 ? 's' : ''})
+                      {isCollapsed ? '▸' : '▾'}
                     </span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {isCollapsed ? '▸' : '▾'}
-                  </span>
-                </button>
+                  </button>
 
-                {!isCollapsed && (
-                  <div className="px-4 pb-3 space-y-2">
-                    {items.map((t) => {
-                      const pb = priorityBadge(t.priority);
-                      return (
-                        <div
-                          key={t.id}
-                          className="rounded-md border border-border bg-card/80 p-3 hover:border-blue-500/30 transition-colors cursor-pointer"
-                          onClick={() => setEditingId(t.id)}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                                <h3 className="text-xs font-semibold truncate">{t.name}</h3>
-                                {t.isBuiltIn && (
-                                  <span className="text-[8px] font-bold uppercase tracking-wider px-1 py-0 rounded bg-blue-500/10 text-blue-400 border border-blue-500/25 shrink-0">
-                                    Built-in
+                  {!isCollapsed && (
+                    <div className="px-4 pb-3 space-y-2">
+                      {items.map((t) => {
+                        const autonomy = t.defaultAutonomyLevel ?? AutonomyLevel.DRAFT_REVIEW;
+                        const st = t.status ?? 'ACTIVE';
+                        const statusCls =
+                          st === 'DRAFT' ?
+                            'bg-amber-500/15 text-amber-600 border-amber-500/30'
+                          : st === 'ARCHIVED' ?
+                            'bg-muted text-muted-foreground border-border'
+                          : 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30';
+                        return (
+                          <div
+                            key={t.id}
+                            className="rounded-md border border-border bg-card/80 p-3 hover:border-blue-500/30 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="text-xs font-semibold truncate">{t.name}</h3>
+                                  <span
+                                    className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded border ${statusCls}`}
+                                  >
+                                    {st}
                                   </span>
+                                </div>
+                                {t.description && (
+                                  <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{t.description}</p>
                                 )}
-                                <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0 rounded border shrink-0 ${pb.cls}`}>
-                                  {pb.label}
-                                </span>
+                                <div className="flex items-center gap-3 text-[9px] text-muted-foreground mt-1">
+                                  <span>{t.phaseCount} phase{t.phaseCount !== 1 ? 's' : ''}</span>
+                                  <span className="uppercase">{t.triggerType}</span>
+                                </div>
                               </div>
-                              {t.description && (
-                                <p className="text-[10px] text-muted-foreground line-clamp-1">{t.description}</p>
-                              )}
-                              <div className="flex items-center gap-3 text-[9px] text-muted-foreground mt-1">
-                                <span>{t.stepCount} step{t.stepCount !== 1 ? 's' : ''}</span>
-                                {t.targetPersonas && t.targetPersonas.length > 0 && (
-                                  <span>{(t.targetPersonas as string[]).slice(0, 3).join(', ')}</span>
-                                )}
+                              <div className="flex flex-col items-end gap-2 shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href={`/dashboard/my-company/play-templates/${t.id}/edit`}
+                                    className="text-[10px] font-medium text-primary hover:text-primary/90 whitespace-nowrap"
+                                  >
+                                    Edit template →
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    disabled={cloningId === t.id || st === 'ARCHIVED'}
+                                    onClick={() => void handleDuplicateTemplate(t.id)}
+                                    className="text-[10px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 whitespace-nowrap"
+                                  >
+                                    {cloningId === t.id ? 'Duplicating…' : 'Duplicate'}
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap justify-end">
+                                  <label className="text-[10px] text-muted-foreground whitespace-nowrap">Default autonomy:</label>
+                                  <select
+                                    value={autonomy}
+                                    disabled={patchingAutonomyId === t.id || st === 'ARCHIVED'}
+                                    onChange={(e) => handleDefaultAutonomyChange(t.id, e.target.value)}
+                                    className="text-[10px] rounded border border-border bg-background px-2 py-1 text-foreground"
+                                  >
+                                    {AUTONOMY_OPTIONS.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                  </select>
+                                  <Link
+                                    href="/dashboard/roadmap"
+                                    className="text-[10px] text-blue-400 hover:text-blue-300 whitespace-nowrap"
+                                  >
+                                    Signal rules →
+                                  </Link>
+                                </div>
                               </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setEditingId(t.id); }}
-                                className="text-[10px] text-blue-400 hover:text-blue-300 px-1.5 py-0.5"
-                              >
-                                Edit
-                              </button>
-                              {!t.isBuiltIn && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }}
-                                  className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5"
-                                >
-                                  Delete
-                                </button>
-                              )}
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

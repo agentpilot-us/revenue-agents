@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
 /**
- * GET   /api/account-campaigns/[id] — full campaign detail with workflows
+ * GET   /api/account-campaigns/[id] — campaign + PlayRun stats for the account
  * PATCH /api/account-campaigns/[id] — update campaign status, phase, name
  */
 
@@ -23,33 +23,6 @@ export async function GET(
       where: { id, userId: session.user.id },
       include: {
         company: { select: { id: true, name: true, industry: true, domain: true } },
-        workflows: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            template: { select: { id: true, name: true, triggerType: true } },
-            targetDivision: { select: { id: true, customName: true, type: true } },
-            targetContact: {
-              select: { id: true, firstName: true, lastName: true, title: true, email: true },
-            },
-            accountSignal: { select: { id: true, title: true, type: true } },
-            steps: {
-              orderBy: { stepOrder: 'asc' },
-              select: {
-                id: true,
-                stepOrder: true,
-                stepType: true,
-                contentType: true,
-                channel: true,
-                status: true,
-                dueAt: true,
-                completedAt: true,
-                contact: {
-                  select: { id: true, firstName: true, lastName: true, title: true },
-                },
-              },
-            },
-          },
-        },
       },
     });
 
@@ -57,20 +30,38 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Compute campaign-level stats
-    const threads = campaign.workflows.length;
-    const completedThreads = campaign.workflows.filter((w) => w.status === 'completed').length;
-    const totalSteps = campaign.workflows.reduce((sum, w) => sum + w.steps.length, 0);
-    const completedSteps = campaign.workflows.reduce(
-      (sum, w) => sum + w.steps.filter((s) => s.status === 'sent' || s.status === 'skipped').length,
+    const playRuns = await prisma.playRun.findMany({
+      where: { companyId: campaign.companyId, userId: session.user.id },
+      select: {
+        id: true,
+        status: true,
+        playTemplate: { select: { id: true, name: true } },
+        triggerContext: true,
+        phaseRuns: { select: { id: true, status: true } },
+      },
+      orderBy: { activatedAt: 'desc' },
+      take: 50,
+    });
+
+    const threads = playRuns.length;
+    const completedThreads = playRuns.filter((r) => r.status === 'COMPLETED').length;
+    const totalSteps = playRuns.reduce((sum, r) => sum + r.phaseRuns.length, 0);
+    const completedSteps = playRuns.reduce(
+      (sum, r) => sum + r.phaseRuns.filter((p) => p.status === 'COMPLETED').length,
       0,
     );
-    const outcomes = campaign.workflows
-      .filter((w) => w.outcome)
-      .map((w) => ({ workflowId: w.id, outcome: w.outcome, divisionName: w.targetDivision?.customName ?? w.targetDivision?.type }));
+
+    const outcomes = playRuns
+      .map((r) => {
+        const ctx = r.triggerContext as Record<string, unknown> | null;
+        const o = ctx?.dismissOutcome;
+        return typeof o === 'string' ? { playRunId: r.id, outcome: o } : null;
+      })
+      .filter(Boolean);
 
     return NextResponse.json({
-      campaign,
+      campaign: { ...campaign, workflows: [] },
+      playRuns,
       stats: { threads, completedThreads, totalSteps, completedSteps, outcomes },
     });
   } catch (error) {

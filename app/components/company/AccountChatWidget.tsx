@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChatUI } from '@/app/chat/ChatUI';
 import { MessageSquare, X, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DEMO_CHAT_THEME } from '@/lib/demo-chat-theme';
+
+const T = DEMO_CHAT_THEME;
 
 interface AccountChatWidgetProps {
   accountId: string;
@@ -30,13 +32,26 @@ export function AccountChatWidget({ accountId, companyName }: AccountChatWidgetP
   if (isMinimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50 md:hidden">
-        <Button
+        <button
+          type="button"
           onClick={() => setIsMinimized(false)}
-          className="rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700 text-white"
-          size="icon"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${T.ACCENT}, ${T.PURPLE})`,
+            border: 'none',
+            color: '#fff',
+            cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(59,130,246,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          aria-label="Open chat"
         >
           <MessageSquare className="h-6 w-6" />
-        </Button>
+        </button>
       </div>
     );
   }
@@ -44,58 +59,123 @@ export function AccountChatWidget({ accountId, companyName }: AccountChatWidgetP
   return (
     <div
       className={`fixed ${
-        isExpanded ? 'right-0 top-0 h-screen w-full md:w-96' : 'bottom-4 right-4 h-[500px] w-[380px]'
-      } z-50 flex flex-col bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-2xl transition-all duration-300 ease-in-out`}
+        isExpanded ? 'right-0 top-0 h-screen w-full md:w-[400px]' : 'bottom-4 right-4 h-[560px] w-[400px]'
+      } z-50 flex flex-col transition-all duration-300 ease-in-out`}
+      style={{
+        background: T.BG,
+        border: `1px solid ${T.BORDER}`,
+        borderRadius: isExpanded ? 0 : 16,
+        boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 rounded-t-lg">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-blue-600" />
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Chat Agent
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-              {companyName}
-            </p>
+      {/* Header – match Autonomous Play demo */}
+      <div
+        style={{
+          padding: '12px 16px',
+          borderBottom: `1px solid ${T.BORDER}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: T.SURFACE,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: `linear-gradient(135deg, ${T.ACCENT}, ${T.PURPLE})`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              fontWeight: 700,
+              color: '#fff',
+            }}
+          >
+            A
           </div>
+          <span style={{ fontWeight: 600, fontSize: 15, color: T.TEXT }}>AgentPilot</span>
+          <span
+            style={{
+              fontSize: 12,
+              color: T.TEXT2,
+              background: T.SURFACE2,
+              padding: '2px 8px',
+              borderRadius: 4,
+              marginLeft: 4,
+            }}
+          >
+            Chat
+          </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <Link
             href={`/chat?play=expansion&accountId=${accountId}`}
             title="Open chat in full page"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-600 dark:text-gray-400"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              color: T.TEXT2,
+              background: 'none',
+            }}
+            className="hover:opacity-80"
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
           </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+          <button
+            type="button"
             onClick={() => setIsExpanded(!isExpanded)}
             title={isExpanded ? 'Collapse' : 'Expand'}
+            style={{
+              background: 'none',
+              border: `1px solid ${T.BORDER}`,
+              color: T.TEXT2,
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronUp className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
             onClick={() => setIsMinimized(true)}
             title="Minimize"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: T.TEXT2,
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
             <X className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </div>
+      <div style={{ fontSize: 11, color: T.TEXT2, padding: '4px 16px', borderBottom: `1px solid ${T.BORDER}` }}>
+        {companyName}
+      </div>
 
-      {/* Chat Content: flex column so input stays visible at bottom */}
+      {/* Chat Content */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <ChatUI playId="expansion" accountId={accountId} compact />
+        <ChatUI playId="expansion" accountId={accountId} compact embedInDemo />
       </div>
     </div>
   );

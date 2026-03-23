@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
 import HotSignalCard, {
   type HotSignalItem,
   type CompanyTriggerItem,
@@ -192,14 +194,25 @@ export default function HotSignalsFeed({
     return items;
   }, [filteredSignals, filteredTriggers, templatePreviews, triggerTemplatePreviews]);
 
+  // Demo bypass: creates PlayRun with 7 pre-seeded actions directly (no SignalPlayMapping/activation). Set false for production.
+  const DEMO_RUN_PLAY_BYPASS = true;
+
   const handleWorkSignal = useCallback(
     async (signalId: string, companyId: string) => {
       setWorking(signalId);
       try {
-        const res = await fetch(`/api/signals/${signalId}/start-play`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
+        const url = DEMO_RUN_PLAY_BYPASS
+          ? '/api/demo/run-play'
+          : `/api/signals/${signalId}/start-play`;
+        const fetchOpts: RequestInit = DEMO_RUN_PLAY_BYPASS
+          ? {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signalId }),
+            }
+          : { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+
+        const res = await fetch(url, fetchOpts);
         const data = await res.json();
 
         if (res.ok) {
@@ -207,16 +220,33 @@ export default function HotSignalsFeed({
           if (playRunId) {
             setActedSignalIds((prev) => new Set(prev).add(signalId));
             onRefresh();
-            window.location.href = `/dashboard/companies/${companyId}/plays/run/${playRunId}`;
+            const redirect =
+              typeof data.redirect === 'string'
+                ? data.redirect
+                : myDayUrlAfterPlayStart(playRunId, companyId);
+            window.location.href = redirect;
             return;
           }
         }
-        if (res.status === 404) {
+        if (!DEMO_RUN_PLAY_BYPASS && res.status === 404) {
           setActedSignalIds((prev) => new Set(prev).add(signalId));
           onRefresh();
+          const configUrl = `/dashboard/roadmap?companyId=${companyId}`;
+          toast.warning('No play configured for this signal', {
+            description: 'Go to Strategic Account Plan → Configuration → Play Rules to add a rule.',
+            action: {
+              label: 'Open Configuration',
+              onClick: () => {
+                window.location.href = configUrl;
+              },
+            },
+          });
         }
-        if (!res.ok && res.status !== 404) {
-          console.error('start-play failed:', res.status, data);
+        if (!res.ok && (DEMO_RUN_PLAY_BYPASS || res.status !== 404)) {
+          console.error('Work This failed:', res.status, data);
+          if (DEMO_RUN_PLAY_BYPASS && data?.error) {
+            toast.error(data.error);
+          }
         }
       } catch (err) {
         console.error('Failed to start play from signal:', err);
@@ -311,7 +341,7 @@ export default function HotSignalsFeed({
       setSelectedAccounts(new Set());
 
       if (lastRunId && lastCompanyId) {
-        window.location.href = `/dashboard/companies/${lastCompanyId}/plays/run/${lastRunId}`;
+        window.location.href = myDayUrlAfterPlayStart(lastRunId, lastCompanyId);
       } else {
         onRefresh();
       }

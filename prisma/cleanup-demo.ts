@@ -9,16 +9,14 @@
 
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { normalizeDatabaseUrlForPg } from '@/lib/prisma-connection-string';
 
 function createPrisma(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error('DATABASE_URL is not set. Use: dotenv -e .env.local -- tsx prisma/cleanup-demo.ts');
   }
-  const normalized = connectionString
-    .replace(/sslmode=require\b/g, 'sslmode=verify-full')
-    .replace(/sslmode=prefer\b/g, 'sslmode=verify-full')
-    .replace(/sslmode=verify-ca\b/g, 'sslmode=verify-full');
+  const normalized = normalizeDatabaseUrlForPg(connectionString);
   const adapter = new PrismaPg({ connectionString: normalized });
   return new PrismaClient({
     adapter,

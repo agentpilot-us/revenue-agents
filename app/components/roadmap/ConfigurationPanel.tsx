@@ -113,11 +113,9 @@ export default function ConfigurationPanel({
         <SignalConfigPanel companyId={companyId} />
       </AccordionSection>
 
-      {roadmapId && (
-        <AccordionSection title="Play Rules">
-          <PlayRulesPanel roadmapId={roadmapId} />
-        </AccordionSection>
-      )}
+      <AccordionSection title="Play Rules">
+        <PlayRulesPanel roadmapId={roadmapId ?? undefined} companyId={companyId} />
+      </AccordionSection>
 
       <AccordionSection title="Conditions &amp; Modifiers" count={conditions.length}>
         {conditions.length === 0 ? (

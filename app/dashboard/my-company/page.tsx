@@ -2,8 +2,26 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { MyCompanyClient } from '@/app/dashboard/my-company/MyCompanyClient';
+import type { TabId } from '@/app/dashboard/my-company/MyCompanyTabs';
 
-export default async function MyCompanyPage() {
+const VALID_TABS: TabId[] = [
+  'Profile',
+  'Products',
+  'Content Library',
+  'Playbooks',
+  'Messaging',
+  'Governance',
+  'Intelligence',
+];
+
+type PageProps = {
+  searchParams: Promise<{ tab?: string }>;
+};
+
+export default async function MyCompanyPage({ searchParams }: PageProps) {
+  const { tab } = await searchParams;
+  const initialTab =
+    tab && VALID_TABS.includes(tab as TabId) ? (tab as TabId) : undefined;
   const session = await auth();
   if (!session?.user?.id) {
     redirect('/api/auth/signin');
@@ -133,6 +151,7 @@ export default async function MyCompanyPage() {
 
   return (
     <MyCompanyClient
+      initialTab={initialTab}
       profile={profileData}
       health={{ companyCount, contactCount, roadmapCount, productCount, signalCount }}
       companyProducts={serializedProducts}

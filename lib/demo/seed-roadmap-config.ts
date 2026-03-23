@@ -20,42 +20,30 @@ export async function seedDefaultRoadmapConfig(roadmapId: string): Promise<void>
   const templates = await prisma.playTemplate.findMany({
     where: { userId: roadmap.userId, status: 'ACTIVE' },
     select: { id: true },
+    orderBy: { createdAt: 'asc' },
     take: 6,
   });
   const firstTemplateId = templates[0]?.id;
   if (firstTemplateId) {
     const signalTypes = ['earnings_call', 'job_posting_signal', 'product_announcement'];
-    for (const signalType of signalTypes) {
-      await prisma.signalPlayMapping.upsert({
-        where: {
-          userId_signalType_playTemplateId: {
-            userId: roadmap.userId,
-            signalType,
-            playTemplateId: firstTemplateId,
-          },
-        },
-        create: {
-          userId: roadmap.userId,
-          signalType,
-          playTemplateId: firstTemplateId,
-          autoActivate: false,
-        },
-        update: {},
-      });
-    }
-    for (const t of templates.slice(0, 3)) {
-      await prisma.accountPlayActivation.upsert({
-        where: {
-          roadmapId_playTemplateId: { roadmapId, playTemplateId: t.id },
-        },
-        create: {
-          roadmapId,
-          playTemplateId: t.id,
-          isActive: true,
-        },
-        update: {},
-      });
-    }
+    const mappingData = signalTypes.map((signalType) => ({
+      userId: roadmap.userId,
+      signalType,
+      playTemplateId: firstTemplateId,
+      autoActivate: false,
+    }));
+    await prisma.signalPlayMapping.createMany({
+      data: mappingData,
+      skipDuplicates: true,
+    });
+    await prisma.accountPlayActivation.createMany({
+      data: templates.slice(0, 3).map((t) => ({
+        roadmapId,
+        playTemplateId: t.id,
+        isActive: true,
+      })),
+      skipDuplicates: true,
+    });
   }
 
   // —— Conditions & modifiers (only if none exist) ——

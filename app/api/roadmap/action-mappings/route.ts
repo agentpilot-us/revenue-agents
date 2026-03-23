@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
       where: { roadmapId },
       include: {
         signalRule: { select: { id: true, name: true, category: true } },
-        template: { select: { id: true, name: true, triggerType: true } },
       },
       orderBy: [{ priorityWeight: 'asc' }, { createdAt: 'asc' }],
     });

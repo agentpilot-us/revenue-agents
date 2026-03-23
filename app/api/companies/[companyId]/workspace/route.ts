@@ -21,7 +21,6 @@ export async function GET(
       company,
       departments,
       contacts,
-      workflows,
       playRuns,
       signals,
       recentActivities,
@@ -76,22 +75,6 @@ export async function GET(
             select: { customName: true, type: true },
           },
         },
-      }),
-
-      prisma.actionWorkflow.findMany({
-        where: { companyId, userId, status: { in: ['pending', 'in_progress'] } },
-        include: {
-          template: { select: { name: true } },
-          accountSignal: { select: { title: true } },
-          targetContact: {
-            select: { firstName: true, lastName: true, title: true },
-          },
-          steps: {
-            orderBy: { stepOrder: 'asc' },
-            select: { id: true, status: true, stepType: true, contentType: true },
-          },
-        },
-        orderBy: [{ urgencyScore: 'desc' }],
       }),
 
       prisma.playRun.findMany({
@@ -155,7 +138,7 @@ export async function GET(
       company,
       departments,
       contacts,
-      workflows,
+      workflows: [],
       playRuns,
       signals,
       recentActivities,

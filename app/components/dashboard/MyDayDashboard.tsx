@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import type { HighlightPlayRunTarget } from './NextStepCard';
 import ActionQueueList from './ActionQueueList';
 import WeeklyStatsBar from './WeeklyStatsBar';
 import HotSignalsFeed from './HotSignalsFeed';
@@ -46,16 +48,31 @@ type MyDayData = {
 
 export default function MyDayDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<MyDayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [dismissedTriggerIds, setDismissedTriggerIds] = useState<Set<string>>(new Set());
   const [dismissedRecIds, setDismissedRecIds] = useState<Set<string>>(new Set());
+  const [highlightPlayRun, setHighlightPlayRun] = useState<HighlightPlayRunTarget | null>(null);
+  /** Avoid re-processing the same focusRun; allow a new run id on repeat navigations. */
+  const lastProcessedFocusRunRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/my-day');
+      const frUrl = searchParams.get('focusRun')?.trim();
+      const fcUrl = searchParams.get('focusCompanyId')?.trim();
+      const runId = frUrl || highlightPlayRun?.runId?.trim();
+      const companyId = fcUrl || highlightPlayRun?.companyId?.trim();
+      const params = new URLSearchParams();
+      if (runId) {
+        params.set('focusRun', runId);
+        if (companyId) params.set('focusCompanyId', companyId);
+      }
+      const qs = params.toString();
+      const url = qs ? `/api/dashboard/my-day?${qs}` : '/api/dashboard/my-day';
+      const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -65,11 +82,37 @@ export default function MyDayDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchParams, highlightPlayRun?.runId, highlightPlayRun?.companyId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Capture ?focusRun=, strip from URL, keep local highlight for a few seconds (each new run id)
+  useEffect(() => {
+    const fr = searchParams.get('focusRun');
+    if (!fr || lastProcessedFocusRunRef.current === fr) return;
+    lastProcessedFocusRunRef.current = fr;
+    const fc = searchParams.get('focusCompanyId') ?? undefined;
+    setHighlightPlayRun({ runId: fr, companyId: fc });
+    router.replace('/dashboard', { scroll: false });
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    if (!data || !highlightPlayRun) return;
+    const id = requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-myd-focus-run="${highlightPlayRun.runId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [data, highlightPlayRun?.runId, highlightPlayRun?.companyId]);
+
+  useEffect(() => {
+    if (!highlightPlayRun) return;
+    const t = setTimeout(() => setHighlightPlayRun(null), 4000);
+    return () => clearTimeout(t);
+  }, [highlightPlayRun?.runId, highlightPlayRun?.companyId]);
 
   useEffect(() => {
     fetch('/api/dashboard/trigger-dismiss')
@@ -150,7 +193,7 @@ export default function MyDayDashboard() {
           const data = await res.json();
           const runId = data.playRunId ?? data.playRun?.id;
           if (runId) {
-            router.push(`/dashboard/companies/${play.companyId}/plays/run/${runId}`);
+            router.push(myDayUrlAfterPlayStart(runId, play.companyId));
           } else {
             router.push('/dashboard');
           }
@@ -208,7 +251,7 @@ export default function MyDayDashboard() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
-            onClick={() => router.push('/dashboard/roadmap?play=custom')}
+            onClick={() => router.push('/dashboard/plays')}
             style={{
               padding: '8px 18px',
               borderRadius: 8,
@@ -278,6 +321,7 @@ export default function MyDayDashboard() {
         onStartRecommendedPlay={handleStartRecommendedPlay}
         onDismissRecommendedPlay={handleDismissRecommendedPlay}
         onCreateAction={() => setModalOpen(true)}
+        highlightPlayRun={highlightPlayRun}
       />
 
       <CreateActionModal

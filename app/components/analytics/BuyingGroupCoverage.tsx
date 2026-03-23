@@ -1,5 +1,7 @@
 'use client';
 
+import { dash } from '@/app/dashboard/dashboard-classes';
+
 interface BuyingGroupCoverageData {
   type: string;
   typeLabel: string;
@@ -14,10 +16,10 @@ interface Props {
 
 export function BuyingGroupCoverage({ data }: Props) {
   return (
-    <div className="p-6 bg-zinc-800/50 border border-slate-700 rounded-lg">
+    <div className={dash.card}>
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-slate-100 mb-1">Buying Group Coverage</h2>
-        <p className="text-sm text-slate-400">
+        <h2 className={`text-xl font-semibold ${dash.sectionTitle} mb-1`}>Buying Group Coverage</h2>
+        <p className="text-sm text-muted-foreground">
           Percentage of accounts with contacts in each buying group type
         </p>
       </div>
@@ -27,22 +29,22 @@ export function BuyingGroupCoverage({ data }: Props) {
           {data.map((item) => (
             <div
               key={item.type}
-              className="p-4 bg-zinc-900/50 rounded-lg border border-slate-700"
+              className={dash.cardTight}
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="text-sm font-medium text-slate-200">{item.typeLabel}</div>
-                <div className="text-lg font-semibold text-amber-400">
+                <div className="text-sm font-medium text-foreground">{item.typeLabel}</div>
+                <div className="text-lg font-semibold text-primary">
                   {item.coverage.toFixed(1)}%
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-amber-500 rounded-full transition-all"
+                    className="h-full bg-primary rounded-full transition-all"
                     style={{ width: `${item.coverage}%` }}
                   />
                 </div>
-                <div className="text-xs text-slate-400 whitespace-nowrap">
+                <div className="text-xs text-muted-foreground whitespace-nowrap">
                   {item.accountsWithContacts} / {item.totalAccounts} accounts
                 </div>
               </div>
@@ -50,7 +52,7 @@ export function BuyingGroupCoverage({ data }: Props) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-500">No buying group coverage data available</p>
+        <p className="text-sm text-muted-foreground">No buying group coverage data available</p>
       )}
     </div>
   );

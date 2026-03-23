@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 
-const TABS = ['Profile', 'Products', 'Content Library', 'Playbooks', 'Messaging', 'Intelligence'] as const;
+const TABS = [
+  'Profile',
+  'Products',
+  'Content Library',
+  'Playbooks',
+  'Messaging',
+  'Governance',
+  'Intelligence',
+] as const;
 export type TabId = (typeof TABS)[number];
 
 type Props = {

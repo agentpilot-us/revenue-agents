@@ -1,11 +1,33 @@
 /**
  * Generates content for a PlayAction using its ContentTemplate: builds context from
  * company/template, calls the content pipeline, updates PlayAction and creates ContentGenerationLog.
+ * When ContentTemplate.contentGenerationType is set, uses the prompt from content-generation-types.
  */
 
 import type { ChannelId } from '@/lib/content/channel-config';
 import { generateOneContent } from '@/lib/content/generate-content';
 import { prisma } from '@/lib/db';
+import { getPromptTemplateForType } from './content-generation-types';
+
+/** Hard cap per field for contact / JSON intel appended to userContext (token budget). */
+const CONTACT_INTEL_FIELD_MAX = 500;
+
+/** Capped blocks appended to userContext (recent signals, engagement lines, objections). */
+const SIGNAL_SNIPPET_MAX = 200;
+const ACTIVITY_SNIPPET_MAX = 200;
+const OBJECTION_SNIPPET_MAX = 200;
+
+function capIntelText(s: string | null | undefined): string {
+  const t = (s ?? '').trim();
+  if (t.length <= CONTACT_INTEL_FIELD_MAX) return t;
+  return `${t.slice(0, CONTACT_INTEL_FIELD_MAX)}…`;
+}
+
+function capSnippet(s: string | null | undefined, max: number): string {
+  const t = (s ?? '').trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
+}
 
 export type GeneratePlayActionContentInput = {
   actionId: string;
@@ -39,14 +61,33 @@ function playContentTypeToChannelId(contentType: string, channel?: string | null
   return 'email';
 }
 
-/** Substitute {{account.name}} and similar in the template prompt. */
+/** Substitute {{account.name}}, {{contact.name}}, {{signal.summary}}, etc. in the template prompt. */
 function substitutePromptTemplate(
   promptTemplate: string,
-  context: { companyName?: string; valueNarrative?: string },
+  context: {
+    companyName?: string;
+    valueNarrative?: string;
+    renewalMessaging?: string;
+    competitiveRules?: string;
+    brandVoice?: string;
+    contactName?: string;
+    contactTitle?: string;
+    signalSummary?: string;
+    signalTitle?: string;
+    divisionName?: string;
+  },
 ): string {
   return promptTemplate
     .replace(/\{\{account\.name\}\}/g, context.companyName ?? '{{account.name}}')
-    .replace(/\{\{governance\.valueNarrative\}\}/g, context.valueNarrative ?? '');
+    .replace(/\{\{governance\.valueNarrative\}\}/g, context.valueNarrative ?? '')
+    .replace(/\{\{governance\.renewalMessaging\}\}/g, context.renewalMessaging ?? '')
+    .replace(/\{\{governance\.competitiveRules\}\}/g, context.competitiveRules ?? '')
+    .replace(/\{\{governance\.brandVoice\}\}/g, context.brandVoice ?? '')
+    .replace(/\{\{contact\.name\}\}/g, context.contactName ?? '{{contact.name}}')
+    .replace(/\{\{contact\.title\}\}/g, context.contactTitle ?? '{{contact.title}}')
+    .replace(/\{\{signal\.summary\}\}/g, context.signalSummary ?? '')
+    .replace(/\{\{signal\.title\}\}/g, context.signalTitle ?? '')
+    .replace(/\{\{division\.name\}\}/g, context.divisionName ?? '{{division.name}}');
 }
 
 export async function generatePlayActionContent(input: GeneratePlayActionContentInput) {
@@ -72,17 +113,124 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
   });
 
   if (!action) throw new Error('PlayAction not found');
-  if (action.phaseRun.playRun.userId !== userId) throw new Error('Unauthorized');
-  if (!action.contentTemplate) throw new Error('PlayAction has no ContentTemplate');
+  type PlayRunWithCompany = { userId: string; company: { id: string; name: string | null }; accountSignalId: string | null };
+  type ActionWithInclude = typeof action & {
+    phaseRun: { playRun: PlayRunWithCompany } | null;
+    contentTemplate: {
+      id: string;
+      name: string;
+      contentType: string;
+      channel?: string | null;
+      promptTemplate: string;
+      systemInstructions?: string | null;
+      governanceRules?: string | null;
+      approvedMessaging?: string | null;
+      prohibitedContent?: string | null;
+      modelTier: string;
+      contextSources: string[];
+      contentGenerationType?: string;
+    } | null;
+  };
+  const act = action as ActionWithInclude;
+  const playRun = act.phaseRun?.playRun;
+  if (!playRun || playRun.userId !== userId) throw new Error('Unauthorized');
+  const template = act.contentTemplate;
+  if (!template) throw new Error('PlayAction has no ContentTemplate');
 
-  const template = action.contentTemplate;
-  const company = action.phaseRun.playRun.company;
+  const company = playRun.company;
   const companyId = company.id;
+
+  let divisionName: string | undefined;
+  let divisionId: string | undefined;
+  let roadmapIntelExtra = '';
+  const runWithTarget = playRun as { roadmapTargetId?: string | null };
+  if (runWithTarget.roadmapTargetId) {
+    const target = await prisma.roadmapTarget.findUnique({
+      where: { id: runWithTarget.roadmapTargetId },
+      select: { name: true, companyDepartmentId: true, intelligence: true },
+    });
+    if (target?.name) divisionName = target.name;
+    if (target?.companyDepartmentId) divisionId = target.companyDepartmentId;
+    if (target?.intelligence != null) {
+      const intelStr =
+        typeof target.intelligence === 'string'
+          ? target.intelligence
+          : JSON.stringify(target.intelligence);
+      const capped = capIntelText(intelStr);
+      if (capped) {
+        roadmapIntelExtra = `\n\nRoadmap / account focus (from strategic plan):\n${capped}`;
+      }
+    }
+  }
+
+  let signalSummary = '';
+  let signalTitle: string | undefined;
+  let signalContext: { title?: string; summary?: string } | undefined;
+  if (playRun.accountSignalId) {
+    const sig = await prisma.accountSignal.findUnique({
+      where: { id: playRun.accountSignalId },
+      select: { title: true, summary: true },
+    });
+    if (sig) {
+      signalSummary = sig.summary ?? sig.title ?? '';
+      signalTitle = sig.title ?? undefined;
+      signalContext = {
+        title: sig.title ?? undefined,
+        summary: sig.summary ?? undefined,
+      };
+    }
+  }
 
   const channelId = playContentTypeToChannelId(template.contentType, template.channel ?? undefined);
 
-  const contacts = [];
-  if (action.contactName || action.contactTitle) {
+  const contacts: Array<{
+    firstName?: string | null;
+    lastName?: string | null;
+    title?: string | null;
+  }> = [];
+
+  let contactIntelExtra = '';
+  let resolvedContactId: string | null = null;
+  const emailTrim = action.contactEmail?.trim();
+  if (emailTrim) {
+    const dbContact = await prisma.contact.findFirst({
+      where: {
+        companyId,
+        email: { equals: emailTrim, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        title: true,
+        bio: true,
+        enrichedData: true,
+      },
+    });
+    if (dbContact) {
+      resolvedContactId = dbContact.id;
+      contacts.push({
+        firstName: dbContact.firstName,
+        lastName: dbContact.lastName,
+        title: dbContact.title ?? action.contactTitle ?? null,
+      });
+      const parts: string[] = [];
+      if (dbContact.bio?.trim()) {
+        parts.push(`Bio: ${capIntelText(dbContact.bio)}`);
+      }
+      if (dbContact.enrichedData != null) {
+        const edStr =
+          typeof dbContact.enrichedData === 'string'
+            ? dbContact.enrichedData
+            : JSON.stringify(dbContact.enrichedData);
+        parts.push(`Enrichment: ${capIntelText(edStr)}`);
+      }
+      if (parts.length) {
+        contactIntelExtra = `\n\nContact intel:\n${parts.join('\n')}`;
+      }
+    }
+  }
+  if (contacts.length === 0 && (action.contactName || action.contactTitle)) {
     const parts = (action.contactName ?? '').split(/\s+/);
     contacts.push({
       firstName: parts[0] ?? null,
@@ -91,21 +239,120 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
     });
   }
 
+  const recentSignals = await prisma.accountSignal.findMany({
+    where: { companyId, userId },
+    orderBy: { publishedAt: 'desc' },
+    take: 3,
+    select: { title: true, summary: true },
+  });
+  let recentSignalsExtra = '';
+  if (recentSignals.length) {
+    const lines = recentSignals.map((s) => {
+      const title = capSnippet(s.title, SIGNAL_SNIPPET_MAX);
+      const sum = s.summary ? capSnippet(s.summary, SIGNAL_SNIPPET_MAX) : '';
+      return sum ? `- ${title}: ${sum}` : `- ${title}`;
+    });
+    recentSignalsExtra = `\n\nRecent signals:\n${lines.join('\n')}`;
+  }
+
+  let recentEngagementExtra = '';
+  if (resolvedContactId) {
+    const acts = await prisma.activity.findMany({
+      where: { contactId: resolvedContactId, userId },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { type: true, createdAt: true, summary: true },
+    });
+    if (acts.length) {
+      const lines = acts.map(
+        (a) =>
+          `- ${capSnippet(a.type, ACTIVITY_SNIPPET_MAX)} @ ${a.createdAt.toISOString()}: ${capSnippet(a.summary, ACTIVITY_SNIPPET_MAX)}`,
+      );
+      recentEngagementExtra = `\n\nRecent engagement:\n${lines.join('\n')}`;
+    }
+  }
+
+  const companyRow = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { activeObjections: true },
+  });
+  let knownObjectionsExtra = '';
+  const objectionsRaw = companyRow?.activeObjections;
+  if (objectionsRaw != null && Array.isArray(objectionsRaw) && objectionsRaw.length > 0) {
+    const top = objectionsRaw.slice(0, 3);
+    const lines: string[] = [];
+    for (const item of top) {
+      if (item && typeof item === 'object' && item !== null && 'objection' in item) {
+        lines.push(
+          `- ${capSnippet(String((item as { objection: unknown }).objection), OBJECTION_SNIPPET_MAX)}`,
+        );
+      } else {
+        lines.push(`- ${capSnippet(JSON.stringify(item), OBJECTION_SNIPPET_MAX)}`);
+      }
+    }
+    if (lines.length) {
+      knownObjectionsExtra = `\n\nKnown objections:\n${lines.join('\n')}`;
+    }
+  }
+
   let valueNarrative = '';
+  let renewalMessaging = '';
+  let competitiveRules = '';
+  let brandVoice = '';
   try {
     const governance = await prisma.playGovernance.findUnique({
       where: { userId },
-      select: { valueNarrative: true },
+      select: {
+        valueNarrative: true,
+        renewalMessaging: true,
+        competitiveRules: true,
+        brandVoice: true,
+      },
     });
     valueNarrative = (governance?.valueNarrative as string) ?? '';
+    renewalMessaging = (governance?.renewalMessaging as string) ?? '';
+    competitiveRules =
+      typeof governance?.competitiveRules === 'object'
+        ? JSON.stringify(governance.competitiveRules)
+        : (governance?.competitiveRules as string) ?? '';
+    brandVoice = (governance?.brandVoice as string) ?? '';
   } catch {
     // optional
   }
 
-  const userContext = substitutePromptTemplate(template.promptTemplate, {
-    companyName: company.name ?? undefined,
-    valueNarrative,
-  });
+  let promptToUse = template.promptTemplate;
+  const contentGenType =
+    (template as { contentGenerationType?: string }).contentGenerationType;
+  if (contentGenType) {
+    const typePrompt = getPromptTemplateForType(contentGenType);
+    if (typePrompt) {
+      promptToUse =
+        contentGenType === 'custom_content'
+          ? typePrompt.replace(
+              '{{userInstructions}}',
+              template.promptTemplate || template.name,
+            )
+          : typePrompt;
+    }
+  }
+  const userContext =
+    substitutePromptTemplate(promptToUse, {
+      companyName: company.name ?? undefined,
+      valueNarrative,
+      renewalMessaging,
+      competitiveRules,
+      brandVoice,
+      contactName: action.contactName ?? undefined,
+      contactTitle: action.contactTitle ?? undefined,
+      signalSummary: signalSummary || undefined,
+      signalTitle,
+      divisionName,
+    }) +
+    contactIntelExtra +
+    roadmapIntelExtra +
+    recentSignalsExtra +
+    recentEngagementExtra +
+    knownObjectionsExtra;
 
   const systemSuffix = [
     template.systemInstructions,
@@ -120,9 +367,10 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
     companyId,
     userId,
     channel: channelId,
+    divisionId,
     contacts: contacts.length ? contacts : undefined,
     userContext,
-    signalContext: undefined,
+    signalContext,
     eventContext: undefined,
   };
 
@@ -159,7 +407,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
         generatedAt: new Date(),
         contextSnapshot: {
           companyName: company.name,
-          contentType: template.contentType,
+          contentType: (template as { contentType: string }).contentType,
           channel: channelId,
         } as import('@prisma/client').Prisma.InputJsonValue,
       },

@@ -7,6 +7,7 @@ type PlayRun = {
   id: string;
   companyId: string;
   status: string;
+  createdAt?: string;
   company: { id: string; name: string };
   playTemplate: { id: string; name: string; slug: string };
   phaseRuns: Array<{
@@ -18,6 +19,7 @@ type PlayRun = {
       title: string;
       status: string;
       actionType: string;
+      suggestedDate: string | null;
       contactName: string | null;
       contactEmail: string | null;
       contactTitle: string | null;
@@ -27,7 +29,13 @@ type PlayRun = {
       editedSubject: string | null;
       cooldownWarning: string | null;
       alternateContact: string | null;
-      contentTemplate: { id: string; name: string; contentType: string } | null;
+      contentTemplate: {
+        id: string;
+        name: string;
+        contentType: string;
+        channel?: string | null;
+        contentGenerationType?: string | null;
+      } | null;
     }>;
   }>;
 };
@@ -53,11 +61,57 @@ type Props = {
   runId: string;
 };
 
+/** Primary CTA label for Generate button based on content generation type or channel. */
+function getGenerateButtonLabel(action: PlayRun['phaseRuns'][0]['actions'][0]): string {
+  const ct = action.contentTemplate;
+  if (!ct) return 'Generate';
+  const type = (ct as { contentGenerationType?: string | null }).contentGenerationType;
+  const channel = (ct as { channel?: string | null }).channel?.toUpperCase();
+  if (type) {
+    if (type === 'contact_research') return 'Research Contacts';
+    if (type === 'meeting_talking_points' || type === 'meeting_agenda') return 'Prep Meeting';
+    if (type === 'executive_briefing' || type === 'account_research_brief') return 'Generate Brief';
+    if (type.startsWith('linkedin_')) return 'Generate LinkedIn';
+    if (type === 'phone_call_script') return 'Generate Call Script';
+  }
+  if (channel === 'EMAIL' || ct.contentType === 'EMAIL') return 'Generate Email';
+  if (channel === 'LINKEDIN') return 'Generate LinkedIn';
+  return 'Generate';
+}
+
 /** Local edit state per action: subject and body shown in the form (edited or generated). */
 function getActionContent(action: PlayRun['phaseRuns'][0]['actions'][0]) {
   const subject = action.editedSubject ?? action.generatedSubject ?? '';
   const body = action.editedContent ?? action.generatedContent ?? '';
   return { subject: typeof subject === 'string' ? subject : '', body: typeof body === 'string' ? body : '' };
+}
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Compute "Day N" (0-based) for an action from suggestedDate. Reference = earliest suggestedDate in run, or run createdAt. */
+function getDayLabel(
+  actionSuggestedDate: string | null,
+  referenceDateMs: number
+): string | null {
+  if (!actionSuggestedDate) return null;
+  const actionMs = new Date(actionSuggestedDate).getTime();
+  const dayOffset = Math.round((actionMs - referenceDateMs) / ONE_DAY_MS);
+  return dayOffset >= 0 ? `Day ${dayOffset}` : null;
+}
+
+/** Get reference timestamp for "Day 0" (earliest action suggestedDate, or run createdAt). */
+function getRunReferenceDateMs(run: PlayRun): number {
+  let earliest: number | null = null;
+  const runCreated = run.createdAt ? new Date(run.createdAt).getTime() : null;
+  for (const pr of run.phaseRuns) {
+    for (const a of pr.actions) {
+      if (a.suggestedDate) {
+        const ms = new Date(a.suggestedDate).getTime();
+        if (earliest == null || ms < earliest) earliest = ms;
+      }
+    }
+  }
+  return earliest ?? runCreated ?? Date.now();
 }
 
 export default function PlayRunExecuteClient({
@@ -70,6 +124,8 @@ export default function PlayRunExecuteClient({
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [busyPhaseRunId, setBusyPhaseRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Error from last Generate click (shown as banner; does not replace page). */
+  const [generateError, setGenerateError] = useState<string | null>(null);
   /** Per-action subject/body for editing. Key = action.id. Synced from run when run loads/updates. */
   const [actionEdits, setActionEdits] = useState<Record<string, { subject: string; body: string }>>({});
 
@@ -147,15 +203,22 @@ export default function PlayRunExecuteClient({
   };
 
   const handleGenerate = async (actionId: string) => {
+    setGenerateError(null);
     setBusyActionId(actionId);
     try {
       const res = await fetch(
         `/api/play-runs/${runId}/actions/${actionId}/generate`,
         { method: 'POST' },
       );
-      if (!res.ok) throw new Error('Generate failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const message = typeof body?.error === 'string' ? body.error : 'Generate failed';
+        throw new Error(message);
+      }
       await fetchRun();
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Generate failed';
+      setGenerateError(message);
       console.error('Generate error:', err);
     } finally {
       setBusyActionId(null);
@@ -241,6 +304,38 @@ export default function PlayRunExecuteClient({
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px', background: t.bg, minHeight: '60vh' }}>
+      {generateError && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: '12px 16px',
+            background: 'rgba(248,113,113,0.12)',
+            border: '1px solid rgba(248,113,113,0.4)',
+            borderRadius: 8,
+            color: '#fca5a5',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <span>{generateError}</span>
+          <button
+            type="button"
+            onClick={() => setGenerateError(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: t.text2,
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontSize: 12,
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Link
@@ -334,6 +429,11 @@ export default function PlayRunExecuteClient({
                   !!(action.generatedContent || action.editedContent);
                 const canSkip =
                   action.status !== 'EXECUTED' && action.status !== 'SKIPPED';
+                const referenceDateMs = run ? getRunReferenceDateMs(run) : 0;
+                const dayLabel = run ? getDayLabel(action.suggestedDate ?? null, referenceDateMs) : null;
+                const isChampionSpecStep =
+                  run?.playTemplate?.slug === 'expansion-dgx-to-drive-thor' &&
+                  (action.title?.toLowerCase().includes('send drive thor spec') ?? false);
 
                 return (
                   <div
@@ -348,8 +448,15 @@ export default function PlayRunExecuteClient({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>
-                          {action.title}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          {dayLabel && (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: t.text3, padding: '3px 6px', background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
+                              {dayLabel}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>
+                            {action.title}
+                          </span>
                         </div>
                         {action.contactName && (
                           <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>
@@ -369,29 +476,36 @@ export default function PlayRunExecuteClient({
                           const edit = actionEdits[action.id] ?? getActionContent(action);
                           return (
                             <div style={{ marginTop: 8 }}>
-                              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: t.text2, marginBottom: 4 }}>Subject</label>
-                              <input
-                                type="text"
-                                value={edit.subject}
-                                onChange={(e) =>
-                                  setActionEdits((prev) => ({
-                                    ...prev,
-                                    [action.id]: { ...(prev[action.id] ?? edit), subject: e.target.value },
-                                  }))
-                                }
-                                placeholder="Subject line"
-                                style={{
-                                  width: '100%',
-                                  padding: '8px 10px',
-                                  borderRadius: 6,
-                                  border: `1px solid ${t.border}`,
-                                  background: 'rgba(0,0,0,0.2)',
-                                  color: t.text1,
-                                  fontSize: 12,
-                                  marginBottom: 8,
-                                  boxSizing: 'border-box',
-                                }}
-                              />
+                              <div style={{ fontSize: 10, fontWeight: 600, color: t.text3, marginBottom: 6, letterSpacing: '0.05em' }}>
+                                Review
+                              </div>
+                              {(action.actionType === 'SEND_EMAIL' || action.actionType === 'SEND_LINKEDIN') ? (
+                                <>
+                                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: t.text2, marginBottom: 4 }}>Subject</label>
+                                  <input
+                                    type="text"
+                                    value={edit.subject}
+                                    onChange={(e) =>
+                                      setActionEdits((prev) => ({
+                                        ...prev,
+                                        [action.id]: { ...(prev[action.id] ?? edit), subject: e.target.value },
+                                      }))
+                                    }
+                                    placeholder="Subject line"
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      borderRadius: 6,
+                                      border: `1px solid ${t.border}`,
+                                      background: 'rgba(0,0,0,0.2)',
+                                      color: t.text1,
+                                      fontSize: 12,
+                                      marginBottom: 8,
+                                      boxSizing: 'border-box',
+                                    }}
+                                  />
+                                </>
+                              ) : null}
                               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: t.text2, marginBottom: 4 }}>Body</label>
                               <textarea
                                 value={edit.body}
@@ -442,7 +556,7 @@ export default function PlayRunExecuteClient({
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {action.status === 'EXECUTED' && (
                           <span style={{ fontSize: 10, fontWeight: 600, color: t.green, padding: '4px 8px', background: t.greenBg, borderRadius: 6 }}>
-                            Sent
+                            {action.actionType === 'SEND_EMAIL' || action.actionType === 'SEND_LINKEDIN' ? 'Sent' : 'Complete'}
                           </span>
                         )}
                         {action.status === 'SKIPPED' && (
@@ -464,8 +578,28 @@ export default function PlayRunExecuteClient({
                               cursor: isBusy ? 'not-allowed' : 'pointer',
                             }}
                           >
-                            {isBusy ? '…' : 'Generate'}
+                            {isBusy ? '…' : getGenerateButtonLabel(action)}
                           </button>
+                        )}
+                        {isChampionSpecStep && (
+                          <a
+                            href="/demo/nvidia-gm-executive-brief.html"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 6,
+                              border: `1px solid ${t.border}`,
+                              background: 'transparent',
+                              color: t.text2,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Generate Executive Brief
+                          </a>
                         )}
                         {canExecute && (
                           <button
@@ -483,7 +617,15 @@ export default function PlayRunExecuteClient({
                               cursor: isBusy ? 'not-allowed' : 'pointer',
                             }}
                           >
-                            {isBusy ? '…' : 'Send'}
+                            {isBusy
+                              ? '…'
+                              : action.actionType === 'SEND_EMAIL'
+                                ? 'Send'
+                                : action.actionType === 'SEND_LINKEDIN'
+                                  ? 'Send'
+                                  : action.actionType === 'REVIEW_BRIEF'
+                                    ? 'Task Done'
+                                    : 'Complete'}
                           </button>
                         )}
                         {canSkip && (

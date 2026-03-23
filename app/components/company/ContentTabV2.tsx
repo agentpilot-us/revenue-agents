@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildContentUrl, type ContentChannel } from '@/lib/urls/content';
-import ContactSelector from '@/app/components/workflow/ContactSelector';
+import ContactSelector from '@/app/components/shared/ContactSelector';
 
 type DepartmentOption = {
   id: string;

@@ -1,14 +1,15 @@
 /**
- * GET  /api/companies/[companyId]/playbooks/runs — list runs for company
- * POST /api/companies/[companyId]/playbooks/runs — create a new run
+ * Legacy path name — backed by PlayRun / PlayTemplate.
+ * GET: active play runs for company. POST: create run from PlayTemplate (playTemplateId).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { createPlayRunFromTemplate } from '@/lib/plays/create-play-run';
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ companyId: string }> }
+  { params }: { params: Promise<{ companyId: string }> },
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -24,13 +25,13 @@ export async function GET(
     return NextResponse.json({ error: 'Company not found' }, { status: 404 });
   }
 
-  const runs = await prisma.playbookRun.findMany({
-    where: { companyId, status: { in: ['active', 'paused'] } },
+  const runs = await prisma.playRun.findMany({
+    where: { companyId, userId: session.user.id, status: { in: ['ACTIVE', 'PAUSED', 'PROPOSED'] } },
     include: {
-      template: { include: { steps: { orderBy: { order: 'asc' } } } },
-      steps: true,
+      playTemplate: { select: { id: true, name: true, slug: true } },
+      phaseRuns: { select: { id: true, status: true } },
     },
-    orderBy: { startedAt: 'desc' },
+    orderBy: { activatedAt: 'desc' },
   });
 
   return NextResponse.json({ runs });
@@ -38,7 +39,7 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ companyId: string }> }
+  { params }: { params: Promise<{ companyId: string }> },
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -56,6 +57,7 @@ export async function POST(
 
   let body: {
     templateId?: string;
+    playTemplateId?: string;
     triggerDate?: string;
     triggerLabel?: string;
     triggerContext?: { triggerDate?: string; triggerLabel?: string };
@@ -66,60 +68,32 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const templateId = body.templateId;
-  const triggerDate = body.triggerDate ?? body.triggerContext?.triggerDate;
+  const playTemplateId = body.playTemplateId ?? body.templateId;
+  const triggerDateRaw = body.triggerDate ?? body.triggerContext?.triggerDate;
   const triggerLabel = body.triggerLabel ?? body.triggerContext?.triggerLabel;
 
-  if (!templateId || !triggerDate) {
-    return NextResponse.json(
-      { error: 'templateId and triggerDate are required' },
-      { status: 400 }
-    );
+  if (!playTemplateId) {
+    return NextResponse.json({ error: 'playTemplateId (or templateId) is required' }, { status: 400 });
   }
 
-  const template = await prisma.playbookTemplate.findFirst({
-    where: { id: templateId, userId: session.user.id },
-    include: { steps: { orderBy: { order: 'asc' } } },
-  });
-  if (!template) {
-    return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+  const anchorDate = triggerDateRaw ? new Date(triggerDateRaw) : undefined;
+  if (anchorDate && Number.isNaN(anchorDate.getTime())) {
+    return NextResponse.json({ error: 'Invalid triggerDate' }, { status: 400 });
   }
 
-  const run = await prisma.playbookRun.create({
-    data: {
+  try {
+    const playRun = await createPlayRunFromTemplate({
+      userId: session.user.id,
       companyId,
-      templateId: template.id,
-      triggerContext: {
-        triggerDate,
-        triggerLabel: triggerLabel ?? template.name,
-      },
-      steps: {
-        create: template.steps.map((s) => ({ stepOrder: s.order })),
-      },
-    },
-    include: {
-      template: { include: { steps: { orderBy: { order: 'asc' } } } },
-      steps: true,
-    },
-  });
+      playTemplateId,
+      anchorDate: anchorDate ?? null,
+      triggerType: 'MANUAL',
+      triggerContext: triggerLabel ? { triggerLabel } : undefined,
+    });
 
-  await prisma.activity
-    .create({
-      data: {
-        companyId,
-        userId: session.user.id,
-        type: 'PLAYBOOK_STARTED',
-        summary: `Playbook started: ${template.name}`,
-        metadata: {
-          playbookRunId: run.id,
-          templateName: template.name,
-          triggerDate,
-          triggerLabel: triggerLabel ?? template.name,
-          stepCount: template.steps.length,
-        },
-      },
-    })
-    .catch(() => {});
-
-  return NextResponse.json({ run, runId: run.id });
+    return NextResponse.json({ run: playRun, runId: playRun.id });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to create run';
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
 }

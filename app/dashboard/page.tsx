@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
@@ -54,5 +55,13 @@ export default async function DashboardPage({
     redirect('/dashboard/content-library');
   }
 
-  return <MyDayDashboard />;
+  return (
+    <Suspense
+      fallback={
+        <div style={{ padding: 40, color: '#64748b', fontSize: 14 }}>Loading your day…</div>
+      }
+    >
+      <MyDayDashboard />
+    </Suspense>
+  );
 }

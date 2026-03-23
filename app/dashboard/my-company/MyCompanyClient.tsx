@@ -1,12 +1,14 @@
 'use client';
 
-import { MyCompanyTabs } from '@/app/dashboard/my-company/MyCompanyTabs';
+import { MyCompanyTabs, type TabId } from '@/app/dashboard/my-company/MyCompanyTabs';
 import { ProfileTab } from '@/app/dashboard/my-company/tabs/ProfileTab';
 import { ProductsTab } from '@/app/dashboard/my-company/tabs/ProductsTab';
 import { ContentLibraryTab } from '@/app/dashboard/my-company/tabs/ContentLibraryTab';
 import { PlaybooksTab } from '@/app/dashboard/my-company/tabs/PlaybooksTab';
 import { MessagingTab } from '@/app/dashboard/my-company/tabs/MessagingTab';
 import { IntelligenceTab } from '@/app/dashboard/my-company/tabs/IntelligenceTab';
+import { GovernanceTab } from '@/app/dashboard/my-company/tabs/GovernanceTab';
+import { SetupProgressCard } from '@/app/dashboard/my-company/SetupProgressCard';
 
 export type ProfileData = {
   companyName: string | null;
@@ -61,6 +63,7 @@ export type CatalogProductItem = {
 };
 
 type Props = {
+  initialTab?: TabId;
   profile: ProfileData;
   health: HealthData;
   companyProducts: CompanyProduct[];
@@ -71,6 +74,7 @@ type Props = {
 };
 
 export function MyCompanyClient({
+  initialTab,
   profile,
   health,
   companyProducts,
@@ -90,7 +94,9 @@ export function MyCompanyClient({
         </p>
       </header>
 
-      <MyCompanyTabs>
+      <SetupProgressCard />
+
+      <MyCompanyTabs defaultTab={initialTab ?? 'Profile'}>
         {(activeTab) => (
           <>
             {activeTab === 'Profile' && (
@@ -113,6 +119,9 @@ export function MyCompanyClient({
             )}
             {activeTab === 'Messaging' && (
               <MessagingTab />
+            )}
+            {activeTab === 'Governance' && (
+              <GovernanceTab />
             )}
             {activeTab === 'Intelligence' && (
               <IntelligenceTab

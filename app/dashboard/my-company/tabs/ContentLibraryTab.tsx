@@ -67,12 +67,25 @@ function getTypeLabel(type: string) {
   return TYPE_OPTIONS.find((t) => t.value === type)?.label ?? type;
 }
 
+type CoverageTemplate = {
+  templateId: string;
+  templateName: string;
+  gaps: {
+    contentGenerationType: string;
+    stepName: string;
+    libraryTypes: string[];
+    count: number;
+  }[];
+};
+
 export function ContentLibraryTab() {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [coverage, setCoverage] = useState<CoverageTemplate[]>([]);
+  const [coverageLoading, setCoverageLoading] = useState(true);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -173,6 +186,47 @@ export function ContentLibraryTab() {
           ))}
         </select>
       </div>
+
+      <section className="rounded-xl border border-border bg-card/50 p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">Coverage vs. active plays</h3>
+        <p className="text-xs text-muted-foreground">
+          For each ACTIVE play template, we suggest Content Library types that usually improve generation for
+          each step. This is type-level only (not industry/department matching).
+        </p>
+        {coverageLoading ? (
+          <p className="text-xs text-muted-foreground">Checking coverage…</p>
+        ) : coverage.length === 0 ? (
+          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+            No gaps detected for active templates, or you have no ACTIVE templates.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {coverage.map((t) => (
+              <li key={t.templateId} className="text-xs border border-amber-500/20 rounded-lg p-3 bg-amber-500/5">
+                <span className="font-medium text-foreground">{t.templateName}</span>
+                <ul className="mt-2 space-y-1.5 list-disc list-inside text-muted-foreground">
+                  {t.gaps.map((g, i) => (
+                    <li key={i}>
+                      Step &quot;{g.stepName}&quot; ({g.contentGenerationType}): add{' '}
+                      {g.libraryTypes.map((lt) => getTypeLabel(lt)).join(' or ')} —{' '}
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => {
+                          const first = g.libraryTypes[0];
+                          if (first) setFilterType(first);
+                        }}
+                      >
+                        Filter library →
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading content...</p>

@@ -180,6 +180,15 @@ export function getChatModel(
     return getLmStudioModel();
   }
 
+  const hasGateway = !!process.env.AI_GATEWAY_API_KEY;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const hasGoogle = !!process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.LLM_PROVIDER === 'gemini';
+  if (!hasGateway && !hasAnthropic && !hasGoogle) {
+    throw new Error(
+      'LLM not configured. Set USE_MOCK_LLM=true for mock responses, or set one of: AI_GATEWAY_API_KEY, ANTHROPIC_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY.',
+    );
+  }
+
   if (useGateway()) {
     return getGatewayChatModel(tier, hint, gatewayModel);
   }

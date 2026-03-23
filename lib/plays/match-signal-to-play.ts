@@ -6,6 +6,7 @@
 
 import { prisma } from '@/lib/db';
 import { createPlayRunFromTemplate } from './create-play-run';
+import { conditionsMatch, type ConditionsContext } from './signal-mapping-conditions';
 
 export type SignalInput = {
   id: string;
@@ -25,36 +26,48 @@ const PRIORITY_ORDER: Array<'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW'> = [
   'LOW',
 ];
 
-type ConditionsContext = {
-  accountTier: string | null;
-  totalArr: number;
+export { conditionsMatch } from './signal-mapping-conditions';
+
+type MappingWithTemplate = {
+  id: string;
+  signalType: string;
+  playTemplateId: string;
+  priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+  conditions: unknown;
+  playTemplate: { id: string; name: string };
 };
 
-/** Conditions JSON: accountTier (string), accountTiers (string[]), arr_gt (number), arr_lt (number). */
-function conditionsMatch(conditions: unknown, ctx: ConditionsContext): boolean {
-  if (conditions == null || typeof conditions !== 'object') return true;
-  const c = conditions as Record<string, unknown>;
-  if (c.accountTier != null) {
-    const tier = typeof c.accountTier === 'string' ? c.accountTier : String(c.accountTier);
-    const normalized = (ctx.accountTier ?? '').toLowerCase();
-    if (normalized !== tier.toLowerCase()) return false;
-  }
-  if (Array.isArray(c.accountTiers) && c.accountTiers.length > 0) {
-    const allowed = (c.accountTiers as string[]).map((t) => t.toLowerCase());
-    const normalized = (ctx.accountTier ?? '').toLowerCase();
-    if (!allowed.includes(normalized)) return false;
-  }
-  if (typeof c.arr_gt === 'number' && ctx.totalArr <= c.arr_gt) return false;
-  if (typeof c.arr_lt === 'number' && ctx.totalArr >= c.arr_lt) return false;
-  return true;
+function pickCandidate(list: MappingWithTemplate[]): MappingWithTemplate {
+  return [...list].sort(
+    (a, b) => PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
+  )[0];
 }
 
+export type SignalResolutionPreview = {
+  signalTypeNorm: string;
+  conditionsContext: ConditionsContext;
+  roadmapId: string | null;
+  matchingMappingsCount: number;
+  candidate: {
+    mappingId: string;
+    signalType: string;
+    priority: string;
+    playTemplateId: string;
+    playTemplateName: string;
+  } | null;
+  /** Picked from templates that are also activated for this roadmap */
+  activationNarrowed: boolean;
+  /** Roadmap exists, activations did not overlap mappings — fell back to any matching mapping */
+  activationBroadenedFallback: boolean;
+  reasonNoMatch?: string;
+};
+
 /**
- * Match a signal to a PlayTemplate via SignalPlayMapping, optionally scoped by
- * AccountPlayActivation for the company's roadmap. Evaluates conditions (accountTier, arr_gt/arr_lt).
- * Creates a PlayRun when a match is found.
+ * Dry-run resolution: same template pick as matchSignalToPlayRun, without creating a PlayRun.
  */
-export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ created: boolean; playRunId?: string }> {
+export async function resolveSignalToPlayCandidate(
+  signal: SignalInput,
+): Promise<SignalResolutionPreview> {
   const signalTypeNorm = signal.type.trim().toLowerCase();
 
   const [mappings, roadmap, companyContext] = await Promise.all([
@@ -96,11 +109,25 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
       mappingType.includes(signalTypeNorm);
     if (!typeMatch) return false;
     return conditionsMatch(m.conditions, conditionsContext);
-  });
+  }) as MappingWithTemplate[];
 
-  if (matchingMappings.length === 0) return { created: false };
+  if (matchingMappings.length === 0) {
+    return {
+      signalTypeNorm,
+      conditionsContext,
+      roadmapId: roadmap?.id ?? null,
+      matchingMappingsCount: 0,
+      candidate: null,
+      activationNarrowed: false,
+      activationBroadenedFallback: false,
+      reasonNoMatch: 'No SignalPlayMapping matched this signal type and conditions (or template inactive).',
+    };
+  }
 
-  let candidate = matchingMappings[0];
+  let activationNarrowed = false;
+  let activationBroadenedFallback = false;
+  let candidate = pickCandidate(matchingMappings);
+
   if (roadmap) {
     const activations = await prisma.accountPlayActivation.findMany({
       where: { roadmapId: roadmap.id, isActive: true },
@@ -109,26 +136,64 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
     const allowedIds = new Set(activations.map((a) => a.playTemplateId));
     const allowed = matchingMappings.filter((m) => allowedIds.has(m.playTemplateId));
     if (allowed.length > 0) {
-      candidate = allowed.sort(
-        (a, b) =>
-          PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
-      )[0];
+      candidate = pickCandidate(allowed);
+      activationNarrowed = true;
     } else {
-      return { created: false };
+      candidate = pickCandidate(matchingMappings);
+      activationBroadenedFallback = true;
     }
-  } else {
-    candidate = matchingMappings.sort(
-      (a, b) =>
-        PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority),
-    )[0];
   }
+
+  return {
+    signalTypeNorm,
+    conditionsContext,
+    roadmapId: roadmap?.id ?? null,
+    matchingMappingsCount: matchingMappings.length,
+    candidate: {
+      mappingId: candidate.id,
+      signalType: candidate.signalType,
+      priority: candidate.priority,
+      playTemplateId: candidate.playTemplateId,
+      playTemplateName: candidate.playTemplate.name,
+    },
+    activationNarrowed,
+    activationBroadenedFallback,
+  };
+}
+
+/**
+ * Match a signal to a PlayTemplate via SignalPlayMapping, optionally scoped by
+ * AccountPlayActivation for the company's roadmap. Evaluates conditions (accountTier, arr_gt/arr_lt).
+ * Creates a PlayRun when a match is found.
+ */
+export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ created: boolean; playRunId?: string }> {
+  const preview = await resolveSignalToPlayCandidate(signal);
+  if (!preview.candidate) return { created: false };
+
+  const signalTypeNorm = preview.signalTypeNorm;
+  const roadmap =
+    preview.roadmapId ?
+      { id: preview.roadmapId }
+    : null;
 
   let targetContact: { name: string; email?: string | null; title?: string | null } | null =
     null;
+  let roadmapTargetId: string | null = null;
+  // Resolve RoadmapTarget: prefer a target whose department type matches the signal context, fall back to first target.
   if (roadmap) {
-    const target = await prisma.roadmapTarget.findFirst({
+    const SIGNAL_DEPT_HINTS: Record<string, string[]> = {
+      exec_hire: ['ENGINEERING', 'PRODUCT', 'IT_INFRASTRUCTURE'],
+      earnings_beat: ['FINANCE', 'ENGINEERING'],
+      competitor_detected: ['ENGINEERING', 'PRODUCT'],
+      product_launch: ['ENGINEERING', 'PRODUCT'],
+      expansion: ['ENGINEERING', 'PRODUCT', 'OPERATIONS'],
+      renewal: ['IT_INFRASTRUCTURE', 'PROCUREMENT', 'FINANCE'],
+    };
+    const deptHints = SIGNAL_DEPT_HINTS[signalTypeNorm] ?? [];
+    const allTargets = await prisma.roadmapTarget.findMany({
       where: { roadmapId: roadmap.id },
       include: {
+        companyDepartment: { select: { type: true } },
         contacts: {
           take: 1,
           include: {
@@ -138,23 +203,36 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
           },
         },
       },
+      orderBy: { createdAt: 'asc' },
     });
-    const firstContact = target?.contacts?.[0]?.contact ?? null;
-    if (firstContact) {
-      targetContact = {
-        name: [firstContact.firstName, firstContact.lastName].filter(Boolean).join(' ') || 'Unknown',
-        email: firstContact.email,
-        title: firstContact.title,
-      };
+    let bestTarget = allTargets.find(
+      (t) => t.companyDepartment?.type && deptHints.includes(t.companyDepartment!.type),
+    );
+    if (!bestTarget && allTargets.length > 0) {
+      bestTarget = allTargets[0];
+    }
+    if (bestTarget) {
+      roadmapTargetId = bestTarget.id;
+      const firstContact = bestTarget.contacts?.[0]?.contact ?? null;
+      if (firstContact) {
+        targetContact = {
+          name: [firstContact.firstName, firstContact.lastName].filter(Boolean).join(' ') || 'Unknown',
+          email: firstContact.email,
+          title: firstContact.title,
+        };
+      }
     }
   }
 
   const playRun = await createPlayRunFromTemplate({
     userId: signal.userId,
     companyId: signal.companyId,
-    playTemplateId: candidate.playTemplateId,
+    playTemplateId: preview.candidate.playTemplateId,
     accountSignalId: signal.id,
     targetContact,
+    roadmapTargetId: roadmapTargetId ?? undefined,
+    triggerType: 'SIGNAL',
+    triggerContext: { signalSummary: signal.summary, signalTitle: signal.title },
   });
 
   await prisma.accountSignal

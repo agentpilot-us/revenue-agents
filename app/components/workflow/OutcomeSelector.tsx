@@ -87,13 +87,13 @@ export default function OutcomeSelector({ workflowId, companyId, onSaved, onStar
     if (!selected) return;
     setSaving(true);
     try {
-      await fetch(`/api/action-workflows/${workflowId}`, {
+      await fetch(`/api/play-runs/${workflowId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           outcome: selected,
           outcomeNote: note || undefined,
-          status: 'completed',
+          status: 'COMPLETED',
         }),
       });
       setSaved(true);

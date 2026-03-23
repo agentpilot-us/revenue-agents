@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
       targetContactId,
       accountSignalId,
       title,
+      roadmapTargetId,
+      productId,
+      triggerType,
+      triggerContext,
     } = body;
 
     if (!companyId || !playTemplateId) {
@@ -58,6 +62,10 @@ export async function POST(req: NextRequest) {
       targetContact,
       accountSignalId: accountSignalId ?? null,
       title: title ?? null,
+      roadmapTargetId: roadmapTargetId ?? null,
+      productId: productId ?? null,
+      triggerType: triggerType ?? undefined,
+      triggerContext: triggerContext ?? null,
     });
 
     return NextResponse.json({ playRunId: playRun.id, playRun });

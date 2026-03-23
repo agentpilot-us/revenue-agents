@@ -6,14 +6,12 @@ import { generateWhyRelevant } from '@/lib/contacts/why-relevant';
 
 const MAX_PER_REQUEST = 10;
 
-// Processes up to MAX_PER_REQUEST pending contacts company-wide.
-// This is intentionally a global sweep — it cleans up contacts
-// left in 'pending' state from any source (find-contacts batch,
-// manual add, import). The find-contacts batch flow has its own
-// scoped enrichment loop and doesn't rely on this route.
+// Processes pending contacts: optionally only the given contactIds (for "Enrich now" on one row),
+// otherwise up to MAX_PER_REQUEST company-wide. Includes contacts with null or 'pending' status
+// so seeded demo contacts (null) are enrichable without pre-setting 'pending'.
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
@@ -31,9 +29,22 @@ export async function POST(
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
+    const body = await req.json().catch(() => ({})) as { contactIds?: string[] };
+    const contactIds = Array.isArray(body?.contactIds) ? body.contactIds : undefined;
+
     const pending = await prisma.contact.findMany({
-      where: { companyId, enrichmentStatus: 'pending' },
-      take: MAX_PER_REQUEST,
+      where: {
+        companyId,
+        ...(contactIds?.length
+          ? { id: { in: contactIds } }
+          : {}),
+        OR: [
+          { enrichmentStatus: null },
+          { enrichmentStatus: 'pending' },
+        ],
+      },
+      take: contactIds?.length ? contactIds.length : MAX_PER_REQUEST,
+      orderBy: { createdAt: 'asc' },
       select: {
         id: true,
         email: true,
@@ -47,6 +58,7 @@ export async function POST(
 
     let enriched = 0;
     let failed = 0;
+    const updatedContacts: Array<{ id: string; email: string | null; title: string | null; linkedinUrl: string | null; enrichmentStatus: string }> = [];
 
     for (const c of pending) {
       await prisma.contact.update({
@@ -88,19 +100,55 @@ export async function POST(
         if (whyRelevant) {
           enrichedData.whyRelevant = whyRelevant;
         }
+        // Persist Apollo data so the UI shows real email/LinkedIn after refresh.
+        // When Apollo doesn't return email, clear placeholder so we don't show fake data.
+        const updateData: {
+          enrichmentStatus: 'complete';
+          enrichedAt: Date;
+          enrichedData: object;
+          email?: string | null;
+          phone?: string | null;
+          title?: string | null;
+          linkedinUrl?: string | null;
+        } = {
+          enrichmentStatus: 'complete',
+          enrichedAt: new Date(),
+          enrichedData: enrichedData as object,
+        };
+        if (result.data.email != null && String(result.data.email).trim() !== '') {
+          updateData.email = String(result.data.email).trim();
+        } else {
+          // Clear placeholder so enriched contacts don't show fake @gm-demo email
+          updateData.email = null;
+        }
+        if (result.data.phone != null && String(result.data.phone).trim() !== '') {
+          updateData.phone = String(result.data.phone).trim();
+        }
+        if (result.data.title != null && String(result.data.title).trim() !== '') {
+          updateData.title = String(result.data.title).trim();
+        }
+        if (result.data.linkedinUrl != null && String(result.data.linkedinUrl).trim() !== '') {
+          updateData.linkedinUrl = String(result.data.linkedinUrl).trim();
+        }
         await prisma.contact.update({
           where: { id: c.id },
-          data: {
-            enrichmentStatus: 'complete',
-            enrichedAt: new Date(),
-            enrichedData: enrichedData as object,
-            ...(result.data.email ? { email: String(result.data.email) } : {}),
-            ...(result.data.phone ? { phone: String(result.data.phone) } : {}),
-            ...(result.data.title ? { title: String(result.data.title) } : {}),
-          },
+          data: updateData,
+        });
+        updatedContacts.push({
+          id: c.id,
+          email: updateData.email ?? null,
+          title: updateData.title ?? null,
+          linkedinUrl: updateData.linkedinUrl ?? null,
+          enrichmentStatus: 'complete',
         });
         enriched++;
       } else {
+        console.warn('[enrich-pending] Apollo enrichment failed', {
+          contactId: c.id,
+          email: c.email,
+          name: [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || undefined,
+          error: result.error,
+        });
         await prisma.contact.update({
           where: { id: c.id },
           data: {
@@ -118,6 +166,7 @@ export async function POST(
       processed: pending.length,
       enriched,
       failed,
+      updatedContacts: updatedContacts.length > 0 ? updatedContacts : undefined,
     });
   } catch (e) {
     console.error('enrich-pending', e);

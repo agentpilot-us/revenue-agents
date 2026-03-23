@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import NextStepCard, { type NextStepItem } from './NextStepCard';
+import NextStepCard, { type NextStepItem, type HighlightPlayRunTarget } from './NextStepCard';
 import ActionCard, { type ActionCardWorkflow } from './ActionCard';
 import PlayRunCard, { type PlayRunCardRun } from './PlayRunCard';
 import RecommendedPlayCard, { type RecommendedPlayItem } from './RecommendedPlayCard';
@@ -40,7 +40,9 @@ export type FollowUpStepItem = {
   contentType: string | null;
   channel: string | null;
   promptHint: string | null;
-  dueAt: string | null;
+  dueAt: string | Date | null;
+  suggestedDate?: string | null;
+  dayLabel?: string | null;
   status: string;
   contact: { id: string; firstName: string | null; lastName: string | null; title: string | null } | null;
   division: { id: string; customName: string | null; type: string } | null;
@@ -52,6 +54,14 @@ export type FollowUpStepItem = {
   signalTitle: string | null;
   source?: 'workflow' | 'play_run' | 'sequence';
   runId?: string;
+  whyNow?: string | null;
+  divisionName?: string | null;
+  contentGenerationType?: string | null;
+  urgencyTier?: 'Overdue' | 'Today' | 'This Week' | 'Upcoming';
+  runStatus?: string;
+  /** Play run: position in full play (Step X of Y) */
+  totalSteps?: number;
+  completedSteps?: number;
 };
 
 type Props = {
@@ -68,6 +78,7 @@ type Props = {
   onStartRecommendedPlay?: (play: RecommendedPlayItem) => void;
   onDismissRecommendedPlay?: (play: RecommendedPlayItem) => void;
   onCreateAction: () => void;
+  highlightPlayRun?: HighlightPlayRunTarget | null;
 };
 
 function deriveNextStep(wf: ActionCardWorkflow): NextStepItem | null {
@@ -180,6 +191,7 @@ export default function ActionQueueList({
   onStartRecommendedPlay,
   onDismissRecommendedPlay,
   onCreateAction,
+  highlightPlayRun = null,
 }: Props) {
   const { continueItems, continueFromPlayRuns, yourPlays, queued, campaigns, playRunCards } = useMemo(() => {
     const cont: NextStepItem[] = [];
@@ -240,6 +252,8 @@ export default function ActionQueueList({
     const allFollowUps = [...followUpStepsFromPlayRuns, ...sequenceFollowUps];
     for (const step of allFollowUps) {
       const runId = step.runId ?? step.id;
+      const dueAt: string | null =
+        step.dueAt instanceof Date ? step.dueAt.toISOString() : (step.dueAt ?? null);
       contFromRuns.push({
         stepId: step.id,
         stepOrder: step.stepOrder,
@@ -247,7 +261,7 @@ export default function ActionQueueList({
         contentType: step.contentType,
         channel: step.channel,
         promptHint: step.promptHint,
-        dueAt: step.dueAt,
+        dueAt,
         status: step.status,
         contact: step.contact,
         division: step.division,
@@ -257,10 +271,16 @@ export default function ActionQueueList({
         companyName: step.companyName,
         templateName: step.templateName,
         signalTitle: step.signalTitle,
-        totalSteps: 0,
-        completedSteps: 0,
+        totalSteps: step.totalSteps ?? 0,
+        completedSteps: step.completedSteps ?? 0,
         runId,
         source: step.source ?? 'play_run',
+        whyNow: step.whyNow ?? undefined,
+        contentGenerationType: step.contentGenerationType ?? undefined,
+        runStatus: step.runStatus ?? undefined,
+        divisionName: step.divisionName ?? (step.division?.customName ?? null),
+        dayLabel: step.dayLabel ?? undefined,
+        urgencyTier: step.urgencyTier ?? undefined,
       });
     }
 
@@ -283,7 +303,7 @@ export default function ActionQueueList({
         contentType: step.contentType,
         channel: step.channel,
         promptHint: step.promptHint,
-        dueAt: step.dueAt,
+        dueAt: step.dueAt instanceof Date ? step.dueAt.toISOString() : (step.dueAt ?? null),
         status: step.status,
         contact: step.contact,
         division: step.division,
@@ -303,6 +323,21 @@ export default function ActionQueueList({
     () => [...continueFromPlayRuns, ...continueItems],
     [continueFromPlayRuns, continueItems],
   );
+
+  const continueByTier = useMemo(() => {
+    const tiers: Record<string, NextStepItem[]> = {
+      Overdue: [],
+      Today: [],
+      'This Week': [],
+      Upcoming: [],
+    };
+    for (const item of continueFromPlayRuns) {
+      const tier = item.urgencyTier ?? 'Upcoming';
+      if (tier in tiers) tiers[tier].push(item);
+      else tiers.Upcoming.push(item);
+    }
+    return tiers;
+  }, [continueFromPlayRuns]);
 
   const hasContent =
     campaigns.length > 0 ||
@@ -381,16 +416,42 @@ export default function ActionQueueList({
             Nothing in progress. Start a play below or respond to a signal above.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {allContinueItems.map((item) => (
-              <NextStepCard
-                key={item.source === 'sequence' ? `seq-${item.stepId}` : (item.runId ? `run-${item.stepId}` : item.stepId)}
-                item={item}
-                variant="continue"
-                onDoThis={onWorkThis}
-                onSkip={item.source === 'sequence' ? undefined : onSkipStep}
-              />
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {continueItems.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {continueItems.map((item) => (
+                  <NextStepCard
+                    key={item.stepId}
+                    item={item}
+                    variant="continue"
+                    onDoThis={onWorkThis}
+                    onSkip={onSkipStep}
+                    highlightPlayRun={highlightPlayRun}
+                  />
+                ))}
+              </div>
+            )}
+            {(['Overdue', 'Today', 'This Week', 'Upcoming'] as const).map((tier) =>
+              continueByTier[tier].length > 0 ? (
+                <div key={tier}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: t.text2, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {tier === 'This Week' ? 'This week' : tier.toLowerCase()}
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {continueByTier[tier].map((item) => (
+                      <NextStepCard
+                        key={item.source === 'sequence' ? `seq-${item.stepId}` : (item.runId ? `run-${item.stepId}` : item.stepId)}
+                        item={item}
+                        variant="continue"
+                        onDoThis={onWorkThis}
+                        onSkip={item.source === 'sequence' ? undefined : onSkipStep}
+                        highlightPlayRun={highlightPlayRun}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            )}
           </div>
         )}
       </div>

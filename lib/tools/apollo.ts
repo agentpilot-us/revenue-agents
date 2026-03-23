@@ -1,6 +1,7 @@
 /**
  * Apollo.io – contact search and enrichment.
- * See: https://docs.apollo.io/reference/people-api-search
+ * - Search: POST mixed_people/api_search (https://docs.apollo.io/reference/people-api-search)
+ * - Enrichment: POST people/match (People Enrichment). Key must be in X-Api-Key header (https://docs.apollo.io/docs/test-api-key).
  * Provider abstraction lives in contact-finder.ts; this module implements Apollo.
  */
 
@@ -175,7 +176,13 @@ export async function enrichPersonApollo(
     }
 
     const data = (await res.json()) as {
-      person?: { email?: string; title?: string };
+      person?: {
+        email?: string | null;
+        title?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        linkedin_url?: string | null;
+      };
       contact?: { email?: string; sanitized_phone?: string; phone_numbers?: Array<{ sanitized_number?: string }> };
     };
     const person = data.person ?? {};
@@ -186,6 +193,20 @@ export async function enrichPersonApollo(
       contact.phone_numbers?.[0]?.sanitized_number ??
       undefined;
     const title = person.title ?? undefined;
+    const linkedinUrl = person.linkedin_url ?? undefined;
+    const hasMatch =
+      (email && email.trim() !== '') ||
+      (person.first_name != null && String(person.first_name).trim() !== '') ||
+      (person.last_name != null && String(person.last_name).trim() !== '') ||
+      (title && title.trim() !== '');
+
+    if (!hasMatch) {
+      return {
+        ok: false,
+        error: 'Apollo returned no matching person for this contact (placeholder or unknown email may not be in their database).',
+      };
+    }
+
     const verified = !!email;
 
     return {
@@ -194,6 +215,7 @@ export async function enrichPersonApollo(
         email: email ?? undefined,
         phone: phone ?? undefined,
         title: title ?? undefined,
+        linkedinUrl: linkedinUrl && linkedinUrl.trim() !== '' ? linkedinUrl.trim() : undefined,
         verified,
         enriched: true,
       },

@@ -3,8 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 
 /**
- * Returns the steps for a play. Resolves the playId against PlaybookTemplate
- * by name/triggerType match, then returns its PlaybookTemplateStep records.
+ * Returns phase-like steps for a play id hint (name/slug/triggerType match on PlayTemplate).
  */
 export async function GET(
   _req: Request,
@@ -17,29 +16,34 @@ export async function GET(
 
   const { playId } = await params;
 
-  const template = await prisma.playbookTemplate.findFirst({
+  const template = await prisma.playTemplate.findFirst({
     where: {
       userId: session.user.id,
-      OR: [
-        { name: { contains: playId, mode: 'insensitive' } },
-        { triggerType: playId },
-      ],
+      status: 'ACTIVE',
+      OR: [{ name: { contains: playId, mode: 'insensitive' } }, { slug: playId }],
     },
     include: {
-      steps: { orderBy: { order: 'asc' } },
+      phases: {
+        orderBy: { orderIndex: 'asc' },
+        select: {
+          orderIndex: true,
+          name: true,
+          description: true,
+          contentTemplates: { select: { channel: true } },
+        },
+      },
     },
-    orderBy: { priority: 'desc' },
   });
 
   if (!template) {
     return NextResponse.json({ steps: [] });
   }
 
-  const steps = template.steps.map((s) => ({
-    order: s.order,
-    label: s.label ?? s.name ?? `Step ${s.order}`,
-    description: s.description ?? '',
-    channel: s.channel ?? undefined,
+  const steps = template.phases.map((p) => ({
+    order: p.orderIndex + 1,
+    label: p.name,
+    description: p.description ?? '',
+    channel: p.contentTemplates[0]?.channel ?? undefined,
   }));
 
   return NextResponse.json({ steps });

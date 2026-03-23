@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { PlayCategory, PlayContentType, PlayScope, PlayTemplateStatus, PlayTriggerType, PhaseGateType } from '@prisma/client';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
 import type { ActivityChannel } from '@/lib/types/channels';
 
 type BuyingGroupOption = {
@@ -58,6 +60,17 @@ const t = {
   purpleBorder: 'rgba(168,85,247,0.25)',
 };
 
+function activityChannelToPlayContentType(ch: ActivityChannel): PlayContentType {
+  switch (ch) {
+    case 'email':
+      return PlayContentType.EMAIL;
+    case 'linkedin':
+      return PlayContentType.LINKEDIN_MSG;
+    default:
+      return PlayContentType.BRIEF;
+  }
+}
+
 let nextStepId = 1;
 function makeStep(partial?: Partial<StepDraft>): StepDraft {
   return {
@@ -92,6 +105,16 @@ type AISuggestion = {
   reasoning: string;
 };
 
+type ObjectiveSuggestion = {
+  playTemplateId: string;
+  playTemplateName: string;
+  phases: Array<{ name: string; steps: Array<{ name: string; contentGenerationType?: string }> }>;
+  roadmapTargetId: string | null;
+  productId: string | null;
+  objectiveText: string;
+  matched: boolean;
+};
+
 export default function CustomPlayBuilder({ companyId, companyName, initialDivisionId, onSwitchToCatalog }: Props) {
   const router = useRouter();
   const [targetDivisionId, setTargetDivisionId] = useState<string>(initialDivisionId ?? '');
@@ -101,7 +124,9 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
   const [objective, setObjective] = useState('');
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
+  const [objectiveSuggestion, setObjectiveSuggestion] = useState<ObjectiveSuggestion | null>(null);
   const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [creatingFromObjective, setCreatingFromObjective] = useState(false);
 
   // Play builder phase (manual or post-AI edit)
   const [playName, setPlayName] = useState('');
@@ -109,6 +134,7 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
   const [steps, setSteps] = useState<StepDraft[]>([makeStep()]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [publishImmediately, setPublishImmediately] = useState(false);
 
   // When true, user skipped AI and is building manually
   const [manualMode, setManualMode] = useState(false);
@@ -121,13 +147,44 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
   }, [companyId]);
 
   const handleSuggest = useCallback(async () => {
-    if (!objective.trim() || !targetDivisionId) return;
+    if (!objective.trim()) return;
     setSuggesting(true);
     setSuggestError(null);
     setSuggestion(null);
+    setObjectiveSuggestion(null);
 
     try {
-      const res = await fetch(
+      const res = await fetch('/api/play-runs/suggest-from-objective', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          objectiveText: objective.trim(),
+          companyId,
+          roadmapTargetId: null,
+          roadmapId: null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to suggest plan');
+      }
+
+      const data = await res.json();
+      if (data.playTemplateId) {
+        setObjectiveSuggestion({
+          playTemplateId: data.playTemplateId,
+          playTemplateName: data.playTemplateName,
+          phases: data.phases ?? [],
+          roadmapTargetId: data.roadmapTargetId ?? null,
+          productId: data.productId ?? null,
+          objectiveText: data.objectiveText ?? objective.trim(),
+          matched: data.matched ?? true,
+        });
+        return;
+      }
+
+      const planRes = await fetch(
         `/api/companies/${companyId}/departments/${targetDivisionId}/suggest-plan`,
         {
           method: 'POST',
@@ -135,20 +192,16 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
           body: JSON.stringify({ objective: objective.trim() }),
         },
       );
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to generate plan');
+      if (!planRes.ok) {
+        const planData = await planRes.json();
+        throw new Error(planData.error || 'Failed to generate plan');
       }
-
-      const data: AISuggestion = await res.json();
-      setSuggestion(data);
-
-      // Pre-populate the builder with AI suggestions
-      setPlayName(data.playName);
-      setPlayDescription(data.playDescription);
+      const planData: AISuggestion = await planRes.json();
+      setSuggestion(planData);
+      setPlayName(planData.playName);
+      setPlayDescription(planData.playDescription);
       setSteps(
-        data.steps.map((s) =>
+        planData.steps.map((s) =>
           makeStep({
             label: s.label,
             description: s.description,
@@ -165,6 +218,39 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
       setSuggesting(false);
     }
   }, [objective, targetDivisionId, companyId]);
+
+  const handleCreateFromObjective = useCallback(async () => {
+    if (!objectiveSuggestion?.playTemplateId) return;
+    setCreatingFromObjective(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/play-runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          playTemplateId: objectiveSuggestion.playTemplateId,
+          roadmapTargetId: objectiveSuggestion.roadmapTargetId,
+          productId: objectiveSuggestion.productId,
+          triggerType: 'OBJECTIVE',
+          triggerContext: { objectiveText: objectiveSuggestion.objectiveText },
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create run');
+      }
+      const data = await res.json();
+      const runId = data.playRunId ?? data.playRun?.id;
+      if (runId) {
+        router.push(myDayUrlAfterPlayStart(runId, companyId));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create run');
+    } finally {
+      setCreatingFromObjective(false);
+    }
+  }, [objectiveSuggestion, companyId, router]);
 
   const addStep = () => setSteps((prev) => [...prev, makeStep()]);
 
@@ -193,45 +279,82 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
     setError(null);
 
     try {
-      // New play system: run plays from Play Catalog only. Custom steps no longer create workflows.
-      const templatesRes = await fetch('/api/play-templates');
-      const templatesData = await templatesRes.json();
-      const templates = templatesData.templates || [];
-      const firstTemplate = templates[0];
-      if (!firstTemplate?.id) {
-        setError('No play templates available. Add plays in Play Catalog first.');
-        setCreating(false);
-        return;
-      }
-      const res = await fetch('/api/play-runs', {
+      const status =
+        publishImmediately ? PlayTemplateStatus.ACTIVE : PlayTemplateStatus.DRAFT;
+      const phases = steps.map((s, i) => ({
+        orderIndex: i,
+        name: s.label.trim() || `Step ${i + 1}`,
+        description: s.description?.trim() || null,
+        offsetDays: null as number | null,
+        gateType: PhaseGateType.MANUAL,
+        gateConfig: null as Record<string, unknown> | null,
+        uiPhaseKind: null as string | null,
+        steps: [
+          {
+            orderIndex: 0,
+            name: s.label.trim(),
+            contentType: activityChannelToPlayContentType(s.channel),
+            channel: null,
+            contentGenerationType: 'custom_content',
+            requiresContact: s.channel === 'email' || s.channel === 'linkedin',
+            isAutomatable: false,
+            promptMode: 'simple' as const,
+            promptHint:
+              [s.description?.trim(), s.label.trim()].filter(Boolean).join('\n\n') || s.label.trim(),
+            rawPromptTemplate: null,
+            systemInstructions: null,
+            governanceRules: null,
+          },
+        ],
+      }));
+
+      const res = await fetch('/api/play-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: playName.trim(),
+          description: playDescription.trim() || null,
+          slug: null,
+          scope: PlayScope.ACCOUNT,
+          category: PlayCategory.ENGAGEMENT,
+          triggerType: PlayTriggerType.MANUAL,
+          signalTypes: [],
+          defaultAutonomyLevel: null,
+          status,
+          phases,
           companyId,
-          playTemplateId: firstTemplate.id,
-          title: playName,
+          activateForCompany: status === PlayTemplateStatus.ACTIVE ? true : undefined,
+          source: 'builder_v1',
         }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create play run');
-      }
       const data = await res.json();
-      const runId = data.playRunId ?? data.playRun?.id;
-      if (runId) {
-        router.push(`/dashboard/companies/${companyId}/plays/run/${runId}`);
-      } else {
-        onSwitchToCatalog?.();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save play template');
       }
+      const newId = data.template?.id;
+      if (newId) {
+        router.push(`/dashboard/my-company/play-templates/${newId}/edit`);
+        return;
+      }
+      onSwitchToCatalog?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create play');
     } finally {
       setCreating(false);
     }
-  }, [playName, companyId, router, onSwitchToCatalog]);
+  }, [
+    playName,
+    playDescription,
+    steps,
+    companyId,
+    router,
+    onSwitchToCatalog,
+    publishImmediately,
+  ]);
 
   const isValid = playName.trim() && steps.every((s) => s.label.trim());
   const showBuilder = manualMode || suggestion;
+  const showObjectiveMatch = objectiveSuggestion != null;
   const selectedGroup = buyingGroups.find((bg) => bg.id === targetDivisionId);
 
   const inputStyle = {
@@ -330,7 +453,7 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
               <button
                 type="button"
                 onClick={handleSuggest}
-                disabled={suggesting || !objective.trim() || !targetDivisionId}
+                disabled={suggesting || !objective.trim()}
                 style={{
                   flex: 1,
                   padding: '12px 24px',
@@ -342,9 +465,9 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 700,
-                  cursor: suggesting || !objective.trim() || !targetDivisionId ? 'not-allowed' : 'pointer',
+                  cursor: suggesting || !objective.trim() ? 'not-allowed' : 'pointer',
                   opacity: suggesting ? 0.7 : 1,
-                  boxShadow: suggesting || !objective.trim() || !targetDivisionId
+                  boxShadow: suggesting || !objective.trim()
                     ? 'none'
                     : '0 4px 20px rgba(168,85,247,0.3)',
                 }}
@@ -369,6 +492,63 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
               </button>
             </div>
           </>
+        )}
+
+        {/* Matched play from objective — create run */}
+        {showObjectiveMatch && objectiveSuggestion && (
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background: t.greenBg,
+              border: `1px solid ${t.greenBorder}`,
+            }}
+          >
+            <p style={{ fontSize: 12, fontWeight: 600, color: t.green, margin: '0 0 6px' }}>
+              {objectiveSuggestion.matched ? 'Matched play' : 'Suggested plan'}
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: t.text1, margin: '0 0 8px' }}>
+              {objectiveSuggestion.playTemplateName}
+            </p>
+            <p style={{ fontSize: 11, color: t.text3, margin: '0 0 8px' }}>
+              {objectiveSuggestion.phases.length} phase(s),{' '}
+              {objectiveSuggestion.phases.reduce((n, ph) => n + ph.steps.length, 0)} steps
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button
+                type="button"
+                disabled={creatingFromObjective}
+                onClick={handleCreateFromObjective}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: t.green,
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: creatingFromObjective ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {creatingFromObjective ? 'Creating…' : 'Create run'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setObjectiveSuggestion(null)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  background: 'transparent',
+                  border: `1px solid ${t.borderMed}`,
+                  color: t.text2,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Choose different plan
+              </button>
+            </div>
+          </div>
         )}
 
         {/* AI reasoning callout */}
@@ -582,6 +762,15 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
 
             {error && <p style={{ fontSize: 12, color: t.red }}>{error}</p>}
 
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: t.text2 }}>
+              <input
+                type="checkbox"
+                checked={publishImmediately}
+                onChange={(e) => setPublishImmediately(e.target.checked)}
+              />
+              Publish immediately (ACTIVE) and activate for this account if a Strategic Account Plan exists
+            </label>
+
             <button
               type="button"
               onClick={handleCreate}
@@ -599,7 +788,7 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
                 boxShadow: creating || !isValid ? 'none' : '0 4px 20px rgba(59,130,246,0.3)',
               }}
             >
-              {creating ? 'Creating...' : 'Create & Start Play'}
+              {creating ? 'Saving…' : publishImmediately ? 'Publish & open in editor' : 'Save template (open in editor)'}
             </button>
           </>
         )}
