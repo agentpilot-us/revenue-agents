@@ -7,6 +7,7 @@
 import type { ChannelId } from '@/lib/content/channel-config';
 import { generateOneContent } from '@/lib/content/generate-content';
 import { prisma } from '@/lib/db';
+import { clearPlayRunAtRiskOnProgress } from '@/lib/plays/clear-play-run-at-risk';
 import { getPromptTemplateForType } from './content-generation-types';
 
 /** Hard cap per field for contact / JSON intel appended to userContext (token budget). */
@@ -100,7 +101,11 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
       phaseRun: {
         include: {
           playRun: {
-            include: {
+            select: {
+              id: true,
+              userId: true,
+              accountSignalId: true,
+              roadmapTargetId: true,
               company: {
                 select: { id: true, name: true, industry: true, dealObjective: true },
               },
@@ -113,7 +118,13 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
   });
 
   if (!action) throw new Error('PlayAction not found');
-  type PlayRunWithCompany = { userId: string; company: { id: string; name: string | null }; accountSignalId: string | null };
+  type PlayRunWithCompany = {
+    id: string;
+    userId: string;
+    company: { id: string; name: string | null };
+    accountSignalId: string | null;
+    roadmapTargetId?: string | null;
+  };
   type ActionWithInclude = typeof action & {
     phaseRun: { playRun: PlayRunWithCompany } | null;
     contentTemplate: {
@@ -412,6 +423,8 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
         } as import('@prisma/client').Prisma.InputJsonValue,
       },
     });
+
+    await clearPlayRunAtRiskOnProgress(playRun.id);
 
     await prisma.contentTemplate.update({
       where: { id: template.id },

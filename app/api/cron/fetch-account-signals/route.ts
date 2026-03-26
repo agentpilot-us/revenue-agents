@@ -1,5 +1,6 @@
 /**
  * Cron: fetch account signals via web search for all user companies.
+ * GET (Vercel Cron) and POST supported; auth via CRON_SECRET (Bearer or ?secret=).
  * Processes companies in batches of 5 with 1s delay to respect rate limits.
  * Dedup by (companyId, url); type-based skip for earnings_call/acquisition within 7 days.
  */
@@ -36,7 +37,8 @@ function sleep(ms: number): Promise<void> {
 
 export const maxDuration = 300;
 
-export async function POST(req: NextRequest) {
+/** Vercel Cron invokes GET; POST kept for manual / external triggers. */
+async function runFetchAccountSignalsCron(req: NextRequest): Promise<NextResponse> {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -267,4 +269,12 @@ export async function POST(req: NextRequest) {
     skippedLlm: skipped,
     errors: errors.length > 0 ? errors : undefined,
   });
+}
+
+export async function GET(req: NextRequest) {
+  return runFetchAccountSignalsCron(req);
+}
+
+export async function POST(req: NextRequest) {
+  return runFetchAccountSignalsCron(req);
 }

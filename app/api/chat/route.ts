@@ -814,6 +814,7 @@ Work step-by-step and explain what you're doing.`;
                   lastSummary: res.summary,
                   lastResearchAt: new Date().toISOString(),
                 } as object,
+                accountResearchRefreshedAt: new Date(),
               },
             });
           }

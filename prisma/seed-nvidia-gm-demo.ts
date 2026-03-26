@@ -19,6 +19,7 @@
  *
  * Prerequisites: Run cleanup:official-demo first if you want a fresh slate. Ensure user exists (sign in once).
  * Run: npm run seed:nvidia-gm   or   npx dotenv -e .env.local -- tsx prisma/seed-nvidia-gm-demo.ts
+ * Legacy "Revenue Vessel" companies for this user are removed at seed start; or run npm run demo:remove-revenue-vessel anytime.
  */
 
 import {
@@ -930,6 +931,19 @@ async function main() {
   }
   console.log(`✅ Found user: ${user.email} (${user.id})`);
   const userId = user.id;
+
+  // 0. Drop legacy non–NVIDIA/GM demo accounts (e.g. old Revenue Vessel persona data)
+  const removedRv = await prisma.company.deleteMany({
+    where: {
+      userId,
+      name: { contains: 'Revenue Vessel', mode: 'insensitive' },
+    },
+  });
+  if (removedRv.count > 0) {
+    console.log(
+      `🗑️  Removed ${removedRv.count} legacy "Revenue Vessel" company row(s) for ${DEMO_USER_EMAIL}.`,
+    );
+  }
 
   // 1. Create NVIDIA CatalogProducts (8 products)
   console.log('📦 Creating NVIDIA products...');

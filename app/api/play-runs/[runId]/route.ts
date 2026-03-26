@@ -20,7 +20,7 @@ export async function PATCH(
     const { runId } = await params;
     const run = await prisma.playRun.findFirst({
       where: { id: runId, userId: session.user.id },
-      select: { id: true, status: true },
+      select: { id: true, status: true, triggerContext: true },
     });
     if (!run) {
       return NextResponse.json({ error: 'Play run not found' }, { status: 404 });
@@ -36,15 +36,22 @@ export async function PATCH(
         triggerContext?: object;
       } = { status: status as 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'PROPOSED' | 'DISMISSED' };
 
+      const basePrev =
+        run.triggerContext != null && typeof run.triggerContext === 'object' && !Array.isArray(run.triggerContext)
+          ? { ...(run.triggerContext as Record<string, unknown>) }
+          : {};
+
+      if (run.status === 'AT_RISK' && status !== 'AT_RISK') {
+        delete basePrev.staleSince;
+        basePrev.staleClearedAt = new Date().toISOString();
+        data.triggerContext = basePrev;
+      }
+
       if (outcome != null || outcomeNote != null) {
-        const existing = await prisma.playRun.findFirst({
-          where: { id: runId, userId: session.user.id },
-          select: { triggerContext: true },
-        });
         const prev =
-          existing?.triggerContext != null && typeof existing.triggerContext === 'object' && !Array.isArray(existing.triggerContext)
-            ? (existing.triggerContext as Record<string, unknown>)
-            : {};
+          data.triggerContext != null && typeof data.triggerContext === 'object' && !Array.isArray(data.triggerContext)
+            ? { ...(data.triggerContext as Record<string, unknown>) }
+            : basePrev;
         data.triggerContext = {
           ...prev,
           ...(outcome != null ? { dismissOutcome: outcome } : {}),

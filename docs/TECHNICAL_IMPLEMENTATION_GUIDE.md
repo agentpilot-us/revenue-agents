@@ -92,7 +92,7 @@ Goal: daily/periodic sync, segment push-back, campaign leads, and correct field 
 
 - **Env:** `EXA_API_KEY` (or fallback `EXASEARCH_API_KEY`). If neither is set, cron skips signal fetching.
 - **Powers:** Account signals (news, earnings, executive changes, product launches) via `lib/signals/fetch-account-signals.ts` and `lib/exa/enrich-company.ts`; used by signal-based plays and dashboard.
-- **Cron:** `GET /api/cron/fetch-account-signals` (every 6 hours in `vercel.json`).
+- **Cron:** `GET`/`POST` `/api/cron/fetch-account-signals` (every 2 hours in `vercel.json`).
 
 ### 3.2 Apollo Configuration
 
@@ -112,13 +112,16 @@ All cron routes expect `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET` 
 | `/api/cron/calculate-engagement` | 02:00 UTC daily | Engagement scoring |
 | `/api/cron/aggregate-analytics` | 01:00 UTC daily | Dashboard analytics |
 | `/api/cron/content-library/run-schedules` | 03:00 UTC daily | Scheduled content syncs |
-| `/api/cron/fetch-account-signals` | Every 6 hours | Web-based account signals |
-| `/api/cron/send-alert-digest` | 14:00 UTC daily | Alert digest emails |
+| `/api/cron/fetch-account-signals` | Every 2 hours | Web-based account signals |
+| `/api/cron/send-alert-digest` | 21:00 UTC daily | Alert digest emails (~afternoon US Pacific) |
 | `/api/cron/process-scheduled-actions` | Every 15 min | Deferred tasks (emails, sequence steps) |
 | `/api/cron/advance-sequences` | Hourly | Multi-step sequence progression |
 | `/api/cron/play-timeline-triggers` | 04:00 UTC daily | TIMELINE plays: create PlayRuns when contract/renewal dates hit offset (e.g. T-90 renewal). |
 | `/api/cron/play-crm-field-gates` | 04:00 UTC daily | CRM_FIELD phase gates: evaluate `Company.salesforceOpportunityData`; complete phase and advance when gateConfig matches. |
 | `/api/cron/action-workflow-triggers` | Every 30 min | Meeting Prep (meetings in 24h) + Engagement Catch-All (recent high-value visits); creates PlayRuns. |
+| `/api/cron/contact-touch-cleanup` | Sun 11:00 UTC | Delete `ContactTouch` rows older than retention (`CONTACT_TOUCH_RETENTION_DAYS`, default 90). |
+| `/api/cron/flag-stale-play-runs` | 13:00 UTC daily | Set `PlayRun` to `AT_RISK` when `ACTIVE` and stale (`PLAY_RUN_STALE_DAYS`, default 14). |
+| `/api/cron/refresh-account-research` | Sat 10:00 UTC | Batch refresh stale `Company` research (`ACCOUNT_RESEARCH_STALE_DAYS`, `ACCOUNT_RESEARCH_BATCH_CAP`). |
 
 **Optional:** `/api/cron/campaign-leads-push` (as needed, e.g. daily) — push campaign leads to Salesforce as Leads. Add to `vercel.json` if using campaign leads.
 

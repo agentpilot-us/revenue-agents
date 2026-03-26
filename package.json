@@ -17,7 +17,8 @@
     "check:demo-play-mappings": "dotenv -e .env.local -- tsx prisma/check-demo-play-mappings.ts",
     "repair:demo-signal-mappings": "dotenv -e .env.local -- tsx prisma/repair-demo-signal-mappings.ts",
     "official-demo:set-live": "dotenv -e .env.local -- tsx prisma/set-official-demo-live.ts",
-    "seed:nvidia-gm": "dotenv -e .env.local -- tsx prisma/seed-nvidia-gm-demo.ts"
+    "seed:nvidia-gm": "dotenv -e .env.local -- tsx prisma/seed-nvidia-gm-demo.ts",
+    "demo:remove-revenue-vessel": "dotenv -e .env.local -- tsx prisma/remove-revenue-vessel-nvidia-demo.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.59",

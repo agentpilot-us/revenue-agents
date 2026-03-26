@@ -165,6 +165,7 @@ export async function POST(
           segmentationRationale: researchData.segmentationRationale ?? undefined,
           researchGoal: researchGoal ?? undefined,
           researchData: body,
+          accountResearchRefreshedAt: new Date(),
         },
       });
 
@@ -251,6 +252,7 @@ export async function POST(
           keyInitiatives: researchData.whatTheyDo.keyInitiatives,
           researchGoal: researchGoal ?? undefined,
           researchData: body,
+          accountResearchRefreshedAt: new Date(),
         },
       });
 

@@ -1,8 +1,8 @@
 /**
- * POST /api/cron/content-library/run-schedules
+ * GET/POST /api/cron/content-library/run-schedules
  * Run due Content Library crawl schedules (daily/weekly): product-linked ContentCrawlSchedule
  * and URL-update ContentLibrarySchedule (re-fetch sourceUrl and re-ingest).
- * Call from Vercel Cron or external cron; require CRON_SECRET in Authorization header or query.
+ * Call from Vercel Cron (GET) or external cron; require CRON_SECRET in Authorization header or query.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
@@ -32,7 +32,8 @@ function nextRunAt(frequency: string): Date {
   return d;
 }
 
-export async function POST(req: NextRequest) {
+/** Vercel Cron invokes GET; POST kept for manual / external triggers. */
+async function runContentLibrarySchedules(req: NextRequest): Promise<NextResponse> {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -214,4 +215,12 @@ export async function POST(req: NextRequest) {
     urlSchedulesRan: urlDue.length,
     urlResults,
   });
+}
+
+export async function GET(req: NextRequest) {
+  return runContentLibrarySchedules(req);
+}
+
+export async function POST(req: NextRequest) {
+  return runContentLibrarySchedules(req);
 }

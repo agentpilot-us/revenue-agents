@@ -166,6 +166,8 @@ model Company {
   dealObjective         String? @db.Text // Rep's deal objective for this account
   keyInitiatives        Json? // Array of initiative strings
   researchData          Json? // Store raw AI research response for reference
+  /** Last time account-level intelligence was refreshed (apply-research, cron, or lightweight chat tool). */
+  accountResearchRefreshedAt DateTime?
   researchGoal          String? @db.Text // Rep's targeting intent (e.g. "Target enterprise AEs across Financial Services, Healthcare")
   segmentationStrategy  String? // FUNCTIONAL | USE_CASE | DIVISIONAL | HYBRID
   segmentationRationale String? @db.Text

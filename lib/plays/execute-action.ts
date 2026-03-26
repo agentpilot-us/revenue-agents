@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/db';
 import { getOutboundProvider } from '@/lib/email';
+import { clearPlayRunAtRiskOnProgress } from '@/lib/plays/clear-play-run-at-risk';
 
 export type ExecutePlayActionInput = {
   actionId: string;
@@ -204,6 +205,8 @@ export async function executePlayAction(input: ExecutePlayActionInput): Promise<
   }
 
   await checkPhaseGateAndAdvance(action.phaseRunId, run.id, userId);
+
+  await clearPlayRunAtRiskOnProgress(run.id);
 
   return {
     ok: true,

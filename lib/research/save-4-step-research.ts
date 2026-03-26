@@ -165,6 +165,7 @@ export async function save4StepResearch(params: {
       researchGoal: researchGoal ?? undefined,
       segmentationStrategy: inferredStrategy,
       ...(researchDataPayload != null && { researchData: researchDataPayload }),
+      accountResearchRefreshedAt: new Date(),
     },
   });
 
