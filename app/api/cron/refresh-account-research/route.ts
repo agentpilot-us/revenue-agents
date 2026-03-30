@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
   }
 
   const staleDaysRaw = process.env.ACCOUNT_RESEARCH_STALE_DAYS?.trim();
-  const staleDays = staleDaysRaw ? Math.max(1, parseInt(staleDaysRaw, 10) || 14) : 14;
+  /** Default 30d balances cost at scale; set ACCOUNT_RESEARCH_STALE_DAYS=14 for aggressive refresh. */
+  const staleDays = staleDaysRaw ? Math.max(1, parseInt(staleDaysRaw, 10) || 30) : 30;
   const cutoff = subDays(new Date(), staleDays);
 
   const capRaw = process.env.ACCOUNT_RESEARCH_BATCH_CAP?.trim();
