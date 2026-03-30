@@ -59,10 +59,21 @@ export function HotSignals({ signals }: HotSignalsProps) {
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  {/* Headline */}
-                  <p className="text-[13px] font-semibold text-[var(--ap-text-primary)] leading-snug">
-                    {s.headline}
-                  </p>
+                  {/* Headline — link to source when AccountSignal has an external URL */}
+                  {s.url && /^https?:\/\//i.test(s.url.trim()) ? (
+                    <a
+                      href={s.url.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[13px] font-semibold text-[var(--ap-text-primary)] leading-snug no-underline hover:underline"
+                    >
+                      {s.headline}
+                    </a>
+                  ) : (
+                    <p className="text-[13px] font-semibold text-[var(--ap-text-primary)] leading-snug">
+                      {s.headline}
+                    </p>
+                  )}
 
                   {/* Description */}
                   {s.description && (

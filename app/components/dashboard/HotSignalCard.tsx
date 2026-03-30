@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import SuggestedActionsStrip from './SuggestedActionsStrip';
 
 const t = {
@@ -35,6 +35,8 @@ export type HotSignalItem = {
   type: string;
   title: string;
   summary: string | null;
+  /** Source article URL from Exa / web ingest; empty for some synthetic signals */
+  url?: string;
   publishedAt: string;
   relevanceScore: number;
   suggestedPlay: string | null;
@@ -91,11 +93,24 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+function httpSourceUrl(url: string | null | undefined): string | null {
+  const u = url?.trim();
+  if (!u || !/^https?:\/\//i.test(u)) return null;
+  return u;
+}
+
 export default function HotSignalCard(props: Props) {
   const [expanded, setExpanded] = useState(false);
 
   if (props.kind === 'signal') {
     const { signal, onWorkThis, onDismiss } = props;
+    const sourceHref = httpSourceUrl(signal.url);
+    const headlineStyle: CSSProperties = {
+      fontSize: 14,
+      fontWeight: 600,
+      color: t.text1,
+      lineHeight: 1.4,
+    };
     return (
       <div
         style={{
@@ -138,10 +153,29 @@ export default function HotSignalCard(props: Props) {
           </span>
         </div>
 
-        {/* Headline */}
-        <div style={{ fontSize: 14, fontWeight: 600, color: t.text1, lineHeight: 1.4 }}>
-          {signal.title}
-        </div>
+        {/* Headline — link to source article when URL is present */}
+        {sourceHref ? (
+          <a
+            href={sourceHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              ...headlineStyle,
+              textDecoration: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecoration = 'none';
+            }}
+          >
+            {signal.title}
+          </a>
+        ) : (
+          <div style={headlineStyle}>{signal.title}</div>
+        )}
 
         {/* Summary */}
         {signal.summary && (

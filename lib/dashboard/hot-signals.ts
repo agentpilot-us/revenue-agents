@@ -50,6 +50,8 @@ export type HotSignal = {
   ctaHref: string;
   color: 'red' | 'amber' | 'green';
   date: string;
+  /** External source URL when this row is from AccountSignal (Exa / web) */
+  url?: string;
   contactId?: string;
   departmentId?: string;
   campaignId?: string;
@@ -332,6 +334,7 @@ export async function getHotSignals(
       companyName: s.company.name,
       headline: s.title,
       description: s.summary,
+      url: s.url || undefined,
       ctaLabel: hasPlanLikeCta ? 'View Plan' : 'View account',
       ctaHref: hasPlanLikeCta
         ? buildContentUrl({
