@@ -26,13 +26,6 @@ const t = {
   purpleBorder: 'rgba(167,139,250,0.2)',
 };
 
-function isInProgress(wf: ActionCardWorkflow): boolean {
-  if (wf.status === 'in_progress') return true;
-  return wf.steps.some(
-    (s) => s.status === 'sent' || s.status === 'skipped' || s.status === 'generating' || s.status === 'ready',
-  );
-}
-
 export type FollowUpStepItem = {
   id: string;
   stepOrder: number;
@@ -59,7 +52,6 @@ export type FollowUpStepItem = {
   contentGenerationType?: string | null;
   urgencyTier?: 'Overdue' | 'Today' | 'This Week' | 'Upcoming';
   runStatus?: string;
-  /** Play run: position in full play (Step X of Y) */
   totalSteps?: number;
   completedSteps?: number;
 };
@@ -68,8 +60,6 @@ type Props = {
   workflows: ActionCardWorkflow[];
   playRuns?: PlayRunCardRun[];
   followUpSteps?: FollowUpStepItem[];
-  followUpStepsFromPlayRuns?: FollowUpStepItem[];
-  sequenceFollowUps?: FollowUpStepItem[];
   recommendedPlays?: RecommendedPlayItem[];
   onDismiss: (id: string) => void;
   onSnooze: (id: string) => void;
@@ -80,44 +70,6 @@ type Props = {
   onCreateAction: () => void;
   highlightPlayRun?: HighlightPlayRunTarget | null;
 };
-
-function deriveNextStep(wf: ActionCardWorkflow): NextStepItem | null {
-  const nextStep = wf.steps.find(
-    (s) => s.status !== 'sent' && s.status !== 'skipped',
-  );
-  if (!nextStep) return null;
-
-  const completedSteps = wf.steps.filter(
-    (s) => s.status === 'sent' || s.status === 'skipped',
-  ).length;
-
-  const step = nextStep as ActionCardWorkflow['steps'][number] & {
-    channel?: string | null;
-    dueAt?: string | null;
-    contact?: { id: string; firstName: string | null; lastName: string | null; title: string | null } | null;
-  };
-
-  return {
-    stepId: step.id,
-    stepOrder: wf.steps.indexOf(nextStep) + 1,
-    stepType: step.stepType,
-    contentType: step.contentType ?? null,
-    channel: step.channel ?? null,
-    promptHint: step.promptHint ?? null,
-    dueAt: step.dueAt ?? null,
-    status: step.status,
-    contact: step.contact ?? wf.targetContact ?? null,
-    division: wf.targetDivision,
-    workflowId: wf.id,
-    workflowTitle: wf.title,
-    companyId: wf.company.id,
-    companyName: wf.company.name,
-    templateName: wf.template?.name ?? null,
-    signalTitle: wf.accountSignal?.title ?? null,
-    totalSteps: wf.steps.length,
-    completedSteps,
-  };
-}
 
 function SectionHeader({
   title,
@@ -177,12 +129,29 @@ function SectionHeader({
   );
 }
 
+const createActionButton = (onCreateAction: () => void) => (
+  <button
+    type="button"
+    onClick={onCreateAction}
+    style={{
+      padding: '6px 14px',
+      borderRadius: 8,
+      background: t.blueBg,
+      border: `1px solid ${t.blueBorder}`,
+      color: t.blue,
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: 'pointer',
+    }}
+  >
+    + Create Action
+  </button>
+);
+
 export default function ActionQueueList({
   workflows,
   playRuns = [],
   followUpSteps = [],
-  followUpStepsFromPlayRuns = [],
-  sequenceFollowUps = [],
   recommendedPlays = [],
   onDismiss,
   onSnooze,
@@ -193,8 +162,7 @@ export default function ActionQueueList({
   onCreateAction,
   highlightPlayRun = null,
 }: Props) {
-  const { continueItems, continueFromPlayRuns, yourPlays, queued, campaigns, playRunCards } = useMemo(() => {
-    const cont: NextStepItem[] = [];
+  const { yourPlays, queued, campaigns, playRunCards } = useMemo(() => {
     const plays: ActionCardWorkflow[] = [];
     const q: ActionCardWorkflow[] = [];
     const campMap = new Map<string, CampaignCardData>();
@@ -238,61 +206,20 @@ export default function ActionQueueList({
         continue;
       }
 
-      if (isInProgress(wf)) {
-        const next = deriveNextStep(wf);
-        if (next) cont.push(next);
-      } else if (!wf.accountSignal) {
+      if (!wf.accountSignal) {
         plays.push(wf);
       } else {
         q.push(wf);
       }
     }
 
-    const contFromRuns: NextStepItem[] = [];
-    const allFollowUps = [...followUpStepsFromPlayRuns, ...sequenceFollowUps];
-    for (const step of allFollowUps) {
-      const runId = step.runId ?? step.id;
-      const dueAt: string | null =
-        step.dueAt instanceof Date ? step.dueAt.toISOString() : (step.dueAt ?? null);
-      contFromRuns.push({
-        stepId: step.id,
-        stepOrder: step.stepOrder,
-        stepType: step.stepType,
-        contentType: step.contentType,
-        channel: step.channel,
-        promptHint: step.promptHint,
-        dueAt,
-        status: step.status,
-        contact: step.contact,
-        division: step.division,
-        workflowId: runId,
-        workflowTitle: step.workflowTitle,
-        companyId: step.companyId,
-        companyName: step.companyName,
-        templateName: step.templateName,
-        signalTitle: step.signalTitle,
-        totalSteps: step.totalSteps ?? 0,
-        completedSteps: step.completedSteps ?? 0,
-        runId,
-        source: step.source ?? 'play_run',
-        whyNow: step.whyNow ?? undefined,
-        contentGenerationType: step.contentGenerationType ?? undefined,
-        runStatus: step.runStatus ?? undefined,
-        divisionName: step.divisionName ?? (step.division?.customName ?? null),
-        dayLabel: step.dayLabel ?? undefined,
-        urgencyTier: step.urgencyTier ?? undefined,
-      });
-    }
-
     return {
-      continueItems: cont,
-      continueFromPlayRuns: contFromRuns,
       yourPlays: plays,
       queued: q,
       campaigns: Array.from(campMap.values()),
       playRunCards: playRuns,
     };
-  }, [workflows, playRuns, followUpStepsFromPlayRuns, sequenceFollowUps]);
+  }, [workflows, playRuns]);
 
   const followUpItems: NextStepItem[] = useMemo(
     () =>
@@ -319,38 +246,8 @@ export default function ActionQueueList({
     [followUpSteps],
   );
 
-  const allContinueItems = useMemo(
-    () => [...continueFromPlayRuns, ...continueItems],
-    [continueFromPlayRuns, continueItems],
-  );
-
-  const continueByTier = useMemo(() => {
-    const tiers: Record<string, NextStepItem[]> = {
-      Overdue: [],
-      Today: [],
-      'This Week': [],
-      Upcoming: [],
-    };
-    for (const item of continueFromPlayRuns) {
-      const tier = item.urgencyTier ?? 'Upcoming';
-      if (tier in tiers) tiers[tier].push(item);
-      else tiers.Upcoming.push(item);
-    }
-    return tiers;
-  }, [continueFromPlayRuns]);
-
-  const hasContent =
-    campaigns.length > 0 ||
-    allContinueItems.length > 0 ||
-    followUpItems.length > 0 ||
-    recommendedPlays.length > 0 ||
-    yourPlays.length > 0 ||
-    queued.length > 0 ||
-    playRunCards.length > 0;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      {/* Campaigns — coordinated multi-persona threads */}
       {campaigns.length > 0 && (
         <div>
           <SectionHeader
@@ -373,36 +270,17 @@ export default function ActionQueueList({
         </div>
       )}
 
-      {/* Section 2: Continue — next step in active workflows / play runs */}
       <div>
         <SectionHeader
-          title="Continue"
-          count={allContinueItems.length}
+          title="Action Queue"
+          count={playRunCards.length}
           countColor={t.blue}
           countBg={t.blueBg}
           countBorder={t.blueBorder}
-          subtitle={allContinueItems.length > 0 ? 'Your next action for each active play.' : undefined}
-          action={
-            <button
-              type="button"
-              onClick={onCreateAction}
-              style={{
-                padding: '6px 14px',
-                borderRadius: 8,
-                background: t.blueBg,
-                border: `1px solid ${t.blueBorder}`,
-                color: t.blue,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              + Create Action
-            </button>
-          }
+          subtitle="Plays in progress. Work this to open the run on the account."
+          action={createActionButton(onCreateAction)}
         />
-
-        {allContinueItems.length === 0 && playRunCards.length === 0 ? (
+        {playRunCards.length === 0 ? (
           <div
             style={{
               padding: 24,
@@ -413,73 +291,22 @@ export default function ActionQueueList({
               borderRadius: 10,
             }}
           >
-            Nothing in progress. Start a play below or respond to a signal above.
+            No active plays. Start one from Hot Signals above or the Play Catalog.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {continueItems.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {continueItems.map((item) => (
-                  <NextStepCard
-                    key={item.stepId}
-                    item={item}
-                    variant="continue"
-                    onDoThis={onWorkThis}
-                    onSkip={onSkipStep}
-                    highlightPlayRun={highlightPlayRun}
-                  />
-                ))}
-              </div>
-            )}
-            {(['Overdue', 'Today', 'This Week', 'Upcoming'] as const).map((tier) =>
-              continueByTier[tier].length > 0 ? (
-                <div key={tier}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: t.text2, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {tier === 'This Week' ? 'This week' : tier.toLowerCase()}
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {continueByTier[tier].map((item) => (
-                      <NextStepCard
-                        key={item.source === 'sequence' ? `seq-${item.stepId}` : (item.runId ? `run-${item.stepId}` : item.stepId)}
-                        item={item}
-                        variant="continue"
-                        onDoThis={onWorkThis}
-                        onSkip={item.source === 'sequence' ? undefined : onSkipStep}
-                        highlightPlayRun={highlightPlayRun}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Play runs — active runs from play system */}
-      {playRunCards.length > 0 && (
-        <div>
-          <SectionHeader
-            title="Action Queue"
-            count={playRunCards.length}
-            countColor={t.blue}
-            countBg={t.blueBg}
-            countBorder={t.blueBorder}
-            subtitle="Plays in progress. Work this to open the run on the account."
-          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {playRunCards.map((run) => (
               <PlayRunCard
                 key={run.id}
                 run={run}
                 onWorkThis={(companyId, runId) => onWorkThis(companyId, runId, 'play_run')}
+                highlightPlayRun={highlightPlayRun}
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Your Plays — user-created plays, not yet started */}
       {yourPlays.length > 0 && (
         <div>
           <SectionHeader
@@ -504,7 +331,6 @@ export default function ActionQueueList({
         </div>
       )}
 
-      {/* Section 3: Follow Up — timed steps that are now due */}
       {followUpItems.length > 0 && (
         <div>
           <SectionHeader
@@ -529,7 +355,6 @@ export default function ActionQueueList({
         </div>
       )}
 
-      {/* Section 4: Start New — recommended plays */}
       {recommendedPlays.length > 0 && (
         <div>
           <SectionHeader
@@ -553,7 +378,6 @@ export default function ActionQueueList({
         </div>
       )}
 
-      {/* Queued Actions — auto-created from signals, not yet started */}
       {queued.length > 0 && (
         <div>
           <SectionHeader
@@ -575,20 +399,6 @@ export default function ActionQueueList({
               />
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!hasContent && (
-        <div
-          style={{
-            padding: 40,
-            textAlign: 'center',
-            color: t.text3,
-            fontSize: 13,
-          }}
-        >
-          No pending actions. Signals will generate actions automatically, or create one manually.
         </div>
       )}
     </div>

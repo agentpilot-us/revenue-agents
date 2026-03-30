@@ -229,13 +229,19 @@ export default function HotSignalsFeed({
           }
         }
         if (!DEMO_RUN_PLAY_BYPASS && res.status === 404) {
-          setActedSignalIds((prev) => new Set(prev).add(signalId));
-          onRefresh();
-          const configUrl = `/dashboard/roadmap?companyId=${companyId}`;
-          toast.warning('No play configured for this signal', {
-            description: 'Go to Strategic Account Plan → Configuration → Play Rules to add a rule.',
+          const catalogUrl = `/dashboard/plays?companyId=${encodeURIComponent(companyId)}`;
+          const configUrl = `/dashboard/roadmap?companyId=${encodeURIComponent(companyId)}`;
+          toast.warning('No play template matched this signal', {
+            description:
+              'Start a play manually from the catalog, or add a signal → play mapping in Strategic Account Plan → Play Rules.',
             action: {
-              label: 'Open Configuration',
+              label: 'Play Catalog',
+              onClick: () => {
+                window.location.href = catalogUrl;
+              },
+            },
+            cancel: {
+              label: 'Play Rules',
               onClick: () => {
                 window.location.href = configUrl;
               },
@@ -244,12 +250,19 @@ export default function HotSignalsFeed({
         }
         if (!res.ok && (DEMO_RUN_PLAY_BYPASS || res.status !== 404)) {
           console.error('Work This failed:', res.status, data);
+          const msg =
+            typeof data?.error === 'string'
+              ? data.error
+              : `Could not start play (${res.status}). Try again or start from the Play Catalog.`;
           if (DEMO_RUN_PLAY_BYPASS && data?.error) {
             toast.error(data.error);
+          } else if (!DEMO_RUN_PLAY_BYPASS) {
+            toast.error(msg);
           }
         }
       } catch (err) {
         console.error('Failed to start play from signal:', err);
+        toast.error('Network error starting play. Check your connection and try again.');
       } finally {
         setWorking(null);
       }

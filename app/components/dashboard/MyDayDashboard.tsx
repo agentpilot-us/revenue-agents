@@ -42,8 +42,6 @@ type MyDayData = {
   }>;
   recommendedPlays?: RecommendedPlayItem[];
   followUpSteps?: FollowUpStepItem[];
-  followUpStepsFromPlayRuns?: FollowUpStepItem[];
-  sequenceFollowUps?: FollowUpStepItem[];
 };
 
 export default function MyDayDashboard() {
@@ -61,18 +59,7 @@ export default function MyDayDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const frUrl = searchParams.get('focusRun')?.trim();
-      const fcUrl = searchParams.get('focusCompanyId')?.trim();
-      const runId = frUrl || highlightPlayRun?.runId?.trim();
-      const companyId = fcUrl || highlightPlayRun?.companyId?.trim();
-      const params = new URLSearchParams();
-      if (runId) {
-        params.set('focusRun', runId);
-        if (companyId) params.set('focusCompanyId', companyId);
-      }
-      const qs = params.toString();
-      const url = qs ? `/api/dashboard/my-day?${qs}` : '/api/dashboard/my-day';
-      const res = await fetch(url);
+      const res = await fetch('/api/dashboard/my-day');
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -82,7 +69,7 @@ export default function MyDayDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [searchParams, highlightPlayRun?.runId, highlightPlayRun?.companyId]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -311,8 +298,6 @@ export default function MyDayDashboard() {
         workflows={data.workflows}
         playRuns={data.playRuns ?? []}
         followUpSteps={data.followUpSteps ?? []}
-        followUpStepsFromPlayRuns={data.followUpStepsFromPlayRuns ?? []}
-        sequenceFollowUps={data.sequenceFollowUps ?? []}
         recommendedPlays={visibleRecommended}
         onDismiss={handleDismiss}
         onSnooze={handleSnooze}

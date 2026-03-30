@@ -1,5 +1,7 @@
 'use client';
 
+import type { HighlightPlayRunTarget } from './NextStepCard';
+
 const t = {
   surface: 'rgba(15,23,42,0.6)',
   border: 'rgba(255,255,255,0.06)',
@@ -43,6 +45,7 @@ export type PlayRunCardRun = {
 type Props = {
   run: PlayRunCardRun;
   onWorkThis: (companyId: string, runId: string) => void;
+  highlightPlayRun?: HighlightPlayRunTarget | null;
 };
 
 function actionLabel(actionType: string): string {
@@ -78,7 +81,10 @@ function dayLabelFor(suggestedDate: string | null | undefined, referenceMs: numb
   return dayOffset >= 0 ? `Day ${dayOffset}` : null;
 }
 
-export default function PlayRunCard({ run, onWorkThis }: Props) {
+export default function PlayRunCard({ run, onWorkThis, highlightPlayRun = null }: Props) {
+  const focusHighlight =
+    highlightPlayRun?.runId === run.id &&
+    (!highlightPlayRun.companyId || highlightPlayRun.companyId === run.companyId);
   const allActions = run.phaseRuns.flatMap((pr) => pr.actions);
   const completed = allActions.filter(
     (a) => a.status === 'EXECUTED' || a.status === 'SKIPPED',
@@ -95,10 +101,12 @@ export default function PlayRunCard({ run, onWorkThis }: Props) {
 
   return (
     <div
+      data-myd-focus-run={focusHighlight ? run.id : undefined}
       style={{
         background: t.surface,
         borderRadius: 12,
-        border: `1px solid ${t.border}`,
+        border: focusHighlight ? `2px solid ${t.blue}` : `1px solid ${t.border}`,
+        boxShadow: focusHighlight ? '0 0 0 4px rgba(59,130,246,0.2)' : undefined,
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
