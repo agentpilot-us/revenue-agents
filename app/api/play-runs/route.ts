@@ -40,12 +40,14 @@ export async function POST(req: NextRequest) {
 
     let targetContact: { name: string; email?: string | null; title?: string | null } | null =
       null;
+    let resolvedTargetContactId: string | null = null;
     if (targetContactId) {
       const contact = await prisma.contact.findFirst({
-        where: { id: targetContactId },
-        select: { firstName: true, lastName: true, email: true, title: true },
+        where: { id: targetContactId, companyId },
+        select: { id: true, firstName: true, lastName: true, email: true, title: true },
       });
       if (contact) {
+        resolvedTargetContactId = contact.id;
         targetContact = {
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Unknown',
           email: contact.email,
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
       playTemplateId,
       anchorDate: anchorDate ?? null,
       targetContact,
+      targetContactId: resolvedTargetContactId,
       accountSignalId: accountSignalId ?? null,
       title: title ?? null,
       roadmapTargetId: roadmapTargetId ?? null,

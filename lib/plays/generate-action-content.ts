@@ -202,13 +202,40 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
 
   let contactIntelExtra = '';
   let resolvedContactId: string | null = null;
-  const emailTrim = action.contactEmail?.trim();
-  if (emailTrim) {
-    const dbContact = await prisma.contact.findFirst({
-      where: {
-        companyId,
-        email: { equals: emailTrim, mode: 'insensitive' },
-      },
+
+  const applyDbContactIntel = (dbContact: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    title: string | null;
+    bio: string | null;
+    enrichedData: unknown;
+  }) => {
+    resolvedContactId = dbContact.id;
+    contacts.push({
+      firstName: dbContact.firstName,
+      lastName: dbContact.lastName,
+      title: dbContact.title ?? action.contactTitle ?? null,
+    });
+    const parts: string[] = [];
+    if (dbContact.bio?.trim()) {
+      parts.push(`Bio: ${capIntelText(dbContact.bio)}`);
+    }
+    if (dbContact.enrichedData != null) {
+      const edStr =
+        typeof dbContact.enrichedData === 'string'
+          ? dbContact.enrichedData
+          : JSON.stringify(dbContact.enrichedData);
+      parts.push(`Enrichment: ${capIntelText(edStr)}`);
+    }
+    if (parts.length) {
+      contactIntelExtra = `\n\nContact intel:\n${parts.join('\n')}`;
+    }
+  };
+
+  if (action.contactId) {
+    const byId = await prisma.contact.findFirst({
+      where: { id: action.contactId, companyId },
       select: {
         id: true,
         firstName: true,
@@ -218,26 +245,30 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
         enrichedData: true,
       },
     });
-    if (dbContact) {
-      resolvedContactId = dbContact.id;
-      contacts.push({
-        firstName: dbContact.firstName,
-        lastName: dbContact.lastName,
-        title: dbContact.title ?? action.contactTitle ?? null,
+    if (byId) {
+      applyDbContactIntel(byId);
+    }
+  }
+
+  if (!resolvedContactId) {
+    const emailTrim = action.contactEmail?.trim();
+    if (emailTrim) {
+      const dbContact = await prisma.contact.findFirst({
+        where: {
+          companyId,
+          email: { equals: emailTrim, mode: 'insensitive' },
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          title: true,
+          bio: true,
+          enrichedData: true,
+        },
       });
-      const parts: string[] = [];
-      if (dbContact.bio?.trim()) {
-        parts.push(`Bio: ${capIntelText(dbContact.bio)}`);
-      }
-      if (dbContact.enrichedData != null) {
-        const edStr =
-          typeof dbContact.enrichedData === 'string'
-            ? dbContact.enrichedData
-            : JSON.stringify(dbContact.enrichedData);
-        parts.push(`Enrichment: ${capIntelText(edStr)}`);
-      }
-      if (parts.length) {
-        contactIntelExtra = `\n\nContact intel:\n${parts.join('\n')}`;
+      if (dbContact) {
+        applyDbContactIntel(dbContact);
       }
     }
   }

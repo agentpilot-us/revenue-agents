@@ -21,6 +21,8 @@ export type CreatePlayRunInput = {
   anchorDate?: Date | null;
   /** Optional: primary contact for actions (name, email, title). */
   targetContact?: { name: string; email?: string | null; title?: string | null } | null;
+  /** Optional: durable link when contact exists on this company (validated in create). */
+  targetContactId?: string | null;
   /** Optional: link to the signal that triggered this run. */
   accountSignalId?: string | null;
   /** Optional: custom title override for the run. */
@@ -114,6 +116,7 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
     playTemplateId,
     anchorDate,
     targetContact,
+    targetContactId,
     accountSignalId,
     roadmapTargetId,
     productId,
@@ -142,6 +145,15 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
   });
   if (!company) {
     throw new Error('Company not found');
+  }
+
+  let validatedTargetContactId: string | null = null;
+  if (targetContactId) {
+    const contactRow = await prisma.contact.findFirst({
+      where: { id: targetContactId, companyId },
+      select: { id: true },
+    });
+    if (contactRow) validatedTargetContactId = contactRow.id;
   }
 
   const parsedInput =
@@ -227,6 +239,7 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
           contactName: targetContact?.name ?? undefined,
           contactEmail: targetContact?.email ?? undefined,
           contactTitle: targetContact?.title ?? undefined,
+          ...(validatedTargetContactId ? { contactId: validatedTargetContactId } : {}),
           suggestedDate: targetDate ?? undefined,
           dueDate: targetDate ?? undefined,
         },

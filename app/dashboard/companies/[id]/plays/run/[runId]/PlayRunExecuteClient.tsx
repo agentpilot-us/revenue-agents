@@ -20,6 +20,7 @@ type PlayRun = {
       status: string;
       actionType: string;
       suggestedDate: string | null;
+      contactId: string | null;
       contactName: string | null;
       contactEmail: string | null;
       contactTitle: string | null;
@@ -114,6 +115,41 @@ function getRunReferenceDateMs(run: PlayRun): number {
   return earliest ?? runCreated ?? Date.now();
 }
 
+type PickerContact = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  title: string | null;
+  email: string | null;
+  enrichmentStatus: string | null;
+  engagementStatus: string;
+  lastContactedAt: string | null;
+};
+
+type ContactDepartmentGroup = {
+  department: { id: string | null; name: string };
+  contacts: PickerContact[];
+};
+
+function pickerDisplayName(c: PickerContact): string {
+  return [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
+}
+
+function formatLastTouch(iso: string | null): string {
+  if (!iso) return 'no touch';
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return '1d ago';
+  return `${days}d ago`;
+}
+
+function enrichmentLabel(status: string | null): string {
+  if (!status) return '—';
+  if (status === 'complete') return 'enriched';
+  return status;
+}
+
 type PhaseActionSectionProps = {
   phase: PlayRun['phaseRuns'][number];
   run: PlayRun;
@@ -121,6 +157,9 @@ type PhaseActionSectionProps = {
   busyPhaseRunId: string | null;
   actionEdits: Record<string, { subject: string; body: string }>;
   setActionEdits: Dispatch<SetStateAction<Record<string, { subject: string; body: string }>>>;
+  contactGroups: ContactDepartmentGroup[] | null;
+  contactsError: string | null;
+  onAssignContact: (actionId: string, contactId: string | null) => void;
   onGenerate: (actionId: string) => void;
   onExecute: (actionId: string) => void;
   onSkip: (actionId: string) => void;
@@ -136,6 +175,9 @@ function PhaseActionSection({
   busyPhaseRunId,
   actionEdits,
   setActionEdits,
+  contactGroups,
+  contactsError,
+  onAssignContact,
   onGenerate,
   onExecute,
   onSkip,
@@ -163,6 +205,10 @@ function PhaseActionSection({
     const isChampionSpecStep =
       run?.playTemplate?.slug === 'expansion-dgx-to-drive-thor' &&
       (action.title?.toLowerCase().includes('send drive thor spec') ?? false);
+
+    const stepLocked = action.status === 'EXECUTED' || action.status === 'SKIPPED';
+    const selectDisabled =
+      isBusy || stepLocked || !!contactsError || contactGroups === null;
 
     return (
       <div
@@ -193,11 +239,76 @@ function PhaseActionSection({
               )}
               <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{action.title}</span>
             </div>
-            {action.contactName && (
+            {contactGroups === null && action.contactName && (
               <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>
                 → {action.contactName}
                 {action.contactTitle && ` · ${action.contactTitle}`}
               </div>
+            )}
+            {contactGroups !== null && (
+              <div style={{ marginTop: 8, maxWidth: '100%' }}>
+                {contactsError && (
+                  <div style={{ fontSize: 10, color: t.amber, marginBottom: 4 }}>{contactsError}</div>
+                )}
+                <label
+                  htmlFor={`step-contact-${action.id}`}
+                  style={{
+                    display: 'block',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: t.text3,
+                    marginBottom: 4,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Step contact
+                </label>
+                <select
+                  id={`step-contact-${action.id}`}
+                  value={action.contactId ?? ''}
+                  disabled={selectDisabled}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onAssignContact(action.id, v === '' ? null : v);
+                  }}
+                  style={{
+                    width: '100%',
+                    maxWidth: 420,
+                    fontSize: 12,
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    border: `1px solid ${t.border}`,
+                    background: t.surface,
+                    color: t.text1,
+                    cursor: selectDisabled ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <option value="">No CRM contact</option>
+                  {contactGroups.map((g) => (
+                    <optgroup key={g.department.id ?? `unassigned-${g.department.name}`} label={g.department.name}>
+                      {g.contacts.map((c) => {
+                        const name = pickerDisplayName(c);
+                        const titlePart = c.title ? c.title : 'No title';
+                        const meta = `${enrichmentLabel(c.enrichmentStatus)} · last ${formatLastTouch(c.lastContactedAt)}`;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {name} · {titlePart} · {meta}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  ))}
+                </select>
+                {action.contactName && !action.contactId && (
+                  <div style={{ fontSize: 10, color: t.text3, marginTop: 4 }}>
+                    Text-only name on step (link a CRM contact above to personalize generation): {action.contactName}
+                    {action.contactTitle && ` · ${action.contactTitle}`}
+                  </div>
+                )}
+              </div>
+            )}
+            {contactGroups === null && (
+              <div style={{ fontSize: 10, color: t.text3, marginTop: 4 }}>Loading contacts…</div>
             )}
             {action.cooldownWarning && (
               <div
@@ -547,6 +658,9 @@ export default function PlayRunExecuteClient({
   const [generateError, setGenerateError] = useState<string | null>(null);
   /** Per-action subject/body for editing. Key = action.id. Synced from run when run loads/updates. */
   const [actionEdits, setActionEdits] = useState<Record<string, { subject: string; body: string }>>({});
+  /** null = loading; array = loaded (may be empty). */
+  const [contactGroups, setContactGroups] = useState<ContactDepartmentGroup[] | null>(null);
+  const [contactsError, setContactsError] = useState<string | null>(null);
 
   const fetchRun = useCallback(async () => {
     try {
@@ -679,6 +793,30 @@ export default function PlayRunExecuteClient({
     }
   };
 
+  const handleAssignContact = async (actionId: string, contactId: string | null) => {
+    setBusyActionId(actionId);
+    setGenerateError(null);
+    try {
+      const res = await fetch(`/api/play-runs/${runId}/actions/${actionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const message = typeof body?.error === 'string' ? body.error : 'Could not update contact';
+        throw new Error(message);
+      }
+      await fetchRun();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not update contact';
+      setGenerateError(message);
+      console.error('Assign contact error:', err);
+    } finally {
+      setBusyActionId(null);
+    }
+  };
+
   const handleSkip = async (actionId: string) => {
     setBusyActionId(actionId);
     try {
@@ -797,6 +935,9 @@ export default function PlayRunExecuteClient({
             busyPhaseRunId={busyPhaseRunId}
             actionEdits={actionEdits}
             setActionEdits={setActionEdits}
+            contactGroups={contactGroups}
+            contactsError={contactsError}
+            onAssignContact={handleAssignContact}
             onGenerate={handleGenerate}
             onExecute={handleExecute}
             onSkip={handleSkip}

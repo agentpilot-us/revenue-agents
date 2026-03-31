@@ -44,6 +44,7 @@ export async function GET(
         enrichedData: true,
         seniority: true,
         seniorityLevel: true,
+        lastContactedAt: true,
         persona: {
           select: {
             name: true,
@@ -230,6 +231,7 @@ export async function GET(
           ...(includeEmailActivity && {
             emailsSentThisWeek: emailsSentByContact[c.id] ?? 0,
           }),
+          lastContactedAt: c.lastContactedAt?.toISOString() ?? null,
         };
       }),
     }));
@@ -274,6 +276,7 @@ export async function GET(
             ...(includeEmailActivity && {
               emailsSentThisWeek: emailsSentByContact[c.id] ?? 0,
             }),
+            lastContactedAt: c.lastContactedAt?.toISOString() ?? null,
           };
         }),
       });

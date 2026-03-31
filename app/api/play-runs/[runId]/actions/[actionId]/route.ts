@@ -5,7 +5,8 @@ import { prisma } from '@/lib/db';
 /**
  * PATCH /api/play-runs/[runId]/actions/[actionId]
  * Update a PlayAction (e.g. skip, or set edited content).
- * Body: { status?: 'SKIPPED', skipReason?: string, editedContent?: string, editedSubject?: string }
+ * Body: { status?, skipReason?, editedContent?, editedSubject?, contactId? }
+ * When contactId changes (including to null), clears generated/edited content so the next Generate uses the new contact.
  */
 export async function PATCH(
   req: NextRequest,
@@ -23,8 +24,16 @@ export async function PATCH(
     const link = await prisma.playAction.findFirst({
       where: { id: actionId },
       select: {
+        id: true,
+        contactId: true,
         contentTemplateId: true,
-        phaseRun: { select: { playRunId: true, playRun: { select: { userId: true } } } },
+        contentTemplate: { select: { name: true } },
+        phaseRun: {
+          select: {
+            playRunId: true,
+            playRun: { select: { userId: true, companyId: true } },
+          },
+        },
       },
     });
     if (
@@ -35,34 +44,90 @@ export async function PATCH(
       return NextResponse.json({ error: 'Action not found' }, { status: 404 });
     }
 
-    const data: {
-      status?: 'SKIPPED';
-      skippedAt?: Date;
-      skipReason?: string | null;
-      editedContent?: string | null;
-      editedSubject?: string | null;
-      reviewedAt?: Date;
-    } = {};
+    const companyId = link.phaseRun.playRun.companyId;
+
+    const data: Record<string, unknown> = {};
+    let clearedForContactChange = false;
+
+    if (body.contactId !== undefined) {
+      const raw = body.contactId;
+      if (raw !== null && typeof raw !== 'string') {
+        return NextResponse.json(
+          { error: 'contactId must be a string or null' },
+          { status: 400 },
+        );
+      }
+      const prevId = link.contactId ?? null;
+      const nextId = raw === null || raw === '' ? null : raw;
+
+      if (nextId !== prevId) {
+        clearedForContactChange = true;
+        if (nextId) {
+          const c = await prisma.contact.findFirst({
+            where: { id: nextId, companyId },
+            select: { firstName: true, lastName: true, email: true, title: true },
+          });
+          if (!c) {
+            return NextResponse.json(
+              { error: 'Contact not found on this account' },
+              { status: 400 },
+            );
+          }
+          const displayName = [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
+          const templateName = link.contentTemplate?.name;
+          data.contactId = nextId;
+          data.contactName = displayName;
+          data.contactEmail = c.email ?? null;
+          data.contactTitle = c.title ?? null;
+          data.title = templateName ? `${templateName} — ${displayName}` : displayName;
+        } else {
+          const templateName = link.contentTemplate?.name;
+          data.contactId = null;
+          data.contactName = null;
+          data.contactEmail = null;
+          data.contactTitle = null;
+          if (templateName) data.title = templateName;
+        }
+        data.generatedContent = null;
+        data.generatedSubject = null;
+        data.generatedAt = null;
+        data.modelUsed = null;
+        data.tokensUsed = null;
+        data.editedContent = null;
+        data.editedSubject = null;
+        data.reviewedAt = null;
+        data.contextSnapshot = null;
+      }
+    }
 
     if (body.status === 'SKIPPED') {
       data.status = 'SKIPPED';
       data.skippedAt = new Date();
       data.skipReason = body.skipReason ?? null;
     }
-    if (body.editedContent !== undefined) {
-      data.editedContent = body.editedContent ?? null;
-      data.reviewedAt = new Date();
-    }
-    if (body.editedSubject !== undefined) {
-      data.editedSubject = body.editedSubject ?? null;
+    if (!clearedForContactChange) {
+      let touchReview = false;
+      if (body.editedContent !== undefined) {
+        data.editedContent = body.editedContent ?? null;
+        touchReview = true;
+      }
+      if (body.editedSubject !== undefined) {
+        data.editedSubject = body.editedSubject ?? null;
+        touchReview = true;
+      }
+      if (touchReview) data.reviewedAt = new Date();
     }
 
     const action = await prisma.playAction.update({
       where: { id: actionId },
-      data,
+      data: data as Parameters<typeof prisma.playAction.update>[0]['data'],
     });
 
-    if (link.contentTemplateId && (data.editedContent !== undefined || data.editedSubject !== undefined)) {
+    if (
+      link.contentTemplateId &&
+      !clearedForContactChange &&
+      (data.editedContent !== undefined || data.editedSubject !== undefined)
+    ) {
       await prisma.contentTemplate
         .update({
           where: { id: link.contentTemplateId },

@@ -344,6 +344,7 @@ model Contact {
   stakeholderEngagementPlays StakeholderEngagementPlay[]
   contactSequenceEnrollments ContactSequenceEnrollment[]
   roadmapContacts            RoadmapContact[]
+  playActions                PlayAction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2286,6 +2287,8 @@ model PlayAction {
   contactEmail        String?
   contactTitle        String?
   contactRole         ContactRole?
+  contactId           String?
+  contact             Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
   status              ActionStatus    @default(PENDING)
   reviewedAt          DateTime?
@@ -2308,6 +2311,7 @@ model PlayAction {
 
   @@index([phaseRunId, status])
   @@index([status])
+  @@index([contactId])
 }
 
 model ContactTouch {

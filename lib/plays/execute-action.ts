@@ -86,7 +86,7 @@ export async function executePlayAction(input: ExecutePlayActionInput): Promise<
   const contactName = action.contactName ?? 'Unknown';
   const contactEmail = action.contactEmail ?? undefined;
 
-  let contactId: string | null = inputContactId ?? null;
+  let contactId: string | null = inputContactId ?? action.contactId ?? null;
   if (!contactId && contactEmail) {
     const contact = await prisma.contact.findFirst({
       where: { companyId, email: contactEmail },
