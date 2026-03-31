@@ -2,55 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import { playRunWorkspaceUrl } from '@/lib/dashboard/my-day-navigation';
 import type { PlayTemplateCatalogItem } from './PlayCatalog';
-import { CONTENT_GENERATION_TYPE_KEYS } from '@/lib/plays/content-generation-types';
-
-type TemplateStep = {
-  order: number;
-  name: string | null;
-  label: string | null;
-  description: string | null;
-  channel?: string | null;
-  phase?: string | null;
-  targetPersona?: string | null;
-  dayOffset?: number | null;
-  contentTemplateId?: string | null;
-  contentGenerationType?: string | null;
-  requiresContact?: boolean;
-  isAutomatable?: boolean;
-  playTemplateRoleId?: string | null;
-};
-
-const CHANNEL_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  email:       { label: 'Email',       color: '#60a5fa', bg: 'rgba(59,130,246,0.08)' },
-  linkedin:    { label: 'LinkedIn',    color: '#38bdf8', bg: 'rgba(56,189,248,0.08)' },
-  call:        { label: 'Call',        color: '#4ade80', bg: 'rgba(34,197,94,0.08)' },
-  phone:       { label: 'Phone',       color: '#4ade80', bg: 'rgba(34,197,94,0.08)' },
-  meeting:     { label: 'Meeting',     color: '#a78bfa', bg: 'rgba(139,92,246,0.08)' },
-  ad_brief:    { label: 'Ads',         color: '#c084fc', bg: 'rgba(192,132,252,0.08)' },
-  event:       { label: 'Event',       color: '#818cf8', bg: 'rgba(99,102,241,0.08)' },
-  demo:        { label: 'Demo',        color: '#fb7185', bg: 'rgba(244,63,94,0.08)' },
-  proposal:    { label: 'Proposal',    color: '#fbbf24', bg: 'rgba(245,158,11,0.08)' },
-  case_study:  { label: 'Case Study',  color: '#f472b6', bg: 'rgba(236,72,153,0.08)' },
-  video:       { label: 'Video',       color: '#f472b6', bg: 'rgba(236,72,153,0.08)' },
-  crm:         { label: 'CRM',         color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
-  in_product:  { label: 'In-Product',  color: '#fb923c', bg: 'rgba(249,115,22,0.08)' },
-  internal:    { label: 'Internal',    color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
-  task:        { label: 'Task',        color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
-  sales_page:  { label: 'Sales Page',  color: '#fbbf24', bg: 'rgba(245,158,11,0.08)' },
-  briefing:    { label: 'Briefing',    color: '#fb7185', bg: 'rgba(244,63,94,0.08)' },
-  content:     { label: 'Content',     color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
-};
-
-const PHASE_COLORS: Record<string, { color: string; bg: string }> = {
-  signal:   { color: '#f97316', bg: 'rgba(249,115,22,0.08)' },
-  prep:     { color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
-  activate: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
-  engage:   { color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-  convert:  { color: '#eab308', bg: 'rgba(234,179,8,0.08)' },
-  advocacy: { color: '#ec4899', bg: 'rgba(236,72,153,0.08)' },
-};
 
 const t = {
   surface: 'rgba(15,23,42,0.95)',
@@ -66,14 +19,14 @@ const t = {
 
 type CompanyOption = { id: string; name: string };
 type DivisionOption = { id: string; label: string };
-type ContactOption = { id: string; name: string; email: string | null };
+
+type ReadonlyStep = { order: number; name: string; phase: string };
 
 type Props = {
   template: PlayTemplateCatalogItem;
   onClose: () => void;
   companyId?: string;
   companyName?: string;
-  /** Pre-select division when opening from deep link (e.g. /dashboard/plays?companyId=...&divisionId=...) */
   initialDivisionId?: string;
 };
 
@@ -82,107 +35,40 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
   const [divisions, setDivisions] = useState<DivisionOption[]>([]);
-  const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState(initialDivisionId || '');
-  const [selectedContactId, setSelectedContactId] = useState('');
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [loadingDivisions, setLoadingDivisions] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [steps, setSteps] = useState<TemplateStep[]>([]);
+  const [stepsExpanded, setStepsExpanded] = useState(false);
+  const [readonlySteps, setReadonlySteps] = useState<ReadonlyStep[]>([]);
   const [loadingSteps, setLoadingSteps] = useState(true);
-  const [patchingContentId, setPatchingContentId] = useState<string | null>(null);
-  const [templateRoles, setTemplateRoles] = useState<
-    Array<{ id: string; key: string; label: string }>
-  >([]);
 
   const needsCompanyPicker = !companyId;
-
-  const updateStepContentType = useCallback(
-    async (
-      contentTemplateId: string,
-      updates: {
-        contentGenerationType?: string;
-        requiresContact?: boolean;
-        isAutomatable?: boolean;
-        playTemplateRoleId?: string | null;
-      },
-    ) => {
-      setPatchingContentId(contentTemplateId);
-      try {
-        const res = await fetch(`/api/content-templates/${contentTemplateId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        });
-        if (!res.ok) return;
-        setSteps((prev) =>
-          prev.map((s) =>
-            s.contentTemplateId === contentTemplateId
-              ? { ...s, ...updates }
-              : s,
-          ),
-        );
-      } finally {
-        setPatchingContentId(null);
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     setLoadingSteps(true);
     fetch(`/api/play-templates/${template.id}`)
       .then((r) => r.json())
       .then((data) => {
-        setTemplateRoles(
-          (data.template?.templateRoles as Array<{ id: string; key: string; label: string }>) ?? [],
-        );
         const phases = data.phases ?? [];
-        const stepList: TemplateStep[] = [];
-        phases.forEach((ph: {
-          name: string;
-          orderIndex: number;
-          contentTemplates?: Array<{
-            id: string;
-            name: string;
-            contentGenerationType?: string;
-            requiresContact?: boolean;
-            isAutomatable?: boolean;
-            playTemplateRoleId?: string | null;
-          }>;
-        }, idx: number) => {
-          const templates = ph.contentTemplates ?? [];
-          if (templates.length > 0) {
-            templates.forEach((c) => {
-              stepList.push({
-                order: stepList.length + 1,
-                name: c.name,
-                label: c.name,
-                description: ph.name,
-                phase: ph.name,
-                dayOffset: null,
-                contentTemplateId: c.id,
-                contentGenerationType: c.contentGenerationType ?? 'custom_content',
-                requiresContact: c.requiresContact ?? false,
-                isAutomatable: c.isAutomatable ?? false,
-                playTemplateRoleId: c.playTemplateRoleId ?? null,
-              });
-            });
+        const stepList: ReadonlyStep[] = [];
+        let order = 0;
+        for (const ph of phases as Array<{ name: string; contentTemplates?: Array<{ name: string }> }>) {
+          const cts = ph.contentTemplates ?? [];
+          if (cts.length > 0) {
+            for (const c of cts) {
+              order += 1;
+              stepList.push({ order, name: c.name, phase: ph.name });
+            }
           } else {
-            stepList.push({
-              order: idx + 1,
-              name: ph.name,
-              label: ph.name,
-              description: ph.name,
-              phase: ph.name,
-              dayOffset: null,
-            });
+            order += 1;
+            stepList.push({ order, name: ph.name, phase: ph.name });
           }
-        });
-        setSteps(stepList);
+        }
+        setReadonlySteps(stepList);
       })
-      .catch(() => {})
+      .catch(() => setReadonlySteps([]))
       .finally(() => setLoadingSteps(false));
   }, [template.id]);
 
@@ -205,13 +91,11 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
   useEffect(() => {
     if (!targetCompanyId) {
       setDivisions([]);
-      setContacts([]);
       return;
     }
     setLoadingDivisions(true);
     const preserveDivision = companyId && targetCompanyId === companyId && initialDivisionId;
-    setSelectedDivisionId(preserveDivision ? initialDivisionId : '');
-    setSelectedContactId('');
+    if (!preserveDivision) setSelectedDivisionId('');
     fetch(`/api/companies/${targetCompanyId}/departments`)
       .then((r) => r.json())
       .then((data) => {
@@ -221,34 +105,13 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
           label: d.customName || (d.type ?? '').replace(/_/g, ' '),
         }));
         setDivisions(list);
-        if (preserveDivision && list.some((d: { id: string; label: string }) => d.id === initialDivisionId)) {
-          setSelectedDivisionId(initialDivisionId);
+        if (preserveDivision && list.some((d: DivisionOption) => d.id === initialDivisionId)) {
+          setSelectedDivisionId(initialDivisionId!);
         }
       })
       .catch(() => setDivisions([]))
       .finally(() => setLoadingDivisions(false));
   }, [targetCompanyId, companyId, initialDivisionId]);
-
-  useEffect(() => {
-    if (!targetCompanyId || !selectedDivisionId) {
-      setContacts([]);
-      setSelectedContactId('');
-      return;
-    }
-    fetch(`/api/companies/${targetCompanyId}/contacts?departmentId=${selectedDivisionId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data.contacts) ? data.contacts : Array.isArray(data) ? data : [];
-        setContacts(
-          list.map((c: { id: string; firstName?: string | null; lastName?: string | null; email?: string | null }) => ({
-            id: c.id,
-            name: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown',
-            email: c.email ?? null,
-          })),
-        );
-      })
-      .catch(() => setContacts([]));
-  }, [targetCompanyId, selectedDivisionId]);
 
   const handleStart = useCallback(async () => {
     const cid = companyId || selectedCompanyId;
@@ -260,7 +123,6 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
         companyId: cid,
         playTemplateId: template.id,
       };
-      if (selectedContactId) payload.targetContactId = selectedContactId;
       if (selectedDivisionId) payload.targetCompanyDepartmentId = selectedDivisionId;
 
       const res = await fetch('/api/play-runs', {
@@ -275,7 +137,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       const data = await res.json();
       const playRunId = data.playRunId ?? data.playRun?.id;
       if (playRunId) {
-        router.push(myDayUrlAfterPlayStart(playRunId, cid));
+        router.push(playRunWorkspaceUrl(cid, playRunId));
       } else {
         router.push('/dashboard');
       }
@@ -283,7 +145,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       setError(err instanceof Error ? err.message : 'Failed to start play');
       setStarting(false);
     }
-  }, [companyId, selectedCompanyId, selectedContactId, selectedDivisionId, template.id, router]);
+  }, [companyId, selectedCompanyId, selectedDivisionId, template.id, router]);
 
   const selectedCompanyName =
     companyName || companies.find((c) => c.id === selectedCompanyId)?.name;
@@ -304,7 +166,6 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
-        {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -338,199 +199,81 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
           </div>
         </div>
 
-        {/* Body */}
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
-          <div style={{ marginBottom: 24 }}>
-            <h3
-              style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: t.text4, marginBottom: 12,
-              }}
-            >
-              Steps ({steps.length})
-            </h3>
-
-            {loadingSteps ? (
-              <p style={{ fontSize: 12, color: t.text3 }}>Loading steps...</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {steps.map((step, idx) => {
-                  const chCfg = step.channel ? CHANNEL_CONFIG[step.channel] : null;
-                  const phCfg = step.phase ? PHASE_COLORS[step.phase] : null;
-                  const isLast = idx === steps.length - 1;
-                  return (
-                    <div key={step.order} style={{ display: 'flex', gap: 12 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 24, flexShrink: 0 }}>
-                        <div
-                          style={{
-                            width: 22, height: 22, borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 10, fontWeight: 700,
-                            background: phCfg?.bg ?? t.blueBg,
-                            color: phCfg?.color ?? t.blue,
-                            border: `1px solid ${t.blueBorder}`,
-                          }}
-                        >
-                          {step.order}
-                        </div>
-                        {!isLast && (
-                          <div style={{ width: 1, flex: 1, background: t.borderMed, minHeight: 12 }} />
-                        )}
-                      </div>
-
-                      <div style={{ paddingBottom: isLast ? 0 : 14, flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>
-                            {step.name ?? step.label ?? `Step ${step.order}`}
-                          </span>
-                          {chCfg && (
-                            <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: chCfg.bg, color: chCfg.color }}>
-                              {chCfg.label}
-                            </span>
-                          )}
-                          {step.phase && phCfg && (
-                            <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: phCfg.bg, color: phCfg.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {step.phase}
-                            </span>
-                          )}
-                          {step.dayOffset != null && (
-                            <span style={{ fontSize: 10, color: t.text4 }}>Day {step.dayOffset}</span>
-                          )}
-                        </div>
-                        {step.targetPersona && (
-                          <p style={{ fontSize: 11, color: t.text4, margin: '1px 0 0' }}>
-                            Target: {step.targetPersona}
-                          </p>
-                        )}
-                        <p style={{ fontSize: 12, color: t.text3, margin: '2px 0 0' }}>
-                          {step.description ?? ''}
-                        </p>
-                        {step.contentTemplateId && (
-                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-                            <label style={{ fontSize: 10, color: t.text4, fontWeight: 600, textTransform: 'uppercase' }}>
-                              Content type
-                            </label>
-                            <select
-                              value={step.contentGenerationType ?? 'custom_content'}
-                              onChange={(e) =>
-                                updateStepContentType(step.contentTemplateId!, {
-                                  contentGenerationType: e.target.value,
-                                })
-                              }
-                              disabled={patchingContentId === step.contentTemplateId}
-                              style={{
-                                fontSize: 11,
-                                padding: '4px 8px',
-                                borderRadius: 4,
-                                border: `1px solid ${t.borderMed}`,
-                                background: 'rgba(0,0,0,0.2)',
-                                color: t.text1,
-                                minWidth: 160,
-                              }}
-                            >
-                              {CONTENT_GENERATION_TYPE_KEYS.map((key) => (
-                                <option key={key} value={key}>
-                                  {key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                                </option>
-                              ))}
-                            </select>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: t.text3, cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={step.requiresContact ?? false}
-                                onChange={(e) =>
-                                  updateStepContentType(step.contentTemplateId!, {
-                                    requiresContact: e.target.checked,
-                                  })
-                                }
-                                disabled={patchingContentId === step.contentTemplateId}
-                              />
-                              Requires contact
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: t.text3, cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={step.isAutomatable ?? false}
-                                onChange={(e) =>
-                                  updateStepContentType(step.contentTemplateId!, {
-                                    isAutomatable: e.target.checked,
-                                  })
-                                }
-                                disabled={patchingContentId === step.contentTemplateId}
-                              />
-                              Automatable
-                            </label>
-                            {templateRoles.length > 0 && (
-                              <>
-                                <label style={{ fontSize: 10, color: t.text4, fontWeight: 600, textTransform: 'uppercase' }}>
-                                  Targets role
-                                </label>
-                                <select
-                                  value={step.playTemplateRoleId ?? ''}
-                                  onChange={(e) =>
-                                    updateStepContentType(step.contentTemplateId!, {
-                                      playTemplateRoleId: e.target.value || null,
-                                    })
-                                  }
-                                  disabled={patchingContentId === step.contentTemplateId}
-                                  style={{
-                                    fontSize: 11,
-                                    padding: '4px 8px',
-                                    borderRadius: 4,
-                                    border: `1px solid ${t.borderMed}`,
-                                    background: 'rgba(0,0,0,0.2)',
-                                    color: t.text1,
-                                    minWidth: 160,
-                                  }}
-                                >
-                                  <option value="">Primary (default)</option>
-                                  {templateRoles.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                      {r.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          <button
+            type="button"
+            onClick={() => setStepsExpanded((e) => !e)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: `1px solid ${t.borderMed}`,
+              background: 'rgba(0,0,0,0.2)',
+              color: t.text1,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 16,
+            }}
+          >
+            <span aria-hidden style={{ fontSize: 10 }}>{stepsExpanded ? '▼' : '▶'}</span>
+            View playbook steps
+            {!loadingSteps && readonlySteps.length > 0 && (
+              <span style={{ fontWeight: 400, color: t.text3 }}>({readonlySteps.length})</span>
             )}
-          </div>
+          </button>
 
-          {/* Metadata */}
-          {(template as { expectedOutcome?: string; targetPersonas?: string[]; targetDepartmentTypes?: string[] }).expectedOutcome && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-              <MetaBlock
-                label="Expected Outcome"
-                value={(template as { expectedOutcome?: string }).expectedOutcome!}
-              />
+          {stepsExpanded && (
+            <div style={{ marginBottom: 16 }}>
+              {loadingSteps ? (
+                <p style={{ fontSize: 12, color: t.text3 }}>Loading steps…</p>
+              ) : (
+                <ol style={{ margin: 0, paddingLeft: 18, color: t.text3, fontSize: 12, lineHeight: 1.6 }}>
+                  {readonlySteps.map((s) => (
+                    <li key={s.order} style={{ marginBottom: 6 }}>
+                      <span style={{ color: t.text1, fontWeight: 600 }}>{s.name}</span>
+                      {s.phase !== s.name && (
+                        <span style={{ color: t.text4 }}> · {s.phase}</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
+
+          {(template as { expectedOutcome?: string }).expectedOutcome && (
+            <div style={{ padding: 12, borderRadius: 8, background: 'rgba(15,23,42,0.3)', border: '1px solid rgba(255,255,255,0.04)', marginTop: 8 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: t.text4, margin: '0 0 4px' }}>
+                Expected outcome
+              </p>
+              <p style={{ fontSize: 11, color: t.text3, margin: 0, lineHeight: 1.5 }}>
+                {(template as { expectedOutcome?: string }).expectedOutcome}
+              </p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: `1px solid ${t.border}`, flexShrink: 0 }}>
           {needsCompanyPicker && (
             <div style={{ marginBottom: 12 }}>
               <label
                 style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: t.text4, marginBottom: 4 }}
               >
-                Target Account
+                Target account
               </label>
               {loadingCompanies ? (
-                <p style={{ fontSize: 12, color: t.text3 }}>Loading accounts...</p>
+                <p style={{ fontSize: 12, color: t.text3 }}>Loading accounts…</p>
               ) : (
                 <select
                   value={selectedCompanyId}
                   onChange={(e) => setSelectedCompanyId(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: `1px solid ${t.borderMed}`, color: t.text1, fontSize: 13, outline: 'none' }}
                 >
-                  <option value="">Select an account...</option>
+                  <option value="">Select an account…</option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -556,26 +299,9 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
                   <option key={d.id} value={d.id}>{d.label}</option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {(selectedDivisionId && contacts.length > 0) && (
-            <div style={{ marginBottom: 12 }}>
-              <label
-                style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: t.text4, marginBottom: 4 }}
-              >
-                Primary Contact <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-              </label>
-              <select
-                value={selectedContactId}
-                onChange={(e) => setSelectedContactId(e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: `1px solid ${t.borderMed}`, color: t.text1, fontSize: 13, outline: 'none' }}
-              >
-                <option value="">Auto-assign</option>
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}{c.email ? ` (${c.email})` : ''}</option>
-                ))}
-              </select>
+              <p style={{ fontSize: 11, color: t.text4, margin: '6px 0 0' }}>
+                Picking a division helps suggest contacts and scope discovery on the next screen.
+              </p>
             </div>
           )}
 
@@ -602,23 +328,10 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
               boxShadow: starting || (!companyId && !selectedCompanyId) ? 'none' : '0 4px 20px rgba(59,130,246,0.3)',
             }}
           >
-            {starting ? 'Starting...' : selectedCompanyName ? `Start Play for ${selectedCompanyName}` : 'Start this Play'}
+            {starting ? 'Starting…' : selectedCompanyName ? `Start play for ${selectedCompanyName}` : 'Start this play'}
           </button>
         </div>
       </div>
     </>
-  );
-}
-
-function MetaBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ padding: 12, borderRadius: 8, background: 'rgba(15,23,42,0.3)', border: '1px solid rgba(255,255,255,0.04)' }}>
-      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#475569', margin: '0 0 4px' }}>
-        {label}
-      </p>
-      <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
-        {value}
-      </p>
-    </div>
   );
 }

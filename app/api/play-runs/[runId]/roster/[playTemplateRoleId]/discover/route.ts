@@ -48,7 +48,11 @@ export async function POST(
     const domain = run.company.domain?.replace(/^www\./, '') ?? '';
     if (!domain) {
       return NextResponse.json(
-        { error: 'Company domain is required for contact discovery' },
+        {
+          error: 'Company domain is required for contact discovery',
+          code: 'MISSING_DOMAIN',
+          candidates: [],
+        },
         { status: 400 },
       );
     }
@@ -85,10 +89,25 @@ export async function POST(
         keywords,
         maxResults: 12,
       });
+      if (!people.length) {
+        return NextResponse.json({
+          candidates: [],
+          code: 'NO_RESULTS',
+          message:
+            'No people matched this search. Broaden role hints on the template, confirm the company domain, or add a contact from CRM.',
+        });
+      }
       return NextResponse.json({ candidates: people });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Discovery failed';
-      return NextResponse.json({ error: msg, candidates: [] }, { status: 502 });
+      return NextResponse.json(
+        {
+          error: msg,
+          code: 'APOLLO_UNAVAILABLE',
+          candidates: [],
+        },
+        { status: 502 },
+      );
     }
   } catch (error) {
     console.error('POST discover roster error:', error);

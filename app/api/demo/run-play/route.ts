@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import { playRunWorkspaceUrl } from '@/lib/dashboard/my-day-navigation';
 import {
   type ActionType,
   PlayContentType,
@@ -351,7 +351,7 @@ export async function POST(req: NextRequest) {
       })
       .catch(() => {});
 
-    const redirect = myDayUrlAfterPlayStart(playRun.id, signal.companyId);
+    const redirect = playRunWorkspaceUrl(signal.companyId, playRun.id);
 
     return NextResponse.json({
       playRunId: playRun.id,

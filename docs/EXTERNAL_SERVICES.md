@@ -318,6 +318,10 @@ APOLLO_API_KEY="..."
 1. Go to [Apollo.io](https://www.apollo.io/)
 2. Get an API key from Settings → Integrations → API
 
+**Stub behavior:** If `APOLLO_API_KEY` is unset, `lib/tools/apollo.ts` returns **placeholder** people so demos and local dev still show a result list. Those are not live Apollo matches — configure a real key in staging/production for accurate play-run discovery (`POST .../roster/.../discover`).
+
+**Play templates:** On each `PlayTemplateRole`, optional `apolloTitleTerms` (comma/newline-separated title keywords) narrows Apollo search from the run discover endpoint; `mapToContactRole` supports roster auto-population from roadmap/CRM data.
+
 **Key files:** `lib/tools/apollo.ts`, `lib/tools/contact-finder.ts`, `lib/tools/enrich-contact.ts`
 
 ---

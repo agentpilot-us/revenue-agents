@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import Link from 'next/link';
+import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
 
 type PlayRun = {
   id: string;
@@ -92,6 +93,7 @@ const t = {
   text1: '#e2e8f0',
   text2: '#94a3b8',
   text3: '#64748b',
+  text4: '#475569',
   blue: '#3b82f6',
   blueBg: 'rgba(59,130,246,0.08)',
   green: '#22c55e',
@@ -771,6 +773,8 @@ export default function PlayRunExecuteClient({
     }>
   >([]);
   const [rosterModalBusy, setRosterModalBusy] = useState(false);
+  /** Discover / roster UX messages (domain, Apollo, no results) shown near roster. */
+  const [rosterSurfaceError, setRosterSurfaceError] = useState<string | null>(null);
 
   const useRosterAssign = (run?.runContacts?.length ?? 0) > 0;
 
@@ -791,6 +795,64 @@ export default function PlayRunExecuteClient({
   useEffect(() => {
     fetchRun();
   }, [fetchRun]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setContactGroups(null);
+    setContactsError(null);
+    fetch(`/api/companies/${companyId}/contacts/by-department`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.error && typeof data.error === 'string') {
+          setContactsError(data.error);
+          setContactGroups([]);
+          return;
+        }
+        const raw = data.groups;
+        if (!Array.isArray(raw)) {
+          setContactGroups([]);
+          return;
+        }
+        const mapped: ContactDepartmentGroup[] = raw.map(
+          (g: {
+            department: { id: string | null; name: string };
+            contacts: Array<{
+              id: string;
+              firstName: string | null;
+              lastName: string | null;
+              title: string | null;
+              email: string | null;
+              enrichmentStatus: string | null;
+              engagementStatus?: string;
+              lastContactedAt?: string | null;
+            }>;
+          }) => ({
+            department: { id: g.department.id, name: g.department.name },
+            contacts: g.contacts.map((c) => ({
+              id: c.id,
+              firstName: c.firstName,
+              lastName: c.lastName,
+              title: c.title,
+              email: c.email,
+              enrichmentStatus: c.enrichmentStatus,
+              engagementStatus: c.engagementStatus ?? '—',
+              lastContactedAt: c.lastContactedAt ?? null,
+            })),
+          }),
+        );
+        setContactGroups(mapped);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setContactsError('Could not load contacts');
+          setContactGroups([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
 
   // Sync local edit state from run when run loads or updates
   useEffect(() => {
@@ -911,6 +973,7 @@ export default function PlayRunExecuteClient({
   const handleRosterPatch = async (playTemplateRoleId: string, contactId: string | null) => {
     setRosterModalBusy(true);
     setGenerateError(null);
+    setRosterSurfaceError(null);
     try {
       const res = await fetch(`/api/play-runs/${runId}/roster`, {
         method: 'PATCH',
@@ -931,22 +994,65 @@ export default function PlayRunExecuteClient({
     }
   };
 
+  const discoverMessageForCode = (
+    code: string | undefined,
+    fallback: string,
+    serverMessage?: string,
+  ): string => {
+    switch (code) {
+      case 'MISSING_DOMAIN':
+        return 'This account needs a company domain (set it on the company profile or via research) before Apollo search can run.';
+      case 'APOLLO_UNAVAILABLE':
+        return (
+          serverMessage ||
+          'Contact discovery is temporarily unavailable. Check APOLLO_API_KEY in your environment or try again later.'
+        );
+      case 'NO_RESULTS':
+        return (
+          serverMessage ||
+          'No matches from Apollo. Broaden role hints on the play template, verify the domain, or pick someone from CRM below.'
+        );
+      default:
+        return fallback;
+    }
+  };
+
   const handleDiscoverApollo = async (playTemplateRoleId: string) => {
     setDiscoverBusy(true);
     setDiscoverCandidates([]);
     setGenerateError(null);
+    setRosterSurfaceError(null);
     try {
       const res = await fetch(
         `/api/play-runs/${runId}/roster/${playTemplateRoleId}/discover`,
         { method: 'POST' },
       );
       const data = await res.json().catch(() => ({}));
+      const code = typeof data?.code === 'string' ? data.code : undefined;
       if (!res.ok) {
-        throw new Error(typeof data?.error === 'string' ? data.error : 'Discovery failed');
+        const msg = discoverMessageForCode(
+          code,
+          typeof data?.error === 'string' ? data.error : 'Discovery failed',
+          typeof data?.message === 'string' ? data.message : undefined,
+        );
+        setRosterSurfaceError(msg);
+        return;
       }
-      setDiscoverCandidates(Array.isArray(data.candidates) ? data.candidates : []);
+      const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+      if (candidates.length === 0) {
+        setRosterSurfaceError(
+          discoverMessageForCode(
+            code === 'NO_RESULTS' ? 'NO_RESULTS' : undefined,
+            'No people returned for this search.',
+            typeof data?.message === 'string' ? data.message : undefined,
+          ),
+        );
+        setDiscoverCandidates([]);
+        return;
+      }
+      setDiscoverCandidates(candidates);
     } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : 'Discovery failed');
+      setRosterSurfaceError(e instanceof Error ? e.message : 'Discovery failed');
     } finally {
       setDiscoverBusy(false);
     }
@@ -1105,7 +1211,7 @@ export default function PlayRunExecuteClient({
           </p>
         </div>
         <Link
-          href="/dashboard"
+          href={myDayUrlAfterPlayStart(runId, companyId)}
           style={{
             padding: '8px 14px',
             borderRadius: 8,
@@ -1134,6 +1240,39 @@ export default function PlayRunExecuteClient({
           <h2 style={{ fontSize: 14, fontWeight: 700, color: t.text1, margin: '0 0 12px' }}>
             Contact roster
           </h2>
+          {rosterSurfaceError && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '10px 12px',
+                borderRadius: 8,
+                background: 'rgba(245,158,11,0.1)',
+                border: '1px solid rgba(245,158,11,0.35)',
+                color: '#fcd34d',
+                fontSize: 12,
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 8,
+                alignItems: 'flex-start',
+              }}
+            >
+              <span>{rosterSurfaceError}</span>
+              <button
+                type="button"
+                onClick={() => setRosterSurfaceError(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: t.text3,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  flexShrink: 0,
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {run.roadmapTarget?.name && (
             <p style={{ fontSize: 12, color: t.text3, margin: '0 0 12px' }}>
               Division: {run.roadmapTarget.name}
@@ -1168,6 +1307,7 @@ export default function PlayRunExecuteClient({
                     type="button"
                     onClick={() => {
                       setDiscoverCandidates([]);
+                      setRosterSurfaceError(null);
                       setRosterModalRoleId(rc.playTemplateRole.id);
                     }}
                     style={{
@@ -1205,6 +1345,7 @@ export default function PlayRunExecuteClient({
             useRosterAssign={useRosterAssign}
             onOpenRosterAssign={(roleId) => {
               setDiscoverCandidates([]);
+              setRosterSurfaceError(null);
               setRosterModalRoleId(roleId);
             }}
             onAssignContact={handleAssignContact}
@@ -1252,80 +1393,108 @@ export default function PlayRunExecuteClient({
               Assign contact
             </h3>
             <p style={{ fontSize: 12, color: t.text3, margin: '0 0 16px' }}>
-              Pick someone already in CRM, or search Apollo and add them to this account.
+              Choose someone already in CRM (by department), or search Apollo below if you need net-new people.
             </p>
-            {contactGroups && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: t.text3, display: 'block', marginBottom: 6 }}>
-                  CRM contacts
-                </label>
-                <select
-                  defaultValue=""
-                  disabled={rosterModalBusy}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v) void handleRosterPatch(rosterModalRoleId, v);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: `1px solid ${t.border}`,
-                    background: 'rgba(0,0,0,0.2)',
-                    color: t.text1,
-                    fontSize: 13,
-                  }}
-                >
-                  <option value="">Select…</option>
-                  {contactGroups.map((g) => (
-                    <optgroup key={g.department.id ?? g.department.name} label={g.department.name}>
+            {contactGroups === null && (
+              <p style={{ fontSize: 12, color: t.text3, marginBottom: 16 }}>Loading contacts…</p>
+            )}
+            {contactGroups !== null && contactsError && (
+              <p style={{ fontSize: 12, color: '#f87171', marginBottom: 16 }}>{contactsError}</p>
+            )}
+            {contactGroups !== null && !contactsError && contactGroups.length === 0 && (
+              <p style={{ fontSize: 12, color: t.text3, marginBottom: 16 }}>No CRM contacts on this account yet.</p>
+            )}
+            {contactGroups !== null && contactGroups.length > 0 && (
+              <div style={{ marginBottom: 20, maxHeight: 220, overflowY: 'auto' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 8 }}>
+                  In CRM (by department)
+                </div>
+                {contactGroups.map((g) => (
+                  <div key={g.department.id ?? `dept-${g.department.name}`} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: t.text4, textTransform: 'uppercase', marginBottom: 6 }}>
+                      {g.department.name}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {g.contacts.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {pickerDisplayName(c)} · {c.title || 'No title'}
-                        </option>
+                        <button
+                          key={c.id}
+                          type="button"
+                          disabled={rosterModalBusy}
+                          onClick={() => void handleRosterPatch(rosterModalRoleId, c.id)}
+                          style={{
+                            textAlign: 'left',
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            border: `1px solid ${t.border}`,
+                            background: 'rgba(0,0,0,0.15)',
+                            color: t.text1,
+                            fontSize: 12,
+                            cursor: rosterModalBusy ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <div style={{ fontWeight: 600 }}>
+                            {pickerDisplayName(c)}
+                            {c.title ? ` · ${c.title}` : ''}
+                          </div>
+                          <div style={{ fontSize: 10, color: t.text3, marginTop: 2 }}>
+                            {c.engagementStatus} · enrich: {enrichmentLabel(c.enrichmentStatus)}
+                          </div>
+                        </button>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                disabled={discoverBusy || rosterModalBusy}
-                onClick={() => void handleDiscoverApollo(rosterModalRoleId)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: t.blueBg,
-                  color: t.blue,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: discoverBusy ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {discoverBusy ? 'Searching…' : 'Search Apollo'}
-              </button>
-              <button
-                type="button"
-                disabled={rosterModalBusy}
-                onClick={() => {
-                  setRosterModalRoleId(null);
-                  setDiscoverCandidates([]);
-                }}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  border: `1px solid ${t.border}`,
-                  background: 'transparent',
-                  color: t.text3,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
+
+            <div
+              style={{
+                borderTop: `1px solid ${t.border}`,
+                paddingTop: 16,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 8 }}>
+                Search Apollo (adds to this account)
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  disabled={discoverBusy || rosterModalBusy}
+                  onClick={() => void handleDiscoverApollo(rosterModalRoleId)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: t.blueBg,
+                    color: t.blue,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: discoverBusy ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {discoverBusy ? 'Searching…' : 'Search Apollo'}
+                </button>
+                <button
+                  type="button"
+                  disabled={rosterModalBusy}
+                  onClick={() => {
+                    setRosterModalRoleId(null);
+                    setDiscoverCandidates([]);
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: `1px solid ${t.border}`,
+                    background: 'transparent',
+                    color: t.text3,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
             {discoverCandidates.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

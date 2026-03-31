@@ -34,7 +34,7 @@ isProject: false
 - **Zod** for cross-field rules (timeline fields only if `TIMELINE`, etc.) — keep.
 - **PUT run-safety:** structural edits only when `_count.runs === 0`; else header-only + **409** with actionable copy — keep; versioning remains a future effort.
 - `**GET ?scope=governance`** — one query param, catalog unchanged — keep.
-- `**uiPhaseKind` in `gateConfig**` — pragmatic, no migration — keep.
+- `**uiPhaseKind` in `gateConfig`** — pragmatic, no migration — keep.
 
 **Adjustments added to this plan:**
 
@@ -44,8 +44,8 @@ isProject: false
 | **Account context on publish**   | **Default:** when `POST` succeeds with `status: ACTIVE` and request includes `companyId`, **auto-create** (upsert) `AccountPlayActivation` for that template + company’s roadmap so the catalog-with-company filter shows the play immediately. **UI:** checkbox **“Activate for [company name]”** default **on** when `companyId` is present; send `activateForCompany: false` to opt out. Server: if no roadmap exists for company, return **400** with clear message or optionally skip activation (product choice — prefer explicit error so AE knows why activation didn’t apply). |
 | `**promptTemplate` vs hint**     | **Simple mode:** user enters a short hint → persist `promptTemplate` as scaffold: `{{userInstructions}}\n\nAdditional guidance:\n[hint]`. **Advanced mode:** raw textarea = stored **as-is** (full prompt). **Heuristic (optional):** if input contains `{{` or exceeds N lines/chars, treat as full prompt. UI: toggle **Advanced** reveals full template editor.                                                                                                                                                                                                                      |
 | **Phase/step UI (v1)**           | **Enforce 1:1** in the builder: each **phase row** = one `PlayPhaseTemplate` + exactly one `ContentTemplate`. Data model still allows multiple content rows per phase (seeds, future); API accepts an array with `steps: [single]` for builder-created payloads, or validate `steps.length === 1` for `source: 'builder_v1'`. Drag-and-drop **only between phases** (reorder sequence), not nested step lists.                                                                                                                                                                          |
-| **CustomPlayBuilder after POST** | On successful `POST` with `DRAFT`, `**router.push`** to `**/dashboard/my-company/play-templates/[id]/edit**` (not toast-only) so review/publish happens in `PlayTemplateBuilder`.                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **Clone API**                    | Add `**POST /api/play-templates/[id]/clone`**: copy template + phases + content templates with new ids, name `**[Original] (copy)**`, slug derived with conflict suffix, `**status: DRAFT**`, no runs. Makes **409** “duplicate as new” flow real.                                                                                                                                                                                                                                                                                                                                      |
+| **CustomPlayBuilder after POST** | On successful `POST` with `DRAFT`, `**router.push`** to `**/dashboard/my-company/play-templates/[id]/edit`** (not toast-only) so review/publish happens in `PlayTemplateBuilder`.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Clone API**                    | Add `**POST /api/play-templates/[id]/clone`**: copy template + phases + content templates with new ids, name `**[Original] (copy)`**, slug derived with conflict suffix, `**status: DRAFT**`, no runs. Makes **409** “duplicate as new” flow real.                                                                                                                                                                                                                                                                                                                                      |
 | **Implementation order**         | Reordered so **POST + builder ship together** for immediate E2E test; **governance GET** after PlaybooksTab shell; **PUT + clone** before **DELETE**; catalog/AI/My Day last. See §8.                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 
@@ -56,7 +56,7 @@ isProject: false
 - `**[PlayTemplate](prisma/schema.prisma)`** already has `status` (`DRAFT` | `ACTIVE` | `ARCHIVED`), `scope`, `category`, `triggerType`, `defaultAutonomyLevel`, `signalTypes[]`, optional timeline fields, and `@@unique([userId, slug])`.
 - **Nested model**: `PlayPhaseTemplate` → **multiple** `[ContentTemplate](prisma/schema.prisma)` per phase (builder v1 still creates one per phase).
 - `**[GET /api/play-templates](app/api/play-templates/route.ts)`** returns **only `ACTIVE`**; with `?companyId=` filters by **AccountPlayActivation**. Drafts invisible in `**[PlaybooksTab](app/dashboard/my-company/tabs/PlaybooksTab.tsx)`** today.
-- `**[PATCH /api/play-templates/[id]](app/api/play-templates/[id]/route.ts)**` only updates `defaultAutonomyLevel`.
+- `**[PATCH /api/play-templates/[id]](app/api/play-templates/[id]/route.ts)`** only updates `defaultAutonomyLevel`.
 - `**[CustomPlayBuilder](app/components/plays/CustomPlayBuilder.tsx)**` is unused; manual create wrongly uses first catalog template + `**POST /api/play-runs**`.
 
 ```mermaid
@@ -197,7 +197,7 @@ Soft archive: `status: ARCHIVED`. Guard active runs with **409** unless `?force=
 2. `**PlayTemplateBuilder` + routes** `/dashboard/my-company/play-templates/new` and `/[id]/edit` — **test E2E create against POST** immediately.
 3. **PlaybooksTab:** **+ Create Template**, **Edit** links, badges (initially only **ACTIVE** visible until step 4).
 4. `**GET ?scope=governance` + enrich `GET [id]`** — drafts/archived in list; wire `fetch` in PlaybooksTab.
-5. `**PUT` with run-safety + `POST /api/play-templates/[id]/clone**`.
+5. `**PUT` with run-safety + `POST /api/play-templates/[id]/clone`**.
 6. `**DELETE` soft-archive** with run guard.
 7. **Play Catalog** entry + **CustomPlayBuilder** (POST DRAFT → redirect edit) + optional AI entry.
 8. **My Day** rewire to `/dashboard/plays`.

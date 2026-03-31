@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import { playRunWorkspaceUrl } from '@/lib/dashboard/my-day-navigation';
 import type { HighlightPlayRunTarget } from './NextStepCard';
 import ActionQueueList from './ActionQueueList';
 import WeeklyStatsBar from './WeeklyStatsBar';
@@ -187,7 +187,7 @@ export default function MyDayDashboard() {
           const data = await res.json();
           const runId = data.playRunId ?? data.playRun?.id;
           if (runId) {
-            router.push(myDayUrlAfterPlayStart(runId, play.companyId));
+            router.push(playRunWorkspaceUrl(play.companyId, runId));
           } else {
             router.push('/dashboard');
           }
@@ -313,12 +313,7 @@ export default function MyDayDashboard() {
         />
       </div>
 
-      {/* Section 3: Needs Attention */}
-      <div style={{ marginBottom: 24 }}>
-        <NeedsAttentionCard />
-      </div>
-
-      {/* Section 4: Action Queue + Recommended Plays */}
+      {/* Section 3: Action Queue + Recommended Plays (above Needs Attention so queue stays high) */}
       <ActionQueueList
         workflows={data.workflows}
         playRuns={data.playRuns ?? []}
@@ -333,6 +328,11 @@ export default function MyDayDashboard() {
         onCreateAction={() => setModalOpen(true)}
         highlightPlayRun={highlightPlayRun}
       />
+
+      {/* Section 4: Needs Attention */}
+      <div style={{ marginTop: 24, marginBottom: 24 }}>
+        <NeedsAttentionCard />
+      </div>
 
       <CreateActionModal
         open={modalOpen}

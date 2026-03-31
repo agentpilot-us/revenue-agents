@@ -25,6 +25,8 @@ export type PlayRunCardRun = {
   status: string;
   company: { id: string; name: string; industry: string | null };
   playTemplate: { id: string; name: string; slug: string };
+  /** When set, distinguishes multiple runs of the same template on one account (e.g. per division). */
+  roadmapTarget?: { id: string; name: string } | null;
   phaseRuns: Array<{
     id: string;
     phaseTemplate: { id: string; name: string; orderIndex: number };
@@ -168,6 +170,12 @@ export default function PlayRunCard({ run, onWorkThis, highlightPlayRun = null }
       <div style={{ fontSize: 14, fontWeight: 600, color: t.text1, lineHeight: 1.4 }}>
         {run.playTemplate.name} — {run.company.name}
       </div>
+
+      {run.roadmapTarget?.name && (
+        <div style={{ fontSize: 11, color: t.text3 }}>
+          Division: {run.roadmapTarget.name}
+        </div>
+      )}
 
       {nextAction && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

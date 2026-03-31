@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import { playRunWorkspaceUrl } from '@/lib/dashboard/my-day-navigation';
 import HotSignalCard, {
   type HotSignalItem,
   type CompanyTriggerItem,
@@ -226,7 +226,7 @@ export default function HotSignalsFeed({
             const redirect =
               typeof data.redirect === 'string'
                 ? data.redirect
-                : myDayUrlAfterPlayStart(playRunId, companyId);
+                : playRunWorkspaceUrl(companyId, playRunId);
             window.location.href = redirect;
             return;
           }
@@ -360,7 +360,7 @@ export default function HotSignalsFeed({
       setSelectedAccounts(new Set());
 
       if (lastRunId && lastCompanyId) {
-        window.location.href = myDayUrlAfterPlayStart(lastRunId, lastCompanyId);
+        window.location.href = playRunWorkspaceUrl(lastCompanyId, lastRunId);
       } else {
         onRefresh();
       }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import { playRunWorkspaceUrl } from '@/lib/dashboard/my-day-navigation';
 
 const t = {
   surface: 'rgba(15,23,42,0.6)',
@@ -130,7 +130,7 @@ export default function PhasedPlanBoard({ companyId, roadmapId, plans }: Props) 
         const data = await res.json();
         const runId = data.playRunId ?? data.playRun?.id;
         if (runId) {
-          router.push(myDayUrlAfterPlayStart(runId, companyId));
+          router.push(playRunWorkspaceUrl(companyId, runId));
         }
       }
     } finally {

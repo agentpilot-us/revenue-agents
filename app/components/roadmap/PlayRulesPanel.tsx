@@ -46,6 +46,7 @@ const SIGNAL_CATEGORIES = [
   { value: 'job_posting_signal', label: 'Job Posting Signal' },
   { value: 'renewal_approaching', label: 'Renewal Approaching' },
   { value: 'industry_news', label: 'Industry News' },
+  { value: 'strategic_partnership', label: 'Strategic Partnership' },
 ] as const;
 
 const PRIORITY_OPTIONS = [

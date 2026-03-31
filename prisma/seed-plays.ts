@@ -8,6 +8,7 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { normalizeDatabaseUrlForPg } from '@/lib/prisma-connection-string';
+import { ensureTemplateRolesForPlayTemplate } from '@/lib/plays/ensure-template-roles';
 
 function createPrisma(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
@@ -550,7 +551,131 @@ Include: usage trends (last 6 months), open support tickets, stakeholder engagem
     promptTemplate: 'Draft an upsell email for {{account.name}} highlighting one relevant product or tier.',
   });
 
-  console.log('Plays 7–11: Champion Development, Re-engagement, New Logo Intro, EBR, Upsell.');
+  // Industry / strategic news → internal briefs + LinkedIn post (e.g. mega-partnerships, ecosystem shifts)
+  const signalLinkedIn = await prisma.playTemplate.upsert({
+    where: { userId_slug: { userId, slug: 'signal-response-linkedin' } },
+    create: {
+      userId,
+      name: 'Signal Response → LinkedIn',
+      description:
+        'Respond to high-impact news (e.g. strategic partnerships, major AI infra deals): summarize the signal, tie it to the buying committee, draft a LinkedIn post.',
+      slug: 'signal-response-linkedin',
+      scope: 'COMPANY',
+      category: 'ENGAGEMENT',
+      status: 'ACTIVE',
+      triggerType: 'SIGNAL',
+      signalTypes: ['industry_news', 'strategic_partnership'],
+    },
+    update: {
+      description:
+        'Respond to high-impact news (e.g. strategic partnerships, major AI infra deals): summarize the signal, tie it to the buying committee, draft a LinkedIn post.',
+      signalTypes: ['industry_news', 'strategic_partnership'],
+    },
+  });
+
+  const signalLiPhase0 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: signalLinkedIn.id, orderIndex: 0 } },
+    create: {
+      playTemplateId: signalLinkedIn.id,
+      orderIndex: 0,
+      name: 'Summarize the signal',
+      description: 'Turn the article / signal into a tight internal brief.',
+      gateType: 'MANUAL',
+    },
+    update: {},
+  });
+  const signalLiPhase1 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: signalLinkedIn.id, orderIndex: 1 } },
+    create: {
+      playTemplateId: signalLinkedIn.id,
+      orderIndex: 1,
+      name: 'Buying committee angle',
+      description: 'Map the news to stakeholders and priorities at this account.',
+      gateType: 'MANUAL',
+    },
+    update: {},
+  });
+  const signalLiPhase2 = await prisma.playPhaseTemplate.upsert({
+    where: { playTemplateId_orderIndex: { playTemplateId: signalLinkedIn.id, orderIndex: 2 } },
+    create: {
+      playTemplateId: signalLinkedIn.id,
+      orderIndex: 2,
+      name: 'Publish',
+      description: 'LinkedIn post ready for review and send.',
+      gateType: 'MANUAL',
+    },
+    update: {},
+  });
+
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: signalLiPhase0.id,
+    name: 'Article & signal summary',
+    contentType: 'BRIEF',
+    modelTier: 'SONNET',
+    contextSources: ['company_news', 'crm_opportunity', 'governance'],
+    contentGenerationType: 'executive_briefing',
+    requiresContact: false,
+    promptTemplate: `You are helping an AE react to a market signal.
+
+Signal title: {{signal.title}}
+Signal summary: {{signal.summary}}
+
+Produce an internal brief for {{account.name}}:
+1) Five bullets: actors, deal size or scale (if stated), technology/stack themes, strategic implication, timing.
+2) Two sentences: what changed in the landscape and why an enterprise buyer would care.
+3) One line: suggested tone (analytical vs. congratulatory) for public commentary.
+
+Use approved narrative where relevant: {{governance.valueNarrative}}. Do not invent dollar figures not implied by the signal.`,
+  });
+
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: signalLiPhase1.id,
+    name: 'Buying committee relevance map',
+    contentType: 'BRIEF',
+    modelTier: 'SONNET',
+    contextSources: ['crm_opportunity', 'stakeholder_map', 'governance'],
+    contentGenerationType: 'executive_briefing',
+    requiresContact: false,
+    promptTemplate: `Using the same signal (title: {{signal.title}}, summary: {{signal.summary}}) and account {{account.name}}:
+
+Map how this news matters to the buying committee. Reference division context when useful: {{division.name}}.
+
+Sections:
+- Roles most likely to care (e.g. CIO, VP Engineering, Head of AI/ML, procurement) and why.
+- Three concrete angles for follow-up conversations tied to {{account.name}}'s likely priorities (inference OK if CRM is thin; label assumptions).
+- Risks to avoid (overclaiming, competitive trash talk, factual errors).
+
+Brand voice: {{governance.brandVoice}}.`,
+  });
+
+  await createContentTemplate(prisma, userId, {
+    phaseTemplateId: signalLiPhase2.id,
+    name: 'LinkedIn post (review & publish)',
+    contentType: 'LINKEDIN_MSG',
+    channel: 'LINKEDIN',
+    modelTier: 'SONNET',
+    contextSources: ['company_news', 'crm_opportunity', 'governance'],
+    contentGenerationType: 'custom_content',
+    requiresContact: true,
+    promptTemplate: `Draft a LinkedIn post for {{contact.name}} ({{contact.title}}) at {{account.name}} reacting to this news.
+
+Signal: {{signal.title}}
+Context: {{signal.summary}}
+
+Requirements:
+- Professional, insight-led; not a hard product pitch.
+- 1 short hook, 2–3 short paragraphs, optional single CTA (comment or DM), under ~200 words.
+- Tie why this partnership or announcement matters to customers building with AI / accelerated computing (or the closest fit to our value narrative).
+- Avoid unverified numbers; if scale is implied, phrase cautiously.
+
+Value narrative guardrails: {{governance.valueNarrative}}`,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await ensureTemplateRolesForPlayTemplate(tx, signalLinkedIn.id);
+  });
+
+  console.log('Plays 7–12: Champion Development, Re-engagement, New Logo Intro, EBR, Upsell, Signal Response → LinkedIn.');
 
   // 8. Optional: seed a few SignalPlayMappings
   const signalTypes = ['exec_hire', 'product_launch', 'competitor_detected'];
@@ -570,9 +695,32 @@ Include: usage trends (last 6 months), open support tickets, stakeholder engagem
       update: {},
     });
   }
-  console.log('SignalPlayMappings created (exec_hire → Executive Intro, product_launch → Feature Launch, competitor_detected → Competitive).');
 
-  console.log('Done. 11 plays seeded (expand to 20+ as needed).');
+  for (const signalType of ['industry_news', 'strategic_partnership'] as const) {
+    await prisma.signalPlayMapping.upsert({
+      where: {
+        userId_signalType_playTemplateId: {
+          userId,
+          signalType,
+          playTemplateId: signalLinkedIn.id,
+        },
+      },
+      create: {
+        userId,
+        signalType,
+        playTemplateId: signalLinkedIn.id,
+        autoActivate: false,
+        priority: 'HIGH',
+      },
+      update: { playTemplateId: signalLinkedIn.id, priority: 'HIGH' },
+    });
+  }
+
+  console.log(
+    'SignalPlayMappings: exec_hire → Executive Intro, product_launch → Feature Launch, competitor_detected → Competitive; industry_news & strategic_partnership → Signal Response → LinkedIn.',
+  );
+
+  console.log('Done. 12 plays seeded (expand to 20+ as needed).');
 }
 
 async function createContentTemplate(
@@ -590,7 +738,9 @@ async function createContentTemplate(
     governanceRules?: string;
     approvedMessaging?: string;
     contentGenerationType?: string;
-  }
+    requiresContact?: boolean;
+    isAutomatable?: boolean;
+  },
 ) {
   const existing = await prisma.contentTemplate.findFirst({
     where: { userId, phaseTemplateId: data.phaseTemplateId, name: data.name },
@@ -613,6 +763,8 @@ async function createContentTemplate(
       governanceRules: data.governanceRules ?? undefined,
       approvedMessaging: data.approvedMessaging ?? undefined,
       contentGenerationType,
+      requiresContact: data.requiresContact ?? false,
+      isAutomatable: data.isAutomatable ?? false,
     },
   });
 }

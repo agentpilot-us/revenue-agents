@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlayCategory, PlayContentType, PlayScope, PlayTemplateStatus, PlayTriggerType, PhaseGateType } from '@prisma/client';
-import { myDayUrlAfterPlayStart } from '@/lib/dashboard/my-day-navigation';
+import { playRunWorkspaceUrl } from '@/lib/dashboard/my-day-navigation';
 import type { ActivityChannel } from '@/lib/types/channels';
 
 type BuyingGroupOption = {
@@ -243,7 +243,7 @@ export default function CustomPlayBuilder({ companyId, companyName, initialDivis
       const data = await res.json();
       const runId = data.playRunId ?? data.playRun?.id;
       if (runId) {
-        router.push(myDayUrlAfterPlayStart(runId, companyId));
+        router.push(playRunWorkspaceUrl(companyId, runId));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create run');
