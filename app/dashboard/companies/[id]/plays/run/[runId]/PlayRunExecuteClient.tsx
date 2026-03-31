@@ -8,8 +8,42 @@ type PlayRun = {
   companyId: string;
   status: string;
   createdAt?: string;
+  targetCompanyDepartmentId?: string | null;
   company: { id: string; name: string };
-  playTemplate: { id: string; name: string; slug: string };
+  playTemplate: {
+    id: string;
+    name: string;
+    slug: string;
+    templateRoles?: Array<{
+      id: string;
+      key: string;
+      label: string;
+      isRequired: boolean;
+      apolloTitleTerms?: string | null;
+    }>;
+  };
+  roadmapTarget?: { id: string; name: string; companyDepartmentId?: string | null } | null;
+  runContacts?: Array<{
+    id: string;
+    playTemplateRoleId: string;
+    contactId: string | null;
+    status: string;
+    playTemplateRole: {
+      id: string;
+      key: string;
+      label: string;
+      isRequired: boolean;
+      apolloTitleTerms?: string | null;
+    };
+    contact: {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string | null;
+      title: string | null;
+      enrichmentStatus: string | null;
+    } | null;
+  }>;
   phaseRuns: Array<{
     id: string;
     status: string;
@@ -36,7 +70,17 @@ type PlayRun = {
         contentType: string;
         channel?: string | null;
         contentGenerationType?: string | null;
+        requiresContact?: boolean;
+        playTemplateRoleId?: string | null;
+        playTemplateRole?: {
+          id: string;
+          key: string;
+          label: string;
+          isRequired: boolean;
+        } | null;
       } | null;
+      playTemplateRoleId?: string | null;
+      targetRoleKey?: string | null;
     }>;
   }>;
 };
@@ -54,6 +98,7 @@ const t = {
   greenBg: 'rgba(34,197,94,0.08)',
   amber: '#f59e0b',
   amberBg: 'rgba(245,158,11,0.08)',
+  amberBorder: 'rgba(245,158,11,0.35)',
 };
 
 type Props = {
@@ -150,6 +195,17 @@ function enrichmentLabel(status: string | null): string {
   return status;
 }
 
+function actionNeedsContactAssignment(
+  action: PlayRun['phaseRuns'][0]['actions'][0],
+): boolean {
+  const ct = action.contentTemplate;
+  if (!ct) return false;
+  if (action.status === 'BLOCKED') return true;
+  if (action.contactId) return false;
+  if (ct.requiresContact) return true;
+  return ct.contentType === 'EMAIL' || ct.contentType === 'LINKEDIN_MSG';
+}
+
 type PhaseActionSectionProps = {
   phase: PlayRun['phaseRuns'][number];
   run: PlayRun;
@@ -159,6 +215,8 @@ type PhaseActionSectionProps = {
   setActionEdits: Dispatch<SetStateAction<Record<string, { subject: string; body: string }>>>;
   contactGroups: ContactDepartmentGroup[] | null;
   contactsError: string | null;
+  useRosterAssign: boolean;
+  onOpenRosterAssign: (playTemplateRoleId: string) => void;
   onAssignContact: (actionId: string, contactId: string | null) => void;
   onGenerate: (actionId: string) => void;
   onExecute: (actionId: string) => void;
@@ -177,6 +235,8 @@ function PhaseActionSection({
   setActionEdits,
   contactGroups,
   contactsError,
+  useRosterAssign,
+  onOpenRosterAssign,
   onAssignContact,
   onGenerate,
   onExecute,
@@ -194,8 +254,12 @@ function PhaseActionSection({
 
   const renderActionCard = (action: (typeof phase.actions)[number]) => {
     const isBusy = busyActionId === action.id;
+    const roleLabel = action.contentTemplate?.playTemplateRole?.label;
+    const assignNeeded = actionNeedsContactAssignment(action);
     const canGenerate =
-      (action.status === 'PENDING' || action.status === 'REVIEWED') && action.contentTemplate;
+      (action.status === 'PENDING' || action.status === 'REVIEWED') &&
+      action.contentTemplate &&
+      !assignNeeded;
     const canExecute =
       (action.status === 'PENDING' || action.status === 'REVIEWED' || action.status === 'EDITED') &&
       !!(action.generatedContent || action.editedContent);
@@ -238,14 +302,48 @@ function PhaseActionSection({
                 </span>
               )}
               <span style={{ fontSize: 13, fontWeight: 600, color: t.text1 }}>{action.title}</span>
+              {roleLabel && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: t.text3,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: 'rgba(255,255,255,0.06)',
+                  }}
+                >
+                  → {roleLabel}
+                </span>
+              )}
             </div>
+            {useRosterAssign && assignNeeded && action.playTemplateRoleId && (
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => onOpenRosterAssign(action.playTemplateRoleId!)}
+                style={{
+                  marginTop: 8,
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: `1px solid ${t.amberBorder}`,
+                  background: t.amberBg,
+                  color: t.amber,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: isBusy ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Assign contact{roleLabel ? ` to ${roleLabel}` : ''}
+              </button>
+            )}
             {contactGroups === null && action.contactName && (
               <div style={{ fontSize: 11, color: t.text3, marginTop: 2 }}>
                 → {action.contactName}
                 {action.contactTitle && ` · ${action.contactTitle}`}
               </div>
             )}
-            {contactGroups !== null && (
+            {!useRosterAssign && contactGroups !== null && (
               <div style={{ marginTop: 8, maxWidth: '100%' }}>
                 {contactsError && (
                   <div style={{ fontSize: 10, color: t.amber, marginBottom: 4 }}>{contactsError}</div>
@@ -661,6 +759,20 @@ export default function PlayRunExecuteClient({
   /** null = loading; array = loaded (may be empty). */
   const [contactGroups, setContactGroups] = useState<ContactDepartmentGroup[] | null>(null);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  const [rosterModalRoleId, setRosterModalRoleId] = useState<string | null>(null);
+  const [discoverBusy, setDiscoverBusy] = useState(false);
+  const [discoverCandidates, setDiscoverCandidates] = useState<
+    Array<{
+      firstName: string;
+      lastName: string;
+      title: string;
+      email?: string;
+      linkedinUrl?: string;
+    }>
+  >([]);
+  const [rosterModalBusy, setRosterModalBusy] = useState(false);
+
+  const useRosterAssign = (run?.runContacts?.length ?? 0) > 0;
 
   const fetchRun = useCallback(async () => {
     try {
@@ -790,6 +902,90 @@ export default function PlayRunExecuteClient({
       console.error('Execute error:', err);
     } finally {
       setBusyActionId(null);
+    }
+  };
+
+  const departmentIdForNewContacts =
+    run?.roadmapTarget?.companyDepartmentId ?? run?.targetCompanyDepartmentId ?? undefined;
+
+  const handleRosterPatch = async (playTemplateRoleId: string, contactId: string | null) => {
+    setRosterModalBusy(true);
+    setGenerateError(null);
+    try {
+      const res = await fetch(`/api/play-runs/${runId}/roster`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playTemplateRoleId, contactId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(typeof body?.error === 'string' ? body.error : 'Roster update failed');
+      }
+      setRosterModalRoleId(null);
+      setDiscoverCandidates([]);
+      await fetchRun();
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Roster update failed');
+    } finally {
+      setRosterModalBusy(false);
+    }
+  };
+
+  const handleDiscoverApollo = async (playTemplateRoleId: string) => {
+    setDiscoverBusy(true);
+    setDiscoverCandidates([]);
+    setGenerateError(null);
+    try {
+      const res = await fetch(
+        `/api/play-runs/${runId}/roster/${playTemplateRoleId}/discover`,
+        { method: 'POST' },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Discovery failed');
+      }
+      setDiscoverCandidates(Array.isArray(data.candidates) ? data.candidates : []);
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Discovery failed');
+    } finally {
+      setDiscoverBusy(false);
+    }
+  };
+
+  const handleAddCandidateToRoster = async (
+    playTemplateRoleId: string,
+    c: { firstName: string; lastName: string; title: string; email?: string; linkedinUrl?: string },
+  ) => {
+    setRosterModalBusy(true);
+    setGenerateError(null);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          departmentId: departmentIdForNewContacts,
+          contacts: [
+            {
+              firstName: c.firstName || undefined,
+              lastName: c.lastName || undefined,
+              title: c.title || undefined,
+              email: c.email || undefined,
+              linkedinUrl: c.linkedinUrl || undefined,
+            },
+          ],
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Could not add contact');
+      }
+      const newId = data.contactIds?.[0] as string | undefined;
+      if (!newId) throw new Error('No contact id returned');
+      await handleRosterPatch(playTemplateRoleId, newId);
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Could not add contact');
+    } finally {
+      setRosterModalBusy(false);
     }
   };
 
@@ -925,6 +1121,75 @@ export default function PlayRunExecuteClient({
         </Link>
       </div>
 
+      {useRosterAssign && run.runContacts && run.runContacts.length > 0 && (
+        <div
+          style={{
+            marginBottom: 24,
+            padding: 16,
+            borderRadius: 12,
+            border: `1px solid ${t.border}`,
+            background: t.surface,
+          }}
+        >
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: t.text1, margin: '0 0 12px' }}>
+            Contact roster
+          </h2>
+          {run.roadmapTarget?.name && (
+            <p style={{ fontSize: 12, color: t.text3, margin: '0 0 12px' }}>
+              Division: {run.roadmapTarget.name}
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {run.runContacts.map((rc) => {
+              const name = rc.contact
+                ? [rc.contact.firstName, rc.contact.lastName].filter(Boolean).join(' ') || 'Unknown'
+                : null;
+              return (
+                <div
+                  key={rc.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: t.text1 }}>
+                      {rc.playTemplateRole.label}
+                    </div>
+                    <div style={{ fontSize: 11, color: t.text3 }}>
+                      {name ?? 'Unassigned'} · {rc.status}
+                      {rc.contact?.enrichmentStatus && ` · ${enrichmentLabel(rc.contact.enrichmentStatus)}`}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDiscoverCandidates([]);
+                      setRosterModalRoleId(rc.playTemplateRole.id);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      border: `1px solid ${t.border}`,
+                      background: 'transparent',
+                      color: t.blue,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Find / assign
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {run.phaseRuns.map((phase) => (
           <PhaseActionSection
@@ -937,6 +1202,11 @@ export default function PlayRunExecuteClient({
             setActionEdits={setActionEdits}
             contactGroups={contactGroups}
             contactsError={contactsError}
+            useRosterAssign={useRosterAssign}
+            onOpenRosterAssign={(roleId) => {
+              setDiscoverCandidates([]);
+              setRosterModalRoleId(roleId);
+            }}
             onAssignContact={handleAssignContact}
             onGenerate={handleGenerate}
             onExecute={handleExecute}
@@ -946,6 +1216,164 @@ export default function PlayRunExecuteClient({
           />
         ))}
       </div>
+
+      {rosterModalRoleId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => !rosterModalBusy && setRosterModalRoleId(null)}
+          onKeyDown={(e) => e.key === 'Escape' && !rosterModalBusy && setRosterModalRoleId(null)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '85vh',
+              overflow: 'auto',
+              borderRadius: 12,
+              border: `1px solid ${t.border}`,
+              background: t.surface,
+              padding: 20,
+            }}
+          >
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: t.text1, margin: '0 0 12px' }}>
+              Assign contact
+            </h3>
+            <p style={{ fontSize: 12, color: t.text3, margin: '0 0 16px' }}>
+              Pick someone already in CRM, or search Apollo and add them to this account.
+            </p>
+            {contactGroups && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: t.text3, display: 'block', marginBottom: 6 }}>
+                  CRM contacts
+                </label>
+                <select
+                  defaultValue=""
+                  disabled={rosterModalBusy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v) void handleRosterPatch(rosterModalRoleId, v);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: `1px solid ${t.border}`,
+                    background: 'rgba(0,0,0,0.2)',
+                    color: t.text1,
+                    fontSize: 13,
+                  }}
+                >
+                  <option value="">Select…</option>
+                  {contactGroups.map((g) => (
+                    <optgroup key={g.department.id ?? g.department.name} label={g.department.name}>
+                      {g.contacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {pickerDisplayName(c)} · {c.title || 'No title'}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                disabled={discoverBusy || rosterModalBusy}
+                onClick={() => void handleDiscoverApollo(rosterModalRoleId)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: t.blueBg,
+                  color: t.blue,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: discoverBusy ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {discoverBusy ? 'Searching…' : 'Search Apollo'}
+              </button>
+              <button
+                type="button"
+                disabled={rosterModalBusy}
+                onClick={() => {
+                  setRosterModalRoleId(null);
+                  setDiscoverCandidates([]);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${t.border}`,
+                  background: 'transparent',
+                  color: t.text3,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+            {discoverCandidates.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: t.text3 }}>Apollo results</div>
+                {discoverCandidates.map((c, i) => (
+                  <div
+                    key={`${c.firstName}-${c.lastName}-${i}`}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      border: `1px solid ${t.border}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: t.text1 }}>
+                      <strong>
+                        {c.firstName} {c.lastName}
+                      </strong>
+                      <div style={{ fontSize: 11, color: t.text3 }}>{c.title}</div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={rosterModalBusy}
+                      onClick={() => void handleAddCandidateToRoster(rosterModalRoleId, c)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: t.greenBg,
+                        color: t.green,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: rosterModalBusy ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Add & assign
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

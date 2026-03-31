@@ -194,8 +194,11 @@ export default function HotSignalsFeed({
     return items;
   }, [filteredSignals, filteredTriggers, templatePreviews, triggerTemplatePreviews]);
 
-  // Demo bypass: creates PlayRun with 7 pre-seeded actions directly (no SignalPlayMapping/activation). Set false for production.
-  const DEMO_RUN_PLAY_BYPASS = true;
+  // Demo bypass uses /api/demo/run-play. Off by default so "Work This" uses real signal → play matching.
+  // Set NEXT_PUBLIC_HOT_SIGNALS_DEMO_BYPASS=true to force demo path in dev.
+  const DEMO_RUN_PLAY_BYPASS =
+    typeof process !== 'undefined' &&
+    process.env.NEXT_PUBLIC_HOT_SIGNALS_DEMO_BYPASS === 'true';
 
   const handleWorkSignal = useCallback(
     async (signalId: string, companyId: string) => {
@@ -321,6 +324,9 @@ export default function HotSignalsFeed({
       );
       if (!templateMatch) {
         console.error('No matching play template found for trigger kind:', triggerKind);
+        toast.error('No play template matched this trigger', {
+          description: 'Pick a template in Start Campaign or add a template whose name includes event or feature.',
+        });
         return;
       }
 

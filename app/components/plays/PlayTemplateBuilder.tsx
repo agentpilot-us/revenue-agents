@@ -39,6 +39,8 @@ type StepDraft = {
   rawPromptTemplate: string;
   systemInstructions: string;
   governanceRules: string;
+  /** FK to PlayTemplateRole; null = server default (primary) */
+  playTemplateRoleId: string | null;
 };
 
 export type PhaseDraft = {
@@ -63,6 +65,7 @@ const defaultStep = (): StepDraft => ({
   rawPromptTemplate: '',
   systemInstructions: '',
   governanceRules: '',
+  playTemplateRoleId: null,
 });
 
 const defaultPhase = (): PhaseDraft => ({
@@ -103,6 +106,9 @@ export default function PlayTemplateBuilder({ mode, templateId, context }: PlayT
   const [defaultAutonomyLevel, setDefaultAutonomyLevel] = useState('');
   const [signalTypes] = useState<string[]>([]);
   const [phases, setPhases] = useState<PhaseDraft[]>([defaultPhase()]);
+  const [templateRoles, setTemplateRoles] = useState<
+    Array<{ id: string; key: string; label: string; isRequired?: boolean }>
+  >([]);
   const [activateForCompany, setActivateForCompany] = useState(!!context?.companyId);
 
   const companyId = context?.companyId?.trim();
@@ -130,6 +136,10 @@ export default function PlayTemplateBuilder({ mode, templateId, context }: PlayT
       setAnchorField(t.anchorField ?? '');
       setAnchorOffsetDays(t.anchorOffsetDays != null ? String(t.anchorOffsetDays) : '');
       setDefaultAutonomyLevel(t.defaultAutonomyLevel ?? '');
+      setTemplateRoles(
+        (t.templateRoles as Array<{ id: string; key: string; label: string; isRequired?: boolean }>) ??
+          [],
+      );
 
       const phs: PhaseDraft[] = (data.phases ?? []).map(
         (p: {
@@ -150,6 +160,7 @@ export default function PlayTemplateBuilder({ mode, templateId, context }: PlayT
             rawPromptTemplate?: string;
             systemInstructions?: string | null;
             governanceRules?: string | null;
+            playTemplateRoleId?: string | null;
           }>;
         }) => {
           const c = p.contentTemplates?.[0];
@@ -172,6 +183,7 @@ export default function PlayTemplateBuilder({ mode, templateId, context }: PlayT
               rawPromptTemplate: c?.rawPromptTemplate ?? '',
               systemInstructions: c?.systemInstructions ?? '',
               governanceRules: c?.governanceRules ?? '',
+              playTemplateRoleId: c?.playTemplateRoleId ?? null,
             },
           };
         },
@@ -231,6 +243,7 @@ export default function PlayTemplateBuilder({ mode, templateId, context }: PlayT
               rawPromptTemplate: ph.step.rawPromptTemplate,
               systemInstructions: ph.step.systemInstructions.trim() || null,
               governanceRules: ph.step.governanceRules.trim() || null,
+              playTemplateRoleId: ph.step.playTemplateRoleId?.trim() || null,
             },
           ],
         })),
@@ -706,6 +719,27 @@ export default function PlayTemplateBuilder({ mode, templateId, context }: PlayT
                 />
                 Requires contact
               </label>
+              {templateRoles.length > 0 && (
+                <div>
+                  <label className="text-xs text-muted-foreground">Targets role</label>
+                  <select
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={ph.step.playTemplateRoleId ?? ''}
+                    onChange={(e) =>
+                      updateStep(idx, {
+                        playTemplateRoleId: e.target.value.trim() ? e.target.value : null,
+                      })
+                    }
+                  >
+                    <option value="">Default (primary)</option>
+                    {templateRoles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label} ({r.key})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"

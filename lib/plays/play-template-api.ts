@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { z } from 'zod';
 import { parseAutonomyLevel } from '@/lib/plays/autonomy';
+import { ensureTemplateRolesForPlayTemplate } from '@/lib/plays/ensure-template-roles';
 
 export const SIMPLE_PROMPT_PREFIX = '{{userInstructions}}\n\nAdditional guidance:\n';
 
@@ -66,6 +67,8 @@ export const playTemplateStepSchema = z.object({
   rawPromptTemplate: z.string().optional().nullable(),
   systemInstructions: z.string().optional().nullable(),
   governanceRules: z.string().optional().nullable(),
+  /** Must belong to this play template; omitted/null defaults to primary after ensureTemplateRoles */
+  playTemplateRoleId: z.string().min(1).optional().nullable(),
 });
 
 export const playTemplatePhaseSchema = z.object({
@@ -173,6 +176,25 @@ function defaultChannelForContentType(ct: PlayContentType): ContentChannel | nul
   }
 }
 
+async function resolveContentTemplateRoleId(
+  tx: Prisma.TransactionClient,
+  playTemplateId: string,
+  requested: string | null | undefined,
+): Promise<string> {
+  const roles = await tx.playTemplateRole.findMany({
+    where: { playTemplateId },
+    orderBy: { orderIndex: 'asc' },
+    select: { id: true, key: true },
+  });
+  const primaryId = roles.find((r) => r.key === 'primary')?.id ?? roles[0]?.id;
+  if (!primaryId) {
+    throw new Error('INVARIANT_NO_TEMPLATE_ROLES');
+  }
+  const rid = requested?.trim();
+  if (!rid) return primaryId;
+  return roles.some((r) => r.id === rid) ? rid : primaryId;
+}
+
 function mergePhaseGateConfig(
   gateConfig: Record<string, unknown> | null | undefined,
   uiPhaseKind: string | null | undefined,
@@ -226,6 +248,8 @@ export async function createPlayTemplateFromBody(
       },
     });
 
+    await ensureTemplateRolesForPlayTemplate(tx, t.id);
+
     const sortedPhases = [...body.phases].sort(
       (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0),
     );
@@ -261,6 +285,8 @@ export async function createPlayTemplateFromBody(
           defaultChannelForContentType(step.contentType)
         : step.channel;
 
+      const playTemplateRoleId = await resolveContentTemplateRoleId(tx, t.id, step.playTemplateRoleId);
+
       await tx.contentTemplate.create({
         data: {
           userId,
@@ -277,9 +303,12 @@ export async function createPlayTemplateFromBody(
           requiresContact: step.requiresContact,
           isAutomatable: step.isAutomatable,
           orderIndex: step.orderIndex ?? 0,
+          playTemplateRoleId,
         },
       });
     }
+
+    await ensureTemplateRolesForPlayTemplate(tx, t.id);
 
     return t;
   });
@@ -344,6 +373,8 @@ export async function replacePlayTemplateFromBody(
       },
     });
 
+    await ensureTemplateRolesForPlayTemplate(tx, templateId);
+
     const sortedPhases = [...body.phases].sort(
       (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0),
     );
@@ -379,6 +410,12 @@ export async function replacePlayTemplateFromBody(
           defaultChannelForContentType(step.contentType)
         : step.channel;
 
+      const playTemplateRoleId = await resolveContentTemplateRoleId(
+        tx,
+        templateId,
+        step.playTemplateRoleId,
+      );
+
       await tx.contentTemplate.create({
         data: {
           userId,
@@ -395,9 +432,12 @@ export async function replacePlayTemplateFromBody(
           requiresContact: step.requiresContact,
           isAutomatable: step.isAutomatable,
           orderIndex: step.orderIndex ?? 0,
+          playTemplateRoleId,
         },
       });
     }
+
+    await ensureTemplateRolesForPlayTemplate(tx, templateId);
   });
 
   return { slug };
@@ -411,6 +451,7 @@ export async function clonePlayTemplate(
   const source = await prisma.playTemplate.findFirst({
     where: { id: sourceId, userId },
     include: {
+      templateRoles: { orderBy: { orderIndex: 'asc' } },
       phases: {
         orderBy: { orderIndex: 'asc' },
         include: {
@@ -445,6 +486,23 @@ export async function clonePlayTemplate(
       },
     });
 
+    const roleIdBySource = new Map<string, string>();
+    for (const role of source.templateRoles) {
+      const nr = await tx.playTemplateRole.create({
+        data: {
+          playTemplateId: t.id,
+          key: role.key,
+          label: role.label,
+          description: role.description,
+          isRequired: role.isRequired,
+          apolloTitleTerms: role.apolloTitleTerms,
+          mapToContactRole: role.mapToContactRole ?? undefined,
+          orderIndex: role.orderIndex,
+        },
+      });
+      roleIdBySource.set(role.id, nr.id);
+    }
+
     for (const phase of source.phases) {
       const phaseRow = await tx.playPhaseTemplate.create({
         data: {
@@ -459,6 +517,10 @@ export async function clonePlayTemplate(
       });
 
       for (const ct of phase.contentTemplates) {
+        const mappedRoleId =
+          ct.playTemplateRoleId && roleIdBySource.has(ct.playTemplateRoleId) ?
+            roleIdBySource.get(ct.playTemplateRoleId)!
+          : undefined;
         await tx.contentTemplate.create({
           data: {
             userId,
@@ -478,9 +540,14 @@ export async function clonePlayTemplate(
             requiresContact: ct.requiresContact,
             isAutomatable: ct.isAutomatable,
             orderIndex: ct.orderIndex,
+            ...(mappedRoleId ? { playTemplateRoleId: mappedRoleId } : {}),
           },
         });
       }
+    }
+
+    if (roleIdBySource.size === 0) {
+      await ensureTemplateRolesForPlayTemplate(tx, t.id);
     }
 
     return t;

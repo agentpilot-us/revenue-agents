@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { syncPlayActionsForTemplateRole } from '@/lib/plays/play-run-roster';
 
 /**
  * PATCH /api/play-runs/[runId]/actions/[actionId]
@@ -28,6 +29,7 @@ export async function PATCH(
         contactId: true,
         contentTemplateId: true,
         contentTemplate: { select: { name: true } },
+        playTemplateRoleId: true,
         phaseRun: {
           select: {
             playRunId: true,
@@ -48,6 +50,7 @@ export async function PATCH(
 
     const data: Record<string, unknown> = {};
     let clearedForContactChange = false;
+    let rosterSynced = false;
 
     if (body.contactId !== undefined) {
       const raw = body.contactId;
@@ -62,7 +65,36 @@ export async function PATCH(
 
       if (nextId !== prevId) {
         clearedForContactChange = true;
-        if (nextId) {
+        if (link.playTemplateRoleId) {
+          if (nextId) {
+            const c = await prisma.contact.findFirst({
+              where: { id: nextId, companyId },
+              select: { firstName: true, lastName: true, email: true, title: true },
+            });
+            if (!c) {
+              return NextResponse.json(
+                { error: 'Contact not found on this account' },
+                { status: 400 },
+              );
+            }
+          }
+          await prisma.playRunContact.update({
+            where: {
+              playRunId_playTemplateRoleId: {
+                playRunId: runId,
+                playTemplateRoleId: link.playTemplateRoleId,
+              },
+            },
+            data: {
+              contactId: nextId,
+              status: nextId ? 'CONFIRMED' : 'UNASSIGNED',
+            },
+          });
+          await syncPlayActionsForTemplateRole(runId, link.playTemplateRoleId, {
+            clearGenerated: true,
+          });
+          rosterSynced = true;
+        } else if (nextId) {
           const c = await prisma.contact.findFirst({
             where: { id: nextId, companyId },
             select: { firstName: true, lastName: true, email: true, title: true },
@@ -88,15 +120,17 @@ export async function PATCH(
           data.contactTitle = null;
           if (templateName) data.title = templateName;
         }
-        data.generatedContent = null;
-        data.generatedSubject = null;
-        data.generatedAt = null;
-        data.modelUsed = null;
-        data.tokensUsed = null;
-        data.editedContent = null;
-        data.editedSubject = null;
-        data.reviewedAt = null;
-        data.contextSnapshot = null;
+        if (!rosterSynced) {
+          data.generatedContent = null;
+          data.generatedSubject = null;
+          data.generatedAt = null;
+          data.modelUsed = null;
+          data.tokensUsed = null;
+          data.editedContent = null;
+          data.editedSubject = null;
+          data.reviewedAt = null;
+          data.contextSnapshot = null;
+        }
       }
     }
 
@@ -116,6 +150,11 @@ export async function PATCH(
         touchReview = true;
       }
       if (touchReview) data.reviewedAt = new Date();
+    }
+
+    if (Object.keys(data).length === 0) {
+      const action = await prisma.playAction.findUnique({ where: { id: actionId } });
+      return NextResponse.json({ action });
     }
 
     const action = await prisma.playAction.update({

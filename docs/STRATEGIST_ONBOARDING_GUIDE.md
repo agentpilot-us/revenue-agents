@@ -127,6 +127,8 @@ Settings to configure: discount caps, cooldown defaults, competitive rules, valu
 
 Play templates are stored in **PlayTemplate** with phases in **PlayPhaseTemplate** and content blueprints in **ContentTemplate**.
 
+For methodology (triggers, gates, content types, anti-patterns, recipes), see **[PLAY_TEMPLATE_DESIGN_GUIDE.md](./PLAY_TEMPLATE_DESIGN_GUIDE.md)**.
+
 ### Primary path — UI (recommended)
 
 1. Go to **My Company → Playbooks** and scroll to **Play Templates**.

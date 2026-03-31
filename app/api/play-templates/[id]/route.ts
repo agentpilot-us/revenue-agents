@@ -32,6 +32,7 @@ export async function GET(
     const template = await prisma.playTemplate.findFirst({
       where: { id, userId: session.user.id },
       include: {
+        templateRoles: { orderBy: { orderIndex: 'asc' } },
         phases: {
           orderBy: { orderIndex: 'asc' },
           include: {
@@ -84,6 +85,7 @@ export async function GET(
             rawPromptTemplate,
             systemInstructions: c.systemInstructions,
             governanceRules: c.governanceRules,
+            playTemplateRoleId: c.playTemplateRoleId,
           };
         }),
       };
@@ -104,6 +106,15 @@ export async function GET(
         anchorOffsetDays: template.anchorOffsetDays,
         defaultAutonomyLevel: template.defaultAutonomyLevel ?? null,
         phaseCount: template.phases.length,
+        templateRoles: template.templateRoles.map((r) => ({
+          id: r.id,
+          key: r.key,
+          label: r.label,
+          isRequired: r.isRequired,
+          apolloTitleTerms: r.apolloTitleTerms,
+          mapToContactRole: r.mapToContactRole,
+          orderIndex: r.orderIndex,
+        })),
       },
       phases: editorPhases,
     });

@@ -10,11 +10,12 @@ Every third-party service Revenue-Agents depends on, what it powers, how to conf
 |---------|----------|-----------|--------|
 | [PostgreSQL (Neon / Supabase / Vercel Postgres)](#postgresql) | Database | **Yes** | All persisted data |
 | [Google OAuth](#google-oauth) | Auth | **Yes** | User sign-in |
-| [Google Gemini](#google-gemini) | AI | **Yes** | Chat, content generation, embeddings |
+| [Google Gemini](#google-gemini) | AI | **Yes** (typical) | Chat, embeddings (direct); see also [AI / LLM Providers](#ai--llm-providers) |
+| [Vercel AI Gateway](#vercel-ai-gateway) | AI | Optional | Unified chat + embeddings routing; `AI_GATEWAY_API_KEY` |
 | [Anthropic (Claude)](#anthropic) | AI | Fallback | Chat, content generation |
 | [Resend](#resend) | Email | **Yes** | Transactional email, magic-link auth, outreach |
 | [Stripe](#stripe) | Payments | **Yes** | Subscriptions, checkout, billing |
-| [Perplexity](#perplexity) | Research | Recommended | Company research, financial signals |
+| [Perplexity](#perplexity) | Research | Recommended | Web-grounded company research; optional earnings depth (`fetch-financial-signals`) — not a replacement for Exa account signals |
 | [Web search](#web-search) | Research | Recommended | Account signals, news, executive changes |
 | [Firecrawl](#firecrawl) | Scraping | Optional | Content Library import, site crawling |
 | [Apollo](#apollo) | Enrichment | Recommended | Contact discovery, enrichment |
@@ -84,11 +85,13 @@ NEXTAUTH_URL="http://localhost:3000"
 
 ## AI / LLM Providers
 
-Gemini is required for embeddings. For chat, Gemini is preferred with Anthropic as fallback.
+**Embeddings** require **`GOOGLE_GENERATIVE_AI_API_KEY`** (Gemini `gemini-embedding-001`) **or** **`AI_GATEWAY_API_KEY`** (Gateway model `google/text-embedding-005`) — see `lib/llm/get-embedding.ts`.
+
+**Chat routing** is **not** “Gemini always first.” Priority in `lib/llm/get-model.ts`: **mock** → **LM Studio** (`LLM_PROVIDER=lmstudio`) → **AI Gateway** (when `AI_GATEWAY_API_KEY` is set) → **Anthropic / Gemini** per env. Full detail: [TECHNICAL_IMPLEMENTATION_GUIDE.md §5](./TECHNICAL_IMPLEMENTATION_GUIDE.md#5-llm-vercel-ai-sdk-and-ai-gateway).
 
 ### Google Gemini
 
-Required provider — handles chat, content generation, and embeddings with a single API key.
+Typical default for chat and for **direct** embeddings when Gateway is not used.
 
 **Env vars:**
 
@@ -107,13 +110,27 @@ GEMINI_FAST_MODEL="gemini-2.5-flash"
 2. Create an API key
 3. Set `GOOGLE_GENERATIVE_AI_API_KEY`
 
-When set, Gemini is used for both chat and embeddings (1536-dim). No other AI key is needed.
+With this key (and no Gateway), Gemini is used for chat and embeddings (1536-dim). You can still set `ANTHROPIC_API_KEY` as fallback per `get-model.ts`.
 
 **Key files:** `lib/llm/get-model.ts`, `lib/llm/get-embedding.ts`
 
+### Vercel AI Gateway
+
+When **`AI_GATEWAY_API_KEY`** is set (and not mock / not LM Studio), chat and embeddings can route through the Gateway for unified spend. Optional media model overrides: `GATEWAY_IMAGE_MODEL`, `GATEWAY_VIDEO_MODEL`.
+
+**Env vars:**
+
+```
+AI_GATEWAY_API_KEY="..."
+```
+
+**Key files:** `lib/llm/get-model.ts`, `lib/llm/get-embedding.ts`
+
+See [Vercel AI Gateway docs](https://vercel.com/docs/ai-gateway/getting-started) and [docs/ai-gateway-evaluation.md](./ai-gateway-evaluation.md).
+
 ### Anthropic
 
-Fallback chat provider when Gemini is not configured.
+Chat fallback / alternate path per `get-model.ts` (not a simple “only if Gemini missing” — Gateway and env order matter).
 
 **Env vars:**
 
@@ -131,7 +148,7 @@ ANTHROPIC_API_KEY="sk-ant-..."
 
 ### Perplexity
 
-Powers company research and financial signal detection.
+**Web-grounded research** for account intelligence flows (`researchCompany` / `lib/research/research-company.ts`) and **optional** earnings-style depth (`lib/signals/fetch-financial-signals.ts`). **Account signals** in the dashboard and **`fetch-account-signals` cron** use **Exa** (`EXA_API_KEY`), not Perplexity — configure both if you need research UI + signal monitoring.
 
 **Env vars:**
 
@@ -148,7 +165,7 @@ PERPLEXITY_API_KEY="pplx-..."
 
 ### Web search
 
-Powers real-time account signal monitoring (news, earnings, executive changes, product launches).
+Powers real-time **account signal** monitoring (news, earnings, executive changes, product launches) via **Exa**.
 
 **Env vars:**
 
@@ -156,11 +173,11 @@ Powers real-time account signal monitoring (news, earnings, executive changes, p
 EXA_API_KEY="..."
 ```
 
-The app also checks `EXASEARCH_API_KEY` as a fallback. Cron jobs skip signal fetching when neither is set.
+**Important:** `lib/signals/fetch-account-signals.ts` (including the **`fetch-account-signals` cron**) uses **`EXA_API_KEY` only** — there is **no** `EXASEARCH_API_KEY` fallback on that path. For reliable signal runs, set **`EXA_API_KEY`**. **`EXASEARCH_API_KEY`** is a fallback only in **`lib/exa/websets.ts`** and **`lib/exa/mcp-client.ts`**. If `EXA_API_KEY` is missing, the main signal Exa client is disabled.
 
 **Setup:**
 
-1. Obtain a web search API key (e.g. from your provider).
+1. Obtain an Exa API key.
 2. Set `EXA_API_KEY` in your environment.
 
 **Key files:** `lib/exa/enrich-company.ts`, `lib/exa/websets.ts`, `lib/exa/mcp-client.ts`, `lib/signals/fetch-account-signals.ts`
@@ -422,23 +439,48 @@ VERCEL_PROJECT_ID="prj_..."     # Optional: deploy to a specific project
 1. Create a Vercel access token at [vercel.com/account/tokens](https://vercel.com/account/tokens)
 2. Set `VERCEL_ACCESS_TOKEN` in your environment
 
-**Cron jobs** (configured in `vercel.json`, secured with `CRON_SECRET`):
+**Cron jobs** (configured in [`vercel.json`](../vercel.json); schedules and auth nuances: [TECHNICAL_IMPLEMENTATION_GUIDE.md §4](./TECHNICAL_IMPLEMENTATION_GUIDE.md#4-cron-jobs)):
 
-| Cron | Schedule | Purpose |
-|------|----------|---------|
-| `/api/cron/calculate-engagement` | 02:00 UTC daily | Engagement scoring |
-| `/api/cron/aggregate-analytics` | 01:00 UTC daily | Dashboard analytics |
-| `/api/cron/content-library/run-schedules` | 03:00 UTC daily | Scheduled content syncs |
-| `/api/cron/fetch-account-signals` | Every 6 hours | Signal monitoring |
-| `/api/cron/send-alert-digest` | 14:00 UTC daily | Alert digest emails |
-| `/api/cron/process-scheduled-actions` | Every 15 min | Deferred task execution |
-| `/api/cron/advance-sequences` | Hourly | Multi-step sequence progression |
+| Cron | Schedule (UTC) | Purpose |
+|------|----------------|---------|
+| `/api/cron/calculate-engagement` | 02:00 daily | Engagement scoring |
+| `/api/cron/aggregate-analytics` | 01:00 daily | Dashboard analytics |
+| `/api/cron/content-library/run-schedules` | 03:00 daily | Scheduled content syncs |
+| `/api/cron/fetch-account-signals` | Every 2 hours (`0 */2 * * *`) | Account signals + signal→PlayRun matching |
+| `/api/cron/send-alert-digest` | 21:00 daily | Alert digest emails |
+| `/api/cron/process-scheduled-actions` | Every 15 min | `ScheduledAction` queue |
+| `/api/cron/advance-sequences` | Hourly | Sequence → scheduled emails |
+| `/api/cron/play-timeline-triggers` | 04:00 daily | TIMELINE play activation |
+| `/api/cron/play-crm-field-gates` | 04:00 daily | CRM_FIELD phase gates |
+| `/api/cron/action-workflow-triggers` | Every 30 min | Meeting Prep + engagement catch-all |
+| `/api/cron/contact-touch-cleanup` | Sun 11:00 | Prune old `ContactTouch` rows |
+| `/api/cron/flag-stale-play-runs` | 13:00 daily | Mark stale `PlayRun` as `AT_RISK` |
+| `/api/cron/refresh-account-research` | Sat 10:00 | Batch refresh stale company research |
+
+**Required for production cron invocations (Vercel injects the Bearer header when set):**
 
 ```
 CRON_SECRET="generate_random_string_here"
 ```
 
-**Key files:** `vercel.json`, `lib/vercel/deploy-static.ts`
+**Optional — cron tuning (defaults match code in `app/api/cron/*`):**
+
+```
+# Contact touch retention (contact-touch-cleanup). Default: 90
+CONTACT_TOUCH_RETENTION_DAYS="90"
+
+# Stale ACTIVE play run → AT_RISK (flag-stale-play-runs). Default: 14
+PLAY_RUN_STALE_DAYS="14"
+
+# Company research refresh: min age before a company is eligible (refresh-account-research). Default: 30 days.
+# Use 14 only for aggressive / high-touch refresh (higher API cost at scale).
+ACCOUNT_RESEARCH_STALE_DAYS="30"
+
+# Max companies processed per weekly refresh run. Default: 4 (max 20 in code)
+ACCOUNT_RESEARCH_BATCH_CAP="4"
+```
+
+**Key files:** `vercel.json`, `app/api/cron/`, `lib/vercel/deploy-static.ts`
 
 ### Vercel Blob
 
@@ -611,9 +653,10 @@ NEXTAUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
 
-# AI (required for embeddings; also powers chat)
+# AI — embeddings: GOOGLE_GENERATIVE_AI_API_KEY and/or AI_GATEWAY_API_KEY (see AI / LLM Providers above)
 GOOGLE_GENERATIVE_AI_API_KEY="..."
-# ANTHROPIC_API_KEY="..."            # optional chat fallback
+# AI_GATEWAY_API_KEY="..."          # optional: Gateway for chat + embeddings
+# ANTHROPIC_API_KEY="..."            # optional chat path per get-model.ts
 
 # Email
 RESEND_API_KEY="re_..."
@@ -626,7 +669,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 # App URL
 NEXT_PUBLIC_URL="http://localhost:3000"
 
-# Cron
+# Cron — set in production so Vercel and secured routes reject anonymous hits (see TECHNICAL_IMPLEMENTATION_GUIDE §4)
 CRON_SECRET="..."
 ```
 

@@ -8,6 +8,7 @@ import type { ChannelId } from '@/lib/content/channel-config';
 import { generateOneContent } from '@/lib/content/generate-content';
 import { prisma } from '@/lib/db';
 import { clearPlayRunAtRiskOnProgress } from '@/lib/plays/clear-play-run-at-risk';
+import { contentStepNeedsAssignableContact } from '@/lib/plays/play-run-roster';
 import { getPromptTemplateForType } from './content-generation-types';
 
 /** Hard cap per field for contact / JSON intel appended to userContext (token budget). */
@@ -106,6 +107,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
               userId: true,
               accountSignalId: true,
               roadmapTargetId: true,
+              targetCompanyDepartmentId: true,
               company: {
                 select: { id: true, name: true, industry: true, dealObjective: true },
               },
@@ -124,6 +126,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
     company: { id: string; name: string | null };
     accountSignalId: string | null;
     roadmapTargetId?: string | null;
+    targetCompanyDepartmentId?: string | null;
   };
   type ActionWithInclude = typeof action & {
     phaseRun: { playRun: PlayRunWithCompany } | null;
@@ -151,6 +154,68 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
   const company = playRun.company;
   const companyId = company.id;
 
+  const templateRole =
+    action.playTemplateRoleId ?
+      await prisma.playTemplateRole.findUnique({ where: { id: action.playTemplateRoleId } })
+    : null;
+
+  let rosterContactId: string | null = null;
+  if (playRun.id && action.playTemplateRoleId) {
+    const row = await prisma.playRunContact.findUnique({
+      where: {
+        playRunId_playTemplateRoleId: {
+          playRunId: playRun.id,
+          playTemplateRoleId: action.playTemplateRoleId,
+        },
+      },
+      select: { contactId: true },
+    });
+    rosterContactId = row?.contactId ?? null;
+  }
+
+  const needsAssignable = contentStepNeedsAssignableContact({
+    requiresContact: template.requiresContact,
+    contentType: template.contentType,
+  });
+  const roleRequired = templateRole?.isRequired !== false;
+  if (needsAssignable && roleRequired && !rosterContactId && !action.contactId) {
+    throw new Error('NEEDS_CONTACT');
+  }
+
+  if (rosterContactId && !action.contactId) {
+    const rc = await prisma.contact.findFirst({
+      where: { id: rosterContactId, companyId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        title: true,
+      },
+    });
+    if (rc) {
+      const name = [rc.firstName, rc.lastName].filter(Boolean).join(' ') || 'Unknown';
+      await prisma.playAction.update({
+        where: { id: action.id },
+        data: {
+          contactId: rc.id,
+          contactName: name,
+          contactEmail: rc.email,
+          contactTitle: rc.title,
+          targetRoleKey: templateRole?.key ?? undefined,
+          ...(action.status === 'BLOCKED' ? { status: 'PENDING' as const } : {}),
+        },
+      });
+      action.contactId = rc.id;
+      action.contactName = name;
+      action.contactEmail = rc.email;
+      action.contactTitle = rc.title;
+      if (action.status === 'BLOCKED') {
+        (action as { status: string }).status = 'PENDING';
+      }
+    }
+  }
+
   let divisionName: string | undefined;
   let divisionId: string | undefined;
   let roadmapIntelExtra = '';
@@ -171,6 +236,18 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
       if (capped) {
         roadmapIntelExtra = `\n\nRoadmap / account focus (from strategic plan):\n${capped}`;
       }
+    }
+  }
+
+  const runDeptId = (playRun as PlayRunWithCompany).targetCompanyDepartmentId;
+  if (!divisionId && runDeptId) {
+    divisionId = runDeptId;
+    const dep = await prisma.companyDepartment.findFirst({
+      where: { id: runDeptId, companyId },
+      select: { customName: true, type: true },
+    });
+    if (dep) {
+      divisionName = dep.customName ?? String(dep.type).replace(/_/g, ' ');
     }
   }
 
@@ -341,6 +418,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
   let renewalMessaging = '';
   let competitiveRules = '';
   let brandVoice = '';
+  let discountGovernanceExtra = '';
   try {
     const governance = await prisma.playGovernance.findUnique({
       where: { userId },
@@ -349,6 +427,10 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
         renewalMessaging: true,
         competitiveRules: true,
         brandVoice: true,
+        maxDiscountPct: true,
+        multiYearDiscountPct: true,
+        earlyRenewalDiscountPct: true,
+        earlyRenewalWindowDays: true,
       },
     });
     valueNarrative = (governance?.valueNarrative as string) ?? '';
@@ -358,6 +440,9 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
         ? JSON.stringify(governance.competitiveRules)
         : (governance?.competitiveRules as string) ?? '';
     brandVoice = (governance?.brandVoice as string) ?? '';
+    if (governance) {
+      discountGovernanceExtra = `\n\nOrg discount governance (do not exceed in offers or pricing language):\n- Max discount: ${governance.maxDiscountPct}%\n- Multi-year add-on cap: ${governance.multiYearDiscountPct}%\n- Early renewal add-on cap: ${governance.earlyRenewalDiscountPct}% (within ${governance.earlyRenewalWindowDays} days of renewal)\n`;
+    }
   } catch {
     // optional
   }
@@ -394,7 +479,8 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
     roadmapIntelExtra +
     recentSignalsExtra +
     recentEngagementExtra +
-    knownObjectionsExtra;
+    knownObjectionsExtra +
+    discountGovernanceExtra;
 
   const systemSuffix = [
     template.systemInstructions,

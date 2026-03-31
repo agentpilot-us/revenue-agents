@@ -49,6 +49,7 @@ export default function MyDayDashboard() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<MyDayData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [dismissedTriggerIds, setDismissedTriggerIds] = useState<Set<string>>(new Set());
@@ -58,14 +59,20 @@ export default function MyDayDashboard() {
   const lastProcessedFocusRunRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    setLoadError(null);
     try {
       const res = await fetch('/api/dashboard/my-day');
       if (res.ok) {
         const json = await res.json();
         setData(json);
+      } else {
+        setLoadError(`Could not load My Day (${res.status}). Try again.`);
+        setData(null);
       }
     } catch (err) {
       console.error('Failed to fetch My Day data:', err);
+      setLoadError('Network error loading My Day. Check your connection and retry.');
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -224,7 +231,25 @@ export default function MyDayDashboard() {
   if (!data) {
     return (
       <div style={{ padding: 40, color: t.text3, fontSize: 14 }}>
-        Failed to load dashboard data.
+        <p style={{ margin: '0 0 12px' }}>{loadError ?? 'Failed to load dashboard data.'}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            fetchData();
+          }}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'rgba(59,130,246,0.15)',
+            color: '#93c5fd',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }

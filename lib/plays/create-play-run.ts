@@ -9,6 +9,11 @@ import { AutonomyLevel } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { parseAutonomyLevel } from './autonomy';
 import { completePhaseAndAdvance } from './execute-action';
+import { ensureTemplateRolesForPlayTemplate } from './ensure-template-roles';
+import {
+  autoPopulatePlayRunContacts,
+  resolveActionStatusForNewStep,
+} from './play-run-roster';
 import { DEMO_PRE_SEEDED_CONTENT, UPSELL_DEMO_PRE_SEEDED_CONTENT } from './pre-seeded-demo-content';
 
 export type { AutonomyLevel };
@@ -29,6 +34,8 @@ export type CreatePlayRunInput = {
   title?: string | null;
   /** Optional: scope run to a division/buying group (RoadmapTarget id). */
   roadmapTargetId?: string | null;
+  /** Optional: division when no roadmap target row (must belong to company). */
+  targetCompanyDepartmentId?: string | null;
   /** Optional: product this run is positioning. */
   productId?: string | null;
   /** Optional: how the run was triggered. Default MANUAL. */
@@ -119,15 +126,21 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
     targetContactId,
     accountSignalId,
     roadmapTargetId,
+    targetCompanyDepartmentId: inputTargetDeptId,
     productId,
     triggerType = 'MANUAL',
     triggerContext,
     autonomyLevel: inputAutonomy,
   } = input;
 
+  await prisma.$transaction(async (tx) => {
+    await ensureTemplateRolesForPlayTemplate(tx, playTemplateId);
+  });
+
   const template = await prisma.playTemplate.findFirst({
     where: { id: playTemplateId, userId },
     include: {
+      templateRoles: { orderBy: { orderIndex: 'asc' } },
       phases: {
         orderBy: { orderIndex: 'asc' },
         include: { contentTemplates: { orderBy: { orderIndex: 'asc' } } },
@@ -145,6 +158,27 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
   });
   if (!company) {
     throw new Error('Company not found');
+  }
+
+  let validatedRoadmapTargetId: string | null = null;
+  if (roadmapTargetId) {
+    const rt = await prisma.roadmapTarget.findFirst({
+      where: {
+        id: roadmapTargetId,
+        roadmap: { userId, companyId },
+      },
+      select: { id: true },
+    });
+    if (rt) validatedRoadmapTargetId = rt.id;
+  }
+
+  let validatedTargetCompanyDepartmentId: string | null = null;
+  if (inputTargetDeptId) {
+    const dept = await prisma.companyDepartment.findFirst({
+      where: { id: inputTargetDeptId, companyId },
+      select: { id: true },
+    });
+    if (dept) validatedTargetCompanyDepartmentId = dept.id;
   }
 
   let validatedTargetContactId: string | null = null;
@@ -191,7 +225,10 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
     companyId,
     userId,
     ...(accountSignalId != null && { accountSignalId }),
-    ...(roadmapTargetId != null && { roadmapTargetId }),
+    ...(validatedRoadmapTargetId != null && { roadmapTargetId: validatedRoadmapTargetId }),
+    ...(validatedTargetCompanyDepartmentId != null && {
+      targetCompanyDepartmentId: validatedTargetCompanyDepartmentId,
+    }),
     ...(productId != null && { productId }),
     triggerType: (triggerType ?? 'MANUAL') as 'MANUAL' | 'SIGNAL' | 'OBJECTIVE' | 'TIMER',
     ...(triggerContext != null && { triggerContext }),
@@ -203,6 +240,53 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
   const playRun = await prisma.playRun.create({
     data: playRunData as Parameters<typeof prisma.playRun.create>[0]['data'],
   });
+
+  const templateRoles = template.templateRoles;
+  const primaryTemplateRole =
+    templateRoles.find((r) => r.key === 'primary') ?? templateRoles[0];
+  if (!primaryTemplateRole) {
+    throw new Error('PlayTemplate has no roles');
+  }
+
+  for (const tr of templateRoles) {
+    await prisma.playRunContact.create({
+      data: {
+        playRunId: playRun.id,
+        playTemplateRoleId: tr.id,
+        status: 'UNASSIGNED',
+      },
+    });
+  }
+
+  const primaryRoster = await prisma.playRunContact.findUnique({
+    where: {
+      playRunId_playTemplateRoleId: {
+        playRunId: playRun.id,
+        playTemplateRoleId: primaryTemplateRole.id,
+      },
+    },
+  });
+
+  if (validatedTargetContactId && primaryRoster) {
+    await prisma.playRunContact.update({
+      where: { id: primaryRoster.id },
+      data: {
+        contactId: validatedTargetContactId,
+        status: 'CONFIRMED',
+      },
+    });
+  }
+
+  await autoPopulatePlayRunContacts(playRun.id);
+
+  const rosterSlots = await prisma.playRunContact.findMany({
+    where: { playRunId: playRun.id },
+    include: {
+      contact: true,
+      playTemplateRole: true,
+    },
+  });
+  const rosterByRoleId = new Map(rosterSlots.map((s) => [s.playTemplateRoleId, s]));
 
   const now = new Date();
 
@@ -224,8 +308,19 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
     });
     for (const content of phase.contentTemplates) {
       const actionType = contentTypeToActionType(content.contentType);
-      const actionTitle = targetContact?.name
-        ? `${content.name} — ${targetContact.name}`
+      const role =
+        templateRoles.find((r) => r.id === content.playTemplateRoleId) ?? primaryTemplateRole;
+      const slot = rosterByRoleId.get(role.id);
+      const c = slot?.contact;
+      const hasContact = !!c?.id;
+      const status = resolveActionStatusForNewStep(content, role, hasContact);
+
+      const contactName = c
+        ? [c.firstName, c.lastName].filter(Boolean).join(' ') || undefined
+        : targetContact?.name ?? undefined;
+      const actionTitle =
+        contactName ? `${content.name} — ${contactName}`
+        : targetContact?.name ? `${content.name} — ${targetContact.name}`
         : content.name;
 
       await prisma.playAction.create({
@@ -235,11 +330,14 @@ export async function createPlayRunFromTemplate(input: CreatePlayRunInput) {
           title: actionTitle,
           actionType,
           priority: 'MEDIUM',
-          status: 'PENDING',
-          contactName: targetContact?.name ?? undefined,
-          contactEmail: targetContact?.email ?? undefined,
-          contactTitle: targetContact?.title ?? undefined,
-          ...(validatedTargetContactId ? { contactId: validatedTargetContactId } : {}),
+          status,
+          playTemplateRoleId: role.id,
+          targetRoleKey: role.key,
+          contactName,
+          contactEmail: c?.email ?? targetContact?.email ?? undefined,
+          contactTitle: c?.title ?? targetContact?.title ?? undefined,
+          contactRole: role.mapToContactRole ?? undefined,
+          ...(c?.id ? { contactId: c.id } : {}),
           suggestedDate: targetDate ?? undefined,
           dueDate: targetDate ?? undefined,
         },

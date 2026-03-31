@@ -179,6 +179,7 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
   let targetContact: { name: string; email?: string | null; title?: string | null } | null =
     null;
   let roadmapTargetId: string | null = null;
+  let targetContactId: string | null = null;
   // Resolve RoadmapTarget: prefer a target whose department type matches the signal context, fall back to first target.
   if (roadmap) {
     const SIGNAL_DEPT_HINTS: Record<string, string[]> = {
@@ -215,6 +216,7 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
       roadmapTargetId = bestTarget.id;
       const firstContact = bestTarget.contacts?.[0]?.contact ?? null;
       if (firstContact) {
+        targetContactId = firstContact.id;
         targetContact = {
           name: [firstContact.firstName, firstContact.lastName].filter(Boolean).join(' ') || 'Unknown',
           email: firstContact.email,
@@ -230,6 +232,7 @@ export async function matchSignalToPlayRun(signal: SignalInput): Promise<{ creat
     playTemplateId: preview.candidate.playTemplateId,
     accountSignalId: signal.id,
     targetContact,
+    targetContactId,
     roadmapTargetId: roadmapTargetId ?? undefined,
     triggerType: 'SIGNAL',
     triggerContext: { signalSummary: signal.summary, signalTitle: signal.title },

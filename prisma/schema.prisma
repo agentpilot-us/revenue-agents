@@ -345,6 +345,7 @@ model Contact {
   contactSequenceEnrollments ContactSequenceEnrollment[]
   roadmapContacts            RoadmapContact[]
   playActions                PlayAction[]
+  playRunContacts            PlayRunContact[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -678,6 +679,7 @@ model CompanyDepartment {
   campaignVisits          CampaignVisit[]
   content                 CompanyDepartmentContent[]
   roadmapTargets          RoadmapTarget[]
+  playRunsTargeted        PlayRun[] @relation("PlayRunTargetDepartment")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2092,6 +2094,13 @@ enum GenerationStatus {
   RATE_LIMITED
 }
 
+enum PlayRunContactStatus {
+  UNASSIGNED
+  DISCOVERED
+  CONFIRMED
+  ENRICHED
+}
+
 // ----- Play templates (PMM-governed blueprints) -----
 model PlayTemplate {
   id              String              @id @default(cuid())
@@ -2121,12 +2130,38 @@ model PlayTemplate {
   runs            PlayRun[]
   signalPlayMappings SignalPlayMapping[]
   accountPlayActivations AccountPlayActivation[]
+  templateRoles   PlayTemplateRole[]
 
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
   @@unique([userId, slug])
   @@index([userId, status, scope])
+}
+
+/** Declared contact slots for a play (roster skeleton + Apollo hints). */
+model PlayTemplateRole {
+  id               String         @id @default(cuid())
+  playTemplateId   String
+  playTemplate     PlayTemplate   @relation(fields: [playTemplateId], references: [id], onDelete: Cascade)
+
+  key              String
+  label            String
+  description      String?        @db.Text
+  isRequired       Boolean        @default(true)
+  apolloTitleTerms String?        @db.Text
+  mapToContactRole ContactRole?
+  orderIndex       Int            @default(0)
+
+  contentTemplates ContentTemplate[]
+  playRunContacts  PlayRunContact[]
+  playActions      PlayAction[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([playTemplateId, key])
+  @@index([playTemplateId])
 }
 
 model PlayPhaseTemplate {
@@ -2186,6 +2221,9 @@ model ContentTemplate {
   timesSent           Int             @default(0)
   avgEditDistance     Float?
 
+  playTemplateRoleId  String?
+  playTemplateRole    PlayTemplateRole? @relation(fields: [playTemplateRoleId], references: [id], onDelete: SetNull)
+
   actions             PlayAction[]
 
   createdAt           DateTime        @default(now())
@@ -2193,6 +2231,7 @@ model ContentTemplate {
 
   @@index([userId])
   @@index([phaseTemplateId])
+  @@index([playTemplateRoleId])
 }
 
 // ----- Play runs (account-level instances) -----
@@ -2209,6 +2248,10 @@ model PlayRun {
 
   roadmapTargetId String?
   roadmapTarget   RoadmapTarget?      @relation(fields: [roadmapTargetId], references: [id], onDelete: SetNull)
+
+  targetCompanyDepartmentId String?
+  targetCompanyDepartment   CompanyDepartment? @relation("PlayRunTargetDepartment", fields: [targetCompanyDepartmentId], references: [id], onDelete: SetNull)
+
   triggerType     PlayRunTriggerType  @default(MANUAL)
   triggerContext  Json?
   productId       String?
@@ -2222,6 +2265,7 @@ model PlayRun {
   currentPhaseIdx Int                  @default(0)
 
   phaseRuns       PlayPhaseRun[]
+  runContacts     PlayRunContact[]
 
   activatedAt     DateTime            @default(now())
   completedAt     DateTime?
@@ -2237,6 +2281,29 @@ model PlayRun {
   @@index([playTemplateId])
   @@index([accountSignalId])
   @@index([roadmapTargetId])
+  @@index([targetCompanyDepartmentId])
+}
+
+/** One roster slot per template role for a specific play run. */
+model PlayRunContact {
+  id                 String                 @id @default(cuid())
+  playRunId          String
+  playRun            PlayRun                @relation(fields: [playRunId], references: [id], onDelete: Cascade)
+  playTemplateRoleId String
+  playTemplateRole   PlayTemplateRole       @relation(fields: [playTemplateRoleId], references: [id], onDelete: Restrict)
+
+  contactId          String?
+  contact            Contact?               @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  status             PlayRunContactStatus   @default(UNASSIGNED)
+  discoveredPayload  Json?
+  autoFilledAt       DateTime?
+
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@unique([playRunId, playTemplateRoleId])
+  @@index([playRunId])
+  @@index([contactId])
 }
 
 model PlayPhaseRun {
@@ -2290,6 +2357,10 @@ model PlayAction {
   contactId           String?
   contact             Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
 
+  playTemplateRoleId  String?
+  playTemplateRole    PlayTemplateRole? @relation(fields: [playTemplateRoleId], references: [id], onDelete: SetNull)
+  targetRoleKey       String?
+
   status              ActionStatus    @default(PENDING)
   reviewedAt          DateTime?
   editedContent       String?         @db.Text
@@ -2312,6 +2383,7 @@ model PlayAction {
   @@index([phaseRunId, status])
   @@index([status])
   @@index([contactId])
+  @@index([playTemplateRoleId])
 }
 
 model ContactTouch {

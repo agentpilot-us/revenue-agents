@@ -104,8 +104,49 @@ export async function GET(
     const playRun = await prisma.playRun.findUnique({
       where: { id: runId },
       include: {
-        playTemplate: { select: { id: true, name: true, slug: true } },
+        playTemplate: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            templateRoles: {
+              orderBy: { orderIndex: 'asc' },
+              select: {
+                id: true,
+                key: true,
+                label: true,
+                isRequired: true,
+                apolloTitleTerms: true,
+              },
+            },
+          },
+        },
         company: { select: { id: true, name: true } },
+        roadmapTarget: { select: { id: true, name: true, companyDepartmentId: true } },
+        runContacts: {
+          orderBy: { playTemplateRole: { orderIndex: 'asc' } },
+          include: {
+            playTemplateRole: {
+              select: {
+                id: true,
+                key: true,
+                label: true,
+                isRequired: true,
+                apolloTitleTerms: true,
+              },
+            },
+            contact: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                title: true,
+                enrichmentStatus: true,
+              },
+            },
+          },
+        },
         phaseRuns: {
           include: {
             phaseTemplate: { select: { id: true, name: true, orderIndex: true, gateType: true } },
@@ -119,6 +160,11 @@ export async function GET(
                     contentType: true,
                     channel: true,
                     contentGenerationType: true,
+                    requiresContact: true,
+                    playTemplateRoleId: true,
+                    playTemplateRole: {
+                      select: { id: true, key: true, label: true, isRequired: true },
+                    },
                   },
                 },
               },

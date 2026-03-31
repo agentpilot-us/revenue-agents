@@ -19,6 +19,7 @@ type TemplateStep = {
   contentGenerationType?: string | null;
   requiresContact?: boolean;
   isAutomatable?: boolean;
+  playTemplateRoleId?: string | null;
 };
 
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -91,11 +92,22 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
   const [steps, setSteps] = useState<TemplateStep[]>([]);
   const [loadingSteps, setLoadingSteps] = useState(true);
   const [patchingContentId, setPatchingContentId] = useState<string | null>(null);
+  const [templateRoles, setTemplateRoles] = useState<
+    Array<{ id: string; key: string; label: string }>
+  >([]);
 
   const needsCompanyPicker = !companyId;
 
   const updateStepContentType = useCallback(
-    async (contentTemplateId: string, updates: { contentGenerationType?: string; requiresContact?: boolean; isAutomatable?: boolean }) => {
+    async (
+      contentTemplateId: string,
+      updates: {
+        contentGenerationType?: string;
+        requiresContact?: boolean;
+        isAutomatable?: boolean;
+        playTemplateRoleId?: string | null;
+      },
+    ) => {
       setPatchingContentId(contentTemplateId);
       try {
         const res = await fetch(`/api/content-templates/${contentTemplateId}`, {
@@ -123,6 +135,9 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
     fetch(`/api/play-templates/${template.id}`)
       .then((r) => r.json())
       .then((data) => {
+        setTemplateRoles(
+          (data.template?.templateRoles as Array<{ id: string; key: string; label: string }>) ?? [],
+        );
         const phases = data.phases ?? [];
         const stepList: TemplateStep[] = [];
         phases.forEach((ph: {
@@ -134,6 +149,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
             contentGenerationType?: string;
             requiresContact?: boolean;
             isAutomatable?: boolean;
+            playTemplateRoleId?: string | null;
           }>;
         }, idx: number) => {
           const templates = ph.contentTemplates ?? [];
@@ -150,6 +166,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
                 contentGenerationType: c.contentGenerationType ?? 'custom_content',
                 requiresContact: c.requiresContact ?? false,
                 isAutomatable: c.isAutomatable ?? false,
+                playTemplateRoleId: c.playTemplateRoleId ?? null,
               });
             });
           } else {
@@ -244,6 +261,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
         playTemplateId: template.id,
       };
       if (selectedContactId) payload.targetContactId = selectedContactId;
+      if (selectedDivisionId) payload.targetCompanyDepartmentId = selectedDivisionId;
 
       const res = await fetch('/api/play-runs', {
         method: 'POST',
@@ -265,7 +283,7 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
       setError(err instanceof Error ? err.message : 'Failed to start play');
       setStarting(false);
     }
-  }, [companyId, selectedCompanyId, selectedContactId, template.id, router]);
+  }, [companyId, selectedCompanyId, selectedContactId, selectedDivisionId, template.id, router]);
 
   const selectedCompanyName =
     companyName || companies.find((c) => c.id === selectedCompanyId)?.name;
@@ -442,6 +460,38 @@ export default function PlayDetailDrawer({ template, onClose, companyId, company
                               />
                               Automatable
                             </label>
+                            {templateRoles.length > 0 && (
+                              <>
+                                <label style={{ fontSize: 10, color: t.text4, fontWeight: 600, textTransform: 'uppercase' }}>
+                                  Targets role
+                                </label>
+                                <select
+                                  value={step.playTemplateRoleId ?? ''}
+                                  onChange={(e) =>
+                                    updateStepContentType(step.contentTemplateId!, {
+                                      playTemplateRoleId: e.target.value || null,
+                                    })
+                                  }
+                                  disabled={patchingContentId === step.contentTemplateId}
+                                  style={{
+                                    fontSize: 11,
+                                    padding: '4px 8px',
+                                    borderRadius: 4,
+                                    border: `1px solid ${t.borderMed}`,
+                                    background: 'rgba(0,0,0,0.2)',
+                                    color: t.text1,
+                                    minWidth: 160,
+                                  }}
+                                >
+                                  <option value="">Primary (default)</option>
+                                  {templateRoles.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>

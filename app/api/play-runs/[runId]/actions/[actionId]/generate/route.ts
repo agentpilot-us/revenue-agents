@@ -38,9 +38,13 @@ export async function POST(
     return NextResponse.json({ action });
   } catch (error) {
     console.error('POST /api/play-runs/[runId]/actions/[actionId]/generate error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Generation failed' },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : 'Generation failed';
+    if (message === 'NEEDS_CONTACT') {
+      return NextResponse.json(
+        { error: 'Assign a contact for this step’s role before generating.', code: 'NEEDS_CONTACT' },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

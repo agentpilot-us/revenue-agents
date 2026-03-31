@@ -62,6 +62,8 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
   const [selectedDivisionIds, setSelectedDivisionIds] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [batchAccountMode, setBatchAccountMode] = useState(false);
+  const [batchCompanyIds, setBatchCompanyIds] = useState<Set<string>>(new Set());
 
   const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
   const divisions = selectedCompany?.departments ?? [];
@@ -85,6 +87,18 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
 
   const toggleTemplate = (id: string) => {
     setSelectedTemplateIds((prev) => {
+      if (batchAccountMode) {
+        return new Set([id]);
+      }
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleBatchCompany = (id: string) => {
+    setBatchCompanyIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -104,6 +118,29 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
   const handleCreate = async () => {
     setCreating(true);
     try {
+      if (batchAccountMode) {
+        const playTemplateId = Array.from(selectedTemplateIds)[0];
+        if (!playTemplateId || batchCompanyIds.size === 0) return;
+        const firstDept =
+          selectedDivisionIds.size > 0 ? Array.from(selectedDivisionIds)[0] : undefined;
+        const res = await fetch('/api/play-runs/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playTemplateId,
+            items: Array.from(batchCompanyIds).map((companyId) => ({
+              companyId,
+              targetCompanyDepartmentId: firstDept,
+            })),
+          }),
+        });
+        if (res.ok) {
+          onCreated();
+          onClose();
+        }
+        return;
+      }
+
       const res = await fetch('/api/account-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,7 +161,9 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
     }
   };
 
-  const totalRuns = selectedTemplateIds.size;
+  const totalRuns = batchAccountMode
+    ? batchCompanyIds.size * Math.min(1, selectedTemplateIds.size)
+    : selectedTemplateIds.size;
 
   return (
     <div
@@ -160,18 +199,53 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
         {/* Step 1: Config */}
         {step === 'config' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: t.text2, display: 'block', marginBottom: 6 }}>Account</label>
-              <select
-                value={selectedCompanyId}
-                onChange={(e) => { setSelectedCompanyId(e.target.value); setSelectedDivisionIds(new Set()); }}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'rgba(15,23,42,0.5)', border: `1px solid ${t.border}`, color: t.text1, fontSize: 13 }}
-              >
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: t.text2, marginBottom: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={batchAccountMode}
+                onChange={(e) => {
+                  setBatchAccountMode(e.target.checked);
+                  setSelectedTemplateIds(new Set());
+                }}
+              />
+              Batch: same play on multiple accounts (creates one play run per account)
+            </label>
+
+            {batchAccountMode ? (
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.text2, display: 'block', marginBottom: 6 }}>
+                  Accounts ({batchCompanyIds.size} selected)
+                </label>
+                <div style={{ maxHeight: 160, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {companies.map((c) => (
+                    <label
+                      key={c.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: t.text1, cursor: 'pointer' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={batchCompanyIds.has(c.id)}
+                        onChange={() => toggleBatchCompany(c.id)}
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: t.text2, display: 'block', marginBottom: 6 }}>Account</label>
+                <select
+                  value={selectedCompanyId}
+                  onChange={(e) => { setSelectedCompanyId(e.target.value); setSelectedDivisionIds(new Set()); }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'rgba(15,23,42,0.5)', border: `1px solid ${t.border}`, color: t.text1, fontSize: 13 }}
+                >
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: t.text2, display: 'block', marginBottom: 6 }}>Campaign Name (optional)</label>
@@ -208,8 +282,8 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
               </div>
             </div>
 
-            {/* Division selection */}
-            {divisions.length > 0 && (
+            {/* Division selection — uses first selected division for batch targeting */}
+            {!batchAccountMode && divisions.length > 0 && (
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: t.text2, display: 'block', marginBottom: 6 }}>
                   Target Divisions <span style={{ fontWeight: 400, color: t.text3 }}>(select buying groups to coordinate across)</span>
@@ -244,7 +318,7 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
             <button
               type="button"
               onClick={() => setStep('plays')}
-              disabled={!selectedCompanyId}
+              disabled={batchAccountMode ? batchCompanyIds.size === 0 : !selectedCompanyId}
               style={{
                 padding: '12px 0',
                 borderRadius: 10,
@@ -266,7 +340,9 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
         {step === 'plays' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ fontSize: 12, color: t.text2, margin: 0 }}>
-              Select plays to run across the selected divisions. Each play × division creates a coordination thread.
+              {batchAccountMode
+                ? 'Select one play template. A separate play run will be created for each selected account.'
+                : 'Select plays to run across the selected divisions. Each play × division creates a coordination thread.'}
             </p>
 
             {loadingTemplates ? (
@@ -328,7 +404,11 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
                   cursor: selectedTemplateIds.size > 0 ? 'pointer' : 'not-allowed',
                 }}
               >
-                Review ({selectedTemplateIds.size} play{selectedTemplateIds.size !== 1 ? 's' : ''}) →
+                Review (
+                {batchAccountMode
+                  ? `${batchCompanyIds.size} run${batchCompanyIds.size !== 1 ? 's' : ''}`
+                  : `${selectedTemplateIds.size} play${selectedTemplateIds.size !== 1 ? 's' : ''}`}
+                ) →
               </button>
             </div>
           </div>
@@ -338,23 +418,31 @@ export default function CreateCampaignModal({ companies, onClose, onCreated }: P
         {step === 'review' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ padding: 16, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${t.border}` }}>
-              <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>Account</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: t.text1 }}>{selectedCompany?.name}</div>
-            </div>
-
-            <div style={{ padding: 16, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${t.border}` }}>
-              <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>Divisions ({selectedDivisionIds.size || 'all'})</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {selectedDivisionIds.size > 0
-                  ? divisions.filter((d) => selectedDivisionIds.has(d.id)).map((d) => (
-                    <span key={d.id} style={{ fontSize: 11, fontWeight: 600, color: t.blue, background: t.blueBg, border: `1px solid ${t.blueBorder}`, padding: '3px 8px', borderRadius: 4 }}>
-                      {d.name || d.type.replace(/_/g, ' ')}
-                    </span>
-                  ))
-                  : <span style={{ fontSize: 12, color: t.text2 }}>All divisions (plays will target the best match)</span>
-                }
+              <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>Account(s)</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: t.text1 }}>
+                {batchAccountMode
+                  ? Array.from(batchCompanyIds)
+                      .map((id) => companies.find((c) => c.id === id)?.name ?? id)
+                      .join(', ')
+                  : selectedCompany?.name}
               </div>
             </div>
+
+            {!batchAccountMode && (
+              <div style={{ padding: 16, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${t.border}` }}>
+                <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>Divisions ({selectedDivisionIds.size || 'all'})</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {selectedDivisionIds.size > 0
+                    ? divisions.filter((d) => selectedDivisionIds.has(d.id)).map((d) => (
+                      <span key={d.id} style={{ fontSize: 11, fontWeight: 600, color: t.blue, background: t.blueBg, border: `1px solid ${t.blueBorder}`, padding: '3px 8px', borderRadius: 4 }}>
+                        {d.name || d.type.replace(/_/g, ' ')}
+                      </span>
+                    ))
+                    : <span style={{ fontSize: 12, color: t.text2 }}>All divisions (plays will target the best match)</span>
+                  }
+                </div>
+              </div>
+            )}
 
             <div style={{ padding: 16, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${t.border}` }}>
               <div style={{ fontSize: 11, color: t.text3, marginBottom: 4 }}>
