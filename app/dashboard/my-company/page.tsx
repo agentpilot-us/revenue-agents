@@ -118,10 +118,15 @@ export default async function MyCompanyPage({ searchParams }: PageProps) {
   }));
 
   const profileData = {
-    companyName: user.companyName ?? primaryCompany?.name ?? null,
-    companyWebsite: user.companyWebsite ?? primaryCompany?.website ?? null,
-    companyIndustry: user.companyIndustry ?? primaryCompany?.industry ?? null,
-    primaryIndustrySellTo: user.primaryIndustrySellTo ?? null,
+    companyName:
+      user.companyName?.trim() ? user.companyName.trim() : primaryCompany?.name ?? null,
+    companyWebsite:
+      user.companyWebsite?.trim() ? user.companyWebsite.trim() : primaryCompany?.website ?? null,
+    companyIndustry:
+      user.companyIndustry?.trim()
+        ? user.companyIndustry.trim()
+        : primaryCompany?.industry ?? null,
+    primaryIndustrySellTo: user.primaryIndustrySellTo?.trim() || null,
     keyInitiatives,
   };
 

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Props = {
   initial: {
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function MyCompanyEditor({ initial }: Props) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [companyName, setCompanyName] = useState(initial.companyName ?? '');
   const [companyWebsite, setCompanyWebsite] = useState(initial.companyWebsite ?? '');
@@ -27,6 +29,23 @@ export function MyCompanyEditor({ initial }: Props) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const initiativesKey = initial.keyInitiatives.join('\u0001');
+  useEffect(() => {
+    if (editing) return;
+    setCompanyName(initial.companyName ?? '');
+    setCompanyWebsite(initial.companyWebsite ?? '');
+    setCompanyIndustry(initial.companyIndustry ?? '');
+    setPrimaryIndustrySellTo(initial.primaryIndustrySellTo ?? '');
+    setKeyInitiativesRaw(initial.keyInitiatives.join('\n'));
+  }, [
+    editing,
+    initial.companyName,
+    initial.companyWebsite,
+    initial.companyIndustry,
+    initial.primaryIndustrySellTo,
+    initiativesKey,
+  ]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -50,10 +69,15 @@ export function MyCompanyEditor({ initial }: Props) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.error ?? 'Failed to save company profile.');
+        setError(
+          data?.details ?
+            `${data.error ?? 'Invalid input'}`
+          : (data?.error ?? 'Failed to save company profile.'),
+        );
         return;
       }
       setEditing(false);
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save company profile.');
     } finally {
