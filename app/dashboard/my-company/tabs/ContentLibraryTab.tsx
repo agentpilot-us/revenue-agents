@@ -38,30 +38,62 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const CONTENT_FIELDS: Record<string, { key: string; label: string; multiline?: boolean }[]> = {
+  /** Aligns with UseCaseForm: description + benefits[] (+ department on row tags) */
   UseCase: [
-    { key: 'headline', label: 'Headline' },
-    { key: 'body', label: 'Body', multiline: true },
-    { key: 'keyMetrics', label: 'Key Metrics' },
+    { key: 'description', label: 'Description', multiline: true },
+    { key: 'benefits', label: 'Benefits (one per line)', multiline: true },
   ],
+  /** Aligns with SuccessStoryForm */
   SuccessStory: [
     { key: 'headline', label: 'Headline' },
     { key: 'oneLiner', label: 'One-Liner' },
     { key: 'fullSummary', label: 'Full Summary', multiline: true },
-    { key: 'whenToUse', label: 'When to Use' },
+    { key: 'keyMetrics', label: 'Key metrics (one per line)', multiline: true },
+    { key: 'whenToUse', label: 'When to Use', multiline: true },
   ],
+  /** Title is top-level; aligns with CompanyEventForm content + optional extras for RAG */
   CompanyEvent: [
-    { key: 'eventTitle', label: 'Event Title' },
     { key: 'date', label: 'Date' },
+    { key: 'eventType', label: 'Event Type' },
     { key: 'location', label: 'Location' },
     { key: 'description', label: 'Description', multiline: true },
     { key: 'registrationUrl', label: 'Registration URL' },
   ],
+  /** Aligns with FeatureReleaseForm */
   FeatureRelease: [
-    { key: 'headline', label: 'Headline' },
-    { key: 'body', label: 'Body', multiline: true },
+    { key: 'description', label: 'Description', multiline: true },
     { key: 'releaseDate', label: 'Release Date' },
+    { key: 'benefits', label: 'Benefits (one per line)', multiline: true },
+  ],
+  /** Matches FrameworkForm + RAG chunking */
+  Framework: [
+    { key: 'description', label: 'Description', multiline: true },
+    { key: 'methodology', label: 'Methodology', multiline: true },
   ],
 };
+
+const MULTILINE_ARRAY_KEYS = new Set(['benefits', 'keyMetrics']);
+
+function fieldDefsForType(type: string) {
+  return CONTENT_FIELDS[type] ?? [{ key: 'body', label: 'Content', multiline: true }];
+}
+
+/** Build content JSON for API: only keys for this type; newline → string[] for benefits/keyMetrics */
+function buildContentPayload(type: string, contentFields: Record<string, string>): Record<string, unknown> {
+  const contentObj: Record<string, unknown> = {};
+  for (const f of fieldDefsForType(type)) {
+    const raw = contentFields[f.key] ?? '';
+    const v = raw.trim();
+    if (!v) continue;
+    if (MULTILINE_ARRAY_KEYS.has(f.key)) {
+      const arr = v.split('\n').map((s) => s.trim()).filter(Boolean);
+      if (arr.length) contentObj[f.key] = arr;
+    } else {
+      contentObj[f.key] = v;
+    }
+  }
+  return contentObj;
+}
 
 function getTypeLabel(type: string) {
   return TYPE_OPTIONS.find((t) => t.value === type)?.label ?? type;
@@ -316,7 +348,14 @@ function ContentPreview({ content, type }: { content: Record<string, unknown>; t
   const oneLiner = content.oneLiner as string | undefined;
   const body = content.body as string | undefined;
   const description = content.description as string | undefined;
-  const preview = headline || oneLiner || body || description || '';
+  const methodology = content.methodology as string | undefined;
+  const preview =
+    headline ||
+    oneLiner ||
+    description ||
+    body ||
+    (type === 'Framework' ? methodology : undefined) ||
+    '';
   if (!preview) return null;
   return (
     <p className="text-[11px] text-muted-foreground line-clamp-2">{String(preview)}</p>
@@ -344,12 +383,28 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
       else if (Array.isArray(v)) result[k] = v.join('\n');
       else if (v != null) result[k] = JSON.stringify(v);
     }
+    if (item.type === 'Framework' && result.body?.trim() && !result.description?.trim()) {
+      result.description = result.body;
+    }
+    if (item.type === 'UseCase') {
+      if (!result.description?.trim()) {
+        const parts = [result.headline, result.body].filter((x) => typeof x === 'string' && x.trim());
+        if (parts.length) result.description = parts.join('\n\n');
+      }
+      if (!result.benefits?.trim() && result.keyMetrics?.trim()) {
+        result.benefits = result.keyMetrics;
+      }
+    }
+    if (item.type === 'FeatureRelease' && !result.description?.trim()) {
+      const parts = [result.headline, result.body].filter((x) => typeof x === 'string' && x.trim());
+      if (parts.length) result.description = parts.join('\n\n');
+    }
     return result;
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const fields = CONTENT_FIELDS[type] ?? [{ key: 'body', label: 'Content', multiline: true }];
+  const fields = fieldDefsForType(type);
 
   const updateField = (key: string, value: string) => {
     setContentFields((prev) => ({ ...prev, [key]: value }));
@@ -360,10 +415,7 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
     setSaving(true);
     setError('');
 
-    const contentObj: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(contentFields)) {
-      if (v.trim()) contentObj[k] = v.trim();
-    }
+    const contentObj = buildContentPayload(type, contentFields);
 
     try {
       if (isNew) {
