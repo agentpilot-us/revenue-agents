@@ -421,6 +421,7 @@ export const chatTools = {
       const session = await auth();
       if (!session?.user?.id) return { error: 'Unauthorized' };
       const allPersonas = await prisma.persona.findMany({
+        where: { userId: session.user.id },
         select: {
           id: true,
           name: true,
@@ -457,6 +458,7 @@ export const chatTools = {
       if (!session?.user?.id) return { error: 'Unauthorized' };
       const { matchPersona } = await import('@/app/actions/match-persona');
       const result = await matchPersona({
+        userId: session.user.id,
         firstName: '',
         lastName: '',
         title: params.title,
@@ -518,7 +520,9 @@ export const chatTools = {
       if (!session?.user?.id) return { error: 'Unauthorized' };
       if (!personaId && !personaName) return { error: 'Provide personaId or personaName' };
       const persona = await prisma.persona.findFirst({
-        where: personaId ? { id: personaId } : { name: personaName! },
+        where: personaId
+          ? { id: personaId, userId: session.user.id }
+          : { name: personaName!, userId: session.user.id },
       });
       if (!persona) return { error: 'Persona not found' };
       return { persona };

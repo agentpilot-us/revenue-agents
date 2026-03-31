@@ -6,6 +6,7 @@ const TABS = [
   'Profile',
   'Products',
   'Content Library',
+  'Personas',
   'Playbooks',
   'Messaging',
   'Governance',

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { MY_COMPANY_SETUP_PROGRESS_INVALIDATE } from '@/lib/my-company/setup-progress-events';
 
 type ValidateCheck = {
   id: string;
@@ -54,6 +55,7 @@ export function SetupProgressCard() {
   const [validateChecks, setValidateChecks] = useState<ValidateCheck[]>([]);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch('/api/my-company/setup-status');
       if (res.ok) {
@@ -68,6 +70,14 @@ export function SetupProgressCard() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const onInvalidate = () => {
+      void load();
+    };
+    window.addEventListener(MY_COMPANY_SETUP_PROGRESS_INVALIDATE, onInvalidate);
+    return () => window.removeEventListener(MY_COMPANY_SETUP_PROGRESS_INVALIDATE, onInvalidate);
   }, [load]);
 
   const runValidate = async () => {

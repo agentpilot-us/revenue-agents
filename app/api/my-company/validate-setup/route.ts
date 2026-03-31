@@ -27,6 +27,7 @@ export async function POST() {
       mappings,
       governance,
       contentCount,
+      personaCount,
       companiesWithContactAndProduct,
       companyWithRenewalProduct,
     ] = await Promise.all([
@@ -34,6 +35,7 @@ export async function POST() {
       prisma.signalPlayMapping.count({ where: { userId } }),
       prisma.playGovernance.findUnique({ where: { userId }, select: { id: true } }),
       prisma.contentLibrary.count({ where: { userId, isActive: true, archivedAt: null } }),
+      prisma.persona.count({ where: { userId } }),
       prisma.company.count({
         where: {
           userId,
@@ -84,6 +86,21 @@ export async function POST() {
         status: contentCount > 0 ? 'pass' : 'warn',
         detail: contentCount > 0 ? `${contentCount} item(s)` : 'Add content for richer generation',
         fixHref: '/dashboard/my-company?tab=Content%20Library',
+      },
+      {
+        id: 'buyer_personas',
+        label: 'At least two buyer personas',
+        status:
+          personaCount >= 2 ? 'pass'
+          : personaCount === 1 ? 'warn'
+          : 'warn',
+        detail:
+          personaCount >= 2 ?
+            `${personaCount} persona(s)`
+          : personaCount === 1 ?
+            'Add one more persona for stronger targeting'
+          : 'Add buyer personas under My Company → Personas',
+        fixHref: '/dashboard/my-company?tab=Personas',
       },
       {
         id: 'test_account',

@@ -1,14 +1,6 @@
-import { prisma } from '@/lib/db';
-import { PersonaLibrary } from '@/app/components/personas/PersonaLibrary';
+import { redirect } from 'next/navigation';
 
-export default async function PersonasPage() {
-  const personas = await prisma.persona.findMany({
-    orderBy: { name: 'asc' },
-  });
-
-  return (
-    <div className="container mx-auto py-8">
-      <PersonaLibrary personas={personas} />
-    </div>
-  );
+/** Legacy URL: buyer personas now live under My Company → Personas. */
+export default function PersonasPage() {
+  redirect('/dashboard/my-company?tab=Personas');
 }

@@ -187,6 +187,8 @@ This section is for **developers** who need to create seed data (docs, products,
 
 Content Library items are the source for RAG (value props, case studies, use cases, etc.) and for health scoring and recommendations.
 
+**Buyer personas vs Content Library:** Structured **buyer personas** (titles, pains, channels, assignable on `Contact.personaId`) live in **My Company → Personas** and are injected into generation as a **BUYER PERSONA** block in `lib/content/build-content-context.ts`. They are **not** created as Content Library rows. The legacy `ContentType.Persona` enum value may still exist on old library items for RAG-only narrative text; new persona-style setup should use the Personas tab, not the Content Library wizard.
+
 **Ways to create/upload Content Library items:**
 
 | Method | Endpoint / flow | Auth | Use case |

@@ -46,7 +46,14 @@ export async function findContactsForDepartment(
 ): Promise<FindContactsResult> {
   const company = await prisma.company.findFirst({
     where: { id: companyId },
-    select: { id: true, name: true, domain: true, website: true, segmentationStrategy: true },
+    select: {
+      id: true,
+      name: true,
+      domain: true,
+      website: true,
+      segmentationStrategy: true,
+      userId: true,
+    },
   });
   if (!company) return { ok: false, error: 'Company not found' };
 
@@ -136,14 +143,15 @@ export async function findContactsForDepartment(
       let whyRelevant: string | undefined;
       try {
         const match = await matchPersona({
+          userId: company.userId,
           firstName: c.firstName,
           lastName: c.lastName,
           title: c.title,
           companyName: company.name,
           department: deptType,
         });
-        personaId = match.personaId;
-        personaName = match.personaName;
+        personaId = match.personaId || undefined;
+        personaName = match.personaName || undefined;
         confidence = match.confidence;
         whyRelevant = match.reasoning;
       } catch {

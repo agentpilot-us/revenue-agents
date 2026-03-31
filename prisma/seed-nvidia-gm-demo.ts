@@ -1529,8 +1529,9 @@ async function main() {
 
   // Champion personas + RoadmapContact for upsell demo (Frank = Champion, Shelly = Decision Maker, Sarah = Technical Evaluator)
   const championPersona = await prisma.persona.upsert({
-    where: { name: 'Champion' },
+    where: { userId_name: { userId, name: 'Champion' } },
     create: {
+      userId,
       name: 'Champion',
       description: 'Executive sponsor or internal champion with budget authority.',
       includeTitles: [],
@@ -1545,8 +1546,9 @@ async function main() {
     select: { id: true },
   });
   const decisionMakerPersona = await prisma.persona.upsert({
-    where: { name: 'Decision Maker' },
+    where: { userId_name: { userId, name: 'Decision Maker' } },
     create: {
+      userId,
       name: 'Decision Maker',
       description: 'Key decision maker for the buying group.',
       includeTitles: [],
@@ -1561,8 +1563,9 @@ async function main() {
     select: { id: true },
   });
   const technicalEvaluatorPersona = await prisma.persona.upsert({
-    where: { name: 'Technical Evaluator' },
+    where: { userId_name: { userId, name: 'Technical Evaluator' } },
     create: {
+      userId,
       name: 'Technical Evaluator',
       description: 'Technical evaluator or gatekeeper.',
       includeTitles: [],

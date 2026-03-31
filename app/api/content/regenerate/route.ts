@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       firstName: string | null;
       lastName: string | null;
       title: string | null;
+      personaId: string | null;
     };
 
     const [contacts, signal] = await Promise.all([
@@ -71,8 +72,9 @@ export async function POST(req: NextRequest) {
             where: {
               companyId: input.companyId,
               id: { in: input.contactIds },
+              company: { userId: session.user.id },
             },
-            select: { firstName: true, lastName: true, title: true },
+            select: { firstName: true, lastName: true, title: true, personaId: true },
           })
         : Promise.resolve([] as ContactRow[]),
       input.triggerId

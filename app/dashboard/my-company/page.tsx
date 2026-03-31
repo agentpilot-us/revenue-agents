@@ -8,6 +8,7 @@ const VALID_TABS: TabId[] = [
   'Profile',
   'Products',
   'Content Library',
+  'Personas',
   'Playbooks',
   'Messaging',
   'Governance',
@@ -105,7 +106,7 @@ export default async function MyCompanyPage({ searchParams }: PageProps) {
       select: { id: true, name: true, slug: true, description: true, relatedProducts: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.contentLibrary.count({ where: { userId, isActive: true } }),
+    prisma.contentLibrary.count({ where: { userId, isActive: true, archivedAt: null } }),
   ]);
 
   const keyInitiatives =

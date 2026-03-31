@@ -75,7 +75,7 @@ export async function getCompanySetupState(): Promise<GetCompanySetupStateResult
       },
     }),
     prisma.contentLibrary.count({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, archivedAt: null },
     }),
   ]);
 

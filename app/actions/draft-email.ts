@@ -37,9 +37,13 @@ export async function draftEmail(params: {
   if (!contact) throw new Error('Contact not found');
 
   // 2. Fetch persona
-  const persona = contact.personaId
-    ? await prisma.persona.findUnique({ where: { id: contact.personaId } })
-    : null;
+  const ownerId = contact.company?.userId;
+  const persona =
+    contact.personaId && ownerId
+      ? await prisma.persona.findFirst({
+          where: { id: contact.personaId, userId: ownerId },
+        })
+      : null;
 
   // 3. Fetch product (if specified) — catalog product by slug (scoped to company owner)
   const product = params.productSlug && contact.company?.userId

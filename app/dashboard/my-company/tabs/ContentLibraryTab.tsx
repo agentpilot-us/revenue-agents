@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { dispatchMyCompanySetupProgressInvalidate } from '@/lib/my-company/setup-progress-events';
 
 type ContentItem = {
   id: string;
@@ -23,7 +24,6 @@ const TYPE_OPTIONS = [
   { value: 'Framework', label: 'Framework' },
   { value: 'Battlecard', label: 'Battlecard' },
   { value: 'EmailContent', label: 'Email Template' },
-  { value: 'Persona', label: 'Persona' },
 ] as const;
 
 const TYPE_COLORS: Record<string, string> = {
@@ -34,7 +34,6 @@ const TYPE_COLORS: Record<string, string> = {
   Framework: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25',
   Battlecard: 'bg-red-500/10 text-red-400 border-red-500/25',
   EmailContent: 'bg-pink-500/10 text-pink-400 border-pink-500/25',
-  Persona: 'bg-orange-500/10 text-orange-400 border-orange-500/25',
 };
 
 const CONTENT_FIELDS: Record<string, { key: string; label: string; multiline?: boolean }[]> = {
@@ -144,6 +143,7 @@ export function ContentLibraryTab() {
     const res = await fetch(`/api/content-library/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setItems((prev) => prev.filter((i) => i.id !== id));
+      dispatchMyCompanySetupProgressInvalidate();
     }
   };
 
@@ -157,6 +157,7 @@ export function ContentLibraryTab() {
       setItems((prev) =>
         prev.map((i) => (i.id === id ? { ...i, isActive: !currentlyActive } : i)),
       );
+      dispatchMyCompanySetupProgressInvalidate();
     }
   };
 
@@ -166,7 +167,10 @@ export function ContentLibraryTab() {
     return (
       <ContentItemEditor
         item={item}
-        onSaved={() => { setEditingId(null); fetchItems(); }}
+        onSaved={() => {
+          setEditingId(null);
+          void fetchItems().then(() => dispatchMyCompanySetupProgressInvalidate());
+        }}
         onCancel={() => setEditingId(null)}
       />
     );
@@ -175,7 +179,10 @@ export function ContentLibraryTab() {
   if (creating) {
     return (
       <ContentItemEditor
-        onSaved={() => { setCreating(false); fetchItems(); }}
+        onSaved={() => {
+          setCreating(false);
+          void fetchItems().then(() => dispatchMyCompanySetupProgressInvalidate());
+        }}
         onCancel={() => setCreating(false)}
       />
     );

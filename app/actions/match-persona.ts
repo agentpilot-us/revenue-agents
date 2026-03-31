@@ -14,6 +14,7 @@ const personaMatchSchema = z.object({
 });
 
 export async function matchPersona(contactData: {
+  userId: string;
   firstName: string;
   lastName: string;
   title: string;
@@ -22,7 +23,20 @@ export async function matchPersona(contactData: {
   companyIndustry?: string;
   department?: string;
 }) {
-  const personas = await prisma.persona.findMany();
+  const personas = await prisma.persona.findMany({
+    where: { userId: contactData.userId },
+    orderBy: { name: 'asc' },
+  });
+
+  if (personas.length === 0) {
+    return {
+      personaId: '',
+      personaName: '',
+      confidence: 0,
+      reasoning:
+        'No buyer personas in your workspace yet. Add them under My Company → Personas, then try again.',
+    };
+  }
 
   const deptLine = contactData.department ? `Department: ${contactData.department}` : '';
 

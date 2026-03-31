@@ -18,6 +18,9 @@ export const SETUP_THRESHOLDS = {
   activeTemplatesMin: 1,
   /** At least one signal→play mapping */
   signalMappingsMin: 1,
+  /** Structured buyer personas — partial at 1, complete at 2+ */
+  personasComplete: 2,
+  personasPartial: 1,
 } as const;
 
 export type StepStatus = 'complete' | 'partial' | 'empty';

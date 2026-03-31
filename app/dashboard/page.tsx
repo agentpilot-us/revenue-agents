@@ -31,26 +31,20 @@ export default async function DashboardPage({
   }
 
   const params = await searchParams;
-  const [contentLibraryCounts, catalogProductCount, industryPlaybookCount] =
+  const [contentLibraryItemCount, catalogProductCount, industryPlaybookCount] =
     await Promise.all([
-      prisma.contentLibrary.groupBy({
-        by: ['type'],
-        where: { userId: session.user.id, isActive: true },
-        _count: { id: true },
+      prisma.contentLibrary.count({
+        where: {
+          userId: session.user.id,
+          isActive: true,
+          archivedAt: null,
+        },
       }),
-      prisma.catalogProduct.count(),
+      prisma.catalogProduct.count({ where: { userId: session.user.id } }),
       prisma.industryPlaybook.count({ where: { userId: session.user.id } }),
     ]);
-  const countByType = Object.fromEntries(
-    contentLibraryCounts.map((c) => [c.type, c._count.id])
-  ) as Partial<Record<string, number>>;
   const contentLibraryTotal =
-    catalogProductCount +
-    industryPlaybookCount +
-    (countByType.UseCase ?? 0) +
-    (countByType.SuccessStory ?? 0) +
-    (countByType.CompanyEvent ?? 0) +
-    (countByType.Framework ?? 0);
+    catalogProductCount + industryPlaybookCount + contentLibraryItemCount;
   if (contentLibraryTotal === 0 && params?.skip_content_prompt !== '1') {
     redirect('/dashboard/content-library');
   }

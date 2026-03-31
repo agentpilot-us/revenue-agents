@@ -4,6 +4,7 @@ import { MyCompanyTabs, type TabId } from '@/app/dashboard/my-company/MyCompanyT
 import { ProfileTab } from '@/app/dashboard/my-company/tabs/ProfileTab';
 import { ProductsTab } from '@/app/dashboard/my-company/tabs/ProductsTab';
 import { ContentLibraryTab } from '@/app/dashboard/my-company/tabs/ContentLibraryTab';
+import { PersonasTab } from '@/app/dashboard/my-company/tabs/PersonasTab';
 import { PlaybooksTab } from '@/app/dashboard/my-company/tabs/PlaybooksTab';
 import { MessagingTab } from '@/app/dashboard/my-company/tabs/MessagingTab';
 import { IntelligenceTab } from '@/app/dashboard/my-company/tabs/IntelligenceTab';
@@ -114,6 +115,7 @@ export function MyCompanyClient({
             {activeTab === 'Content Library' && (
               <ContentLibraryTab />
             )}
+            {activeTab === 'Personas' && <PersonasTab />}
             {activeTab === 'Playbooks' && (
               <PlaybooksTab catalogProducts={catalogProducts} />
             )}

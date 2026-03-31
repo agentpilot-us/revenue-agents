@@ -105,6 +105,7 @@ model User {
 
   // My Company intelligence hub
   myCompanySheetConfig   MyCompanySheetConfig?
+  personas               Persona[]
 
   // Salesforce OAuth tokens (per-user)
   salesforceAccessToken    String?   @db.Text
@@ -1423,9 +1424,11 @@ model ContentImport {
 // ============================================
 
 model Persona {
-  id String @id @default(cuid())
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name        String  @unique
+  name        String
   description String? @db.Text
 
   includeTitles String[]
@@ -1447,6 +1450,8 @@ model Persona {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([userId, name])
+  @@index([userId])
   @@index([primaryDepartment])
 }
 

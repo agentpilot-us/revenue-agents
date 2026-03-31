@@ -46,7 +46,10 @@ export type ContentContextInput = {
     firstName?: string | null;
     lastName?: string | null;
     title?: string | null;
+    personaId?: string | null;
   }>;
+  /** When no contact row is available, pass a persona id explicitly. */
+  personaId?: string;
   motion?: string;
   playId?: string;
   contentType?: string;
@@ -85,6 +88,43 @@ const SENDER_ROLE_LABELS: Record<string, string> = {
   executive: 'Executive / VP — strategic, peer-to-peer, brief and high-impact',
 };
 
+function formatBuyerPersonaForPrompt(p: {
+  name: string;
+  description: string | null;
+  includeTitles: string[];
+  excludeTitles: string[];
+  primaryDepartment: string | null;
+  secondaryDepartments: string[];
+  painPoints: string[];
+  successMetrics: string[];
+  contentTypes: string[];
+  messagingTone: string;
+  preferredChannels: string[];
+}): string {
+  const deptLabel = (d: string) => d.replace(/_/g, ' ');
+  const lines: string[] = [`Name: ${p.name}`];
+  if (p.description?.trim()) lines.push(`Overview: ${p.description.trim()}`);
+  if (p.includeTitles.length)
+    lines.push(`Typical titles (include): ${p.includeTitles.join(', ')}`);
+  if (p.excludeTitles.length)
+    lines.push(`Titles to avoid: ${p.excludeTitles.join(', ')}`);
+  if (p.primaryDepartment)
+    lines.push(`Primary department: ${deptLabel(p.primaryDepartment)}`);
+  if (p.secondaryDepartments.length)
+    lines.push(
+      `Secondary departments: ${p.secondaryDepartments.map(deptLabel).join(', ')}`,
+    );
+  if (p.painPoints.length) lines.push(`Pain points: ${p.painPoints.join('; ')}`);
+  if (p.successMetrics.length)
+    lines.push(`Success metrics: ${p.successMetrics.join('; ')}`);
+  if (p.contentTypes.length)
+    lines.push(`Content preferences: ${p.contentTypes.join(', ')}`);
+  lines.push(`Tone toward this buyer: ${p.messagingTone}`);
+  if (p.preferredChannels.length)
+    lines.push(`Preferred channels: ${p.preferredChannels.join(', ')}`);
+  return lines.join('\n');
+}
+
 const TONE_LABELS: Record<string, string> = {
   direct: 'Direct & concise — get to the point quickly, no fluff',
   consultative:
@@ -112,12 +152,30 @@ export async function buildContentContext(
     signalContext,
     eventContext,
     activeActionIndex,
+    personaId: inputPersonaId,
   } = input;
 
   const channelConfig = getChannelConfig(channel);
   const tier = channelConfig.contextTier;
 
-  const [company, user] = await Promise.all([
+  const resolvedPersonaId =
+    inputPersonaId ?? contacts.find((c) => c.personaId)?.personaId ?? undefined;
+
+  const buyerPersonaSelect = {
+    name: true,
+    description: true,
+    includeTitles: true,
+    excludeTitles: true,
+    primaryDepartment: true,
+    secondaryDepartments: true,
+    painPoints: true,
+    successMetrics: true,
+    contentTypes: true,
+    messagingTone: true,
+    preferredChannels: true,
+  } as const;
+
+  const [company, user, buyerPersona] = await Promise.all([
     prisma.company.findFirst({
       where: { id: companyId, userId },
       select: {
@@ -133,6 +191,12 @@ export async function buildContentContext(
       where: { id: userId },
       select: { name: true, companyName: true },
     }),
+    resolvedPersonaId
+      ? prisma.persona.findFirst({
+          where: { id: resolvedPersonaId, userId },
+          select: buyerPersonaSelect,
+        })
+      : Promise.resolve(null),
   ]);
 
   if (!company) throw new Error('Company not found');
@@ -193,6 +257,16 @@ export async function buildContentContext(
   const recipientsSection = buildRecipientsBlock(contacts, channelConfig.mode);
   const toneLine = deriveToneFromContacts(contacts);
 
+  const buyerPersonaBlock =
+    buyerPersona ?
+      `\n\n### BUYER PERSONA (who we are writing to)\n${formatBuyerPersonaForPrompt(
+        {
+          ...buyerPersona,
+          primaryDepartment: buyerPersona.primaryDepartment ?? null,
+        },
+      )}`
+    : '';
+
   const include = {
     research: tier !== 'light',
     account: tier !== 'light',
@@ -224,7 +298,9 @@ export async function buildContentContext(
       : Promise.resolve(''),
     getActiveObjectionsBlock(companyId, userId, divisionId),
     include.messaging
-      ? getMessagingContextForAgent(userId, company.industry ?? undefined)
+      ? getMessagingContextForAgent(userId, company.industry ?? undefined).then((m) =>
+          m?.content?.trim() ? m.content.trim() : '',
+        )
       : Promise.resolve(''),
     include.product || include.caseStudies || include.productFraming
       ? getRelevantProductIdsForIndustry(userId, company.industry ?? null, null)
@@ -375,7 +451,9 @@ export async function buildContentContext(
       ? `\n\n${featureReleasesBlock}`
       : '';
   const messagingSectionFinal =
-    include.messaging && messagingSection ? messagingSection : '';
+    include.messaging && messagingSection
+      ? `\n\n### SELLER MESSAGING (how we position & talk)\n${messagingSection}`
+      : '';
 
   const aeIdentityLine = aeCompany
     ? `You are writing on behalf of ${aeName} at ${aeCompany}.\n`
@@ -467,7 +545,7 @@ export async function buildContentContext(
   const systemPrompt = `You are a B2B sales content writer.
 ${aeIdentityLine}${senderRoleLine}${requestedToneLine}${intentLine}${matrixLine}${actionLine}${userContextLine}${toneLine}${landminesLine}${divisionIntelLine}${signalLine}${eventLine}
 The user is creating ${channelConfig.label} content for the target account "${company.name}".
-${departmentContext}${recipientsSection}
+${departmentContext}${recipientsSection}${buyerPersonaBlock}
 ${dealContextLine}${productFramingLine}${existingStackLine}
 Context below includes:
 1) TARGET ACCOUNT: research and account messaging for ${company.name}.

@@ -275,6 +275,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
     firstName?: string | null;
     lastName?: string | null;
     title?: string | null;
+    personaId?: string | null;
   }> = [];
 
   let contactIntelExtra = '';
@@ -285,6 +286,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
     firstName: string | null;
     lastName: string | null;
     title: string | null;
+    personaId: string | null;
     bio: string | null;
     enrichedData: unknown;
   }) => {
@@ -293,6 +295,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
       firstName: dbContact.firstName,
       lastName: dbContact.lastName,
       title: dbContact.title ?? action.contactTitle ?? null,
+      personaId: dbContact.personaId,
     });
     const parts: string[] = [];
     if (dbContact.bio?.trim()) {
@@ -318,6 +321,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
         firstName: true,
         lastName: true,
         title: true,
+        personaId: true,
         bio: true,
         enrichedData: true,
       },
@@ -340,6 +344,7 @@ export async function generatePlayActionContent(input: GeneratePlayActionContent
           firstName: true,
           lastName: true,
           title: true,
+          personaId: true,
           bio: true,
           enrichedData: true,
         },
