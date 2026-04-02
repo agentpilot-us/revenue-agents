@@ -11,11 +11,13 @@ export const YOUR_INDUSTRY_OPTIONS = [
   { value: 'financial_services', label: 'Financial Services' },
   { value: 'retail', label: 'Retail / E-commerce' },
   { value: 'energy', label: 'Energy / Utilities' },
+  { value: 'growth_agency', label: 'Growth agency' },
   { value: 'other', label: 'Other' },
 ] as const;
 
 export const PRIMARY_INDUSTRY_SELL_TO_OPTIONS = [
   { value: 'automotive', label: 'Automotive' },
+  { value: 'enterprise_b2b', label: 'Enterprise B2B' },
   { value: 'healthcare', label: 'Healthcare' },
   { value: 'manufacturing', label: 'Manufacturing' },
   { value: 'financial_services', label: 'Financial Services' },
@@ -28,12 +30,24 @@ export const PRIMARY_INDUSTRY_SELL_TO_OPTIONS = [
 /** For "Import multiple industries" checkboxes (display labels). */
 export const ADDITIONAL_INDUSTRIES = [
   { value: 'automotive', label: 'Automotive' },
+  { value: 'enterprise_b2b', label: 'Enterprise B2B' },
   { value: 'healthcare', label: 'Healthcare' },
   { value: 'manufacturing', label: 'Manufacturing' },
   { value: 'financial_services', label: 'Financial Services' },
   { value: 'retail', label: 'Retail / E-commerce' },
   { value: 'energy', label: 'Energy / Utilities' },
 ] as const;
+
+/** Resolve stored value to dropdown label; unknown values pass through (legacy free text). */
+export function labelForIndustryOption(
+  options: ReadonlyArray<{ readonly value: string; readonly label: string }>,
+  stored: string | null | undefined
+): string | null {
+  if (stored == null || !String(stored).trim()) return null;
+  const v = stored.trim();
+  const hit = options.find((o) => o.value === v);
+  return hit?.label ?? v;
+}
 
 export const REFRESH_FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Daily', hint: 'Good for: frequent product updates, active events' },

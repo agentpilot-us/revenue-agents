@@ -34,25 +34,25 @@ function ReviewItemCard({
   const [expanded, setExpanded] = useState(false);
   const ext = item.extraction;
   return (
-    <div className="rounded border border-slate-200 dark:border-slate-700 overflow-hidden">
-      <label className="flex items-start gap-3 p-3 hover:bg-slate-50 dark:hover:bg-zinc-700/50 cursor-pointer">
+    <div className="rounded-lg border border-border overflow-hidden bg-card/40">
+      <label className="flex items-start gap-3 p-3 hover:bg-accent/40 cursor-pointer">
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggle}
-          className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-zinc-600 text-blue-600"
+          className="mt-1 h-4 w-4 rounded border-border text-primary"
         />
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</h4>
+          <h4 className="font-medium text-foreground truncate">{item.title}</h4>
           {item.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mt-1">{item.description}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
           )}
           <div className="flex flex-wrap gap-2 mt-2">
-            <span className="px-2 py-0.5 text-xs rounded bg-slate-100 dark:bg-zinc-700 text-slate-700 dark:text-slate-300">
+            <span className="px-2 py-0.5 text-xs rounded-md bg-muted text-muted-foreground border border-border/60">
               {item.type}
             </span>
             {ext?.confidence && (
-              <span className={`px-2 py-0.5 text-xs rounded ${ext.confidence === 'high' ? 'bg-green-100 dark:bg-green-900/30' : ext.confidence === 'medium' ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-gray-100 dark:bg-gray-700'} text-gray-700 dark:text-gray-300`}>
+              <span className={`px-2 py-0.5 text-xs rounded-md border border-border/60 ${ext.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : ext.confidence === 'medium' ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}>
                 {ext.confidence} confidence
               </span>
             )}
@@ -61,7 +61,7 @@ function ReviewItemCard({
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block truncate max-w-full"
+            className="text-xs text-primary hover:underline mt-1 inline-block truncate max-w-full"
             onClick={(e) => e.stopPropagation()}
           >
             {item.url}
@@ -70,7 +70,7 @@ function ReviewItemCard({
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); setExpanded((x) => !x); }}
-              className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-2 text-xs text-primary hover:underline"
             >
               {expanded ? 'Hide what we found' : 'Show what we found'}
             </button>
@@ -78,35 +78,35 @@ function ReviewItemCard({
         </div>
       </label>
       {ext && expanded && (
-        <div className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-zinc-800/50 p-3 text-sm space-y-2">
+        <div className="border-t border-border bg-muted/30 p-3 text-sm space-y-2">
           {ext.valuePropositions?.length > 0 && (
             <div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">Value propositions:</span>
-              <ul className="list-disc list-inside mt-0.5 text-gray-600 dark:text-gray-400">{ext.valuePropositions.slice(0, 5).map((v, i) => <li key={i}>{v}</li>)}</ul>
+              <span className="font-medium text-foreground">Value propositions:</span>
+              <ul className="list-disc list-inside mt-0.5 text-muted-foreground">{ext.valuePropositions.slice(0, 5).map((v, i) => <li key={i}>{v}</li>)}</ul>
             </div>
           )}
           {ext.capabilities?.length > 0 && (
             <div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">Capabilities:</span>
-              <ul className="list-disc list-inside mt-0.5 text-gray-600 dark:text-gray-400">{ext.capabilities.slice(0, 6).map((c, i) => <li key={i}>{c}</li>)}</ul>
+              <span className="font-medium text-foreground">Capabilities:</span>
+              <ul className="list-disc list-inside mt-0.5 text-muted-foreground">{ext.capabilities.slice(0, 6).map((c, i) => <li key={i}>{c}</li>)}</ul>
             </div>
           )}
           {ext.proofPoints?.length > 0 && (
             <div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">Proof points:</span>
-              <ul className="list-disc list-inside mt-0.5 text-gray-600 dark:text-gray-400">{ext.proofPoints.slice(0, 5).map((p, i) => <li key={i}>{p}</li>)}</ul>
+              <span className="font-medium text-foreground">Proof points:</span>
+              <ul className="list-disc list-inside mt-0.5 text-muted-foreground">{ext.proofPoints.slice(0, 5).map((p, i) => <li key={i}>{p}</li>)}</ul>
             </div>
           )}
           {ext.pricingStance && (
             <div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">Pricing:</span>
-              <p className="mt-0.5 text-gray-600 dark:text-gray-400">{ext.pricingStance}</p>
+              <span className="font-medium text-foreground">Pricing:</span>
+              <p className="mt-0.5 text-muted-foreground">{ext.pricingStance}</p>
             </div>
           )}
           {ext.missingSignals?.length > 0 && (
             <div>
               <span className="font-medium text-amber-700 dark:text-amber-400">Missing:</span>
-              <ul className="list-disc list-inside mt-0.5 text-gray-600 dark:text-gray-400">{ext.missingSignals.map((m, i) => <li key={i}>{m}</li>)}</ul>
+              <ul className="list-disc list-inside mt-0.5 text-muted-foreground">{ext.missingSignals.map((m, i) => <li key={i}>{m}</li>)}</ul>
             </div>
           )}
         </div>
@@ -379,26 +379,26 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6">
+    <div className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
       <div className="flex flex-wrap gap-2 mb-3">
         <button
           type="button"
           onClick={() => setMode('url')}
-          className={`px-3 py-1.5 rounded text-sm ${mode === 'url' ? 'bg-blue-600 text-white' : 'border border-slate-300 dark:border-slate-600'}`}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'url' ? 'bg-primary text-primary-foreground' : 'border border-border bg-background text-foreground hover:bg-accent/50'}`}
         >
           Single URL
         </button>
         <button
           type="button"
           onClick={() => setMode('site')}
-          className={`px-3 py-1.5 rounded text-sm ${mode === 'site' ? 'bg-blue-600 text-white' : 'border border-slate-300 dark:border-slate-600'}`}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'site' ? 'bg-primary text-primary-foreground' : 'border border-border bg-background text-foreground hover:bg-accent/50'}`}
         >
           Full site
         </button>
         <button
           type="button"
           onClick={() => setMode('upload')}
-          className={`px-3 py-1.5 rounded text-sm ${mode === 'upload' ? 'bg-blue-600 text-white' : 'border border-slate-300 dark:border-slate-600'}`}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'upload' ? 'bg-primary text-primary-foreground' : 'border border-border bg-background text-foreground hover:bg-accent/50'}`}
         >
           Upload file
         </button>
@@ -411,13 +411,13 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
             placeholder="https://example.com/page"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-zinc-900"
+            className="flex-1 min-w-[200px] px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <button
             type="button"
             onClick={handleScrapeUrl}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
           >
             {loading ? 'Getting data…' : 'Get Data'}
           </button>
@@ -432,13 +432,13 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
               placeholder="https://example.com"
               value={siteUrl}
               onChange={(e) => setSiteUrl(e.target.value)}
-              className="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-zinc-900"
+              className="flex-1 min-w-[200px] px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <button
               type="button"
               onClick={handleDiscoverLinks}
               disabled={loading}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-50"
+              className="px-4 py-2 rounded-md border border-border bg-background text-sm font-medium hover:bg-accent disabled:opacity-50"
             >
               {loading ? '…' : 'Discover links'}
             </button>
@@ -447,7 +447,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
                 type="button"
                 onClick={handleScrapeSite}
                 disabled={loading || selectedUrls.size === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
               >
                 {batchProgress
                   ? `Scraping ${batchProgress.done} of ${batchProgress.total}…`
@@ -459,46 +459,46 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
           </div>
           {highValueLinks.length > 0 && (
             <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Recommended</p>
-              <div className="max-h-32 overflow-y-auto rounded border border-slate-200 dark:border-slate-700 p-2 text-sm space-y-1">
+              <p className="text-sm font-medium text-foreground">Recommended</p>
+              <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-background/50 p-2 text-sm space-y-1">
                 {highValueLinks.slice(0, 30).map((l) => (
                   <label key={l.url} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={selectedUrls.has(l.url)}
                       onChange={() => toggleUrlSelection(l.url)}
-                      className="rounded border-gray-300 dark:border-zinc-600 text-blue-600"
+                      className="rounded border-border text-primary"
                     />
-                    <a href={l.url} target="_blank" rel="noopener noreferrer" className="truncate hover:underline flex-1" onClick={(e) => e.stopPropagation()}>
+                    <a href={l.url} target="_blank" rel="noopener noreferrer" className="truncate hover:underline flex-1 text-foreground" onClick={(e) => e.stopPropagation()}>
                       {l.title || l.url}
                     </a>
                   </label>
                 ))}
-                {highValueLinks.length > 30 && <p className="text-gray-500">+ {highValueLinks.length - 30} more</p>}
+                {highValueLinks.length > 30 && <p className="text-muted-foreground text-xs">+ {highValueLinks.length - 30} more</p>}
               </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={selectHighValueOnly} className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 rounded">Select recommended only</button>
-                <button type="button" onClick={selectAllUrls} className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 rounded">Select all</button>
-                <button type="button" onClick={deselectAllUrls} className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 rounded">Deselect all</button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={selectHighValueOnly} className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-accent">Select recommended only</button>
+                <button type="button" onClick={selectAllUrls} className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-accent">Select all</button>
+                <button type="button" onClick={deselectAllUrls} className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-accent">Deselect all</button>
               </div>
             </div>
           )}
           {lowValueLinks.length > 0 && (
             <div className="space-y-1 mt-2">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Optional (blog, legal, etc.)</p>
-              <div className="max-h-24 overflow-y-auto rounded border border-slate-200 dark:border-slate-700 p-2 text-sm space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">Optional (blog, legal, etc.)</p>
+              <div className="max-h-24 overflow-y-auto rounded-md border border-border bg-background/50 p-2 text-sm space-y-1">
                 {lowValueLinks.slice(0, 15).map((l) => (
                   <label key={l.url} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={selectedUrls.has(l.url)}
                       onChange={() => toggleUrlSelection(l.url)}
-                      className="rounded border-gray-300 dark:border-zinc-600 text-blue-600"
+                      className="rounded border-border text-primary"
                     />
-                    <span className="truncate">{l.title || l.url}</span>
+                    <span className="truncate text-foreground">{l.title || l.url}</span>
                   </label>
                 ))}
-                {lowValueLinks.length > 15 && <p className="text-gray-500">+ {lowValueLinks.length - 15} more</p>}
+                {lowValueLinks.length > 15 && <p className="text-muted-foreground text-xs">+ {lowValueLinks.length - 15} more</p>}
               </div>
             </div>
           )}
@@ -507,7 +507,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
 
       {mode === 'upload' && (
         <div>
-          <label className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer">
+          <label className="inline-block px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 cursor-pointer">
             {loading ? 'Uploading…' : 'Choose file (PDF, DOCX, TXT, max 4 MB)'}
             <input
               type="file"
@@ -520,28 +520,28 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {success && <p className="mt-2 text-sm text-green-600 dark:text-green-400">{success}</p>}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {success && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
 
       {/* Review Panel */}
       {reviewItems.length > 0 && (
-        <div className="mt-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5">
+        <div className="mt-6 rounded-xl border border-border bg-card/80 p-5 shadow-sm">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="font-semibold text-foreground">
               Review scraped content ({reviewItems.length} items)
             </h3>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={selectAllReviewItems}
-                className="text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700"
+                className="text-sm px-3 py-1.5 rounded-md border border-border bg-background hover:bg-accent"
               >
                 Select all
               </button>
               <button
                 type="button"
                 onClick={deselectAllReviewItems}
-                className="text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700"
+                className="text-sm px-3 py-1.5 rounded-md border border-border bg-background hover:bg-accent"
               >
                 Deselect all
               </button>
@@ -559,7 +559,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
             ))}
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-300">
+            <span className="text-sm text-muted-foreground">
               {selectedReviewItems.size} of {reviewItems.length} selected
             </span>
             <div className="flex gap-2">
@@ -569,7 +569,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
                   setReviewItems([]);
                   setSelectedReviewItems(new Set());
                 }}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-zinc-700"
+                className="px-4 py-2 rounded-md border border-border bg-background hover:bg-accent text-sm font-medium"
               >
                 Cancel
               </button>
@@ -577,7 +577,7 @@ export function ContentLibraryActions({ onSuccess }: { onSuccess?: () => void })
                 type="button"
                 onClick={handleApproveSelected}
                 disabled={approving || selectedReviewItems.size === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+                className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
               >
                 {approving ? 'Adding…' : `Approve selected (${selectedReviewItems.size})`}
               </button>

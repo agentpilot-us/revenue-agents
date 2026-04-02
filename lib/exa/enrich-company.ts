@@ -17,6 +17,18 @@ export type EnrichCompanyResult = {
   error?: string;
 };
 
+/** Optional caps for Stradex free-brief / cost-controlled enrichment */
+export type EnrichCompanyOptions = {
+  /** Max LinkedIn people rows to persist (default 20) */
+  maxPeopleResults?: number;
+  /** Signal search lookback in hours (default 168 in caller) */
+  signalLookbackHours?: number;
+  /** Stop persisting signals after this many (default: unlimited) */
+  maxSignalsToPersist?: number;
+  /** Skip Exa webset creation (saves follow-on monitoring setup for one-off briefs) */
+  skipWebset?: boolean;
+};
+
 type ExaPeopleResult = {
   title: string | null;
   url: string;
@@ -105,7 +117,10 @@ function guessEmail(firstName: string, lastName: string, domain: string | null):
  * Run web enrichment for a company: signals (news/exec/financial) + people (LinkedIn).
  * Call after company create; runs async. Sets enrichment started/completed timestamps.
  */
-export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCompanyResult> {
+export async function enrichCompanyWithExa(
+  companyId: string,
+  options?: EnrichCompanyOptions
+): Promise<EnrichCompanyResult> {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { id: true, name: true, domain: true, industry: true, userId: true, isDemoAccount: true },
@@ -124,12 +139,14 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
 
   try {
     // 1. Fetch account signals (news, earnings, exec) — reuse existing fetcher (7-day lookback for initial)
+    const lookbackHours = options?.signalLookbackHours ?? 168;
     const signalResult = await fetchAccountSignals(
       company.name,
       company.domain ?? '',
       company.industry,
-      168
+      lookbackHours
     );
+    const maxSignals = options?.maxSignalsToPersist;
 
     const publishedAtFallback = new Date();
     for (const signal of signalResult.signals) {
@@ -170,6 +187,7 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
         },
       });
       signalsFound++;
+      if (maxSignals != null && signalsFound >= maxSignals) break;
     }
   } catch (err) {
     console.warn('Enrich company signals error:', err);
@@ -181,10 +199,11 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
       const domainFilter = company.domain
         ? ` at ${company.name} OR ${company.domain}`
         : ` at ${company.name}`;
+      const numPeople = options?.maxPeopleResults ?? 20;
       const peopleRes = await exa.search(
         `${company.name} VP Director "Revenue Operations" OR "Sales Operations" OR "Engineering" OR "Product" OR "Customer Success"${domainFilter}`,
         {
-          numResults: 20,
+          numResults: numPeople,
           category: 'people',
           includeDomains: ['linkedin.com'],
           contents: { text: { maxCharacters: 500 } },
@@ -229,12 +248,14 @@ export async function enrichCompanyWithExa(companyId: string): Promise<EnrichCom
     }
   }
 
-  // Create persistent webset for ongoing signal monitoring
+  // Create persistent webset for ongoing signal monitoring (skip for one-off Stradex briefs)
   let exaWebsetId: string | null = null;
-  try {
-    exaWebsetId = await createCompanyWebset(company.name, company.industry);
-  } catch (err) {
-    console.warn('Webset creation error during enrichment:', err);
+  if (!options?.skipWebset) {
+    try {
+      exaWebsetId = await createCompanyWebset(company.name, company.industry);
+    } catch (err) {
+      console.warn('Webset creation error during enrichment:', err);
+    }
   }
 
   await prisma.company.update({

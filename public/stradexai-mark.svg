@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <defs>
+    <linearGradient id="sx" x1="4" y1="36" x2="36" y2="4" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0052e6" />
+      <stop offset="0.45" stop-color="#0091ff" />
+      <stop offset="1" stop-color="#6d28d9" />
+    </linearGradient>
+  </defs>
+  <rect width="40" height="40" rx="11" fill="url(#sx)" />
+  <!-- Bold italic S: reads clearly at 36px; system UI for crisp geometry -->
+  <text
+    x="20"
+    y="27"
+    text-anchor="middle"
+    font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="24"
+    font-weight="900"
+    font-style="italic"
+    fill="#ffffff"
+    letter-spacing="-0.1em"
+  >
+    S
+  </text>
+</svg>

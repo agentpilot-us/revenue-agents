@@ -7,6 +7,11 @@
  *
  * Total LLM calls: 1 (discover) + N (enrich, parallel) = 5–7.
  * Down from 18–26 with the agentic loop.
+ *
+ * Stradex note: this path loads the **userId** tenant’s My Company, catalog, and content library.
+ * It does **not** consume `agentContext.stradexSellerProfile`. For multi-seller Stradex intake, keep
+ * `STRADEX_BRIEF_RUN_BUYING_GROUPS` off unless the service user’s catalog represents one offering for
+ * every lead (see docs/STRADEX_LEAD_BRIEF.md). Future: optional sellerOverride from company agentContext.
  */
 
 import { prisma } from '@/lib/db';

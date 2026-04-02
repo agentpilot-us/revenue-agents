@@ -57,17 +57,17 @@ export function ContentLibraryHealthPanel() {
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6 animate-pulse">
-        <div className="h-6 w-32 bg-slate-200 dark:bg-zinc-700 rounded mb-4" />
-        <div className="h-4 w-full bg-slate-100 dark:bg-zinc-700 rounded mb-2" />
-        <div className="h-4 w-3/4 bg-slate-100 dark:bg-zinc-700 rounded" />
+      <div className="rounded-xl border border-border bg-card/60 p-5 shadow-sm animate-pulse">
+        <div className="h-6 w-32 bg-muted rounded mb-4" />
+        <div className="h-4 w-full bg-muted rounded mb-2" />
+        <div className="h-4 w-3/4 bg-muted rounded" />
       </div>
     );
   }
 
   if (error || !health) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6 text-sm text-gray-500 dark:text-gray-400">
+      <div className="rounded-xl border border-border bg-card/60 p-5 shadow-sm text-sm text-muted-foreground">
         {error || 'Content health unavailable'}
       </div>
     );
@@ -81,12 +81,12 @@ export function ContentLibraryHealthPanel() {
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-zinc-800 p-5 mb-6">
-      <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Content health</h2>
+    <div className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
+      <h2 className="font-semibold text-foreground mb-3">Content health</h2>
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-zinc-700 flex items-center justify-center text-lg font-bold text-gray-900 dark:text-gray-100">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-lg font-bold text-foreground">
             {health.overallScore}
           </div>
           <div>
@@ -96,7 +96,7 @@ export function ContentLibraryHealthPanel() {
           </div>
         </div>
         {health.lowConfidenceCount > 0 && (
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             {health.lowConfidenceCount} low-confidence extraction{health.lowConfidenceCount !== 1 ? 's' : ''} — consider reviewing
           </p>
         )}
@@ -110,7 +110,7 @@ export function ContentLibraryHealthPanel() {
 
       {health.recommendations.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Top recommendations</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">Top recommendations</h3>
           <ul className="space-y-2">
             {health.recommendations.map((rec) => (
               <RecommendationItem key={rec.priority} rec={rec} />
@@ -121,8 +121,8 @@ export function ContentLibraryHealthPanel() {
 
       {health.gaps.length > 0 && health.recommendations.length === 0 && (
         <div>
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Gaps</h3>
-          <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+          <h3 className="text-sm font-medium text-foreground mb-2">Gaps</h3>
+          <ul className="space-y-1 text-sm text-muted-foreground">
             {health.gaps.slice(0, 3).map((g) => (
               <li key={g.type}>• {g.message}</li>
             ))}
@@ -155,19 +155,19 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
   const statusColors = {
     complete: 'bg-green-500',
     partial: 'bg-amber-500',
-    missing: 'bg-slate-300 dark:bg-zinc-600',
+    missing: 'bg-muted-foreground/30',
   };
   const hasItems = dimension.items?.length > 0;
   return (
     <div className="text-sm">
       <div className="flex justify-between mb-0.5">
-        <span className="text-gray-700 dark:text-gray-300">{dimension.name}</span>
-        <span className="text-gray-500 dark:text-gray-400">
+        <span className="text-foreground">{dimension.name}</span>
+        <span className="text-muted-foreground">
           {displayHave}/{total}
-          {have > total && <span className="ml-0.5 text-gray-400 dark:text-gray-500">({have} found)</span>}
+          {have > total && <span className="ml-0.5 text-muted-foreground/80">({have} found)</span>}
         </span>
       </div>
-      <div className="h-2 rounded-full bg-slate-100 dark:bg-zinc-700 overflow-hidden">
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div
           className={`h-full rounded-full ${statusColors[dimension.status]}`}
           style={{ width: `${barPct}%` }}
@@ -178,12 +178,12 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
           <button
             type="button"
             onClick={() => setExpanded((e) => !e)}
-            className="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className="mt-1 text-xs text-primary hover:underline"
           >
             {expanded ? 'Hide what we have' : 'View what we have'}
           </button>
           {expanded && (
-            <ul className="mt-1.5 pl-4 list-disc text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+            <ul className="mt-1.5 pl-4 list-disc text-xs text-muted-foreground space-y-0.5">
               {dimension.items.map((item, i) => (
                 <li key={i}>{item}</li>
               ))}
@@ -197,13 +197,13 @@ function DimensionBar({ dimension }: { dimension: ContentHealthDimension }) {
 
 function RecommendationItem({ rec }: { rec: ContentHealthRecommendation }) {
   return (
-    <li className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm p-2 rounded bg-slate-50 dark:bg-zinc-800/50">
-      <span className="font-medium text-gray-700 dark:text-gray-300">
+    <li className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm p-2 rounded-md border border-border/60 bg-muted/30">
+      <span className="font-medium text-foreground">
         {rec.priority}. {rec.action}
       </span>
-      <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">{rec.reason}</span>
+      <span className="text-muted-foreground text-xs sm:text-sm">{rec.reason}</span>
       {rec.inputType === 'url' && (
-        <span className="text-xs text-blue-600 dark:text-blue-400 shrink-0">Paste URL above</span>
+        <span className="text-xs text-primary shrink-0">Paste URL above</span>
       )}
     </li>
   );

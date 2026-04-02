@@ -4,6 +4,32 @@ import Resend from 'next-auth/providers/resend';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/db';
 
+function parseAutoActivateSignInEmails(): Set<string> {
+  const raw = process.env.AUTO_ACTIVATE_SIGN_IN_EMAILS ?? '';
+  return new Set(
+    raw
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+/** Set accountStatus=active for allowlisted emails (skip waitlist). Runs on create + each sign-in. */
+async function maybeAutoActivateUserByEmail(email: string | null | undefined) {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return;
+  const allowed = parseAutoActivateSignInEmails();
+  if (!allowed.has(normalized)) return;
+  try {
+    await prisma.user.updateMany({
+      where: { email: { equals: normalized, mode: 'insensitive' } },
+      data: { accountStatus: 'active', activatedAt: new Date() },
+    });
+  } catch (e) {
+    console.error('[auth] AUTO_ACTIVATE_SIGN_IN_EMAILS update failed:', e);
+  }
+}
+
 const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
 if (!secret?.length) {
   throw new Error(
@@ -61,6 +87,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: 'database',
   },
   trustHost: true,
+  events: {
+    async createUser({ user }) {
+      await maybeAutoActivateUserByEmail(user.email);
+    },
+    async signIn({ user }) {
+      await maybeAutoActivateUserByEmail(user.email);
+    },
+  },
   callbacks: {
     async session({ session, user }) {
       if (session?.user && user) {

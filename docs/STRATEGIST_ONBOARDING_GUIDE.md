@@ -15,6 +15,7 @@ Configuration happens primarily in **My Company**, which has six tabs: Profile, 
 
 **Also plan for:**
 
+- **Stradex free brief (service user)** — If you operate the public Stradex lead funnel, **My Company** on that login is Stradex-only; per-lead seller voice lives on each target-account company. See **[STRADEX_FREE_BRIEF_OPS.md](./STRADEX_FREE_BRIEF_OPS.md)** and **[STRADEX_LEAD_BRIEF.md](./STRADEX_LEAD_BRIEF.md)**.
 - **Minimum depth** — See **Minimum viable configuration** below so you know how much to add before AE onboarding vs. what can wait.
 - **At least one test target account** — Required before **Step 10** (divisions, contacts, and for renewal tests a **CompanyProduct** with contract dates). Import via **Target Accounts** / Add Account (or your deployment’s equivalent) or API; see the AE Onboarding Guide for import details.
 - **Play Catalog verification** — After templates are **ACTIVE**, confirm AEs see them under **sidebar → Plays** (`/dashboard/plays`); see Step 8.

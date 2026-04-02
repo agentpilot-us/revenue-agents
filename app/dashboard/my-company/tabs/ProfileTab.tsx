@@ -2,6 +2,11 @@
 
 import { MyCompanyEditor } from '@/app/dashboard/my-company/MyCompanyEditor';
 import type { ProfileData, HealthData } from '@/app/dashboard/my-company/MyCompanyClient';
+import {
+  YOUR_INDUSTRY_OPTIONS,
+  PRIMARY_INDUSTRY_SELL_TO_OPTIONS,
+  labelForIndustryOption,
+} from '@/lib/constants/industries';
 
 type Props = {
   profile: ProfileData;
@@ -9,6 +14,15 @@ type Props = {
 };
 
 export function ProfileTab({ profile, health }: Props) {
+  const yourIndustryLabel = labelForIndustryOption(
+    YOUR_INDUSTRY_OPTIONS,
+    profile.companyIndustry
+  );
+  const primaryIndustryLabel = labelForIndustryOption(
+    PRIMARY_INDUSTRY_SELL_TO_OPTIONS,
+    profile.primaryIndustrySellTo
+  );
+
   return (
     <div className="space-y-6 max-w-3xl">
         <section className="rounded-xl border border-border bg-card/60 p-5 shadow-sm">
@@ -23,9 +37,9 @@ export function ProfileTab({ profile, health }: Props) {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Industry</dt>
+              <dt className="text-muted-foreground">Your industry</dt>
               <dd className="text-foreground">
-                {profile.companyIndustry ?? 'Not set'}
+                {yourIndustryLabel ?? 'Not set'}
               </dd>
             </div>
             <div>
@@ -37,7 +51,7 @@ export function ProfileTab({ profile, health }: Props) {
             <div>
               <dt className="text-muted-foreground">Primary industry you sell to</dt>
               <dd className="text-foreground">
-                {profile.primaryIndustrySellTo ?? 'Not set'}
+                {primaryIndustryLabel ?? 'Not set'}
               </dd>
             </div>
           </dl>

@@ -1,7 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { dispatchMyCompanySetupProgressInvalidate } from '@/lib/my-company/setup-progress-events';
+import { CONTENT_LIBRARY_HEALTH_INVALIDATE } from '@/app/components/content-library/ContentLibraryHealthPanel';
+
+function dispatchContentLibraryHealthInvalidate() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(CONTENT_LIBRARY_HEALTH_INVALIDATE));
+  }
+}
 
 type ContentItem = {
   id: string;
@@ -14,6 +22,7 @@ type ContentItem = {
   isActive: boolean;
   userConfirmed: boolean;
   sourceUrl: string | null;
+  isPinned?: boolean;
 };
 
 const TYPE_OPTIONS = [
@@ -24,6 +33,10 @@ const TYPE_OPTIONS = [
   { value: 'Framework', label: 'Framework' },
   { value: 'Battlecard', label: 'Battlecard' },
   { value: 'EmailContent', label: 'Email Template' },
+  { value: 'ResourceLink', label: 'Resource Link' },
+  { value: 'UploadedDocument', label: 'Uploaded Document' },
+  { value: 'Persona', label: 'Persona' },
+  { value: 'VideoLink', label: 'Video Link' },
 ] as const;
 
 const TYPE_COLORS: Record<string, string> = {
@@ -34,6 +47,10 @@ const TYPE_COLORS: Record<string, string> = {
   Framework: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25',
   Battlecard: 'bg-red-500/10 text-red-400 border-red-500/25',
   EmailContent: 'bg-pink-500/10 text-pink-400 border-pink-500/25',
+  ResourceLink: 'bg-sky-500/10 text-sky-400 border-sky-500/25',
+  UploadedDocument: 'bg-stone-500/10 text-stone-400 border-stone-500/25',
+  Persona: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25',
+  VideoLink: 'bg-rose-500/10 text-rose-400 border-rose-500/25',
 };
 
 const CONTENT_FIELDS: Record<string, { key: string; label: string; multiline?: boolean }[]> = {
@@ -69,6 +86,17 @@ const CONTENT_FIELDS: Record<string, { key: string; label: string; multiline?: b
     { key: 'description', label: 'Description', multiline: true },
     { key: 'methodology', label: 'Methodology', multiline: true },
   ],
+  ResourceLink: [
+    { key: 'description', label: 'Description', multiline: true },
+    { key: 'resourceType', label: 'Resource type (e.g. whitepaper, guide)' },
+  ],
+  UploadedDocument: [{ key: 'summary', label: 'Summary / notes', multiline: true }],
+  Persona: [
+    { key: 'role', label: 'Role / title' },
+    { key: 'painPoints', label: 'Pain points', multiline: true },
+    { key: 'goals', label: 'Goals', multiline: true },
+  ],
+  VideoLink: [{ key: 'description', label: 'Description', multiline: true }],
 };
 
 const MULTILINE_ARRAY_KEYS = new Set(['benefits', 'keyMetrics']);
@@ -126,7 +154,13 @@ export function ContentLibraryTab() {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        setItems(data.content ?? []);
+        const list = (data.content ?? []) as ContentItem[];
+        list.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return 0;
+        });
+        setItems(list);
       }
     } finally {
       setLoading(false);
@@ -138,12 +172,49 @@ export function ContentLibraryTab() {
     fetchItems();
   }, [fetchItems]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/content-library/coverage');
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) {
+            setCoverage(Array.isArray(data.templates) ? data.templates : []);
+          }
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setCoverageLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this content item?')) return;
     const res = await fetch(`/api/content-library/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setItems((prev) => prev.filter((i) => i.id !== id));
       dispatchMyCompanySetupProgressInvalidate();
+      dispatchContentLibraryHealthInvalidate();
+    }
+  };
+
+  const handleTogglePin = async (id: string, currentlyPinned: boolean) => {
+    const res = await fetch(`/api/content-library/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isPinned: !currentlyPinned }),
+    });
+    if (res.ok) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, isPinned: !currentlyPinned } : i)),
+      );
+      dispatchContentLibraryHealthInvalidate();
     }
   };
 
@@ -158,6 +229,7 @@ export function ContentLibraryTab() {
         prev.map((i) => (i.id === id ? { ...i, isActive: !currentlyActive } : i)),
       );
       dispatchMyCompanySetupProgressInvalidate();
+      dispatchContentLibraryHealthInvalidate();
     }
   };
 
@@ -169,7 +241,10 @@ export function ContentLibraryTab() {
         item={item}
         onSaved={() => {
           setEditingId(null);
-          void fetchItems().then(() => dispatchMyCompanySetupProgressInvalidate());
+          void fetchItems().then(() => {
+            dispatchMyCompanySetupProgressInvalidate();
+            dispatchContentLibraryHealthInvalidate();
+          });
         }}
         onCancel={() => setEditingId(null)}
       />
@@ -181,7 +256,10 @@ export function ContentLibraryTab() {
       <ContentItemEditor
         onSaved={() => {
           setCreating(false);
-          void fetchItems().then(() => dispatchMyCompanySetupProgressInvalidate());
+          void fetchItems().then(() => {
+            dispatchMyCompanySetupProgressInvalidate();
+            dispatchContentLibraryHealthInvalidate();
+          });
         }}
         onCancel={() => setCreating(false)}
       />
@@ -299,6 +377,11 @@ export function ContentLibraryTab() {
                           <h4 className="text-sm font-medium text-foreground truncate">
                             {item.title}
                           </h4>
+                          {item.isPinned && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 rounded border border-amber-500/40 text-amber-600 dark:text-amber-400">
+                              Pinned
+                            </span>
+                          )}
                           <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 rounded border ${TYPE_COLORS[item.type] ?? 'bg-muted text-muted-foreground border-border'}`}>
                             {getTypeLabel(item.type)}
                           </span>
@@ -309,13 +392,48 @@ export function ContentLibraryTab() {
                           )}
                         </div>
                         <ContentPreview content={item.content} type={item.type} />
+                        {item.sourceUrl && (
+                          <a
+                            href={
+                              item.sourceUrl.startsWith('http')
+                                ? item.sourceUrl
+                                : `https://${item.sourceUrl}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-primary hover:underline truncate block max-w-full mt-0.5"
+                          >
+                            {item.sourceUrl}
+                          </a>
+                        )}
                         <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
                           {item.industry && <span>{item.industry}</span>}
                           {item.department && <span>{item.department}</span>}
                           {item.persona && <span>{item.persona}</span>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                        <Link
+                          href={`/dashboard/content-library/${item.id}/changes`}
+                          className="text-[10px] text-muted-foreground hover:text-primary px-1.5 py-0.5"
+                        >
+                          History
+                        </Link>
+                        {item.type === 'SuccessStory' && (
+                          <Link
+                            href={`/dashboard/content-library/${item.id}/edit`}
+                            className="text-[10px] text-muted-foreground hover:text-primary px-1.5 py-0.5"
+                          >
+                            Case study editor
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePin(item.id, Boolean(item.isPinned))}
+                          className="text-[10px] px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
+                        >
+                          {item.isPinned ? 'Unpin' : 'Pin'}
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleToggleActive(item.id, item.isActive)}
@@ -382,6 +500,7 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
   const [industry, setIndustry] = useState(item?.industry ?? '');
   const [department, setDepartment] = useState(item?.department ?? '');
   const [persona, setPersona] = useState(item?.persona ?? '');
+  const [sourceUrl, setSourceUrl] = useState(item?.sourceUrl ?? '');
   const [contentFields, setContentFields] = useState<Record<string, string>>(() => {
     if (!item?.content) return {};
     const result: Record<string, string> = {};
@@ -411,18 +530,32 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    setSourceUrl(item?.sourceUrl ?? '');
+  }, [item?.id, item?.sourceUrl]);
+
   const fields = fieldDefsForType(type);
+  const showSourceUrlField =
+    type === 'ResourceLink' || type === 'VideoLink' || Boolean(item?.sourceUrl?.trim());
 
   const updateField = (key: string, value: string) => {
     setContentFields((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSave = async () => {
-    if (!title.trim()) { setError('Title is required'); return; }
+    if (!title.trim()) {
+      setError('Title is required');
+      return;
+    }
+    if ((type === 'ResourceLink' || type === 'VideoLink') && !sourceUrl.trim()) {
+      setError('Source URL is required for resource links and video links.');
+      return;
+    }
     setSaving(true);
     setError('');
 
     const contentObj = buildContentPayload(type, contentFields);
+    const urlPayload = sourceUrl.trim() || undefined;
 
     try {
       if (isNew) {
@@ -436,6 +569,7 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
             industry: industry.trim() || undefined,
             department: department.trim() || undefined,
             persona: persona.trim() || undefined,
+            sourceUrl: urlPayload,
           }),
         });
         if (!res.ok) {
@@ -455,6 +589,7 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
             industry: industry.trim() || null,
             department: department.trim() || null,
             persona: persona.trim() || null,
+            sourceUrl: sourceUrl.trim() || null,
           }),
         });
         if (!res.ok) {
@@ -511,6 +646,21 @@ function ContentItemEditor({ item, onSaved, onCancel }: EditorProps) {
           </select>
         </label>
       </div>
+
+      {showSourceUrlField && (
+        <label className="space-y-1 block max-w-2xl">
+          <span className="text-xs font-medium text-muted-foreground">
+            Source URL{type === 'ResourceLink' || type === 'VideoLink' ? ' *' : ''}
+          </span>
+          <input
+            type="url"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://..."
+          />
+        </label>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <label className="space-y-1">

@@ -23,6 +23,8 @@ function industryToKeywords(industry: string): string[] {
     retail: ['retail', 'commerce', 'ecommerce', 'store'],
     energy: ['energy', 'utility', 'power', 'oil', 'gas', 'renewable'],
     technology: ['technology', 'tech', 'software', 'solution', 'platform'],
+    growth_agency: ['growth', 'agency', 'marketing', 'demand', 'revenue', 'gtm', 'go-to-market'],
+    enterprise_b2b: ['enterprise', 'b2b', 'mid-market', 'commercial', 'sales', 'account'],
     other: [],
   };
   return map[lower] ?? [lower.replace(/[^a-z0-9]/g, ' ')];

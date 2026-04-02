@@ -1,3 +1,8 @@
+/**
+ * Legacy full-page content library (gray layout). The app route `/dashboard/content-library`
+ * uses {@link ContentLibraryDashboardClient} + {@link ContentLibraryTab} instead; this
+ * component is kept for reference or one-off reuse.
+ */
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';

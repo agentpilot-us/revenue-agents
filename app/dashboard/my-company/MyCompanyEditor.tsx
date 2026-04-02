@@ -1,7 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  YOUR_INDUSTRY_OPTIONS,
+  PRIMARY_INDUSTRY_SELL_TO_OPTIONS,
+} from '@/lib/constants/industries';
+
+/** Include current DB value in the list when it predates the shared dropdown options. */
+function optionsWithLegacy(
+  options: ReadonlyArray<{ readonly value: string; readonly label: string }>,
+  current: string
+): { value: string; label: string }[] {
+  const cur = current.trim();
+  const base = options.map((o) => ({ value: o.value, label: o.label }));
+  if (!cur || base.some((o) => o.value === cur)) return base;
+  return [{ value: cur, label: `${cur} (saved)` }, ...base];
+}
 
 type Props = {
   initial: {
@@ -31,6 +46,16 @@ export function MyCompanyEditor({ initial }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const initiativesKey = initial.keyInitiatives.join('\u0001');
+
+  const yourIndustryOptions = useMemo(
+    () => optionsWithLegacy(YOUR_INDUSTRY_OPTIONS, companyIndustry),
+    [companyIndustry]
+  );
+  const primaryIndustryOptions = useMemo(
+    () => optionsWithLegacy(PRIMARY_INDUSTRY_SELL_TO_OPTIONS, primaryIndustrySellTo),
+    [primaryIndustrySellTo]
+  );
+
   useEffect(() => {
     if (editing) return;
     setCompanyName(initial.companyName ?? '');
@@ -120,25 +145,39 @@ export function MyCompanyEditor({ initial }: Props) {
             placeholder="https://example.com"
           />
         </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Industry</span>
-          <input
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+        <label className="space-y-1 md:col-span-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Your industry
+          </span>
+          <select
+            className="w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             value={companyIndustry}
             onChange={(e) => setCompanyIndustry(e.target.value)}
-            placeholder="Software, Automotive, Healthcare…"
-          />
+          >
+            <option value="">Select industry</option>
+            {yourIndustryOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </label>
-        <label className="space-y-1">
+        <label className="space-y-1 md:col-span-2">
           <span className="text-xs font-medium text-muted-foreground">
             Primary industry you sell to
           </span>
-          <input
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          <select
+            className="w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             value={primaryIndustrySellTo}
             onChange={(e) => setPrimaryIndustrySellTo(e.target.value)}
-            placeholder="e.g. Automotive manufacturers"
-          />
+          >
+            <option value="">Select target industry</option>
+            {primaryIndustryOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
       <div className="space-y-1">
