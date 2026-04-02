@@ -38,11 +38,11 @@ Companies dedupe by **service `userId` + target account domain**. Two different 
 
 ### `STRADEX_BRIEF_RUN_BUYING_GROUPS`
 
-Default for **multi-seller** Stradex intake: keep **`false`**. The research pipeline uses the **service user’s** User profile, **catalog**, and **content library** — not `stradexSellerProfile`.
+Default for **multi-seller** Stradex intake: keep **`false`**. The research pipeline still loads the **service user’s** **catalog** and **content library** (and My Company–backed context where applicable). **`stradexSellerProfile` does not replace that data** — it is prepended to discover/enrich LLM prompts as **seller voice** so “we/our” framing matches the submitter when the target `Company` row has a profile.
 
 **Enable only when** that service user’s catalog and content library represent **a single product/offering that applies to every lead** (e.g. managed briefs exclusively for one client’s product).
 
-**Phase B (not implemented):** A `sellerOverride` path in [`lib/research/run-research-pipeline.ts`](../lib/research/run-research-pipeline.ts) / discover–enrich could read `stradexSellerProfile` and synthetic product text so buying groups work per submitter without a user per seller.
+**Phase B (implemented):** When `agentContext.stradexSellerProfile` exists, [`runResearchPipeline`](../lib/research/run-research-pipeline.ts) and the buying-groups / group-enrich / department-enrich routes pass [`getStradexSellerVoicePromptBlockFromContext`](../lib/stradex/seller-profile.ts) into discover and enrich prompts. Catalog and RAG chunks remain tenant-scoped to **`userId`**.
 
 ### `demoNote` refresh (seller name corrections)
 

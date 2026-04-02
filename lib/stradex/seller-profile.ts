@@ -123,6 +123,12 @@ export function buildStradexSellerVoicePromptBlock(profile: StradexSellerProfile
   return lines.join('\n');
 }
 
+/** For research / buying-groups prompts when the target Company row is a Stradex lead. */
+export function getStradexSellerVoicePromptBlockFromContext(agentContext: unknown): string | undefined {
+  const p = getStradexSellerProfile(agentContext);
+  return p ? buildStradexSellerVoicePromptBlock(p) : undefined;
+}
+
 export type StradexSellerProfilePatch = {
   companyName?: string;
   website?: string | null;

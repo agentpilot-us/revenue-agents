@@ -235,6 +235,8 @@ export type DiscoverGroupsPromptInput = {
   productNames: string;
   userGoal?: string;
   dealContext?: DealContext;
+  /** Stradex per-lead seller voice; when set, frames "our" side of the brief vs tenant My Company. */
+  sellerVoicePromptBlock?: string;
 };
 
 /**
@@ -307,8 +309,11 @@ PRODUCT CONTEXT: Focus buying groups on products selected for this deal (already
  * When dealContext is provided, appends conditional blocks in order: account status → deal shape → buying motion → product context.
  */
 export function buildDiscoverGroupsPrompt(input: DiscoverGroupsPromptInput): { system: string; user: string } {
-  const { companyName, companyDomain, productNames, userGoal, dealContext } = input;
-  let system = `You are an account intelligence AI. Your task is to analyze research about a target company and output ONLY:
+  const { companyName, companyDomain, productNames, userGoal, dealContext, sellerVoicePromptBlock } = input;
+  const sellerPrefix = sellerVoicePromptBlock?.trim()
+    ? `WHO IS SELLING (use for "we/our" framing when mapping offerings to the target; not the platform operator unless stated):\n\n${sellerVoicePromptBlock.trim()}\n\n---\n\n`
+    : '';
+  let system = `${sellerPrefix}You are an account intelligence AI. Your task is to analyze research about a target company and output ONLY:
 1. COMPANY BASICS: name, website, industry, employees, headquarters, revenue (from the research only; use "Not disclosed" if missing).
 2. BUYING GROUPS: 4–6 groups that would buy products like: ${productNames}.
 
@@ -358,6 +363,7 @@ export type EnrichGroupPromptInput = {
   ragChunks?: string[];
   userGoal?: string;
   existingStackBlock?: string;
+  sellerVoicePromptBlock?: string;
 };
 
 /**
@@ -381,12 +387,16 @@ export function buildEnrichGroupPrompt(input: EnrichGroupPromptInput): {
     ragChunks,
     userGoal,
     existingStackBlock,
+    sellerVoicePromptBlock,
   } = input;
 
   const productBlock = buildProductBlock(catalogProducts);
   const contentBlock = contentLibrary ? buildContentLibraryBlock(contentLibrary) : '';
   const ragBlock = ragChunks?.length ? buildRAGBlock(ragChunks) : '';
   const existingStackSection = existingStackBlock ? `\n\n${existingStackBlock}` : '';
+  const sellerPrefix = sellerVoicePromptBlock?.trim()
+    ? `WHO IS SELLING (use for "we/our" framing; catalog + library ground proof for this seller):\n\n${sellerVoicePromptBlock.trim()}\n\n---\n\n`
+    : '';
 
   const keywordInstruction =
     segmentType === 'USE_CASE' || segmentType === 'DIVISIONAL'
@@ -395,7 +405,7 @@ For searchKeywords: provide 4–6 terms that would appear in LinkedIn titles or 
       : `
 For searchKeywords: leave empty or minimal — titles are sufficient for FUNCTIONAL segments.`;
 
-  const system = `You are an account intelligence AI. Enrich ONE buying group for ${companyName}.
+  const system = `${sellerPrefix}You are an account intelligence AI. Enrich ONE buying group for ${companyName}.
 
 ${productBlock}
 ${contentBlock}

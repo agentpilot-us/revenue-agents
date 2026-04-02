@@ -5,6 +5,7 @@ import {
   enrichBuyingGroup,
   runPerplexityResearchOnly,
 } from '@/lib/research/research-company';
+import { getStradexSellerVoicePromptBlockFromContext } from '@/lib/stradex/seller-profile';
 import type { BuyingGroupSeed } from '@/lib/research/company-research-schema';
 
 export const maxDuration = 120;
@@ -23,7 +24,7 @@ export async function POST(
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId: session.user.id },
-      select: { id: true, name: true, domain: true },
+      select: { id: true, name: true, domain: true, agentContext: true },
     });
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
@@ -70,12 +71,17 @@ export async function POST(
       );
     }
 
+    const sellerVoice = getStradexSellerVoicePromptBlockFromContext(company.agentContext);
+
     const result = await enrichBuyingGroup(
       company.name,
       company.domain ?? undefined,
       seed,
       session.user.id,
       perplexityResult.summary,
+      undefined,
+      undefined,
+      sellerVoice
     );
 
     if (!result.ok) {

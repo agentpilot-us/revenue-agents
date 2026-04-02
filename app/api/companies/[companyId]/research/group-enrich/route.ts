@@ -5,6 +5,7 @@ import {
   enrichBuyingGroup,
   runPerplexityResearchOnly,
 } from '@/lib/research/research-company';
+import { getStradexSellerVoicePromptBlockFromContext } from '@/lib/stradex/seller-profile';
 import type { BuyingGroupDetail, BuyingGroupSeed } from '@/lib/research/company-research-schema';
 
 export const maxDuration = 120;
@@ -30,7 +31,7 @@ export async function POST(
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId: session.user.id },
-      select: { id: true, name: true, domain: true },
+      select: { id: true, name: true, domain: true, agentContext: true },
     });
 
     if (!company) {
@@ -77,6 +78,8 @@ export async function POST(
       summary = perplexityResult.summary;
     }
 
+    const sellerVoice = getStradexSellerVoicePromptBlockFromContext(company.agentContext);
+
     const settled = await Promise.allSettled(
       groups.map((seed: BuyingGroupSeed) =>
         enrichBuyingGroup(
@@ -85,7 +88,9 @@ export async function POST(
           seed,
           session.user.id!,
           summary,
-          userGoal
+          userGoal,
+          undefined,
+          sellerVoice
         )
       )
     );

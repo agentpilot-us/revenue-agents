@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { discoverBuyingGroupsForAccount } from '@/lib/research/research-company';
+import { getStradexSellerVoicePromptBlockFromContext } from '@/lib/stradex/seller-profile';
 import { parseDealContext } from '@/lib/types/deal-context';
 
 export const maxDuration = 60;
@@ -20,7 +21,7 @@ export async function POST(
 
     const company = await prisma.company.findFirst({
       where: { id: companyId, userId: session.user.id },
-      select: { id: true, name: true, domain: true },
+      select: { id: true, name: true, domain: true, agentContext: true },
     });
 
     if (!company) {
@@ -52,12 +53,15 @@ export async function POST(
       });
     }
 
+    const sellerVoice = getStradexSellerVoicePromptBlockFromContext(company.agentContext);
+
     const result = await discoverBuyingGroupsForAccount(
       company.name,
       company.domain ?? undefined,
       session.user.id,
       userGoal,
-      dealContext
+      dealContext,
+      sellerVoice
     );
 
     if (!result.ok) {

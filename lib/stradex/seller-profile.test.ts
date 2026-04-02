@@ -2,8 +2,33 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildStradexDemoNote,
+  getStradexSellerVoicePromptBlockFromContext,
   refreshStradexDemoNoteLine,
 } from './seller-profile';
+
+describe('getStradexSellerVoicePromptBlockFromContext', () => {
+  it('returns undefined when no profile', () => {
+    assert.equal(getStradexSellerVoicePromptBlockFromContext(null), undefined);
+    assert.equal(getStradexSellerVoicePromptBlockFromContext({}), undefined);
+  });
+
+  it('returns prompt text including company name', () => {
+    const block = getStradexSellerVoicePromptBlockFromContext({
+      stradexSellerProfile: {
+        schemaVersion: 1,
+        companyName: 'SellerCo',
+        website: null,
+        oneLiner: 'a · b',
+        motionSummary: 'a',
+        challengeOrGoal: 'b',
+        toneOrPositioningNotes: null,
+        lastUpdatedAt: new Date().toISOString(),
+      },
+    });
+    assert.ok(block?.includes('SellerCo'));
+    assert.ok(block?.includes('Selling on behalf of'));
+  });
+});
 
 describe('refreshStradexDemoNoteLine', () => {
   it('returns canonical first line when demoNote is empty', () => {

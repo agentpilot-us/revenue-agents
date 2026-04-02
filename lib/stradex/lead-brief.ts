@@ -218,8 +218,8 @@ export async function runStradexBriefPipeline(companyId: string, userId: string)
 
   /**
    * Full discover → enrich → save pipeline (multiple LLM calls). Off by default for free briefs.
-   * Safe to enable only when the service user's catalog + content library represent one offering for every lead;
-   * otherwise research uses My Company, not stradexSellerProfile (see docs/STRADEX_LEAD_BRIEF.md).
+   * Safe to enable only when the service user's catalog + content library represent one offering for every lead.
+   * When enabled, discover/enrich prompts still use tenant catalog/library but prepend stradexSellerProfile voice (see docs).
    */
   const runBuyingGroups = process.env.STRADEX_BRIEF_RUN_BUYING_GROUPS === 'true';
   if (runBuyingGroups) {

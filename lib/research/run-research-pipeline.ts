@@ -8,13 +8,13 @@
  * Total LLM calls: 1 (discover) + N (enrich, parallel) = 5–7.
  * Down from 18–26 with the agentic loop.
  *
- * Stradex note: this path loads the **userId** tenant’s My Company, catalog, and content library.
- * It does **not** consume `agentContext.stradexSellerProfile`. For multi-seller Stradex intake, keep
- * `STRADEX_BRIEF_RUN_BUYING_GROUPS` off unless the service user’s catalog represents one offering for
- * every lead (see docs/STRADEX_LEAD_BRIEF.md). Future: optional sellerOverride from company agentContext.
+ * Stradex: when the target `Company.agentContext` has `stradexSellerProfile`, that seller voice block
+ * is prepended to discover/enrich prompts so “we/our” maps to the submitter, not only My Company.
+ * Catalog and content library still come from **userId** (see docs/STRADEX_LEAD_BRIEF.md).
  */
 
 import { prisma } from '@/lib/db';
+import { getStradexSellerVoicePromptBlockFromContext } from '@/lib/stradex/seller-profile';
 import {
   discoverBuyingGroupsForAccount,
   enrichBuyingGroup,
@@ -60,6 +60,7 @@ export async function runResearchPipeline(params: PipelineParams): Promise<Pipel
       employees: true,
       headquarters: true,
       revenue: true,
+      agentContext: true,
     },
   });
 
@@ -69,6 +70,8 @@ export async function runResearchPipeline(params: PipelineParams): Promise<Pipel
     return { ok: false, error: msg };
   }
 
+  const sellerVoicePromptBlock = getStradexSellerVoicePromptBlockFromContext(company.agentContext);
+
   // Step 1: Discover buying groups (1 Perplexity call + 1 LLM call)
   emit({ step: 'discover_start' });
 
@@ -76,7 +79,9 @@ export async function runResearchPipeline(params: PipelineParams): Promise<Pipel
     company.name,
     company.domain ?? undefined,
     userId,
-    userGoal ?? undefined
+    userGoal ?? undefined,
+    undefined,
+    sellerVoicePromptBlock
   );
 
   if (!discoverResult.ok) {
@@ -104,7 +109,8 @@ export async function runResearchPipeline(params: PipelineParams): Promise<Pipel
           userId,
           perplexitySummary,
           userGoal ?? undefined,
-          existingStackBlock ?? undefined
+          existingStackBlock ?? undefined,
+          sellerVoicePromptBlock
         );
         if (result.ok) {
           emit({ step: 'enrich_done', index, total: groups.length, groupName: seed.name });

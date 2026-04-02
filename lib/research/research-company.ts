@@ -193,7 +193,8 @@ export async function discoverBuyingGroupsForAccount(
   companyDomain: string | undefined,
   userId: string,
   userGoal?: string,
-  dealContext?: DealContext
+  dealContext?: DealContext,
+  sellerVoicePromptBlock?: string
 ): Promise<DiscoverBuyingGroupsResult> {
   const perplexityResult = await runPerplexityResearchOnly(
     companyName,
@@ -253,6 +254,7 @@ export async function discoverBuyingGroupsForAccount(
     productNames,
     userGoal: userGoal?.trim() || undefined,
     dealContext,
+    sellerVoicePromptBlock: sellerVoicePromptBlock?.trim() || undefined,
   });
   const userPrompt = userTemplate.replace(
     '{{PERPLEXITY_SUMMARY}}',
@@ -302,7 +304,8 @@ export async function enrichBuyingGroup(
   userId: string,
   perplexitySummary: string,
   userGoal?: string,
-  existingStackBlock?: string
+  existingStackBlock?: string,
+  sellerVoicePromptBlock?: string
 ): Promise<EnrichGroupResult> {
   const catalogProductsStruct = await prisma.catalogProduct.findMany({
     where: { userId } as { userId: string },
@@ -382,6 +385,7 @@ export async function enrichBuyingGroup(
     ragChunks: ragChunks.length > 0 ? ragChunks : undefined,
     userGoal: userGoal?.trim() || undefined,
     existingStackBlock,
+    sellerVoicePromptBlock: sellerVoicePromptBlock?.trim() || undefined,
   });
   const userPrompt = userTemplate.replace(
     '{{PERPLEXITY_SUMMARY}}',
